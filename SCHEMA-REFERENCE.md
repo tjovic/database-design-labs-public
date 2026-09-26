@@ -7,8 +7,7 @@
 `AdventureWorksENG` is a small, Croatian-market variant of Microsoft's
 AdventureWorks sample database: a retailer selling products (organized into
 subcategories and categories) to customers, who are billed through invoices
-with individual line items. It keeps the shape of a real order-entry system
-while staying small enough to query and modify freely in a 90-minute lab.
+with individual line items. 
 
 ---
 

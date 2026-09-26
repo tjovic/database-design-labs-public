@@ -172,8 +172,4 @@ and `Product`, carrying quantity and price.
 with no salesman on record, a customer with no city), while a `LEFT JOIN`
 keeps them. Labs 1 and 2 build this distinction deliberately.
 
----
 
-*Generated from the live schema (`sys.tables`, `sys.columns`, `sys.foreign_keys`)
-so it stays accurate even if a lab script's inline comments drift from the
-actual database.*

@@ -2,8 +2,7 @@
 
 > A recap of the `AdventureWorksENG` database used throughout this course.
 > If you already met this schema in an introductory course, treat this as a
-> refresher, not new material — every lab from [Lab 00](labs/lab00-tsql-essentials/)
-> onward assumes you can read this diagram without help.
+> refresher, not new material
 
 `AdventureWorksENG` is a small, Croatian-market variant of Microsoft's
 AdventureWorks sample database: a retailer selling products (organized into
@@ -27,10 +26,6 @@ erDiagram
     SUB-CATEGORY ||--|{ PRODUCT : "has"
     CATEGORY ||--|{ SUB-CATEGORY : "has"
 ```
-
-Reading `A ──< B`: one row in `A` relates to many rows in `B` (one-to-many).
-`>──` just flips the direction of the same arrow so the diagram reads
-left-to-right.
 
 ---
 

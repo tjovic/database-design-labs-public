@@ -15,12 +15,17 @@ while staying small enough to query and modify freely in a 90-minute lab.
 
 ## Entity-relationship diagram
 
-```
-State ──< City ──< Customer ──< Invoice >── Salesman
-                                    v            
-                                    v ── CreditCard
-                                    v
-                              InvoiceItem >── Product >── Subcategory >── Category
+```mermaid
+erDiagram
+    STATE ||--|{ CITY : "has"
+    CITY ||--|{ CUSTOMER : "has"
+    CUSTOMER ||--|{ INVOICE : "places"
+    SALESMAN ||--|{ INVOICE : "handles"
+    INVOICE ||--|| CREDIT-CARD : "uses"
+    INVOICE ||--|{ INVOICE-ITEM : "contains"
+    PRODUCT ||--|{ INVOICE-ITEM : "included_in"
+    SUB-CATEGORY ||--|{ PRODUCT : "has"
+    CATEGORY ||--|{ SUB-CATEGORY : "has"
 ```
 
 Reading `A ──< B`: one row in `A` relates to many rows in `B` (one-to-many).

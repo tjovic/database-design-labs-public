@@ -319,14 +319,15 @@ At this point, the structure looks like this:
 ```mermaid
 flowchart TD
     A[User / Application]
-    B[vCustomerInfo]
 
     subgraph DB[Database]
+        B[vCustomerInfo]
         C[CustomerData]
+
+        B --> C
     end
 
     A --> B
-    B --> C
 ```
 
 ---
@@ -435,37 +436,39 @@ FROM dbo.vCustomerInfo
 
 >The underlying structure has changed completely, but users can continue using the same View without changing their query.
 
-**Before**:
+### Before
+
 ```mermaid
 flowchart TD
     A[User / Application]
-    B[vCustomerInfo]
 
     subgraph DB[Database]
+        B[vCustomerInfo]
         C[CustomerData]
+
+        B --> C
     end
 
     A --> B
-    B --> C
 ```
-**After:**
+
+### After
 
 ```mermaid
 flowchart TD
     A[User / Application]
-    B[vCustomerInfo]
 
     subgraph DB[Database]
+        B[vCustomerInfo]
         C[Customer]
         D[City]
+
+        B --> C
+        B --> D
     end
 
     A --> B
-    B --> C
-    B --> D
 ```
-
-
 
 
 > **The database structure changed, but the interface remained the same.**

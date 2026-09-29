@@ -81,7 +81,17 @@ SELECT * FROM dbo.vCustomerCities;
 INSERT INTO dbo.vCustomerCities (FirstName, LastName, City)
 VALUES ('Alan', 'Turing', 'London');
 -- Error: cannot decide which table this belongs to.
+
+-- This may work because only Customer columns are affected
+INSERT  INTO dbo.vCustomerCities (FirstName, LastName)
+VALUES ('Ana', 'Horvat');
+
+--SQL Server may allow this because the statement affects only one base table.
+--However, this does not mean that a View is a good interface for modifying data.
 ```
+
+>In practice, Views are usually used for reading, abstraction, reporting, and controlled access to data.
+>For data modifications, explicit interfaces such as stored procedures or application/service logic are usually a better choice.
 
 ### Calculated columns are read-only
 
@@ -116,7 +126,7 @@ WHERE IDInvoiceItem = 1;
 --The calculated column cannot be updated directly.
 
 ```
-### Aggregate Views are read-only
+### Aggregate functions, GROUP BY, and HAVING
 
 Views containing aggregate functions such as `SUM`, `AVG`, `COUNT`,
 `MIN`, or `MAX` cannot normally be modified directly.
@@ -145,7 +155,8 @@ WHERE InvoiceID = 1;
 --TotalAmount does not represent one stored value in one row.
 --It is calculated from multiple rows in InvoiceItem.
 ```
-### DISTINCT Views are read-only
+### DISTINCT
+A View may also remove duplicate rows using `DISTINCT`.
 
 ```sql
 GO
@@ -451,7 +462,8 @@ Task:
   - (c) DELETE it.
   - (d) DROP the View.
 
-**Solution**
+<details>
+<summary>Show solution</summary>
 
 ```sql
 GO
@@ -478,6 +490,7 @@ GO
 DROP VIEW dbo.vCategories;
 GO
 ```
+</details>
 
 ### Exercise 2 – Multi-table View: what is updatable?
 
@@ -493,7 +506,8 @@ Task:
   - (c) INSERT a new customer using ONLY Customer columns. Did it work? Can you see them through the View? Are they in the Customer table?
   - (d) DROP the View.
 
-**Solution**
+<details>
+<summary>Show solution</summary>
 
 ```sql
 GO
@@ -515,8 +529,7 @@ JOIN State AS s  ON s.IDState = ci.StateID;
 GO
 
 -- (a) Might succeed or fail depending on SQL Server version.
--- If it succeeds, it inserts into City (because CityName maps to City.Name only).
--- We use a clearly-labeled test value so cleanup can find it.
+
 INSERT INTO dbo.vCustomerLocations (CityName) VALUES ('_TestCity_Lab02');
 
 -- (b) Similar — may insert into State if it succeeds.
@@ -542,6 +555,7 @@ DELETE FROM State WHERE Name = '_TestState_Lab02';
 DELETE FROM Customer WHERE Email = 'marie@example.com';
 GO
 ```
+</details>
 
 ### Exercise 3 – WITH CHECK OPTION
 
@@ -555,7 +569,8 @@ Task:
   - (e) Modify the View back to the default (allow invisible inserts).
   - (f) DROP the View.
 
-**Solution**
+<details>
+<summary>Show solution</summary>
 
 ```sql
 -- Step 1: create
@@ -607,6 +622,7 @@ GO
 DROP VIEW dbo.vAcceptedCards;
 GO
 ```
+</details>
 
 ## Cleanup
 

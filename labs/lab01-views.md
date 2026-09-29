@@ -128,11 +128,6 @@ DROP VIEW dbo.vCustomerOverview;
 GO
 ```
 
->**Performance note**: 
-A regular View does not store query results and does not automatically make a query faster.
-SQL Server still executes the underlying query.
-Views are mainly used for abstraction, reuse, readability, and controlled access to data.
-
 ## Part 2 – The View Owns Nothing
 
 A small, two-column View makes it easy to spot the moment when the underlying table changes and the View reflects it — without being touched.
@@ -162,7 +157,8 @@ VALUES ('Ada', 'Lovelace', 'ada@example.com', '555-0001', 1);
 ```
 
 ```sql
--- The View immediately shows the new row — because it runs its SELECT again
+-- The View immediately shows the new row because it reads
+-- the current data from the underlying table
 SELECT *
 FROM dbo.vCustomerNames
 WHERE LastName = 'Lovelace';
@@ -180,6 +176,11 @@ SELECT *
 FROM dbo.vCustomerNames
 WHERE LastName = 'Lovelace';
 ```
+
+>**Performance note**: 
+A regular View does not store query results and does not automatically make a query faster.
+SQL Server still executes the underlying query.
+Views are mainly used for abstraction, reuse, readability, and controlled access to data.
 
 ## Part 3 – Modifying and Dropping Views
 
@@ -234,7 +235,7 @@ FROM Customer;
 
 A View can act as a **stable interface** between users or applications and the underlying database structure.
 
-This means that the physical structure of the database can change while the query used by the user remains the same.
+This means that the underlying database structure can change while the interface used by the application remains the same.
 
 For this example, we will use a small separate database.
 
@@ -500,6 +501,17 @@ flowchart TD
 ```
 
 This makes Views useful as a stable interface between applications, users, reports, and the underlying database model.
+
+### Return to the training database
+
+The stable-interface example used a separate demo database.
+
+For the rest of the lab, switch back to `AdventureWorksENG`:
+
+```sql
+USE AdventureWorksENG;
+GO
+```
 
 ## Part 5 – System Views: The Database Describing Itself
 

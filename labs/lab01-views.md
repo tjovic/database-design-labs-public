@@ -62,8 +62,8 @@ SELECT
 FROM Customer AS c
 JOIN City  AS ci ON ci.IDCity  = c.CityID
 JOIN State AS s  ON s.IDState = ci.StateID
-LEFT JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-LEFT JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
+JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
 GROUP BY
     c.FirstName, c.LastName, ci.Name, s.Name;
 ```
@@ -71,7 +71,7 @@ GROUP BY
 ```sql
 -- Stage 5: add filtering, calculated column, ordering
 SELECT
-    c.FirstName + ' ' + c.LastName AS CustomerName,
+    CONCAT_WS(' ', FirstName, c.LastName) AS CustomerName,
     ci.Name AS City,
     s.Name  AS State,
     COUNT(DISTINCT i.IDInvoice) AS InvoiceCount,
@@ -80,9 +80,9 @@ SELECT
 FROM Customer AS c
 JOIN City  AS ci ON ci.IDCity  = c.CityID
 JOIN State AS s  ON s.IDState = ci.StateID
-LEFT JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-LEFT JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceDate >= '2004-01-01'
+JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceDate >= '2004-06-01' AND i.InvoiceDate < '2004-06-30'
 GROUP BY
     c.FirstName, c.LastName, ci.Name, s.Name
 HAVING SUM(ii.TotalPrice) > 1000
@@ -96,7 +96,7 @@ GO
 CREATE VIEW dbo.vCustomerOverview
 AS
 SELECT
-    c.FirstName + ' ' + c.LastName AS CustomerName,
+    CONCAT_WS(' ', FirstName, c.LastName) AS CustomerName,
     ci.Name AS City,
     s.Name  AS State,
     COUNT(DISTINCT i.IDInvoice) AS InvoiceCount,
@@ -105,9 +105,9 @@ SELECT
 FROM Customer AS c
 JOIN City  AS ci ON ci.IDCity  = c.CityID
 JOIN State AS s  ON s.IDState = ci.StateID
-LEFT JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-LEFT JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceDate >= '2004-01-01'
+JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceDate >= '2004-06-01' AND i.InvoiceDate < '2004-06-30'
 GROUP BY
     c.FirstName, c.LastName, ci.Name, s.Name
 HAVING SUM(ii.TotalPrice) > 1000;
@@ -116,17 +116,26 @@ GO
 > Notice the `ORDER BY` is gone.
 > Views cannot guarantee row order — that is the caller's responsibility.
 
-### Naming convention
-> We will prefix View names with the letter `v` — for example, `vCustomerOverview`.
-> Many teams use `v`, `vw_`, or `view_`. Different companies, different rules.
-> The important thing is that a reader sees the name and knows instantly: this is a View, not a table.
 
 ```sql
-SELECT * FROM dbo.vCustomerOverview;
+SELECT * 
+FROM dbo.vCustomerOverview
+ORDER BY TotalSpent DESC;
+```
+> A View defines which rows and columns are returned, but not their final display order.
+> If a specific order is required, use `ORDER BY` when querying the View.
 
+```sql
 DROP VIEW dbo.vCustomerOverview;
 GO
 ```
+The `vCustomerOverview` View summarizes customer purchasing activity for June 2004 by combining customer and invoice data.
+It shows the customer's location, number of invoices, total spending, and most recent purchase date, but only for customers who spent more than 1000 during that period.
+
+#### Naming convention
+> We will prefix View names with the letter `v` — for example, `vCustomerOverview`.
+> Many teams use `v`, `vw_`, or `view_`. Different companies, different rules.
+> The important thing is that a reader sees the name and knows instantly: this is a View, not a table.
 
 ## Part 2 – The View Owns Nothing
 
@@ -514,6 +523,20 @@ GO
 ```
 
 ## Part 5 – System Views: The Database Describing Itself
+
+SQL Server stores information about database objects such as tables, columns, indexes, and constraints.
+
+This information is exposed through **system Views**, such as `sys.tables` and `sys.columns`.
+
+Because system metadata is available through Views, we can query the structure of the database using ordinary SQL.
+
+System Views are useful for:
+- exploring database structure
+- checking object definitions
+- writing administration and diagnostic queries
+- generating dynamic SQL or documentation
+
+System Views are a good example of how Views can provide a structured interface over more complex internal database metadata.
 
 ```sql
 -- Every row = one table in the current database

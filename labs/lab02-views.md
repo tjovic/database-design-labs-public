@@ -52,7 +52,7 @@ VALUES ('Grace', 'Hopper', 'grace@example.com', '555-0002', 1);
 -- Verify in the base table
 SELECT *
 FROM Customer
-WHERE FirstName = 'Grace';
+WHERE LastName = 'Hopper';
 ```
 
 ### A JOIN View is usually NOT updatable
@@ -81,16 +81,93 @@ SELECT * FROM dbo.vCustomerCities;
 INSERT INTO dbo.vCustomerCities (FirstName, LastName, City)
 VALUES ('Alan', 'Turing', 'London');
 -- Error: cannot decide which table this belongs to.
-
-
--- Even INSERT that touches only Customer columns is usually REFUSED.
--- SQL Server plays it safe with join Views and rejects the whole class:
---   Msg 4405: "View or function is not updatable because the modification
---              affects multiple base tables."
--- To make a join View updatable, use an INSTEAD OF trigger (out of scope here).
-INSERT INTO dbo.vCustomerCities (FirstName, LastName)
-VALUES ('Alan', 'Turing');
 ```
+
+### Calculated columns are read-only
+
+A View can contain calculated columns, but you cannot directly modify
+the calculated result.
+
+```sql
+GO
+
+CREATE OR ALTER VIEW dbo.vInvoiceItems
+AS
+SELECT
+    IDInvoiceItem,
+    Quantity,
+    InitialPrice,
+    Quantity * InitialPrice AS LineTotal
+FROM InvoiceItem;
+GO
+
+SELECT *
+FROM dbo.vInvoiceItems;
+
+--This works:
+UPDATE dbo.vInvoiceItems
+SET Quantity = 5
+WHERE IDInvoiceItem = 1;
+
+--But this does not:
+UPDATE dbo.vInvoiceItems
+SET LineTotal = 500
+WHERE IDInvoiceItem = 1;
+--The calculated column cannot be updated directly.
+
+```
+### Aggregate Views are read-only
+
+Views containing aggregate functions such as `SUM`, `AVG`, `COUNT`,
+`MIN`, or `MAX` cannot normally be modified directly.
+
+```sql
+GO
+
+CREATE OR ALTER VIEW dbo.vInvoiceSummary
+AS
+SELECT
+    InvoiceID,
+    COUNT(*) AS NumberOfItems,
+    SUM(Quantity) AS TotalQuantity,
+    SUM(Quantity * InitialPrice) AS TotalAmount
+FROM InvoiceItem
+GROUP BY InvoiceID;
+GO
+
+SELECT *
+FROM dbo.vInvoiceSummary;
+
+--For example, this is not allowed:
+UPDATE dbo.vInvoiceSummary
+SET TotalAmount = 1000
+WHERE InvoiceID = 1;
+--TotalAmount does not represent one stored value in one row.
+--It is calculated from multiple rows in InvoiceItem.
+```
+### DISTINCT Views are read-only
+
+```sql
+GO
+
+CREATE OR ALTER VIEW dbo.vCreditCardTypes
+AS
+SELECT DISTINCT
+    Type
+FROM CreditCard;
+GO
+
+SELECT *
+FROM dbo.vCreditCardTypes;
+
+--For example:
+UPDATE dbo.vCreditCardTypes
+SET Type = 'VISA'
+WHERE Type = 'Visa';
+--SQL Server refuses the modification because it is ambiguous which
+--underlying rows should be changed.
+```
+
 
 ```sql
 -- Cleanup for this section
@@ -98,8 +175,13 @@ GO
 
 DROP VIEW IF EXISTS dbo.vCustomers;
 GO
-
 DROP VIEW IF EXISTS dbo.vCustomerCities;
+GO
+DROP VIEW IF EXISTS dbo.vInvoiceItems;
+GO
+DROP VIEW IF EXISTS dbo.vInvoiceSummary;
+GO
+DROP VIEW IF EXISTS dbo.vCreditCardTypes;
 GO
 ```
 

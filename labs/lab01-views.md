@@ -267,7 +267,8 @@ Try each exercise on your own first. Only look at the solution after you have at
 
 Task: Create a View named dbo.vCustomers that returns three columns from Customer: FirstName, LastName, Email. Then query the View and confirm rows come back.
 
-**Solution**
+<details>
+<summary>Show answer</summary>
 
 ```sql
 GO
@@ -283,12 +284,14 @@ GO
 
 SELECT * FROM dbo.vCustomers;
 ```
+</details>
 
 ### Exercise 2 – Modify the View
 
 Task: Use CREATE OR ALTER VIEW to modify dbo.vCustomers so it also returns PhoneNumber. Query the View to verify.
 
-**Solution**
+<details>
+<summary>Show answer</summary>
 
 ```sql
 GO
@@ -305,6 +308,7 @@ GO
 
 SELECT * FROM dbo.vCustomers;
 ```
+</details>
 
 ### Exercise 3 – Hide a JOIN inside a View
 
@@ -313,7 +317,8 @@ Task: Create a View named dbo.vCustomerCities that returns FirstName, LastName, 
 **Hints**
 - Customer.CityID → City.IDCity (join condition)
 
-**Solution**
+<details>
+<summary>Show answer</summary>
 
 ```sql
 GO
@@ -331,17 +336,20 @@ GO
 
 SELECT * FROM dbo.vCustomerCities;
 ```
+</details>
 
-### Bonus Exercise (if you finish early)
+### Bonus Exercise
 
 Task: Using sys.tables, count how many tables exist in this database.
 
-**Solution**
+<details>
+<summary>Show answer</summary>
 
 ```sql
 SELECT COUNT(*) AS TableCount
 FROM sys.tables;
 ```
+</details>
 
 ## Cleanup
 

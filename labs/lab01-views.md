@@ -125,10 +125,7 @@ ORDER BY TotalSpent DESC;
 > A View defines which rows and columns are returned, but not their final display order.
 > If a specific order is required, use `ORDER BY` when querying the View.
 
-```sql
-DROP VIEW dbo.vCustomerOverview;
-GO
-```
+
 The `vCustomerOverview` View summarizes customer purchasing activity for June 2004 by combining customer and invoice data.
 It shows the customer's location, number of invoices, total spending, and most recent purchase date, but only for customers who spent more than 1000 during that period.
 

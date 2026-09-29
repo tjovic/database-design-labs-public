@@ -1,7 +1,7 @@
 # Database Design Labs — Sample Coursework
 
 
-Target database: `AdventureWorksENG`
+Target database: [AdventureWorksENG](SCHEMA-REFERENCE.md)
 
 ---
 

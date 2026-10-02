@@ -26,10 +26,10 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 | # | Lab | Main topics |
 |---|---|---|
-| 00 | [T-SQL Essentials](lab/lab00-tsql-essentials.md) | batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `CAST` |
-| 01 | [Views](lab/lab01-views.md) | creating Views, hiding query complexity, stable interfaces, system Views |
-| 02 | [Views – continued](lab/lab02-views.md) | modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
-| 03 | [Triggers](lab/lab03-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
+| 00 | [T-SQL Essentials](labs/lab00-tsql-essentials.md) | batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `CAST` |
+| 01 | [Views](labs/lab01-views.md) | creating Views, hiding query complexity, stable interfaces, system Views |
+| 02 | [Views – continued](labs/lab02-views.md) | modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
+| 03 | [Triggers](labs/lab03-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
 
 > Additional labs will be added as the course progresses.
 

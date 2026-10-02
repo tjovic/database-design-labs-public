@@ -1,36 +1,60 @@
 # Lab 2 – Views (continued)
 
-Database: `AdventureWorksENG`
+**Database:** `AdventureWorksENG`
 
-Today you will learn:
-- How to INSERT, UPDATE, DELETE through a View (and its rules)
-- WITH CHECK OPTION — the View refuses changes that break its filter
-- WITH SCHEMABINDING — the underlying tables cannot silently break the View
-- WITH ENCRYPTION — hide the View's definition
-- How to combine these options
+In Lab 1, Views were introduced mainly as a way to simplify queries and hide complexity.
 
-Key idea to remember all lesson:
+In this lab, we continue with a different question:
 
-> A View is not just a window. A View has rules.
+> **What rules apply when we modify data through a View?**
+
+We will also look at several View options that control how a View behaves.
+
+---
+
+## Learning objectives
+
+After completing this lab, you should be able to:
+
+- modify data through a simple View;
+- explain why some Views are not updatable;
+- use `WITH CHECK OPTION` to prevent changes that would make rows disappear from a filtered View;
+- use `WITH SCHEMABINDING` to prevent incompatible schema changes;
+- explain what `WITH ENCRYPTION` does and does not protect;
+- combine View options correctly.
+
+Start by selecting the database:
 
 ```sql
 USE AdventureWorksENG;
 GO
 ```
 
-## Part 1 – Modifying Data Through a View
+---
 
-The rules for writing through a View:
+# Section 1 – Modifying data through a View
 
-1. The change must reference columns from EXACTLY ONE table.
-2. Referenced columns must not be results of subqueries, aggregates, or calculations.
-3. Referenced columns must not appear in GROUP BY, HAVING, or DISTINCT.
-4. The View must include every column the target table needs (e.g. all NOT NULL columns without defaults).
+A View is usually used for reading data, but some Views can also be used for:
+
+- `INSERT`
+- `UPDATE`
+- `DELETE`
+
+The important question is:
+
+> Can SQL Server clearly map the change made through the View back to the underlying table?
+
+A simple View over one table is often updatable.
+
+More complex Views have additional restrictions.
+
+---
+
+## A simple updatable View
+
+Create a simple View over `Customer`:
 
 ```sql
--- Create the simple View from Lab 1
-GO
-
 CREATE OR ALTER VIEW dbo.vCustomers
 AS
 SELECT
@@ -43,64 +67,142 @@ FROM Customer;
 GO
 ```
 
+Now insert through the View:
+
 ```sql
--- INSERT through the View — it lands in the Customer table
-INSERT INTO dbo.vCustomers (FirstName, LastName, Email, PhoneNumber, CityID)
-VALUES ('Grace', 'Hopper', 'grace@example.com', '555-0002', 1);
-
-
--- Verify in the base table
-SELECT *
-FROM Customer
-WHERE LastName = 'Hopper';
+INSERT INTO dbo.vCustomers
+(
+    FirstName,
+    LastName,
+    Email,
+    PhoneNumber,
+    CityID
+)
+VALUES
+(
+    'Grace',
+    'Hopper',
+    'grace@example.com',
+    '555-0002',
+    1
+);
 ```
 
-### A JOIN View is usually NOT updatable
+The row is inserted into the underlying `Customer` table.
+
+Verify it:
 
 ```sql
-GO
+SELECT *
+FROM Customer
+WHERE Email = 'grace@example.com';
+```
 
+You can also update through the View:
+
+```sql
+UPDATE dbo.vCustomers
+SET PhoneNumber = '555-9999'
+WHERE Email = 'grace@example.com';
+```
+
+And delete through the View:
+
+```sql
+DELETE FROM dbo.vCustomers
+WHERE Email = 'grace@example.com';
+```
+
+The View itself does not store a separate copy of the row.
+
+The modification affects the underlying table.
+
+---
+
+## General rules
+
+A View is more likely to be updatable when SQL Server can clearly identify the affected base-table rows.
+
+Typical restrictions include:
+
+- the change should affect columns from one base table;
+- calculated columns cannot be modified directly;
+- aggregate results cannot be modified directly;
+- `GROUP BY`, `HAVING`, and `DISTINCT` make direct modifications more restricted;
+- the View must expose the columns required to create a valid row in the underlying table.
+
+The easiest way to understand these rules is to look at examples.
+
+---
+
+## JOIN Views have additional restrictions
+
+Create a View that joins `Customer` and `City`:
+
+```sql
 CREATE OR ALTER VIEW dbo.vCustomerCities
 AS
 SELECT
     c.IDCustomer,
     c.FirstName,
     c.LastName,
-    ci.Name AS City
+    c.Email,
+    c.PhoneNumber,
+    c.CityID,
+    ci.Name AS CityName
 FROM Customer AS c
-JOIN City AS ci ON ci.IDCity = c.CityID;
+JOIN City AS ci
+    ON ci.IDCity = c.CityID;
 GO
 ```
 
+Reading from the View works normally:
+
 ```sql
--- Reading works fine
-SELECT * FROM dbo.vCustomerCities;
-
-
--- INSERT that touches columns from BOTH tables will fail
-INSERT INTO dbo.vCustomerCities (FirstName, LastName, City)
-VALUES ('Alan', 'Turing', 'London');
--- Error: cannot decide which table this belongs to.
-
--- This may work because only Customer columns are affected
-INSERT  INTO dbo.vCustomerCities (FirstName, LastName)
-VALUES ('Ana', 'Horvat');
-
---SQL Server may allow this because the statement affects only one base table.
---However, this does not mean that a View is a good interface for modifying data.
+SELECT TOP (10) *
+FROM dbo.vCustomerCities;
 ```
 
->In practice, Views are usually used for reading, abstraction, reporting, and controlled access to data.
->For data modifications, explicit interfaces such as stored procedures or application/service logic are usually a better choice.
+A modification that SQL Server can map to one base table may be allowed.
 
-### Calculated columns are read-only
-
-A View can contain calculated columns, but you cannot directly modify
-the calculated result.
+For example:
 
 ```sql
-GO
+UPDATE dbo.vCustomerCities
+SET LastName = 'Updated'
+WHERE IDCustomer = 1;
+```
 
+Only a column from `Customer` is being modified.
+
+However, one statement cannot use the View to modify columns from multiple base tables at the same time.
+
+For example:
+
+```sql
+UPDATE dbo.vCustomerCities
+SET
+    LastName = 'Updated',
+    CityName = 'New City'
+WHERE IDCustomer = 1;
+```
+
+This attempts to modify both:
+
+- `Customer.LastName`
+- `City.Name`
+
+SQL Server rejects the statement because one View modification cannot update multiple base tables.
+
+> **Key idea:** A joined View is not automatically read-only, but modifications are limited to changes SQL Server can map unambiguously to one base table.
+
+---
+
+## Calculated columns are read-only
+
+A View can contain calculated values:
+
+```sql
 CREATE OR ALTER VIEW dbo.vInvoiceItems
 AS
 SELECT
@@ -110,30 +212,48 @@ SELECT
     Quantity * InitialPrice AS LineTotal
 FROM InvoiceItem;
 GO
+```
 
-SELECT *
+Reading the calculated column is fine:
+
+```sql
+SELECT TOP (10) *
 FROM dbo.vInvoiceItems;
+```
 
---This works:
+Updating a normal base-table column can work:
+
+```sql
 UPDATE dbo.vInvoiceItems
 SET Quantity = 5
 WHERE IDInvoiceItem = 1;
+```
 
---But this does not:
+But the calculated value itself cannot be directly updated:
+
+```sql
 UPDATE dbo.vInvoiceItems
 SET LineTotal = 500
 WHERE IDInvoiceItem = 1;
---The calculated column cannot be updated directly.
-
 ```
-### Aggregate functions, GROUP BY, and HAVING
 
-Views containing aggregate functions such as `SUM`, `AVG`, `COUNT`,
-`MIN`, or `MAX` cannot normally be modified directly.
+Why?
+
+`LineTotal` is not a stored value in `InvoiceItem`.
+
+It is calculated from:
 
 ```sql
-GO
+Quantity * InitialPrice
+```
 
+---
+
+## Aggregate Views are not directly updatable
+
+Create a View with aggregate functions:
+
+```sql
 CREATE OR ALTER VIEW dbo.vInvoiceSummary
 AS
 SELECT
@@ -144,66 +264,116 @@ SELECT
 FROM InvoiceItem
 GROUP BY InvoiceID;
 GO
+```
 
-SELECT *
+Querying it works normally:
+
+```sql
+SELECT TOP (10) *
 FROM dbo.vInvoiceSummary;
+```
 
---For example, this is not allowed:
+But this does not work:
+
+```sql
 UPDATE dbo.vInvoiceSummary
 SET TotalAmount = 1000
 WHERE InvoiceID = 1;
---TotalAmount does not represent one stored value in one row.
---It is calculated from multiple rows in InvoiceItem.
 ```
-### DISTINCT
-A View may also remove duplicate rows using `DISTINCT`.
+
+`TotalAmount` is calculated from several rows in `InvoiceItem`.
+
+It does not represent one stored column in one base-table row.
+
+---
+
+## DISTINCT also restricts modifications
+
+A View may remove duplicate values using `DISTINCT`:
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vCreditCardTypes
 AS
 SELECT DISTINCT
     Type
 FROM CreditCard;
 GO
+```
 
+Querying it is fine:
+
+```sql
 SELECT *
 FROM dbo.vCreditCardTypes;
+```
 
---For example:
+But this is not directly updatable:
+
+```sql
 UPDATE dbo.vCreditCardTypes
 SET Type = 'VISA'
 WHERE Type = 'Visa';
---SQL Server refuses the modification because it is ambiguous which
---underlying rows should be changed.
 ```
 
+One row in the View may represent many rows in `CreditCard`.
+
+---
+
+## Check your understanding
+
+1. Why can a simple one-table View often be updated?
+2. Can a calculated column be updated directly?
+3. Why are aggregate Views usually not directly updatable?
+4. Is every JOIN View read-only?
+5. Can one View modification change columns from two base tables at the same time?
+
+<details>
+<summary>Show answers</summary>
+
+1. Because SQL Server can usually map the View row directly to one row in one base table.
+2. No. The value is derived from other columns.
+3. Because one View row may represent calculations over several base-table rows.
+4. No. Some modifications may be allowed when the change maps to one base table.
+5. No. A single modification through such a View cannot update multiple base tables.
+
+</details>
+
+---
+
+## Cleanup
 
 ```sql
--- Cleanup for this section
-GO
-
 DROP VIEW IF EXISTS dbo.vCustomers;
-GO
 DROP VIEW IF EXISTS dbo.vCustomerCities;
-GO
 DROP VIEW IF EXISTS dbo.vInvoiceItems;
-GO
 DROP VIEW IF EXISTS dbo.vInvoiceSummary;
-GO
 DROP VIEW IF EXISTS dbo.vCreditCardTypes;
 GO
+
+DELETE FROM Customer
+WHERE Email = 'grace@example.com';
+GO
 ```
 
-## Part 2 – WITH CHECK OPTION
+---
 
-The trap: a row you insert can vanish from your own View.
+# Section 2 – WITH CHECK OPTION
+
+A filtered View shows only rows that satisfy its `WHERE` condition.
+
+But by default, SQL Server may allow a change through the View that creates a row which does **not** satisfy that condition.
+
+The result can be surprising:
+
+> You insert a row through the View, but the row immediately disappears from the View.
+
+---
+
+## The disappearing row problem
+
+Create a View that shows only Visa cards:
 
 ```sql
--- A View that filters credit cards
-GO
-
 CREATE OR ALTER VIEW dbo.vVisaCards
 AS
 SELECT
@@ -217,31 +387,76 @@ WHERE Type = 'Visa';
 GO
 ```
 
+Insert an American Express card through the Visa View:
+
 ```sql
--- Query it — only Visa cards
-SELECT * FROM dbo.vVisaCards;
-
-
--- Insert an American Express through the View
--- Default behavior: SUCCEEDS silently
-INSERT INTO dbo.vVisaCards (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('American Express', '378282246310005', 12, 2030);
-
-
--- But the new row does NOT appear through the View
-SELECT * FROM dbo.vVisaCards WHERE CardNumber = '378282246310005';
-
-
--- It IS in the base table
-SELECT * FROM CreditCard WHERE CardNumber = '378282246310005';
+INSERT INTO dbo.vVisaCards
+(
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
+)
+VALUES
+(
+    'American Express',
+    '378282246310005',
+    12,
+    2030
+);
 ```
 
-### The fix: WITH CHECK OPTION
+The insert succeeds.
+
+But the row is not visible through the View:
 
 ```sql
--- Rewrite the View with WITH CHECK OPTION at the very end
-GO
+SELECT *
+FROM dbo.vVisaCards
+WHERE CardNumber = '378282246310005';
+```
 
+It does exist in the base table:
+
+```sql
+SELECT *
+FROM CreditCard
+WHERE CardNumber = '378282246310005';
+```
+
+Why?
+
+The View filters with:
+
+```sql
+WHERE Type = 'Visa'
+```
+
+but the inserted row has `Type = 'American Express'`.
+
+---
+
+## Visualizing the problem
+
+```mermaid
+flowchart LR
+    A["INSERT through View"]
+    B{"Row satisfies<br/>View WHERE?"}
+    C["Visible through View"]
+    D["Stored in base table<br/>but invisible in View"]
+
+    A --> B
+    B -->|Yes| C
+    B -->|No| D
+```
+
+---
+
+## The fix – WITH CHECK OPTION
+
+Add `WITH CHECK OPTION` at the end of the View definition:
+
+```sql
 CREATE OR ALTER VIEW dbo.vVisaCards
 AS
 SELECT
@@ -256,103 +471,227 @@ WITH CHECK OPTION;
 GO
 ```
 
+Now try to insert an invalid row:
+
 ```sql
--- Now the same insert is REFUSED
-INSERT INTO dbo.vVisaCards (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('Discover', '6011000000000000', 6, 2029);
--- Error: value violates the CHECK OPTION.
-
-
--- A valid insert still works
-INSERT INTO dbo.vVisaCards (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('Visa', '4111111111111111', 3, 2028);
+INSERT INTO dbo.vVisaCards
+(
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
+)
+VALUES
+(
+    'Discover',
+    '6011000000000000',
+    6,
+    2029
+);
 ```
 
-```sql
--- Cleanup for this section
-GO
+SQL Server rejects the change because the new row would not be visible through the View.
 
+A valid row still works:
+
+```sql
+INSERT INTO dbo.vVisaCards
+(
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
+)
+VALUES
+(
+    'Visa',
+    '4111111111111111',
+    3,
+    2028
+);
+```
+
+```mermaid
+flowchart LR
+    A["INSERT / UPDATE through View"]
+    B{"Row satisfies<br/>View WHERE?"}
+    C["Allowed"]
+    D["Rejected by<br/>WITH CHECK OPTION"]
+
+    A --> B
+    B -->|Yes| C
+    B -->|No| D
+```
+
+> **WITH CHECK OPTION ensures that rows modified through the View remain visible through that View.**
+
+---
+
+## Check your understanding
+
+1. Without `WITH CHECK OPTION`, can a row inserted through a filtered View become invisible through that View?
+2. Where is that row stored?
+3. What does `WITH CHECK OPTION` prevent?
+4. Does `WITH CHECK OPTION` change which rows the View displays?
+
+<details>
+<summary>Show answers</summary>
+
+1. Yes.
+2. In the underlying base table.
+3. It prevents modifications through the View that would create rows which do not satisfy the View's filter.
+4. No. The filter still determines what the View displays.
+
+</details>
+
+---
+
+## Cleanup
+
+```sql
 DROP VIEW IF EXISTS dbo.vVisaCards;
-DELETE FROM CreditCard WHERE CardNumber IN ('378282246310005', '4111111111111111');
+GO
+
+DELETE FROM CreditCard
+WHERE CardNumber IN
+(
+    '378282246310005',
+    '4111111111111111',
+    '6011000000000000'
+);
 GO
 ```
 
-## Part 3 – WITH SCHEMABINDING
+---
 
-Prevent underlying tables from silently breaking the View.
+# Section 3 – WITH SCHEMABINDING
 
-IMPORTANT: we do NOT touch shared tables like Customer here — dropping a column from a real table would destroy production data. Instead we create a throwaway table `SchemaBindingDemo` just for this demo.
+A normal View depends on underlying tables, but SQL Server may allow a schema change that later causes the View to fail.
+
+`WITH SCHEMABINDING` creates a stronger dependency between the View and the objects it references.
+
+> **SCHEMABINDING prevents incompatible schema changes that would break the View.**
+
+For safety, we will use a temporary demonstration table.
+
+---
+
+## Without SCHEMABINDING
 
 ```sql
--- Create a fresh test table we can safely drop columns from
-GO
-
 CREATE TABLE dbo.SchemaBindingDemo
 (
-    ID       int IDENTITY PRIMARY KEY,
-    Name     nvarchar(50),
-    Note     nvarchar(200)
+    ID   int IDENTITY PRIMARY KEY,
+    Name nvarchar(50),
+    Note nvarchar(200)
 );
+GO
 
-INSERT INTO dbo.SchemaBindingDemo (Name, Note) VALUES
+INSERT INTO dbo.SchemaBindingDemo (Name, Note)
+VALUES
     ('Row 1', 'first'),
     ('Row 2', 'second');
 GO
 ```
 
-```sql
--- A plain View over our test table (no SCHEMABINDING)
-GO
+Create a normal View:
 
+```sql
 CREATE OR ALTER VIEW dbo.vDemoContacts
 AS
-SELECT ID, Name, Note
+SELECT
+    ID,
+    Name,
+    Note
 FROM dbo.SchemaBindingDemo;
 GO
 ```
 
+Now drop a column the View uses:
+
 ```sql
--- Drop a column the View depends on — nothing warns us
-ALTER TABLE dbo.SchemaBindingDemo DROP COLUMN Note;
-
-
--- Now the View is broken
-SELECT * FROM dbo.vDemoContacts;
--- Error: Invalid column name 'Note'.
+ALTER TABLE dbo.SchemaBindingDemo
+DROP COLUMN Note;
+GO
 ```
 
-```sql
--- Add the column back so the rest of the demo works
-GO
+SQL Server allows the change.
 
-ALTER TABLE dbo.SchemaBindingDemo ADD Note nvarchar(200) NULL;
+But now:
+
+```sql
+SELECT *
+FROM dbo.vDemoContacts;
 ```
 
-### The fix: WITH SCHEMABINDING (goes BEFORE the AS)
+fails because the View still expects `Note`.
 
-Requires: two-part names (`dbo.SchemaBindingDemo`) and no `SELECT *`.
+Add the column back:
 
 ```sql
+ALTER TABLE dbo.SchemaBindingDemo
+ADD Note nvarchar(200) NULL;
 GO
+```
 
+---
+
+## With SCHEMABINDING
+
+Rewrite the View:
+
+```sql
 CREATE OR ALTER VIEW dbo.vDemoContacts
 WITH SCHEMABINDING
 AS
-SELECT ID, Name, Note
+SELECT
+    ID,
+    Name,
+    Note
 FROM dbo.SchemaBindingDemo;
 GO
 ```
 
+Now try:
+
 ```sql
--- Now try to drop the column again
-ALTER TABLE dbo.SchemaBindingDemo DROP COLUMN Note;
--- Error: dependent on column 'Note'. Refused.
+ALTER TABLE dbo.SchemaBindingDemo
+DROP COLUMN Note;
 ```
 
-```sql
--- Cleanup for this section
-GO
+SQL Server refuses the change because the schemabound View depends on that column.
 
+### Requirements used here
+
+With `SCHEMABINDING`:
+
+- use two-part object names such as `dbo.SchemaBindingDemo`;
+- explicitly list the columns instead of using `SELECT *`.
+
+---
+
+## Check your understanding
+
+1. What problem does `WITH SCHEMABINDING` help prevent?
+2. Does it prevent every possible change to the underlying table?
+3. Why do we use `dbo.SchemaBindingDemo` instead of only `SchemaBindingDemo`?
+4. Can we use `SELECT *` in this schemabound View?
+
+<details>
+<summary>Show answers</summary>
+
+1. It prevents incompatible schema changes to referenced objects that would break the View.
+2. No. It prevents changes that conflict with the View's dependencies.
+3. Schemabound object references use two-part names.
+4. No. The referenced columns must be listed explicitly.
+
+</details>
+
+---
+
+## Cleanup
+
+```sql
 DROP VIEW IF EXISTS dbo.vDemoContacts;
 GO
 
@@ -360,69 +699,111 @@ DROP TABLE IF EXISTS dbo.SchemaBindingDemo;
 GO
 ```
 
-## Part 4 – WITH ENCRYPTION
+---
 
-Hide the View definition from `sp_helptext`. (Not real security — a determined attacker with privileges can still recover it.)
+# Section 4 – WITH ENCRYPTION
+
+`WITH ENCRYPTION` hides a View definition from normal metadata tools such as `sp_helptext`.
+
+> **Important:** This should not be treated as a security boundary. It hides the definition from normal inspection, but it is not a substitute for permissions or proper security controls.
+
+Create a normal View:
 
 ```sql
--- Plain View — definition is readable
-GO
-
 CREATE OR ALTER VIEW dbo.vActiveCards
 AS
-SELECT IDCreditCard, Type, CardNumber
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber
 FROM CreditCard
 WHERE ExpirationYear >= 2026;
 GO
 ```
 
+Its definition can be inspected:
+
 ```sql
--- sp_helptext shows the source
 EXECUTE sp_helptext 'dbo.vActiveCards';
 ```
 
-```sql
--- Encrypt it (option goes BEFORE the AS)
-GO
+Rewrite it:
 
+```sql
 CREATE OR ALTER VIEW dbo.vActiveCards
 WITH ENCRYPTION
 AS
-SELECT IDCreditCard, Type, CardNumber
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber
 FROM CreditCard
 WHERE ExpirationYear >= 2026;
 GO
 ```
 
+Now:
+
 ```sql
--- Now sp_helptext refuses
 EXECUTE sp_helptext 'dbo.vActiveCards';
-
-
--- Query still works
-SELECT * FROM dbo.vActiveCards;
 ```
 
-Warning: once encrypted, you cannot un-encrypt. Losing your original source code means you can only DROP and re-CREATE. Always keep the source in Git.
+does not return the View definition.
+
+The View itself still works:
 
 ```sql
-GO
+SELECT TOP (10) *
+FROM dbo.vActiveCards;
+```
 
+> Always keep the original View source in version control.
+
+---
+
+## Check your understanding
+
+1. What does `WITH ENCRYPTION` hide?
+2. Does the View still work normally?
+3. Should `WITH ENCRYPTION` be treated as strong security?
+4. Where should the original View source code be stored?
+
+<details>
+<summary>Show answers</summary>
+
+1. The View definition from normal metadata inspection tools such as `sp_helptext`.
+2. Yes.
+3. No.
+4. In version control, such as Git.
+
+</details>
+
+---
+
+## Cleanup
+
+```sql
 DROP VIEW IF EXISTS dbo.vActiveCards;
 GO
 ```
 
-## Part 5 – Combining Options
+---
 
-Placement rules:
-- SCHEMABINDING and ENCRYPTION → BEFORE the AS
-- CHECK OPTION → AFTER the SELECT
+# Section 5 – Combining View options
 
-Multiple options before AS use one WITH, comma-separated. Order between them does not matter.
+The View options used in this lab appear in different positions.
+
+| Option | Position |
+|---|---|
+| `WITH SCHEMABINDING` | before `AS` |
+| `WITH ENCRYPTION` | before `AS` |
+| `WITH CHECK OPTION` | after the query |
+
+Options before `AS` use one `WITH` clause and are separated by commas.
+
+Example:
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vVisaCards
 WITH SCHEMABINDING, ENCRYPTION
 AS
@@ -438,216 +819,441 @@ WITH CHECK OPTION;
 GO
 ```
 
+Query it:
+
 ```sql
--- Verify
-SELECT TOP (5) * FROM dbo.vVisaCards;
+SELECT TOP (5) *
+FROM dbo.vVisaCards;
+```
 
-GO
+---
 
+## Check your understanding
+
+1. Where does `WITH SCHEMABINDING` appear?
+2. Where does `WITH CHECK OPTION` appear?
+3. How are multiple options before `AS` separated?
+4. Can `SCHEMABINDING` and `CHECK OPTION` be used together?
+
+<details>
+<summary>Show answers</summary>
+
+1. Before `AS`.
+2. At the end of the query.
+3. With commas inside one `WITH` clause.
+4. Yes.
+
+</details>
+
+---
+
+## Cleanup
+
+```sql
 DROP VIEW IF EXISTS dbo.vVisaCards;
 GO
 ```
 
-## Exercises
+---
 
-Try each exercise on your own first. Only look at the solution after you have attempted it.
+# Exercises
 
-### Exercise 1 – Modify data through a View
+Try each exercise before opening the solution.
 
-Task:
-- Create `dbo.vCategories` that returns all columns and rows from Category.
-- Through the View:
-  - (a) INSERT a category named 'Alarms'.
-  - (b) RENAME it to 'Active Protection'.
-  - (c) DELETE it.
-  - (d) DROP the View.
+---
+
+## Exercise 1 – Modify data through a simple View
+
+Create `dbo.vCategories` that returns all columns from `Category`.
+
+Through the View:
+
+1. insert a category named `'Alarms'`;
+2. rename it to `'Active Protection'`;
+3. delete it;
+4. drop the View.
 
 <details>
 <summary>Show solution</summary>
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vCategories
 AS
-SELECT * FROM Category;
+SELECT *
+FROM Category;
 GO
 
--- (a) Insert
-INSERT INTO dbo.vCategories (Name) VALUES ('Alarms');
+INSERT INTO dbo.vCategories (Name)
+VALUES ('Alarms');
 
--- (b) Update
 UPDATE dbo.vCategories
 SET Name = 'Active Protection'
 WHERE Name = 'Alarms';
 
--- (c) Delete
-DELETE FROM dbo.vCategories WHERE Name = 'Active Protection';
-
--- (d) Drop
-GO
+DELETE FROM dbo.vCategories
+WHERE Name = 'Active Protection';
 
 DROP VIEW dbo.vCategories;
 GO
 ```
+
 </details>
 
-### Exercise 2 – Multi-table View: what is updatable?
+---
 
-Task:
-- Create `dbo.vCustomerLocations` returning:
-  - city name (CityName)
-  - state name (StateName)
-  - all customer columns
-  - using Customer + City + State.
-- Then try:
-  - (a) INSERT a new city through the View. What happens?
-  - (b) INSERT a new state through the View. What happens?
-  - (c) INSERT a new customer using ONLY Customer columns. Did it work? Can you see them through the View? Are they in the Customer table?
-  - (d) DROP the View.
+## Exercise 2 – JOIN View restrictions
+
+Create `dbo.vCustomerLocations` returning:
+
+- `IDCustomer`;
+- `FirstName`;
+- `LastName`;
+- `Email`;
+- `PhoneNumber`;
+- `CityID`;
+- city name as `CityName`;
+- state name as `StateName`.
+
+Use `Customer`, `City`, and `State`.
+
+Then test the View:
+
+1. update only `Customer.LastName` through the View;
+2. try to update both `Customer.LastName` and `City.Name` in the same statement;
+3. explain why the two statements behave differently;
+4. drop the View.
 
 <details>
 <summary>Show solution</summary>
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vCustomerLocations
 AS
 SELECT
-    ci.Name AS CityName,
-    s.Name  AS StateName,
     c.IDCustomer,
     c.FirstName,
     c.LastName,
     c.Email,
     c.PhoneNumber,
-    c.CityID
+    c.CityID,
+    ci.Name AS CityName,
+    s.Name  AS StateName
 FROM Customer AS c
-JOIN City  AS ci ON ci.IDCity  = c.CityID
-JOIN State AS s  ON s.IDState = ci.StateID;
-GO
-
--- (a) Might succeed or fail depending on SQL Server version.
-
-INSERT INTO dbo.vCustomerLocations (CityName) VALUES ('_TestCity_Lab02');
-
--- (b) Similar — may insert into State if it succeeds.
-INSERT INTO dbo.vCustomerLocations (StateName) VALUES ('_TestState_Lab02');
-
--- (c) Should succeed — references only Customer columns.
---     Use unique test email so cleanup can find it later.
-INSERT INTO dbo.vCustomerLocations (FirstName, LastName, Email, PhoneNumber, CityID)
-VALUES ('Marie', 'Curie', 'marie@example.com', '555-0002', 1);
-
--- Check the base table (find our test row)
-SELECT * FROM Customer WHERE Email = 'marie@example.com';
-
--- (d) Drop the view
-GO
-
-DROP VIEW dbo.vCustomerLocations;
-GO
-
--- Clean up anything the tests may have actually inserted
-DELETE FROM City  WHERE Name = '_TestCity_Lab02';
-DELETE FROM State WHERE Name = '_TestState_Lab02';
-DELETE FROM Customer WHERE Email = 'marie@example.com';
+JOIN City AS ci
+    ON ci.IDCity = c.CityID
+JOIN State AS s
+    ON s.IDState = ci.StateID;
 GO
 ```
+
+This targets only `Customer`:
+
+```sql
+UPDATE dbo.vCustomerLocations
+SET LastName = LastName
+WHERE IDCustomer = 1;
+```
+
+Now try to modify two base tables:
+
+```sql
+UPDATE dbo.vCustomerLocations
+SET
+    LastName = 'Test',
+    CityName = 'Test City'
+WHERE IDCustomer = 1;
+```
+
+This fails because the statement attempts to modify both `Customer` and `City`.
+
+```sql
+DROP VIEW dbo.vCustomerLocations;
+GO
+```
+
 </details>
 
-### Exercise 3 – WITH CHECK OPTION
+---
 
-Task:
-- Create `dbo.vAcceptedCards` returning all columns from CreditCard where Type is 'Visa' or 'MasterCard'.
-- Then:
-  - (a) INSERT an American Express through the View.
-  - (b) Query the View for the new card. Do you see it? Is it in the table?
-  - (c) Modify the View to REFUSE rows that would not be visible through it.
-  - (d) Try INSERTing American Express again.
-  - (e) Modify the View back to the default (allow invisible inserts).
-  - (f) DROP the View.
+## Exercise 3 – WITH CHECK OPTION
+
+Create `dbo.vAcceptedCards` showing cards whose `Type` is `'Visa'` or `'MasterCard'`.
+
+Then:
+
+1. insert an American Express card through the View;
+2. query the View for the new card;
+3. query the base table for the new card;
+4. add `WITH CHECK OPTION`;
+5. try another American Express insert;
+6. remove `WITH CHECK OPTION`;
+7. drop the View.
 
 <details>
 <summary>Show solution</summary>
 
 ```sql
--- Step 1: create
-GO
-
 CREATE OR ALTER VIEW dbo.vAcceptedCards
 AS
-SELECT IDCreditCard, Type, CardNumber, ExpirationMonth, ExpirationYear
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
 FROM CreditCard
 WHERE Type IN ('Visa', 'MasterCard');
 GO
+```
 
--- (a) Insert Amex — succeeds silently
-INSERT INTO dbo.vAcceptedCards (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('American Express', '378282246310005', 12, 2030);
+```sql
+INSERT INTO dbo.vAcceptedCards
+(
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
+)
+VALUES
+(
+    'American Express',
+    '378282246310005',
+    12,
+    2030
+);
+```
 
--- (b) Query — you will NOT see it through the View
-SELECT * FROM dbo.vAcceptedCards WHERE CardNumber = '378282246310005';
+```sql
+SELECT *
+FROM dbo.vAcceptedCards
+WHERE CardNumber = '378282246310005';
 
--- But it IS in the table
-SELECT * FROM CreditCard WHERE CardNumber = '378282246310005';
+SELECT *
+FROM CreditCard
+WHERE CardNumber = '378282246310005';
+```
 
--- (c) Add CHECK OPTION
-GO
+Add `WITH CHECK OPTION`:
 
+```sql
 CREATE OR ALTER VIEW dbo.vAcceptedCards
 AS
-SELECT IDCreditCard, Type, CardNumber, ExpirationMonth, ExpirationYear
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
 FROM CreditCard
 WHERE Type IN ('Visa', 'MasterCard')
 WITH CHECK OPTION;
 GO
+```
 
--- (d) Try Amex again — now refused
-INSERT INTO dbo.vAcceptedCards (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('American Express', '378282246310005', 12, 2030);
+This insert is rejected:
 
--- (e) Remove CHECK OPTION
-GO
+```sql
+INSERT INTO dbo.vAcceptedCards
+(
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
+)
+VALUES
+(
+    'American Express',
+    '371449635398431',
+    12,
+    2030
+);
+```
 
+Remove the option:
+
+```sql
 CREATE OR ALTER VIEW dbo.vAcceptedCards
 AS
-SELECT IDCreditCard, Type, CardNumber, ExpirationMonth, ExpirationYear
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber,
+    ExpirationMonth,
+    ExpirationYear
 FROM CreditCard
 WHERE Type IN ('Visa', 'MasterCard');
 GO
 
--- (f) Drop
 DROP VIEW dbo.vAcceptedCards;
 GO
 ```
+
 </details>
 
-## Cleanup
+---
+
+## Exercise 4 – SCHEMABINDING
+
+Create a temporary table with:
+
+- `ID`
+- `Name`
+- `Description`
+
+Create a normal View over the table.
+
+1. Drop `Description`.
+2. Observe what happens when you query the View.
+3. Add the column back.
+4. Recreate the View using `WITH SCHEMABINDING`.
+5. Try to drop `Description` again.
+6. Explain the difference.
+
+<details>
+<summary>Show solution</summary>
 
 ```sql
--- Remove any leftover Views
+CREATE TABLE dbo.SchemaExercise
+(
+    ID          int IDENTITY PRIMARY KEY,
+    Name        nvarchar(50),
+    Description nvarchar(200)
+);
 GO
 
-DROP VIEW IF EXISTS dbo.vCategories;
+CREATE OR ALTER VIEW dbo.vSchemaExercise
+AS
+SELECT
+    ID,
+    Name,
+    Description
+FROM dbo.SchemaExercise;
 GO
 
-DROP VIEW IF EXISTS dbo.vCustomerLocations;
-GO
-
-DROP VIEW IF EXISTS dbo.vAcceptedCards;
-
--- Remove test data.
--- Identify test customers by the unique test emails we assigned above,
--- NEVER by FirstName alone (there are many real customers with these names).
-DELETE FROM CreditCard WHERE CardNumber IN ('378282246310005', '4111111111111111');
-DELETE FROM Customer WHERE Email IN
-    ('grace@example.com', 'marie@example.com', 'ada@example.com');
--- The 'Alan Turing' INSERT attempts above all failed (Msg 4405 or Msg 515),
--- so there is nothing to clean up for them.
-
--- Drop the safety table if it survived a partial run
-DROP TABLE IF EXISTS dbo.SchemaBindingDemo;
+ALTER TABLE dbo.SchemaExercise
+DROP COLUMN Description;
 GO
 ```
+
+Restore the column:
+
+```sql
+ALTER TABLE dbo.SchemaExercise
+ADD Description nvarchar(200) NULL;
+GO
+```
+
+Recreate the View:
+
+```sql
+CREATE OR ALTER VIEW dbo.vSchemaExercise
+WITH SCHEMABINDING
+AS
+SELECT
+    ID,
+    Name,
+    Description
+FROM dbo.SchemaExercise;
+GO
+```
+
+This is rejected:
+
+```sql
+ALTER TABLE dbo.SchemaExercise
+DROP COLUMN Description;
+```
+
+Cleanup:
+
+```sql
+DROP VIEW IF EXISTS dbo.vSchemaExercise;
+GO
+
+DROP TABLE IF EXISTS dbo.SchemaExercise;
+GO
+```
+
+</details>
+
+---
+
+# Cleanup
+
+Run this if you stopped the lab before completing all individual cleanup steps:
+
+```sql
+DROP VIEW IF EXISTS dbo.vCustomers;
+DROP VIEW IF EXISTS dbo.vCustomerCities;
+DROP VIEW IF EXISTS dbo.vInvoiceItems;
+DROP VIEW IF EXISTS dbo.vInvoiceSummary;
+DROP VIEW IF EXISTS dbo.vCreditCardTypes;
+DROP VIEW IF EXISTS dbo.vVisaCards;
+DROP VIEW IF EXISTS dbo.vDemoContacts;
+DROP VIEW IF EXISTS dbo.vActiveCards;
+DROP VIEW IF EXISTS dbo.vCategories;
+DROP VIEW IF EXISTS dbo.vCustomerLocations;
+DROP VIEW IF EXISTS dbo.vAcceptedCards;
+DROP VIEW IF EXISTS dbo.vSchemaExercise;
+GO
+
+DELETE FROM CreditCard
+WHERE CardNumber IN
+(
+    '378282246310005',
+    '4111111111111111',
+    '6011000000000000',
+    '371449635398431'
+);
+
+DELETE FROM Customer
+WHERE Email = 'grace@example.com';
+
+DROP TABLE IF EXISTS dbo.SchemaBindingDemo;
+DROP TABLE IF EXISTS dbo.SchemaExercise;
+GO
+```
+
+---
+
+# What you should know after this lab
+
+The important ideas are:
+
+```text
+Simple View
+    -> may allow INSERT / UPDATE / DELETE
+
+Complex View
+    -> additional modification restrictions
+```
+
+```text
+WITH CHECK OPTION
+    -> modified rows must remain visible through the View
+```
+
+```text
+WITH SCHEMABINDING
+    -> prevents incompatible schema changes to referenced objects
+```
+
+```text
+WITH ENCRYPTION
+    -> hides the View definition from normal metadata inspection
+    -> not a security boundary
+```
+
+And remember:
+
+> **A View is not just a saved SELECT. Its definition also determines what can be modified through it and which rules apply.**
+
+---
+
+# Where to go next
+
+In the next lab, **Triggers**, the database becomes active.
+
+A View responds when you query or modify it.
+
+A Trigger reacts automatically when data changes.

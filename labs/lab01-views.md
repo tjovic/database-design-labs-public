@@ -1,147 +1,270 @@
 # Lab 1 – Views
 
-Database: `AdventureWorksENG`
+**Database:** `AdventureWorksENG`
 
-Today you will learn:
-- What a View is (a saved SELECT statement, not stored data)
-- How to create, use, modify, and drop Views
-- How to query the database's own metadata using system Views
+A View is a named query that behaves like a virtual table.
 
-**Key idea to remember all lesson:**
+It does not normally store a separate copy of the data.
 
-> Views store SQL. Tables store data.
+> **Core idea:** Views store SQL. Tables store data.
+
+---
+
+## Learning objectives
+
+After completing this lab, you should be able to:
+
+- explain what a View is;
+- create and query a View;
+- modify a View definition;
+- drop a View;
+- explain why Views are useful for abstraction and reuse;
+- explain how a View can provide a stable interface over changing database structures;
+- query SQL Server metadata using system Views.
+
+Start by selecting the training database:
 
 ```sql
 USE AdventureWorksENG;
 GO
 ```
 
-## Part 1 – Why Views Exist
+---
 
-A query that grows uncomfortable to read.
+# Section 1 – Why Views exist
+
+Views become useful when queries grow longer, more repetitive, or harder to read.
+
+Let us build one query step by step.
+
+---
+
+## Stage 1 – A simple SELECT
 
 ```sql
--- Stage 1: a plain SELECT
 SELECT
     c.FirstName,
     c.LastName
 FROM Customer AS c;
 ```
 
+---
+
+## Stage 2 – Add the customer's city
+
 ```sql
--- Stage 2: join the customer's city
 SELECT
     c.FirstName,
     c.LastName,
     ci.Name AS City
 FROM Customer AS c
-JOIN City AS ci ON ci.IDCity = c.CityID;
+JOIN City AS ci
+    ON ci.IDCity = c.CityID;
 ```
 
+---
+
+## Stage 3 – Add the state
+
 ```sql
--- Stage 3: add the state
 SELECT
     c.FirstName,
     c.LastName,
     ci.Name AS City,
-    s.Name  AS State
+    s.Name AS State
 FROM Customer AS c
-JOIN City  AS ci ON ci.IDCity  = c.CityID
-JOIN State AS s  ON s.IDState = ci.StateID;
+JOIN City AS ci
+    ON ci.IDCity = c.CityID
+JOIN State AS s
+    ON s.IDState = ci.StateID;
 ```
 
+---
+
+## Stage 4 – Add purchase history
+
 ```sql
--- Stage 4: add purchase history
 SELECT
     c.FirstName,
     c.LastName,
     ci.Name AS City,
-    s.Name  AS State,
+    s.Name AS State,
     COUNT(DISTINCT i.IDInvoice) AS InvoiceCount,
-    SUM(ii.TotalPrice)          AS TotalSpent
+    SUM(ii.TotalPrice) AS TotalSpent
 FROM Customer AS c
-JOIN City  AS ci ON ci.IDCity  = c.CityID
-JOIN State AS s  ON s.IDState = ci.StateID
-JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
+JOIN City AS ci
+    ON ci.IDCity = c.CityID
+JOIN State AS s
+    ON s.IDState = ci.StateID
+JOIN Invoice AS i
+    ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii
+    ON ii.InvoiceID = i.IDInvoice
 GROUP BY
-    c.FirstName, c.LastName, ci.Name, s.Name;
+    c.FirstName,
+    c.LastName,
+    ci.Name,
+    s.Name;
 ```
 
+---
+
+## Stage 5 – Add filtering and calculations
+
 ```sql
--- Stage 5: add filtering, calculated column, ordering
 SELECT
-    CONCAT_WS(' ', FirstName, c.LastName) AS CustomerName,
+    CONCAT_WS(' ', c.FirstName, c.LastName) AS CustomerName,
     ci.Name AS City,
-    s.Name  AS State,
+    s.Name AS State,
     COUNT(DISTINCT i.IDInvoice) AS InvoiceCount,
-    SUM(ii.TotalPrice)          AS TotalSpent,
-    MAX(i.InvoiceDate)          AS LastPurchase
+    SUM(ii.TotalPrice) AS TotalSpent,
+    MAX(i.InvoiceDate) AS LastPurchase
 FROM Customer AS c
-JOIN City  AS ci ON ci.IDCity  = c.CityID
-JOIN State AS s  ON s.IDState = ci.StateID
-JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceDate >= '2004-06-01' AND i.InvoiceDate < '2004-06-30'
+JOIN City AS ci
+    ON ci.IDCity = c.CityID
+JOIN State AS s
+    ON s.IDState = ci.StateID
+JOIN Invoice AS i
+    ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii
+    ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceDate >= '2004-06-01'
+  AND i.InvoiceDate <  '2004-07-01'
 GROUP BY
-    c.FirstName, c.LastName, ci.Name, s.Name
+    c.FirstName,
+    c.LastName,
+    ci.Name,
+    s.Name
 HAVING SUM(ii.TotalPrice) > 1000
 ORDER BY TotalSpent DESC;
 ```
 
-```sql
--- Save this query as a View and call it with a single line
-GO
+The query now contains:
 
-CREATE VIEW dbo.vCustomerOverview
+- several joins;
+- filtering;
+- aggregation;
+- grouping;
+- a calculated column;
+- sorting.
+
+If the same logic is needed repeatedly, we can save the query as a View.
+
+---
+
+## Create the View
+
+```sql
+CREATE OR ALTER VIEW dbo.vCustomerOverview
 AS
 SELECT
-    CONCAT_WS(' ', FirstName, c.LastName) AS CustomerName,
+    CONCAT_WS(' ', c.FirstName, c.LastName) AS CustomerName,
     ci.Name AS City,
-    s.Name  AS State,
+    s.Name AS State,
     COUNT(DISTINCT i.IDInvoice) AS InvoiceCount,
-    SUM(ii.TotalPrice)          AS TotalSpent,
-    MAX(i.InvoiceDate)          AS LastPurchase
+    SUM(ii.TotalPrice) AS TotalSpent,
+    MAX(i.InvoiceDate) AS LastPurchase
 FROM Customer AS c
-JOIN City  AS ci ON ci.IDCity  = c.CityID
-JOIN State AS s  ON s.IDState = ci.StateID
-JOIN Invoice     AS i  ON i.CustomerID = c.IDCustomer
-JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceDate >= '2004-06-01' AND i.InvoiceDate < '2004-06-30'
+JOIN City AS ci
+    ON ci.IDCity = c.CityID
+JOIN State AS s
+    ON s.IDState = ci.StateID
+JOIN Invoice AS i
+    ON i.CustomerID = c.IDCustomer
+JOIN InvoiceItem AS ii
+    ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceDate >= '2004-06-01'
+  AND i.InvoiceDate <  '2004-07-01'
 GROUP BY
-    c.FirstName, c.LastName, ci.Name, s.Name
+    c.FirstName,
+    c.LastName,
+    ci.Name,
+    s.Name
 HAVING SUM(ii.TotalPrice) > 1000;
 GO
 ```
-> Notice the `ORDER BY` is gone.
-> Views cannot guarantee row order — that is the caller's responsibility.
 
+Notice that the `ORDER BY` is no longer part of the View definition.
+
+A View defines which rows and columns are returned, but it does not guarantee the final display order.
+
+The caller decides the order:
 
 ```sql
-SELECT * 
+SELECT *
 FROM dbo.vCustomerOverview
 ORDER BY TotalSpent DESC;
 ```
-> A View defines which rows and columns are returned, but not their final display order.
-> If a specific order is required, use `ORDER BY` when querying the View.
 
+The `vCustomerOverview` View summarizes customer purchasing activity for June 2004.
 
-The `vCustomerOverview` View summarizes customer purchasing activity for June 2004 by combining customer and invoice data.
-It shows the customer's location, number of invoices, total spending, and most recent purchase date, but only for customers who spent more than 1000 during that period.
+It returns:
 
-#### Naming convention
-> We will prefix View names with the letter `v` — for example, `vCustomerOverview`.
-> Many teams use `v`, `vw_`, or `view_`. Different companies, different rules.
-> The important thing is that a reader sees the name and knows instantly: this is a View, not a table.
+- customer name;
+- city;
+- state;
+- number of invoices;
+- total spending;
+- most recent purchase date.
 
-## Part 2 – The View Owns Nothing
+Only customers who spent more than `1000` during that period are included.
 
-A small, two-column View makes it easy to spot the moment when the underlying table changes and the View reflects it — without being touched.
+---
+
+## Naming convention
+
+In these labs, View names are prefixed with `v`.
+
+For example:
+
+```text
+vCustomerOverview
+vCustomerNames
+vCustomerCities
+```
+
+Other teams may use conventions such as:
+
+```text
+vw_
+view_
+```
+
+The exact convention is less important than using one consistently.
+
+---
+
+## Check your understanding
+
+1. What does a View store?
+2. Does a regular View store a separate copy of the query results?
+3. Why was `ORDER BY` removed from the View definition?
+4. Where should `ORDER BY` normally be used when querying a View?
+5. What is one advantage of saving a complex query as a View?
+
+<details>
+<summary>Show answers</summary>
+
+1. A query definition.
+2. No.
+3. Because a View does not define the final display order of its rows.
+4. In the query that selects from the View.
+5. It can hide complexity, improve reuse, and make repeated queries easier to read.
+
+</details>
+
+---
+
+# Section 2 – A View owns no data
+
+A regular View does not normally contain its own copy of the rows.
+
+It reads data from its underlying tables.
+
+Create a simple View:
 
 ```sql
-GO
-
-CREATE VIEW dbo.vCustomerNames
+CREATE OR ALTER VIEW dbo.vCustomerNames
 AS
 SELECT
     FirstName,
@@ -150,50 +273,127 @@ FROM Customer;
 GO
 ```
 
+Query it:
+
 ```sql
-SELECT * FROM dbo.vCustomerNames;
+SELECT *
+FROM dbo.vCustomerNames;
 ```
 
-### Proving the View owns no data
+---
+
+## Proving that the View owns no data
+
+Insert a test customer directly into the base table:
 
 ```sql
--- Insert a new customer directly into the base table
-INSERT INTO Customer (FirstName, LastName, Email, PhoneNumber, CityID)
-VALUES ('Ada', 'Lovelace', 'ada@example.com', '555-0001', 1);
+INSERT INTO Customer
+(
+    FirstName,
+    LastName,
+    Email,
+    PhoneNumber,
+    CityID
+)
+VALUES
+(
+    'Ada',
+    'Lovelace',
+    'ada@example.com',
+    '555-0001',
+    1
+);
 ```
 
+Now query the View:
+
 ```sql
--- The View immediately shows the new row because it reads
--- the current data from the underlying table
 SELECT *
 FROM dbo.vCustomerNames
 WHERE LastName = 'Lovelace';
 ```
 
+The new row appears immediately.
+
+The View itself was not modified.
+
+Now update the base table:
+
 ```sql
--- Same idea with UPDATE — target our own test row (never real data)
 UPDATE Customer
 SET FirstName = 'Augusta'
 WHERE Email = 'ada@example.com';
 ```
 
+Query the View again:
+
 ```sql
 SELECT *
 FROM dbo.vCustomerNames
 WHERE LastName = 'Lovelace';
 ```
 
->**Performance note**: 
-A regular View does not store query results and does not automatically make a query faster.
-SQL Server still executes the underlying query.
-Views are mainly used for abstraction, reuse, readability, and controlled access to data.
+The View shows the updated value.
 
-## Part 3 – Modifying and Dropping Views
+Conceptually:
+
+```mermaid
+flowchart LR
+    A["Customer table"]
+    B["vCustomerNames"]
+    C["SELECT from View"]
+
+    A --> B --> C
+```
+
+The View reads the current data from `Customer`.
+
+---
+
+## Performance note
+
+A regular View does not automatically make a query faster.
+
+SQL Server still executes the underlying query.
+
+Views are mainly useful for:
+
+- abstraction;
+- reuse;
+- readability;
+- controlled access to data;
+- hiding query complexity.
+
+---
+
+## Check your understanding
+
+1. If a row changes in the base table, does a regular View automatically reflect that change?
+2. Does the View need to be recreated after every data change?
+3. Does creating a regular View automatically improve performance?
+
+<details>
+<summary>Show answers</summary>
+
+1. Yes.
+2. No.
+3. No.
+
+</details>
+
+---
+
+# Section 3 – Modifying and dropping Views
+
+A View definition can change over time.
+
+---
+
+## ALTER VIEW
+
+An existing View can be changed with `ALTER VIEW`:
 
 ```sql
--- Old-style: ALTER VIEW replaces the definition
-GO
-
 ALTER VIEW dbo.vCustomerNames
 AS
 SELECT
@@ -204,15 +404,20 @@ FROM Customer;
 GO
 ```
 
+Query it:
+
 ```sql
-SELECT * FROM dbo.vCustomerNames;
+SELECT *
+FROM dbo.vCustomerNames;
 ```
 
-```sql
--- Modern idiom (SQL Server 2016+): CREATE OR ALTER
--- Works whether the View exists or not — perfect for deployment scripts
-GO
+---
 
+## CREATE OR ALTER VIEW
+
+A more convenient approach is:
+
+```sql
 CREATE OR ALTER VIEW dbo.vCustomerNames
 AS
 SELECT
@@ -223,29 +428,66 @@ FROM Customer;
 GO
 ```
 
->In the rest of the labs, we will normally use `CREATE OR ALTER VIEW`
+This works whether the View already exists or not.
+
+For that reason, we will normally use:
 
 ```sql
--- Remove the View (data is untouched)
+CREATE OR ALTER VIEW
+```
+
+in the rest of these labs.
+
+---
+
+## DROP VIEW
+
+Remove the View:
+
+```sql
 DROP VIEW dbo.vCustomerNames;
 GO
 ```
 
+Dropping a View does not delete the data from the underlying table.
+
+The data still exists:
+
 ```sql
--- Underlying data still exists
 SELECT TOP (5) *
 FROM Customer;
 ```
 
-## Part 4 - Views as a stable interface
+---
 
-A View can act as a **stable interface** between users or applications and the underlying database structure.
+## Check your understanding
 
-This means that the underlying database structure can change while the interface used by the application remains the same.
+1. What is the difference between `ALTER VIEW` and `CREATE OR ALTER VIEW`?
+2. Why is `CREATE OR ALTER VIEW` convenient in scripts?
+3. Does `DROP VIEW` delete rows from the base table?
 
-For this example, we will use a small separate database.
+<details>
+<summary>Show answers</summary>
 
-### Step 1 — Create a demo database
+1. `ALTER VIEW` requires the View to already exist. `CREATE OR ALTER VIEW` works whether it exists or not.
+2. The same script can be used for both initial creation and later changes.
+3. No.
+
+</details>
+
+---
+
+# Section 4 – Views as a stable interface
+
+A View can act as a stable interface between users or applications and the underlying database structure.
+
+The internal database design may change while the query used by the application remains the same.
+
+To demonstrate this safely, we will use a separate demo database.
+
+---
+
+## Step 1 – Create a demo database
 
 ```sql
 USE master;
@@ -263,23 +505,23 @@ GO
 
 ---
 
-### Step 2 — Start with a denormalized table
+## Step 2 – Start with a denormalized table
 
-Suppose our customer data is stored in a single table.
+Suppose all customer information is stored in one table:
 
 ```sql
 CREATE TABLE dbo.CustomerData
 (
-    CustomerID   INT PRIMARY KEY,
-    FirstName    NVARCHAR(50) NOT NULL,
-    LastName     NVARCHAR(50) NOT NULL,
-    CityName     NVARCHAR(100) NOT NULL,
-    CountryName  NVARCHAR(100) NOT NULL
+    CustomerID  int PRIMARY KEY,
+    FirstName   nvarchar(50) NOT NULL,
+    LastName    nvarchar(50) NOT NULL,
+    CityName    nvarchar(100) NOT NULL,
+    CountryName nvarchar(100) NOT NULL
 );
 GO
 ```
 
-Insert some test data:
+Insert sample data:
 
 ```sql
 INSERT INTO dbo.CustomerData
@@ -298,10 +540,10 @@ VALUES
 GO
 ```
 
-Now create a View:
+Create a View:
 
 ```sql
-CREATE VIEW dbo.vCustomerInfo
+CREATE OR ALTER VIEW dbo.vCustomerInfo
 AS
 SELECT
     CustomerID,
@@ -313,7 +555,7 @@ FROM dbo.CustomerData;
 GO
 ```
 
-The user can retrieve customer information using:
+The application uses:
 
 ```sql
 SELECT *
@@ -321,15 +563,15 @@ FROM dbo.vCustomerInfo
 ORDER BY CustomerID;
 ```
 
-At this point, the structure looks like this:
+At this point:
 
 ```mermaid
 flowchart TD
-    A[User / Application]
+    A["User / Application"]
 
-    subgraph DB[Database]
-        B[vCustomerInfo]
-        C[CustomerData]
+    subgraph DB["Database"]
+        B["vCustomerInfo"]
+        C["CustomerData"]
 
         B --> C
     end
@@ -339,32 +581,32 @@ flowchart TD
 
 ---
 
-### Step 3 — Normalize the database
+## Step 3 – Normalize the database
 
-Later, we decide to normalize the database.
+Later, the database design changes.
 
-Instead of storing city information repeatedly in `CustomerData`, we separate the data into two tables:
+Instead of storing city information repeatedly in `CustomerData`, we separate the data into:
 
 - `Customer`
 - `City`
 
-Create the normalized tables:
+Create the new structure:
 
 ```sql
 CREATE TABLE dbo.City
 (
-    CityID       INT PRIMARY KEY,
-    CityName     NVARCHAR(100) NOT NULL,
-    CountryName  NVARCHAR(100) NOT NULL
+    CityID      int PRIMARY KEY,
+    CityName    nvarchar(100) NOT NULL,
+    CountryName nvarchar(100) NOT NULL
 );
 GO
 
 CREATE TABLE dbo.Customer
 (
-    CustomerID  INT PRIMARY KEY,
-    FirstName   NVARCHAR(50) NOT NULL,
-    LastName    NVARCHAR(50) NOT NULL,
-    CityID      INT NOT NULL,
+    CustomerID int PRIMARY KEY,
+    FirstName  nvarchar(50) NOT NULL,
+    LastName   nvarchar(50) NOT NULL,
+    CityID     int NOT NULL,
 
     CONSTRAINT FK_Customer_City
         FOREIGN KEY (CityID)
@@ -373,7 +615,7 @@ CREATE TABLE dbo.Customer
 GO
 ```
 
-Insert the same data into the normalized structure:
+Insert the same logical data:
 
 ```sql
 INSERT INTO dbo.City
@@ -403,15 +645,15 @@ VALUES
 GO
 ```
 
-The internal database structure has now changed.
+The internal database structure has changed.
 
 ---
 
-### Step 4 — Change the View, not the user query
+## Step 4 – Change the View, not the application query
 
-The old View still depends on `CustomerData`.
+The old View still reads from `CustomerData`.
 
-We can change the View definition so that it reads from the new normalized tables.
+We can change only the View definition:
 
 ```sql
 CREATE OR ALTER VIEW dbo.vCustomerInfo
@@ -428,30 +670,34 @@ JOIN dbo.City AS ci
 GO
 ```
 
+The original table is no longer needed:
+
 ```sql
---The View now uses the normalized tables, so the original denormalized table is no longer needed and can be removed.
 DROP TABLE dbo.CustomerData;
 GO
 ```
 
-Now run exactly the same query as before:
+Now run the same application query:
 
 ```sql
 SELECT *
 FROM dbo.vCustomerInfo
+ORDER BY CustomerID;
 ```
 
->The underlying structure has changed completely, but users can continue using the same View without changing their query.
+The query did not change.
+
+Only the internal implementation changed.
 
 ### Before
 
 ```mermaid
 flowchart TD
-    A[User / Application]
+    A["User / Application"]
 
-    subgraph DB[Database]
-        B[vCustomerInfo]
-        C[CustomerData]
+    subgraph DB["Database"]
+        B["vCustomerInfo"]
+        C["CustomerData"]
 
         B --> C
     end
@@ -463,12 +709,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[User / Application]
+    A["User / Application"]
 
-    subgraph DB[Database]
-        B[vCustomerInfo]
-        C[Customer]
-        D[City]
+    subgraph DB["Database"]
+        B["vCustomerInfo"]
+        C["Customer"]
+        D["City"]
 
         B --> C
         B --> D
@@ -477,89 +723,131 @@ flowchart TD
     A --> B
 ```
 
-
 > **The database structure changed, but the interface remained the same.**
 
 The user does not need to know whether the data comes from one table or several tables.
 
-This is an important use of Views:
+This is an example of:
 
-> **A View can provide a stable interface while hiding changes in the underlying database structure.**
-
-This is an example of **abstraction** and **logical data independence**.
+- abstraction;
+- logical data independence.
 
 ---
 
-### Key idea
+## Key idea
 
-Without a View, an application that directly queried `CustomerData` would need to be changed after normalization.
+Without a View:
 
-With the View, only the View definition needs to change.
+```text
+Application -> CustomerData
+```
+
+If the table structure changes, the application query may also need to change.
+
+With a View:
+
+```text
+Application -> View -> underlying tables
+```
+
+The View can absorb some internal structural changes.
 
 ```mermaid
 flowchart TD
-    A[Application query stays the same]
-    B[vCustomerInfo<br/>Stable interface]
-    C[Underlying structure may change]
+    A["Application query stays the same"]
+    B["vCustomerInfo<br/>Stable interface"]
+    C["Underlying structure may change"]
 
-    A --> B
-    B --> C
+    A --> B --> C
 ```
 
-This makes Views useful as a stable interface between applications, users, reports, and the underlying database model.
+---
 
-### Return to the training database
+## Check your understanding
 
-The stable-interface example used a separate demo database.
+1. What remained unchanged after the database was normalized?
+2. What had to change?
+3. Why can a View act as a stable interface?
+4. What does abstraction mean in this example?
 
-For the rest of the lab, switch back to `AdventureWorksENG`:
+<details>
+<summary>Show answers</summary>
+
+1. The query used by the application.
+2. The View definition and the underlying table structure.
+3. Because the View can preserve the same columns and interface while reading from a different internal structure.
+4. The application does not need to know the details of how the data is stored internally.
+
+</details>
+
+---
+
+## Return to the training database
 
 ```sql
 USE AdventureWorksENG;
 GO
 ```
 
-## Part 5 – System Views: The Database Describing Itself
+---
 
-SQL Server stores information about database objects such as tables, columns, indexes, and constraints.
+# Section 5 – System Views
 
-This information is exposed through **system Views**, such as `sys.tables` and `sys.columns`.
+SQL Server stores metadata about database objects such as:
 
-Because system metadata is available through Views, we can query the structure of the database using ordinary SQL.
+- tables;
+- columns;
+- indexes;
+- constraints;
+- Views.
+
+This metadata can itself be queried using system Views.
+
+Examples include:
+
+```text
+sys.tables
+sys.columns
+```
 
 System Views are useful for:
-- exploring database structure
-- checking object definitions
-- writing administration and diagnostic queries
-- generating dynamic SQL or documentation
 
-System Views are a good example of how Views can provide a structured interface over more complex internal database metadata.
+- exploring database structure;
+- checking metadata;
+- writing administration queries;
+- diagnostics;
+- generating documentation or dynamic SQL.
+
+---
+
+## List tables
 
 ```sql
--- Every row = one table in the current database
-SELECT * FROM sys.tables;
+SELECT *
+FROM sys.tables;
 ```
 
+A more focused query:
+
 ```sql
--- Every row = one column
-SELECT * FROM sys.columns;
+SELECT
+    name
+FROM sys.tables
+ORDER BY name;
 ```
 
-Two vocabularies for the same idea:
+---
+
+## List columns
 
 ```sql
--- SQL Server-specific:
-SELECT name FROM sys.tables ORDER BY name;
+SELECT *
+FROM sys.columns;
 ```
 
-```sql
--- SQL-standard INFORMATION_SCHEMA interface
--- available in several DBMSs, including SQL Server, PostgreSQL and MySQL
-SELECT * FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_NAME;
-```
+To list columns together with their table names:
 
 ```sql
--- List every column of every table
 SELECT
     t.name AS TableName,
     c.name AS ColumnName
@@ -571,27 +859,92 @@ ORDER BY
     c.column_id;
 ```
 
+---
+
+## INFORMATION_SCHEMA
+
+SQL Server also provides standard-style metadata Views:
+
 ```sql
--- Objects have IDs, just like business entities
+SELECT *
+FROM INFORMATION_SCHEMA.TABLES
+ORDER BY TABLE_NAME;
+```
+
+`INFORMATION_SCHEMA` exists in several relational database systems, although available metadata and implementation details differ between DBMSs.
+
+---
+
+## Object IDs
+
+SQL Server objects have internal IDs.
+
+For example:
+
+```sql
 SELECT OBJECT_ID('Customer');
+```
+
+And:
+
+```sql
 SELECT OBJECT_NAME(OBJECT_ID('Customer'));
 ```
 
-## Exercises
+This is useful when working with SQL Server metadata.
 
-Try each exercise on your own first. Only look at the solution after you have attempted it.
+---
 
-### Exercise 1 – Create your first View
+## Check your understanding
 
-Task: Create a View named dbo.vCustomers that returns three columns from Customer: FirstName, LastName, Email. Then query the View and confirm rows come back.
+1. What is metadata?
+2. Which system View lists tables?
+3. Which system View lists columns?
+4. What does `OBJECT_ID()` return?
+5. Why are system Views useful?
 
 <details>
-<summary>Show answer</summary>
+<summary>Show answers</summary>
+
+1. Data that describes database objects and structure.
+2. `sys.tables`.
+3. `sys.columns`.
+4. The internal object ID for a database object.
+5. They allow database structure and metadata to be queried with SQL.
+
+</details>
+
+---
+
+# Exercises
+
+Try each exercise before opening the solution.
+
+---
+
+## Exercise 1 – Create your first View
+
+Create a View named:
+
+```text
+dbo.vCustomers
+```
+
+It should return:
+
+- `FirstName`
+- `LastName`
+- `Email`
+
+from `Customer`.
+
+Then query the View.
+
+<details>
+<summary>Show solution</summary>
 
 ```sql
-GO
-
-CREATE VIEW dbo.vCustomers
+CREATE OR ALTER VIEW dbo.vCustomers
 AS
 SELECT
     FirstName,
@@ -600,20 +953,30 @@ SELECT
 FROM Customer;
 GO
 
-SELECT * FROM dbo.vCustomers;
+SELECT *
+FROM dbo.vCustomers;
 ```
+
 </details>
 
-### Exercise 2 – Modify the View
+---
 
-Task: Use CREATE OR ALTER VIEW to modify dbo.vCustomers so it also returns PhoneNumber. Query the View to verify.
+## Exercise 2 – Modify the View
+
+Modify `dbo.vCustomers` so that it also returns:
+
+```text
+PhoneNumber
+```
+
+Use `CREATE OR ALTER VIEW`.
+
+Then query the View again.
 
 <details>
-<summary>Show answer</summary>
+<summary>Show solution</summary>
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vCustomers
 AS
 SELECT
@@ -624,23 +987,42 @@ SELECT
 FROM Customer;
 GO
 
-SELECT * FROM dbo.vCustomers;
+SELECT *
+FROM dbo.vCustomers;
 ```
+
 </details>
 
-### Exercise 3 – Hide a JOIN inside a View
+---
 
-Task: Create a View named dbo.vCustomerCities that returns FirstName, LastName, and the city name (aliased as City). The city name comes from the City table. Then query the View WITHOUT writing a JOIN.
+## Exercise 3 – Hide a JOIN inside a View
 
-**Hints**
-- Customer.CityID → City.IDCity (join condition)
+Create:
+
+```text
+dbo.vCustomerCities
+```
+
+The View should return:
+
+- `FirstName`
+- `LastName`
+- city name as `City`
+
+Use `Customer` and `City`.
+
+Then query the View **without writing a JOIN in the final SELECT**.
+
+Hint:
+
+```text
+Customer.CityID -> City.IDCity
+```
 
 <details>
-<summary>Show answer</summary>
+<summary>Show solution</summary>
 
 ```sql
-GO
-
 CREATE OR ALTER VIEW dbo.vCustomerCities
 AS
 SELECT
@@ -652,47 +1034,136 @@ JOIN City AS ci
     ON ci.IDCity = c.CityID;
 GO
 
-SELECT * FROM dbo.vCustomerCities;
+SELECT *
+FROM dbo.vCustomerCities;
 ```
+
 </details>
 
-### Bonus Exercise
+---
 
-Task: Using sys.tables, count how many tables exist in this database.
+## Exercise 4 – Explore system Views
+
+Using `sys.tables`, count how many user tables exist in the current database.
 
 <details>
-<summary>Show answer</summary>
+<summary>Show solution</summary>
 
 ```sql
 SELECT COUNT(*) AS TableCount
 FROM sys.tables;
 ```
+
 </details>
 
-## Cleanup
+---
 
-Drop the Views you created so the training database stays clean.
+## Exercise 5 – List table columns
+
+Using `sys.tables` and `sys.columns`, list all columns belonging to the `Customer` table.
+
+Return:
+
+- table name;
+- column name.
+
+<details>
+<summary>Show solution</summary>
 
 ```sql
-GO
+SELECT
+    t.name AS TableName,
+    c.name AS ColumnName
+FROM sys.tables AS t
+JOIN sys.columns AS c
+    ON c.object_id = t.object_id
+WHERE t.name = 'Customer'
+ORDER BY c.column_id;
+```
 
+</details>
+
+---
+
+# Cleanup
+
+Remove the Views created during the exercises:
+
+```sql
 DROP VIEW IF EXISTS dbo.vCustomers;
-GO
-
 DROP VIEW IF EXISTS dbo.vCustomerCities;
-GO
-
--- Also remove the test customer we inserted (identified by unique email)
-DELETE FROM Customer WHERE Email = 'ada@example.com';
+DROP VIEW IF EXISTS dbo.vCustomerOverview;
 GO
 ```
 
-## Key takeaways
+Remove the test customer:
 
-- A View stores a query definition, not a copy of the data.
-- Changes in the underlying tables are immediately visible through the View.
-- A View can hide joins and other query complexity.
-- A View can provide a stable interface even if the underlying database structure changes.
-- `CREATE OR ALTER VIEW` is convenient when maintaining View definitions.
-- A regular View does not automatically improve query performance.
-- SQL Server metadata can itself be queried through system Views.
+```sql
+DELETE FROM Customer
+WHERE Email = 'ada@example.com';
+GO
+```
+
+The separate demo database can also be removed when it is no longer needed:
+
+```sql
+USE master;
+GO
+
+DROP DATABASE IF EXISTS DatabaseDesignDemo;
+GO
+
+USE AdventureWorksENG;
+GO
+```
+
+---
+
+# What you should know after this lab
+
+The most important ideas are:
+
+```text
+View
+    -> stores a query definition
+    -> behaves like a virtual table
+```
+
+```text
+Base table changes
+    -> immediately visible through a regular View
+```
+
+```text
+View
+    -> hides query complexity
+    -> supports reuse
+    -> can provide a stable interface
+```
+
+```text
+CREATE OR ALTER VIEW
+    -> create a new View
+    -> or replace an existing definition
+```
+
+```text
+sys.tables / sys.columns
+    -> expose SQL Server metadata through system Views
+```
+
+And remember:
+
+> **Views store SQL. Tables store data.**
+
+---
+
+# Where to go next
+
+In the next lab, **Views (continued)**, we will look at what happens when data is modified through a View.
+
+You will also learn about:
+
+- `WITH CHECK OPTION`;
+- `WITH SCHEMABINDING`;
+- `WITH ENCRYPTION`.

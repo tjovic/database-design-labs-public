@@ -30,6 +30,7 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 | 01 | [Views](labs/lab01-views.md) | creating Views, hiding query complexity, stable interfaces, system Views |
 | 02 | [Views – continued](labs/lab02-views.md) | modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
 | 03 | [Triggers](labs/lab03-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
+| 04 | [Stored Procedures](labs/lab04-stored-procedures.md) | creating and executing procedures, input and output parameters, `RETURN`, encapsulating database operations |
 
 > Additional labs will be added as the course progresses.
 
@@ -51,6 +52,8 @@ Lab 02 – Views continued
 Lab 00 – T-SQL Essentials
         ↓
 Lab 03 – Triggers
+        ↓
+Lab 04 – Stored Procedures
 ```
 
 The exact order may change as new labs are added.
@@ -75,7 +78,7 @@ Some examples intentionally produce SQL Server errors. These are part of the lea
 
 The labs use `AdventureWorksENG`, a training database prepared for the course.
 
-The examples may create temporary Views, tables, triggers, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
+The examples may create temporary Views, tables, triggers, stored procedures, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
 
 ---
 

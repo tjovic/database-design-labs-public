@@ -26,10 +26,11 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 | # | Lab | Main topics |
 |---|---|---|
-| 00 | [T-SQL Essentials](labs/lab00-tsql-essentials.md) | batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `CAST` |
+| 00 | [T-SQL Essentials](labs/lab00-tsql-essentials.md) | batches and `GO`, variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `CAST` |
 | 01 | [Views](labs/lab01-views.md) | creating and querying Views, hiding query complexity, stable interfaces, system Views, modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
 | 02 | [Triggers](labs/lab02-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
 | 03 | [Stored Procedures](labs/lab03-stored-procedures.md) | creating and executing procedures, input and output parameters, `RETURN`, encapsulating database operations |
+| 04 | [Functions](labs/lab04-functions.md) | scalar functions, inline and multi-statement table-valued functions, parameters and return values, functions vs. procedures, performance considerations |
 
 > Additional labs will be added as the course progresses.
 
@@ -51,6 +52,8 @@ Lab 00 – T-SQL Essentials
 Lab 02 – Triggers
         ↓
 Lab 03 – Stored Procedures
+        ↓
+Lab 04 – Functions
 ```
 
 A single lab may span more than one class session when the topic requires additional time.
@@ -77,7 +80,7 @@ Some examples intentionally produce SQL Server errors. These are part of the lea
 
 The labs use `AdventureWorksENG`, a training database prepared for the course.
 
-The examples may create temporary Views, tables, triggers, stored procedures, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
+The examples may create temporary Views, tables, triggers, stored procedures, functions, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
 
 ---
 

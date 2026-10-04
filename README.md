@@ -27,10 +27,9 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 | # | Lab | Main topics |
 |---|---|---|
 | 00 | [T-SQL Essentials](labs/lab00-tsql-essentials.md) | batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `CAST` |
-| 01 | [Views](labs/lab01-views.md) | creating Views, hiding query complexity, stable interfaces, system Views |
-| 02 | [Views – continued](labs/lab02-views.md) | modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
-| 03 | [Triggers](labs/lab03-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
-| 04 | [Stored Procedures](labs/lab04-stored-procedures.md) | creating and executing procedures, input and output parameters, `RETURN`, encapsulating database operations |
+| 01 | [Views](labs/lab01-views.md) | creating and querying Views, hiding query complexity, stable interfaces, system Views, modifying data through Views, `WITH CHECK OPTION`, `SCHEMABINDING`, `ENCRYPTION` |
+| 02 | [Triggers](labs/lab02-triggers.md) | DML triggers, `inserted` / `deleted`, multi-row safety, auditing and business rules |
+| 03 | [Stored Procedures](labs/lab03-stored-procedures.md) | creating and executing procedures, input and output parameters, `RETURN`, encapsulating database operations |
 
 > Additional labs will be added as the course progresses.
 
@@ -38,23 +37,23 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 ## Lab order
 
-The lab number identifies the material, but the labs are not necessarily taught strictly in numerical order.
+The lab number identifies a thematic unit, but the labs are not necessarily taught strictly in numerical order.
 
-For example, **Lab 00 – T-SQL Essentials** is used as preparation before **Lab 03 – Triggers**, because triggers rely on several T-SQL concepts introduced there.
+For example, **Lab 00 – T-SQL Essentials** is used as preparation before **Lab 02 – Triggers**, because triggers rely on several T-SQL concepts introduced there.
 
 A typical progression for the current materials is:
 
 ```text
 Lab 01 – Views
         ↓
-Lab 02 – Views continued
-        ↓
 Lab 00 – T-SQL Essentials
         ↓
-Lab 03 – Triggers
+Lab 02 – Triggers
         ↓
-Lab 04 – Stored Procedures
+Lab 03 – Stored Procedures
 ```
+
+A single lab may span more than one class session when the topic requires additional time.
 
 The exact order may change as new labs are added.
 

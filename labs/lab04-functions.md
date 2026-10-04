@@ -117,6 +117,38 @@ flowchart TD
     D -- Table --> F[Table-Valued Function]
 ```
 
+### Functions as reusable building blocks
+
+A function is not limited to a `SELECT` statement that you run directly in SSMS.
+
+Functions can also be used inside SQL statements in other database objects, such as:
+
+- stored procedures;
+- triggers;
+- other functions.
+
+For example, a stored procedure can call a function to calculate or validate a value and then use that result when performing an operation.
+
+```sql
+-- Inside a stored procedure or trigger
+SET @IsLeapYear = dbo.fn_IsLeapYear(YEAR(@SomeDate));
+```
+
+The responsibilities remain different:
+
+```text
+Function
+    -> calculates and returns a result
+
+Stored Procedure
+    -> can use that result and perform an operation
+
+Trigger
+    -> can use that result while reacting to an event
+```
+
+> **Key idea:** Functions are reusable building blocks. They can be composed with other database objects wherever their returned value can be used.
+
 Functions are intended to calculate and return results. A T-SQL
 user-defined function cannot modify application tables using operations
 such as `INSERT`, `UPDATE`, or `DELETE`.
@@ -130,6 +162,7 @@ such as `INSERT`, `UPDATE`, or `DELETE`.
 2. Can a T-SQL function modify application tables?
 3. Which object would you choose if the result must be used inside
     another query?
+4. Can a stored procedure or trigger use a function?
 
 <details>
 <summary>Show answers</summary>
@@ -138,6 +171,7 @@ such as `INSERT`, `UPDATE`, or `DELETE`.
     is used as part of another SQL statement.
 2. No. A T-SQL user-defined function cannot modify application tables.
 3. A function.
+4. Yes. Functions can be used inside SQL statements in procedures, triggers, and other functions wherever their returned value can be used.
 
 </details>
 
@@ -916,7 +950,81 @@ GO
 
 ---
 
-# Section 7 – Real-World Example
+# Section 7 – Two Performance Warnings
+
+Functions make SQL code reusable and expressive, but they can also affect query performance.
+
+There are two different situations to recognise.
+
+## 1. Scalar functions evaluated over many rows
+
+You have already seen this query:
+
+```sql
+SELECT
+    IDProduct,
+    Name,
+    dbo.fn_ProductSoldQuantity(IDProduct) AS TotalSold
+FROM Product;
+```
+
+The scalar function may need to be evaluated for many product rows.
+
+Modern SQL Server versions can optimise some scalar functions using **scalar UDF inlining**, but this is not guaranteed.
+
+The important question is:
+
+```text
+How many rows will use this function?
+```
+
+---
+
+## 2. Functions applied to filtered columns
+
+Consider the following query:
+
+```sql
+SELECT
+    IDInvoice,
+    InvoiceDate
+FROM Invoice
+WHERE YEAR(InvoiceDate) = 2011;
+```
+
+The condition is easy to read, but the function is applied directly to the `InvoiceDate` column.
+
+This can make it harder for SQL Server to use an index efficiently.
+
+The same condition can be written as a date range:
+
+```sql
+SELECT
+    IDInvoice,
+    InvoiceDate
+FROM Invoice
+WHERE InvoiceDate >= '20110101'
+  AND InvoiceDate <  '20120101';
+```
+
+The second form leaves the column unchanged and compares it directly with boundary values.
+
+This property is related to **SARGability** (*Search ARGument ABLE*).
+
+You will study SARGability, index seeks, index scans, and execution plans in detail when we study indexes and query performance.
+
+For now, remember the difference:
+
+| Situation | Question to ask |
+| --- | --- |
+| Scalar function used for many rows | How many times may this function need to be evaluated? |
+| Function applied to a column in `WHERE` | Can SQL Server efficiently search the column using an index? |
+
+> **Key idea:** These are two different performance concerns. Do not confuse repeated scalar function evaluation with SARGability.
+
+---
+
+# Section 8 – Real-World Example
 
 A common design problem is deciding **which database object should own
 which responsibility**.
@@ -1591,6 +1699,16 @@ Inline Table-Valued Function
 Multi-Statement Table-Valued Function
     -> declares and fills a returned table variable
     -> supports multiple statements and procedural logic
+```
+
+```text
+Functions and other database objects
+    -> procedures can use functions
+    -> triggers can use functions
+    -> functions can be composed with other functions
+Performance
+    -> scalar functions may be evaluated over many rows
+    -> functions applied to filtered columns can affect SARGability
 ```
 
 A practical decision tree is:

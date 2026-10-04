@@ -1706,6 +1706,9 @@ Functions and other database objects
     -> procedures can use functions
     -> triggers can use functions
     -> functions can be composed with other functions
+```
+
+```text  
 Performance
     -> scalar functions may be evaluated over many rows
     -> functions applied to filtered columns can affect SARGability

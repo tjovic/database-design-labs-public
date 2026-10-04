@@ -363,7 +363,7 @@ SELECT
     Name,
     Color
 FROM Product
-WHERE Color = 'Black';
+WHERE Color = 'Crna';
 
 SELECT *
 FROM @SelectedProducts;

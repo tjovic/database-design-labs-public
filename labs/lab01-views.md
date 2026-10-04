@@ -1391,7 +1391,7 @@ INSERT INTO dbo.vVisaCards
 )
 VALUES
 (
-    'Discover',
+    'Master Card',
     '6011000000000000',
     6,
     2029

@@ -1625,7 +1625,7 @@ SELECT
     Type,
     CardNumber
 FROM CreditCard
-WHERE ExpirationYear >= 2026;
+WHERE ExpirationYear >= 2008;
 GO
 ```
 
@@ -1646,7 +1646,7 @@ SELECT
     Type,
     CardNumber
 FROM CreditCard
-WHERE ExpirationYear >= 2026;
+WHERE ExpirationYear >= 2008;
 GO
 ```
 

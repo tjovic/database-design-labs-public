@@ -47,7 +47,7 @@ graph LR
     City ---|1| r2 ---|N| Customer
     Customer ---|1| r3 ---|N| Invoice
     Salesman ---|1| r4 ---|N| Invoice
-    Invoice ---|1| r5 ---|1| CreditCard
+    Invoice ---|N| r5 ---|1| CreditCard
     Invoice ---|1| r6 ---|N| InvoiceItem
     Product ---|1| r7 ---|N| InvoiceItem
     Subcategory ---|1| r8 ---|N| Product

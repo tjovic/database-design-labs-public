@@ -805,10 +805,304 @@ Transactions are outside the scope of this lab, but this example shows why they 
 > **Key idea:** A stored procedure can group several statements into one callable operation. A transaction guarantees that related changes succeed or fail together.
 
 
+---
+# Section 6 - Real-world example: Calculating a loyalty discount
+
+Stored procedures are often used to implement **business rules**.
+
+Consider a simple loyalty program.
+
+When a customer is making a purchase, the application needs to determine whether the customer is eligible for a discount.
+
+The discount depends on how much the customer spent during a specified period:
+
+| Total spent | Discount |
+|---:|---:|
+| Less than €500 | 0% |
+| €500 – €999.99 | 5% |
+| €1,000 – €1,999.99 | 10% |
+| €2,000 or more | 15% |
+
+The application provides:
+
+- the customer,
+- the beginning of the period,
+- the end of the period.
+
+The stored procedure calculates the customer's total spending and returns the appropriate discount percentage.
+
+```mermaid
+flowchart LR
+    A["Application"] -->|"Customer ID<br/>Date from<br/>Date to"| B["Stored procedure"]
+    B --> C["Calculate total spending"]
+    C --> D["Determine discount"]
+    D -->|"OUTPUT parameter"| A
+```
+
+This example demonstrates three different ways of working with values inside a stored procedure:
+
+| Value | Type | Purpose |
+|---|---|---|
+| `@CustomerID` | Input parameter | Customer to check |
+| `@DateFrom` | Input parameter | Beginning of the period |
+| `@DateTo` | Input parameter | End of the period |
+| `@TotalSpent` | Local variable | Stores the calculated spending |
+| `@DiscountPercent` | Output parameter | Returns the discount to the caller |
+
+---
+
+### Calculating the customer's spending
+
+First, let's calculate how much customer `100` spent during 2003:
+
+```sql
+USE AdventureWorksENG;
+GO
+```
+
+```sql
+SELECT SUM(ii.TotalPrice)
+FROM Invoice i
+JOIN InvoiceItem ii
+    ON ii.InvoiceID = i.IDInvoice
+WHERE i.CustomerID = 100
+  AND i.InvoiceDate >= '2003-01-01'
+  AND i.InvoiceDate <= '2003-12-31';
+```
+
+The result is:
+
+```text
+1728.510000
+```
+
+According to our loyalty rules, this customer should receive a **10% discount**.
+
+However, there is one small problem.
+
+If the customer has no purchases during the selected period, `SUM()` returns `NULL`.
+
+We want the total spending to be `0` instead:
+
+```sql
+SELECT COALESCE(SUM(ii.TotalPrice), 0)
+FROM Invoice i
+JOIN InvoiceItem ii
+    ON ii.InvoiceID = i.IDInvoice
+WHERE i.CustomerID = 100
+  AND i.InvoiceDate >= '2003-01-01'
+  AND i.InvoiceDate <= '2003-12-31';
+```
+
+Now we can use this calculation inside a stored procedure.
+
+---
+
+### Creating the procedure
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetLoyaltyDiscount
+    @CustomerID int,
+    @DateFrom date,
+    @DateTo date,
+    @DiscountPercent decimal(5,2) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @TotalSpent decimal(10,2);
+
+    SELECT @TotalSpent =
+        COALESCE(SUM(ii.TotalPrice), 0)
+    FROM Invoice i
+    JOIN InvoiceItem ii
+        ON ii.InvoiceID = i.IDInvoice
+    WHERE i.CustomerID = @CustomerID
+      AND i.InvoiceDate >= @DateFrom
+      AND i.InvoiceDate <= @DateTo;
+
+    IF @TotalSpent >= 2000
+        SET @DiscountPercent = 15;
+    ELSE IF @TotalSpent >= 1000
+        SET @DiscountPercent = 10;
+    ELSE IF @TotalSpent >= 500
+        SET @DiscountPercent = 5;
+    ELSE
+        SET @DiscountPercent = 0;
+END;
+GO
+```
+
+The procedure receives three **input parameters**:
+
+```sql
+@CustomerID int,
+@DateFrom date,
+@DateTo date,
+```
+
+These values come from the caller.
+
+The procedure also declares a **local variable**:
+
+```sql
+DECLARE @TotalSpent decimal(10,2);
+```
+
+This variable exists only while the procedure is executing.
+
+The query calculates the customer's spending and stores the result in that variable:
+
+```sql
+SELECT @TotalSpent =
+    COALESCE(SUM(ii.TotalPrice), 0)
+FROM Invoice i
+JOIN InvoiceItem ii
+    ON ii.InvoiceID = i.IDInvoice
+WHERE i.CustomerID = @CustomerID
+  AND i.InvoiceDate >= @DateFrom
+  AND i.InvoiceDate <= @DateTo;
+```
+
+The procedure then applies the loyalty rules:
+
+```sql
+IF @TotalSpent >= 2000
+    SET @DiscountPercent = 15;
+ELSE IF @TotalSpent >= 1000
+    SET @DiscountPercent = 10;
+ELSE IF @TotalSpent >= 500
+    SET @DiscountPercent = 5;
+ELSE
+    SET @DiscountPercent = 0;
+```
+
+```mermaid
+flowchart TD
+    A["Calculate @TotalSpent"] --> B{"@TotalSpent >= 2000?"}
+    B -->|"Yes"| C["15%"]
+    B -->|"No"| D{"@TotalSpent >= 1000?"}
+    D -->|"Yes"| E["10%"]
+    D -->|"No"| F{"@TotalSpent >= 500?"}
+    F -->|"Yes"| G["5%"]
+    F -->|"No"| H["0%"]
+```
+
+Finally, `@DiscountPercent` is an **OUTPUT parameter**:
+
+```sql
+@DiscountPercent decimal(5,2) OUTPUT
+```
+
+This allows the procedure to return the calculated discount to the caller.
+
+---
+
+### Calling the procedure
+
+The caller first needs a variable that will receive the returned value:
+
+```sql
+DECLARE @Discount decimal(5,2);
+```
+
+We can then execute the procedure:
+
+```sql
+EXEC dbo.usp_GetLoyaltyDiscount
+    @CustomerID = 100,
+    @DateFrom = '2003-01-01',
+    @DateTo = '2003-12-31',
+    @DiscountPercent = @Discount OUTPUT;
+```
+
+Finally, we can inspect the returned value:
+
+```sql
+SELECT @Discount AS DiscountPercent;
+```
+
+The complete call is:
+
+```sql
+DECLARE @Discount decimal(5,2);
+
+EXEC dbo.usp_GetLoyaltyDiscount
+    @CustomerID = 100,
+    @DateFrom = '2003-01-01',
+    @DateTo = '2003-12-31',
+    @DiscountPercent = @Discount OUTPUT;
+
+SELECT @Discount AS DiscountPercent;
+```
+
+The result should be:
+
+| DiscountPercent |
+|---:|
+| 10.00 |
+
+The procedure calculated that customer `100` spent **€1,728.51** during the selected period and therefore returned a **10% discount**.
+
+```mermaid
+flowchart LR
+    A["@CustomerID = 100<br/>@DateFrom = 2003-01-01<br/>@DateTo = 2003-12-31"] -->|"INPUT"| B["usp_GetLoyaltyDiscount"]
+    B --> C["@TotalSpent<br/>1728.51"]
+    C --> D["IF / ELSE"]
+    D --> E["@DiscountPercent<br/>10%"]
+    E -->|"OUTPUT"| F["Caller"]
+```
+
+---
+
+### Input, local, and output values
+
+It is important to understand the different roles of the values used in this example.
+
+**Input parameters** bring values into the procedure:
+
+```sql
+@CustomerID
+@DateFrom
+@DateTo
+```
+
+A **local variable** stores an intermediate result inside the procedure:
+
+```sql
+@TotalSpent
+```
+
+An **OUTPUT parameter** sends a value back to the caller:
+
+```sql
+@DiscountPercent
+```
+
+Conceptually:
+
+```mermaid
+flowchart LR
+    A["Input parameters"] --> B["Stored procedure"]
+    B --> C["Local variable<br/>@TotalSpent"]
+    C --> D["Business logic"]
+    D --> E["OUTPUT parameter"]
+```
+
+### Key takeaways
+
+- Stored procedures can implement business rules.
+- Input parameters allow the caller to provide values to the procedure.
+- Local variables can store intermediate results inside the procedure.
+- `IF` and `ELSE` can be used to make decisions based on calculated values.
+- An `OUTPUT` parameter allows a stored procedure to return a value to the caller.
+- The caller must specify `OUTPUT` when receiving the value.
+- A procedure can combine queries, variables, control flow, and parameters into a reusable database operation.
+---
+
 # Exercises
 
 Try each exercise before opening the solution.
-
 ---
 
 ## Exercise 1 – Your First Procedure
@@ -1116,6 +1410,7 @@ DROP PROCEDURE IF EXISTS dbo.usp_CustomersByLastName;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductInfo;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityInState;
 DROP PROCEDURE IF EXISTS dbo.usp_TransferMoney;
+DROP PROCEDURE IF EXISTS dbo.usp_GetLoyaltyDiscount;
 GO
 ```
 

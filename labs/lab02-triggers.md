@@ -1309,9 +1309,21 @@ flowchart LR
     E --> F
 ```
 
+We can now create the tables needed for our inventory example.
+
 ---
 
 ## 11.1. Creating the tables
+
+For this example, we will create a separate test database. The AdventureWorks database already contains a `Product` table, so using a separate database allows us to keep this example simple and independent from the existing database structure.
+
+```sql
+CREATE DATABASE InventoryDemo;
+GO
+
+USE InventoryDemo;
+GO
+```
 
 First, create the `Product` table:
 
@@ -2189,8 +2201,6 @@ If `ActivityLog` was created only for this lab:
 DROP TABLE IF EXISTS ActivityLog;
 DROP TABLE IF EXISTS SalaryRange;
 DROP TABLE IF EXISTS Employee;
-DROP TABLE IF EXISTS InvoiceItem;
-DROP TABLE IF EXISTS Product;
 
 GO
 ```

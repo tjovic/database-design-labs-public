@@ -1265,6 +1265,701 @@ The `EXISTS` condition finds that at least one row has a salary outside the allo
 
 > This is another example of why trigger logic should be written to work with **sets of rows**, not with a single row.
 
+# Section 11 - Real-world example: Maintaining inventory
+
+Triggers are often useful when a change in one table must automatically cause a related change in another table.
+
+A common real-world example is **inventory management**.
+
+Suppose we have products in stock and we create invoices when those products are sold.
+
+We will use two simple tables:
+
+- `Product` — stores products and the quantity currently available
+- `InvoiceItem` — stores products sold on invoices
+
+But maintaining inventory involves more than just selling a product.
+
+Think about the following questions:
+
+- What should happen to the stock when a new `InvoiceItem` is **inserted**?
+- What should happen if an `InvoiceItem` is **deleted**?
+- What should happen if the quantity of an existing `InvoiceItem` is **updated**?
+
+The expected behavior is:
+
+| Operation | Example | Inventory change |
+|---|---|---|
+| `INSERT` | Sell 3 keyboards | Stock decreases by 3 |
+| `DELETE` | Remove a sale of 3 keyboards | Stock increases by 3 |
+| `UPDATE` | Change quantity from 3 to 5 | Stock decreases by another 2 |
+
+This is a good scenario for triggers because every change to `InvoiceItem` should automatically produce the corresponding change in inventory.
+
+```mermaid
+flowchart LR
+    A["InvoiceItem"] --> B{"Operation"}
+
+    B -->|"INSERT"| C["Decrease stock"]
+    B -->|"DELETE"| D["Increase stock"]
+    B -->|"UPDATE"| E["Adjust stock"]
+
+    C --> F["Product.StockQuantity"]
+    D --> F
+    E --> F
+```
+
+---
+
+## 11.1. Creating the tables
+
+First, create the `Product` table:
+
+```sql
+CREATE TABLE Product
+(
+    IDProduct int PRIMARY KEY,
+    Name varchar(100) NOT NULL,
+    StockQuantity int NOT NULL
+);
+GO
+```
+
+Now create the `InvoiceItem` table:
+
+```sql
+CREATE TABLE InvoiceItem
+(
+    IDInvoiceItem int IDENTITY(1,1) PRIMARY KEY,
+    IDInvoice int NOT NULL,
+    IDProduct int NOT NULL,
+    Quantity int NOT NULL,
+    UnitPrice decimal(10,2) NOT NULL,
+
+    CONSTRAINT FK_InvoiceItem_Product
+        FOREIGN KEY (IDProduct)
+        REFERENCES Product(IDProduct)
+);
+GO
+```
+
+For this example, we do not need a complete `Invoice` table. `IDInvoice` is simply used to identify which invoice an item belongs to.
+
+Insert several products:
+
+```sql
+INSERT INTO Product
+    (IDProduct, Name, StockQuantity)
+VALUES
+    (10, 'Keyboard', 20),
+    (20, 'Mouse', 35),
+    (30, 'Monitor', 12),
+    (40, 'USB-C Cable', 50);
+GO
+```
+
+Check the initial inventory:
+
+```sql
+SELECT *
+FROM Product
+ORDER BY IDProduct;
+```
+
+The result should be:
+
+| IDProduct | Name | StockQuantity |
+|---:|---|---:|
+| 10 | Keyboard | 20 |
+| 20 | Mouse | 35 |
+| 30 | Monitor | 12 |
+| 40 | USB-C Cable | 50 |
+
+We are now ready to implement the inventory rules.
+
+---
+
+## 11.2. INSERT — selling a product
+
+Suppose a customer buys **3 keyboards**.
+
+The application creates an invoice item:
+
+```sql
+INSERT INTO InvoiceItem
+    (IDInvoice, IDProduct, Quantity, UnitPrice)
+VALUES
+    (1001, 10, 3, 25.00);
+```
+
+The inventory should automatically change from:
+
+```text
+20 keyboards
+```
+
+to:
+
+```text
+20 - 3 = 17 keyboards
+```
+
+```mermaid
+flowchart LR
+    A["INSERT InvoiceItem<br/>3 × Keyboard"] --> B["AFTER INSERT<br/>trigger"]
+    B --> C["Product"]
+    C --> D["Keyboard<br/>20 → 17"]
+```
+
+However, we have not created the trigger yet.
+
+Remove the test row before continuing:
+
+```sql
+DELETE FROM InvoiceItem
+WHERE IDInvoice = 1001;
+```
+
+---
+
+## 11.3. Creating the INSERT trigger
+
+We can use an `AFTER INSERT` trigger to automatically decrease the inventory:
+
+```sql
+CREATE OR ALTER TRIGGER trg_InvoiceItem_Insert
+ON InvoiceItem
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Product
+    SET StockQuantity = StockQuantity - (
+        SELECT SUM(Quantity)
+        FROM inserted
+        WHERE inserted.IDProduct = Product.IDProduct
+    )
+    WHERE IDProduct IN (
+        SELECT IDProduct
+        FROM inserted
+    );
+END;
+GO
+```
+
+Let's examine the important part:
+
+```sql
+SELECT SUM(Quantity)
+FROM inserted
+WHERE inserted.IDProduct = Product.IDProduct
+```
+
+For each affected product, the subquery calculates the total quantity sold.
+
+The `WHERE` condition limits the update to products that appear in `inserted`:
+
+```sql
+WHERE IDProduct IN (
+    SELECT IDProduct
+    FROM inserted
+);
+```
+
+The process is:
+
+```mermaid
+flowchart LR
+    A["INSERT<br/>InvoiceItem"] --> B["inserted"]
+    B --> C["SUM Quantity<br/>per product"]
+    C --> D["UPDATE<br/>Product"]
+```
+
+---
+
+## 11.4. Testing the INSERT trigger
+
+Check the inventory before the sale:
+
+```sql
+SELECT *
+FROM Product
+ORDER BY IDProduct;
+```
+
+Now sell 3 keyboards:
+
+```sql
+INSERT INTO InvoiceItem
+    (IDInvoice, IDProduct, Quantity, UnitPrice)
+VALUES
+    (1001, 10, 3, 25.00);
+```
+
+Check the inventory again:
+
+```sql
+SELECT *
+FROM Product
+ORDER BY IDProduct;
+```
+
+The result should now be:
+
+| IDProduct | Name | StockQuantity |
+|---:|---|---:|
+| 10 | Keyboard | **17** |
+| 20 | Mouse | 35 |
+| 30 | Monitor | 12 |
+| 40 | USB-C Cable | 50 |
+
+The application did not explicitly update `Product`.
+
+It only inserted an `InvoiceItem`.
+
+The trigger automatically updated the inventory.
+
+---
+
+## 11.5. Remember: `inserted` is a table
+
+Our trigger must also work when one SQL statement inserts multiple invoice items.
+
+For example:
+
+```sql
+INSERT INTO InvoiceItem
+    (IDInvoice, IDProduct, Quantity, UnitPrice)
+VALUES
+    (1002, 10, 2, 25.00),
+    (1002, 10, 4, 25.00),
+    (1002, 20, 1, 15.00),
+    (1002, 40, 5, 8.00);
+```
+
+The `inserted` table conceptually contains:
+
+| IDProduct | Quantity |
+|---:|---:|
+| 10 | 2 |
+| 10 | 4 |
+| 20 | 1 |
+| 40 | 5 |
+
+Remember:
+
+> **A trigger executes once per statement, not once per row.**
+
+Therefore, the trigger executes **once**, and `inserted` contains all four rows.
+
+For product `10`, there are even two rows:
+
+```text
+Keyboard: 2 + 4 = 6
+```
+
+This is why the trigger uses:
+
+```sql
+SUM(Quantity)
+```
+
+The inventory changes are:
+
+| Product | Quantity sold | Inventory change |
+|---|---:|---:|
+| Keyboard | 2 + 4 = 6 | -6 |
+| Mouse | 1 | -1 |
+| USB-C Cable | 5 | -5 |
+
+```mermaid
+flowchart TD
+    A["One INSERT statement"] --> B["Keyboard × 2"]
+    A --> C["Keyboard × 4"]
+    A --> D["Mouse × 1"]
+    A --> E["USB-C Cable × 5"]
+
+    B --> F["inserted"]
+    C --> F
+    D --> F
+    E --> F
+
+    F --> G["One trigger execution"]
+    G --> H["SUM Quantity per product"]
+    H --> I["UPDATE Product"]
+```
+
+Check the inventory:
+
+```sql
+SELECT *
+FROM Product
+ORDER BY IDProduct;
+```
+
+The trigger correctly handles both single-row and multi-row inserts.
+
+---
+
+## 11.6. DELETE — returning products to stock
+
+Now consider what happens when an invoice item is deleted.
+
+When an `InvoiceItem` is inserted, its quantity is removed from stock.
+
+Therefore, if the invoice item is deleted, that quantity should be **returned to stock**.
+
+For a `DELETE` operation, SQL Server provides the deleted rows through the `deleted` table.
+
+```mermaid
+flowchart LR
+    A["DELETE<br/>InvoiceItem"] --> B["deleted"]
+    B --> C["AFTER DELETE<br/>trigger"]
+    C --> D["Increase<br/>StockQuantity"]
+```
+
+The rule is the opposite of `INSERT`:
+
+| Operation | Inventory calculation |
+|---|---|
+| `INSERT` | `StockQuantity - Quantity` |
+| `DELETE` | `StockQuantity + Quantity` |
+
+Create the trigger:
+
+```sql
+CREATE OR ALTER TRIGGER trg_InvoiceItem_Delete
+ON InvoiceItem
+AFTER DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Product
+    SET StockQuantity = StockQuantity + (
+        SELECT SUM(Quantity)
+        FROM deleted
+        WHERE deleted.IDProduct = Product.IDProduct
+    )
+    WHERE IDProduct IN (
+        SELECT IDProduct
+        FROM deleted
+    );
+END;
+GO
+```
+
+Notice how similar this trigger is to the `INSERT` trigger.
+
+The main differences are:
+
+```text
+inserted  → deleted
+-         → +
+```
+
+### Testing the DELETE trigger
+
+Check the invoice items:
+
+```sql
+SELECT *
+FROM InvoiceItem
+ORDER BY IDInvoiceItem;
+```
+
+Now delete all items belonging to invoice `1002`:
+
+```sql
+DELETE FROM InvoiceItem
+WHERE IDInvoice = 1002;
+```
+
+This may delete several rows with a single statement.
+
+The trigger executes once, `deleted` contains all deleted rows, and the corresponding quantities are returned to stock.
+
+Check the inventory:
+
+```sql
+SELECT *
+FROM Product
+ORDER BY IDProduct;
+```
+
+---
+
+## 11.7. UPDATE — changing the sold quantity
+
+An `UPDATE` is particularly interesting because SQL Server provides **both versions** of each affected row:
+
+- `deleted` contains the **old values**
+- `inserted` contains the **new values**
+
+Suppose our invoice contains:
+
+| IDInvoice | Product | Quantity |
+|---:|---|---:|
+| 1001 | Keyboard | 3 |
+
+The customer actually bought 5 keyboards, so we correct the quantity:
+
+```sql
+UPDATE InvoiceItem
+SET Quantity = 5
+WHERE IDInvoice = 1001
+  AND IDProduct = 10;
+```
+
+During the trigger execution:
+
+| Table | Product | Quantity |
+|---|---|---:|
+| `deleted` | Keyboard | **3** |
+| `inserted` | Keyboard | **5** |
+
+The stock should **not** be reduced by another 5.
+
+The original 3 keyboards were already removed from stock.
+
+We need to account only for the difference:
+
+```text
+5 - 3 = 2
+```
+
+Another simple way to think about it is:
+
+```text
+current stock
++ old quantity
+- new quantity
+= new stock
+```
+
+If the current stock is 17:
+
+```text
+17 + 3 - 5 = 15
+```
+
+```mermaid
+flowchart LR
+    A["Current stock<br/>17"] --> B["+ old quantity<br/>3"]
+    B --> C["20"]
+    C --> D["- new quantity<br/>5"]
+    D --> E["New stock<br/>15"]
+```
+
+For simplicity, we assume that an update can change the **quantity**, but not the product itself.
+
+---
+
+## 11.8. Creating the UPDATE trigger
+
+We can apply the same approach that we used for `INSERT` and `DELETE`.
+
+First, return the old quantity from `deleted`, and then subtract the new quantity from `inserted`:
+
+```sql
+CREATE OR ALTER TRIGGER trg_InvoiceItem_Update
+ON InvoiceItem
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Product
+    SET StockQuantity =
+        StockQuantity
+        + (
+            SELECT SUM(Quantity)
+            FROM deleted
+            WHERE deleted.IDProduct = Product.IDProduct
+        )
+        - (
+            SELECT SUM(Quantity)
+            FROM inserted
+            WHERE inserted.IDProduct = Product.IDProduct
+        )
+    WHERE IDProduct IN (
+        SELECT IDProduct
+        FROM inserted
+    );
+END;
+GO
+```
+
+The calculation is:
+
+```text
+StockQuantity + old quantity - new quantity
+```
+
+For our example:
+
+```text
+17 + 3 - 5 = 15
+```
+
+The relationship between `deleted` and `inserted` is:
+
+```mermaid
+flowchart TD
+    A["UPDATE InvoiceItem"] --> B["deleted<br/>old values"]
+    A --> C["inserted<br/>new values"]
+
+    B --> D["Return old quantity"]
+    C --> E["Subtract new quantity"]
+
+    D --> F["Adjust inventory"]
+    E --> F
+```
+
+### Testing the UPDATE trigger
+
+Check the current invoice item:
+
+```sql
+SELECT *
+FROM InvoiceItem
+WHERE IDInvoice = 1001;
+```
+
+Change the quantity:
+
+```sql
+UPDATE InvoiceItem
+SET Quantity = 5
+WHERE IDInvoice = 1001
+  AND IDProduct = 10;
+```
+
+Now check both the invoice item and the product:
+
+```sql
+SELECT *
+FROM InvoiceItem
+WHERE IDInvoice = 1001;
+
+SELECT *
+FROM Product
+WHERE IDProduct = 10;
+```
+
+The invoice quantity should now be `5`, and the inventory should have been reduced by only the additional `2` keyboards.
+
+---
+
+## 11.9. Putting it all together
+
+We now have three triggers maintaining the inventory:
+
+| Operation on `InvoiceItem` | Data available | Inventory action |
+|---|---|---|
+| `INSERT` | `inserted` | Subtract new quantity |
+| `DELETE` | `deleted` | Add old quantity |
+| `UPDATE` | `deleted` + `inserted` | Add old quantity, subtract new quantity |
+
+The complete process is:
+
+```mermaid
+flowchart TD
+    A["InvoiceItem changes"]
+
+    A --> B["INSERT"]
+    A --> C["DELETE"]
+    A --> D["UPDATE"]
+
+    B --> E["inserted"]
+    C --> F["deleted"]
+    D --> G["deleted + inserted"]
+
+    E --> H["Subtract quantity"]
+    F --> I["Add quantity"]
+    G --> J["Add old quantity<br/>Subtract new quantity"]
+
+    H --> K["Product.StockQuantity"]
+    I --> K
+    J --> K
+```
+
+The application modifies `InvoiceItem`.
+
+The database automatically keeps `Product.StockQuantity` synchronized.
+
+---
+
+## 11.10. Why use a trigger here?
+
+Without triggers, every application that sells a product would have to remember to perform two operations:
+
+```mermaid
+flowchart LR
+    A["Application"] --> B["INSERT InvoiceItem"]
+    A --> C["UPDATE Product"]
+```
+
+If another application, script, import process, or developer inserts an invoice item but forgets to update the inventory, the data becomes inconsistent.
+
+With a trigger:
+
+```mermaid
+flowchart LR
+    A["Application"] --> B["InvoiceItem"]
+    B --> C["Trigger"]
+    C --> D["Product"]
+```
+
+The inventory rule is implemented inside the database.
+
+The same rule is applied regardless of whether the change comes from:
+
+- an application,
+- a stored procedure,
+- an import process,
+- or a manually executed SQL statement.
+
+> **Key idea:** A trigger can be useful when a data change must always cause another related data change.
+
+---
+
+## 11.11. A note about real inventory systems
+
+This example is intentionally simplified.
+
+A real inventory system would usually require additional rules and mechanisms, such as:
+
+- preventing stock from becoming negative,
+- handling cancelled invoices,
+- handling product returns,
+- supporting multiple warehouses,
+- keeping a history of inventory movements,
+- handling concurrent transactions.
+
+For this lab, the important concept is simpler:
+
+```mermaid
+flowchart LR
+    A["InvoiceItem<br/>changes"] --> B["Trigger"]
+    B --> C["Inventory<br/>stays synchronized"]
+```
+
+This example also demonstrates why `inserted` and `deleted` must always be treated as **tables**, not as individual rows.
+
+### Key takeaways
+
+- Triggers can automatically maintain related data.
+- `AFTER INSERT` can reduce inventory when products are sold.
+- `AFTER DELETE` can restore inventory when an invoice item is removed.
+- `AFTER UPDATE` can use both `deleted` and `inserted` to adjust inventory.
+- `inserted` and `deleted` may contain multiple rows.
+- Aggregate functions such as `SUM()` can be used when several affected rows belong to the same product.
+- Triggers should be written to handle the complete set of affected rows.
+- A trigger can enforce the same rule regardless of which application or SQL statement changes the data.
+```
+
 ## Preparation
 
 Remove the demonstration triggers before starting the exercises:
@@ -1494,6 +2189,9 @@ If `ActivityLog` was created only for this lab:
 DROP TABLE IF EXISTS ActivityLog;
 DROP TABLE IF EXISTS SalaryRange;
 DROP TABLE IF EXISTS Employee;
+DROP TABLE IF EXISTS InvoiceItem;
+DROP TABLE IF EXISTS Product;
+
 GO
 ```
 

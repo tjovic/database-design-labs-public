@@ -986,8 +986,8 @@ SELECT
     Name,
     Color,
     CASE Color
-        WHEN 'Black' THEN 'Dark'
-        WHEN 'White' THEN 'Light'
+        WHEN 'Crna' THEN 'Dark'
+        WHEN 'Žuta' THEN 'Light'
         ELSE 'Other'
     END AS ColorGroup
 FROM Product;
@@ -1002,11 +1002,10 @@ returns the result for the first one that is `TRUE`:
 ```sql
 SELECT
     IDProduct,
-    ListPrice,
+    PriceWithoutVAT,
     CASE
-        WHEN ListPrice IS NULL THEN 'Unknown'
-        WHEN ListPrice = 0     THEN 'Free'
-        WHEN ListPrice < 100   THEN 'Cheap'
+        WHEN PriceWithoutVAT = 0     THEN 'Free'
+        WHEN PriceWithoutVAT < 100   THEN 'Cheap'
         ELSE 'Expensive'
     END AS PriceCategory
 FROM Product;

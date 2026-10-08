@@ -799,6 +799,9 @@ SELECT FORMAT(GETDATE(), 'dd.MM.yyyy');
 T-SQL supports repetition with `WHILE`. The statements inside the loop
 run as long as the condition is `TRUE`.
 
+> **No `FOR` loop:** Unlike many programming languages, T-SQL has no
+> `FOR` loop. `WHILE` is the only general-purpose loop construct.
+
 General structure:
 
 ```sql
@@ -905,6 +908,36 @@ GO
 > an action until a condition changes), not as a row-by-row replacement
 > for set-based queries.
 
+### A realistic (but uncommon) use case – batch deletes
+
+Deleting a very large number of rows with a single `DELETE` statement
+can hold locks for a long time and cause the transaction log to grow
+significantly. A common technique is to delete the rows in small
+batches instead:
+
+```sql
+-- Illustrative pattern – do not run against AdventureWorksENG
+DECLARE @RowsDeleted int = 1;
+
+WHILE @RowsDeleted > 0
+BEGIN
+    DELETE TOP (1000)
+    FROM SomeLargeTable
+    WHERE SomeCondition;
+
+    SET @RowsDeleted = @@ROWCOUNT;
+END
+```
+
+`@@ROWCOUNT` returns the number of rows affected by the previous
+statement. Each iteration deletes at most 1000 rows; the loop stops
+once a batch deletes zero rows, meaning nothing matching the condition
+is left.
+
+This is one of the few situations where reaching for `WHILE` is
+standard practice. It is still the exception rather than the rule —
+most day-to-day T-SQL work remains set-based.
+
 ### Check your understanding
 
 1. What must happen inside a `WHILE` loop to avoid an infinite loop?
@@ -912,6 +945,9 @@ GO
 3. What does `CONTINUE` do?
 4. Should `WHILE` normally be your first choice for processing the rows
     of a table?
+5. Does T-SQL have a `FOR` loop?
+6. In the batch-delete pattern above, how does the loop know when to
+    stop?
 
 <details>
 <summary>Show answers</summary>
@@ -923,6 +959,10 @@ GO
     `WHILE` condition.
 4. No. A set-based `SELECT` is normally preferred; `WHILE` is for tasks
     that are inherently iterative.
+5. No. `WHILE` is the only general-purpose loop construct in T-SQL.
+6. `@@ROWCOUNT` is checked after each `DELETE`; once a batch deletes
+    zero rows, the condition `@RowsDeleted > 0` becomes `FALSE` and the
+    loop stops.
 
 </details>
 

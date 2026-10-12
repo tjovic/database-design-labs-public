@@ -1460,7 +1460,7 @@ END;
 GO
 ```
 > \[!NOTE]
->  SET NO
+> `SET NOCOUNT ON` prevents SQL Server from sending `(n rows affected)` messages to the client after each statement. This reduces unnecessary communication and is commonly used in stored procedures and triggers. 
 
 Let's examine the important part:
 

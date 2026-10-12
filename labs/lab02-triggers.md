@@ -862,7 +862,8 @@ return true.
 
 To detect a real value change, compare `inserted` and `deleted`.
 
-> **Note:** SQL Server does not provide matching `INSERT()` or `DELETE()` functions.
+> \[!NOTE]
+> SQL Server does not provide matching `INSERT()` or `DELETE()` functions.
 >
 > `UPDATE(column)` is a special trigger function used to check whether a column was targeted by an `INSERT` or `UPDATE` statement.
 

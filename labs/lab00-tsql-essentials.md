@@ -977,18 +977,48 @@ most day-to-day T-SQL work remains set-based.
 
 ------------------------------------------------------------------------
 
-## Section 8 – CASE WHEN
+## Section 8 – CASE Expressions
 
-`CASE` computes a value based on conditions. Unlike `IF`, it is an
-**expression**, not a statement: it returns a value and can be used
-anywhere an expression is allowed, such as in `SELECT`, `WHERE`, or
-`PRINT`.
+In SQL, we often need to return different values depending on certain conditions.
 
-There are two forms: simple `CASE` and searched `CASE`.
+For example, we might want to:
 
-### Simple CASE
+- convert stored codes into readable descriptions;
+- classify products into price categories;
+- calculate discounts based on product prices;
+- count rows that satisfy specific conditions;
+- sort results according to custom business rules.
 
-Compares one expression against a list of possible values:
+T-SQL provides the `CASE` expression for these situations.
+
+> [!IMPORTANT]
+> **`CASE` is an expression, not a control-of-flow statement.**
+>
+> It evaluates conditions and returns a value.
+>
+> This makes it particularly useful inside SQL queries.
+
+---
+
+### 1. Simple CASE
+
+The simplest form of `CASE` compares one expression against a list of possible values.
+
+General syntax:
+
+```sql
+CASE expression
+    WHEN value1 THEN result1
+    WHEN value2 THEN result2
+    ELSE default_result
+END
+```
+
+Consider the `Product` table.
+
+Products have a `Color` column containing values such as `'Crna'` and `'Žuta'`.
+
+Suppose we want to display a more general color category.
 
 ```sql
 SELECT
@@ -1000,82 +1030,433 @@ SELECT
         ELSE 'Other'
     END AS ColorGroup
 FROM Product;
-GO
 ```
 
-### Searched CASE
+SQL Server compares the value of `Color` with each `WHEN` value.
 
-Evaluates a list of independent boolean conditions, in order, and
-returns the result for the first one that is `TRUE`:
+For example:
+
+| Color | ColorGroup |
+|---|---|
+| Crna | Dark |
+| Žuta | Light |
+| Crvena | Other |
+
+The original value stored in the table does not change.
+
+`CASE` only determines the value returned by the query.
+
+> [!TIP]
+> This is a common reporting technique.
+>
+> Databases often store short codes, while reports display more meaningful descriptions.
+
+---
+
+### 2. Searched CASE
+
+The second form is called **searched CASE**.
+
+Instead of comparing one expression with fixed values, each `WHEN` contains its own condition.
+
+General syntax:
+
+```sql
+CASE
+    WHEN condition1 THEN result1
+    WHEN condition2 THEN result2
+    ELSE default_result
+END
+```
+
+This is particularly useful when working with numeric ranges.
+
+#### Example – Product price categories
+
+Suppose we want to classify products according to their prices.
 
 ```sql
 SELECT
     IDProduct,
+    Name,
     PriceWithoutVAT,
     CASE
-        WHEN PriceWithoutVAT = 0     THEN 'Free'
-        WHEN PriceWithoutVAT < 100   THEN 'Cheap'
+        WHEN PriceWithoutVAT < 10 THEN 'Cheap'
+        WHEN PriceWithoutVAT < 100 THEN 'Medium'
         ELSE 'Expensive'
     END AS PriceCategory
 FROM Product;
+```
+
+The query assigns a category to each product:
+
+| PriceWithoutVAT | PriceCategory |
+|---:|---|
+| 5.00 | Cheap |
+| 45.00 | Medium |
+| 150.00 | Expensive |
+
+Notice that the `CASE` expression is evaluated separately for each returned row.
+
+> [!IMPORTANT]
+> **The order of `WHEN` conditions matters.**
+>
+> SQL Server uses the result associated with the first satisfied condition.
+>
+> Once a matching condition is found, later conditions do not determine the result.
+
+Consider this example:
+
+```sql
+SELECT
+    Name,
+    PriceWithoutVAT,
+    CASE
+        WHEN PriceWithoutVAT < 100 THEN 'Below 100'
+        WHEN PriceWithoutVAT < 10 THEN 'Below 10'
+        ELSE '100 or more'
+    END AS PriceCategory
+FROM Product;
+```
+
+What happens when the price is `5`?
+
+The result is `'Below 100'`.
+
+The second condition is never selected because the first condition already matches.
+
+> [!WARNING]
+> When conditions overlap, their order can change the result.
+>
+> Always place more specific conditions before more general ones when necessary.
+
+---
+
+### 3. Conditional Calculations
+
+`CASE` does not have to return text.
+
+It can also return numbers or the results of calculations.
+
+#### Example – Applying a discount
+
+Suppose products costing at least 100 receive a 10% discount.
+
+```sql
+SELECT
+    Name,
+    PriceWithoutVAT,
+    CASE
+        WHEN PriceWithoutVAT >= 100
+            THEN PriceWithoutVAT * 0.90
+        ELSE PriceWithoutVAT
+    END AS DiscountedPrice
+FROM Product;
+```
+
+The expression returns:
+
+- 90% of the original price when the product costs at least 100;
+- the original price otherwise.
+
+For example:
+
+| PriceWithoutVAT | DiscountedPrice |
+|---:|---:|
+| 50.00 | 50.00 |
+| 100.00 | 90.00 |
+| 200.00 | 180.00 |
+
+> [!NOTE]
+> This query does not update product prices.
+>
+> The discount is calculated only in the query result.
+
+#### Multiple discount levels
+
+We can extend the example:
+
+```sql
+SELECT
+    Name,
+    PriceWithoutVAT,
+    CASE
+        WHEN PriceWithoutVAT >= 500 THEN PriceWithoutVAT * 0.80
+        WHEN PriceWithoutVAT >= 100 THEN PriceWithoutVAT * 0.90
+        ELSE PriceWithoutVAT
+    END AS DiscountedPrice
+FROM Product;
+```
+
+The discount now depends on the price:
+
+| Price | Discount |
+|---|---|
+| 500 or more | 20% |
+| 100–499.99 | 10% |
+| Below 100 | No discount |
+
+Notice that the highest price range is checked first.
+
+---
+
+### 4. CASE with Aggregate Functions
+
+Another common use of `CASE` is **conditional aggregation**.
+
+Suppose we want to count how many products belong to different price categories.
+
+We can combine `CASE` with `SUM()`:
+
+```sql
+SELECT
+    COUNT(*) AS TotalProducts,
+
+    SUM(
+        CASE
+            WHEN PriceWithoutVAT < 100 THEN 1
+            ELSE 0
+        END
+    ) AS ProductsBelow100,
+
+    SUM(
+        CASE
+            WHEN PriceWithoutVAT >= 100 THEN 1
+            ELSE 0
+        END
+    ) AS Products100OrMore
+
+FROM Product;
+```
+
+How does this work?
+
+Consider the following expression:
+
+```sql
+CASE
+    WHEN PriceWithoutVAT < 100 THEN 1
+    ELSE 0
+END
+```
+
+For each product:
+
+- it returns `1` if the price is below 100;
+- otherwise, it returns `0`.
+
+`SUM()` then adds these values.
+
+For example:
+
+| Product | Price | CASE result |
+|---|---:|---:|
+| A | 50 | 1 |
+| B | 150 | 0 |
+| C | 75 | 1 |
+| D | 200 | 0 |
+
+The sum is `2`.
+
+Therefore, two products cost less than 100.
+
+> [!TIP]
+> Conditional aggregation is extremely common in SQL reports.
+>
+> It allows us to calculate several statistics in a single query.
+
+---
+
+### 5. CASE in ORDER BY
+
+Normally, SQL sorts results using the values of one or more columns.
+
+However, sometimes we need a custom sorting order.
+
+For example, suppose we want to display:
+
+1. Expensive products first.
+2. Medium-priced products second.
+3. Cheap products last.
+
+We can use `CASE` inside `ORDER BY`.
+
+```sql
+SELECT
+    Name,
+    PriceWithoutVAT
+FROM Product
+ORDER BY
+    CASE
+        WHEN PriceWithoutVAT >= 100 THEN 1
+        WHEN PriceWithoutVAT >= 10 THEN 2
+        ELSE 3
+    END,
+    PriceWithoutVAT DESC;
+```
+
+The `CASE` expression produces a sorting priority.
+
+| Price | Sorting priority |
+|---:|---:|
+| 150 | 1 |
+| 50 | 2 |
+| 5 | 3 |
+
+SQL Server sorts by this priority first.
+
+Within each category, products are sorted by price in descending order.
+
+> [!NOTE]
+> `CASE` can be used in many places where SQL expects an expression, including `SELECT`, `ORDER BY`, and expressions within other SQL statements.
+
+---
+
+### 6. CASE vs. IF...ELSE
+
+Both `CASE` and `IF...ELSE` evaluate conditions, but they serve different purposes.
+
+The distinction is important:
+
+**`CASE` returns a value.**
+
+**`IF...ELSE` controls which SQL statements are executed.**
+
+#### CASE – Choosing a value
+
+```sql
+SELECT
+    Name,
+    PriceWithoutVAT,
+    CASE
+        WHEN PriceWithoutVAT < 100 THEN 'Affordable'
+        ELSE 'Expensive'
+    END AS PriceCategory
+FROM Product;
+```
+
+Here, `CASE` calculates a value for every product returned by the query.
+
+#### IF...ELSE – Choosing which code executes
+
+```sql
+DECLARE @ProductCount int;
+
+SELECT @ProductCount = COUNT(*)
+FROM Product;
+
+IF @ProductCount > 100
+BEGIN
+    PRINT 'The database contains more than 100 products.';
+END
+ELSE
+BEGIN
+    PRINT 'The database contains 100 products or fewer.';
+END;
 GO
 ```
 
-> \[!IMPORTANT]
-> The `WHEN` conditions are evaluated top to bottom. The
-> first one that is `TRUE` determines the result, so order matters.
+Here, `IF...ELSE` determines which `PRINT` statement executes.
 
-### CASE inside PRINT
+#### Where are they commonly used?
 
-Because `CASE` is an expression, it can also appear inside `PRINT`:
+| CASE | IF...ELSE |
+|---|---|
+| Returns a value | Controls execution |
+| Commonly used inside queries | Commonly used in procedural T-SQL |
+| Can calculate a result for each row | Evaluates a condition to choose statements |
+| Useful in reports and calculations | Useful in procedures, functions, triggers, and scripts |
+
+> [!IMPORTANT]
+> **Need to choose a value? Use `CASE`.**
+>
+> **Need to choose which SQL statements execute? Use `IF...ELSE`.**
+
+Stored procedures, functions, and triggers can use both constructs.
+
+For example, a stored procedure might use `IF...ELSE` to decide whether to perform an operation and `CASE` inside a query to calculate values.
+
+---
+
+### 7. CASE and NULL
+
+There is one more important rule.
+
+The `ELSE` branch is optional.
+
+If no `WHEN` condition matches and `ELSE` is omitted, `CASE` returns `NULL`.
 
 ```sql
-DECLARE @RowCount int = 0;
-
-PRINT CASE
-        WHEN @RowCount = 0 THEN 'No rows'
-        ELSE 'Some rows'
-      END;
-GO
+SELECT
+    CASE
+        WHEN 1 = 2 THEN 'Yes'
+    END AS Result;
 ```
 
-`CASE` cannot run statements such as `PRINT` or `INSERT` inside one of
-its branches. Use `IF` when you need to execute statements
-conditionally.
+Result:
 
-### No ELSE
+```text
+NULL
+```
 
-If no `WHEN` condition matches and `ELSE` is omitted, `CASE` returns
-`NULL`:
+We can provide a default value using `ELSE`:
 
 ```sql
-SELECT CASE
-        WHEN 1 = 2 THEN 'Never'
-      END AS Result;
--- Result: NULL
+SELECT
+    CASE
+        WHEN 1 = 2 THEN 'Yes'
+        ELSE 'No'
+    END AS Result;
 ```
+
+Result:
+
+```text
+No
+```
+
+> [!TIP]
+> Including `ELSE` makes the intended default behavior explicit.
+>
+> It is especially useful when unexpected or missing values may occur.
+
+---
 
 ### Check your understanding
 
-1. What is the difference between simple `CASE` and searched `CASE`?
-2. In what order are the `WHEN` conditions of a searched `CASE`
-    evaluated?
-3. What does `CASE` return if no `WHEN` matches and there is no
-    `ELSE`?
-4. Can a `CASE` branch run a `PRINT` statement?
+1. What is the main difference between `CASE` and `IF...ELSE`?
+2. What is the difference between simple `CASE` and searched `CASE`?
+3. Why does the order of `WHEN` conditions matter?
+4. Can `CASE` return a numeric value?
+5. Can `CASE` be used inside `ORDER BY`?
+6. What does `CASE` return when no condition matches and `ELSE` is omitted?
+7. Why might we combine `CASE` with `SUM()`?
 
 <details>
 <summary>Show answers</summary>
 
-1. Simple `CASE` compares one expression against a list of values;
-    searched `CASE` evaluates independent boolean conditions.
-2. Top to bottom; the first condition that is `TRUE` determines the
-    result.
-3. `NULL`.
-4. No. `CASE` is an expression that returns a value, not a statement;
-    use `IF` to run statements conditionally.
+1. `CASE` returns a value, while `IF...ELSE` controls which SQL statements execute.
+2. Simple `CASE` compares one expression against possible values. Searched `CASE` evaluates separate conditions.
+3. The first satisfied condition determines the result.
+4. Yes. `CASE` can return numbers, text, dates, or other compatible values.
+5. Yes. It can define custom sorting priorities.
+6. `NULL`.
+7. To count or sum values that satisfy specific conditions.
 
 </details>
+
+---
+
+### Key takeaways
+
+- `CASE` is an expression that returns a value.
+- Simple `CASE` compares one expression with possible values.
+- Searched `CASE` evaluates multiple conditions.
+- The order of `WHEN` conditions matters.
+- `CASE` can return calculated values, not just text.
+- `CASE` is commonly used in `SELECT`, `ORDER BY`, and conditional aggregation.
+- `CASE` and `IF...ELSE` serve different purposes.
+- `CASE` returns `NULL` when no condition matches and no `ELSE` is provided.
 
 --
 

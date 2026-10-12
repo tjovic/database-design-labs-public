@@ -1067,6 +1067,229 @@ SELECT CASE
 
 </details>
 
+--
+
+## Section 9 - `SET NOCOUNT ON` and `@@ROWCOUNT`
+
+When SQL Server executes a statement that affects data, it keeps track of how many rows were affected.
+
+By default, SQL Server also sends this information to the client.
+
+For example:
+
+```sql
+UPDATE Product
+SET PriceWithoutVAT = PriceWithoutVAT * 1.10
+WHERE IDProduct <= 5;
+```
+
+In the **Messages** tab, you will see something similar to:
+
+```text
+(4 rows affected)
+```
+
+This tells us that the `UPDATE` statement affected 5 rows.
+
+---
+
+### `@@ROWCOUNT`
+
+SQL Server also makes the number of rows affected by the previous statement available through the system variable `@@ROWCOUNT`.
+
+For example:
+
+```sql
+UPDATE Product
+SET PriceWithoutVAT = PriceWithoutVAT * 1.10
+WHERE IDProduct <= 5;
+
+SELECT @@ROWCOUNT AS RowsAffected;
+```
+
+Example result:
+
+| RowsAffected |
+|---:|
+| 4 |
+
+`@@ROWCOUNT` is automatically updated by SQL Server after a statement executes.
+
+It can be used after statements such as:
+
+```sql
+SELECT
+INSERT
+UPDATE
+DELETE
+```
+
+For example, after a `DELETE`:
+
+```sql
+DELETE FROM Product
+WHERE MinimumQuantityInStock = 45;
+
+SELECT @@ROWCOUNT AS DeletedRows;
+```
+
+If three products were deleted, the result is:
+
+| DeletedRows |
+|---:|
+| 5 |
+
+This can be useful when our SQL code needs to know whether a statement actually affected any rows.
+
+For example:
+
+```sql
+UPDATE Product
+SET MinimumQuantityInStock = MinimumQuantityInStock * 1.10
+WHERE IDProduct = 99999;
+
+IF @@ROWCOUNT = 0
+    PRINT 'No product was updated.';
+```
+
+### Read `@@ROWCOUNT` immediately
+
+There is one important rule:
+
+> **Read or save `@@ROWCOUNT` immediately after the statement you are interested in.**
+
+Other statements can change its value.
+
+For example, this is correct:
+
+```sql
+UPDATE Product
+SET PriceWithoutVAT = PriceWithoutVAT * 1.10
+WHERE IDProduct <= 5;
+
+DECLARE @RowsUpdated int = @@ROWCOUNT;
+
+SELECT @RowsUpdated AS RowsUpdated;
+```
+
+We save the value immediately after the `UPDATE`.
+
+Conceptually:
+
+```mermaid
+flowchart LR
+    A["UPDATE Product"] --> B["SQL Server counts<br/>affected rows"]
+    B --> C["@@ROWCOUNT"]
+    C --> D["Save or use<br/>the value"]
+```
+
+---
+
+### `SET NOCOUNT ON`
+
+Although SQL Server keeps track of the affected rows, we do not always need the `(n rows affected)` message to be sent to the client.
+
+We can suppress these messages using:
+
+```sql
+SET NOCOUNT ON;
+```
+
+Try the following:
+
+```sql
+SET NOCOUNT ON;
+
+UPDATE Product
+SET PriceWithoutVAT = PriceWithoutVAT
+WHERE IDProduct <= 5;
+```
+
+The `(5 rows affected)` message is no longer sent to the client.
+
+This is particularly useful in **stored procedures and triggers**, which may execute several SQL statements. Sending a row-count message after every statement is usually unnecessary.
+
+> \[!IMPORTANT]
+> `SET NOCOUNT ON` does not stop SQL Server from counting affected rows. It only prevents the `(n rows affected)` message from being sent to the client.
+
+Therefore, `@@ROWCOUNT` still works:
+
+```sql
+SET NOCOUNT ON;
+
+UPDATE Product
+SET PriceWithoutVAT = PriceWithoutVAT
+WHERE IDProduct <= 5;
+
+SELECT @@ROWCOUNT AS RowsAffected;
+```
+
+Example result:
+
+| RowsAffected |
+|---:|
+| 4 |
+
+The difference is:
+
+| Feature | Purpose |
+|---|---|
+| `@@ROWCOUNT` | Tells our SQL code how many rows were affected by the previous statement |
+| `SET NOCOUNT ON` | Prevents SQL Server from sending `(n rows affected)` messages to the client |
+
+These two features are therefore independent:
+
+```text
+UPDATE affects 5 rows
+        |
+        +--> @@ROWCOUNT = 5
+        |
+        +--> "(5 rows affected)" message
+                    |
+                    └── suppressed by SET NOCOUNT ON
+```
+
+---
+
+### Why will we use `SET NOCOUNT ON`?
+
+You will frequently see the following pattern in later labs:
+
+```sql
+CREATE OR ALTER PROCEDURE ...
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- procedure code
+END;
+```
+
+The same pattern is commonly used in triggers.
+
+The procedure or trigger can still use `@@ROWCOUNT` when it needs to know how many rows were affected.
+
+### Turn `NOCOUNT` back off
+
+`SET NOCOUNT` applies to the current session.
+
+For the remaining examples in this lab, turn the row-count messages back on:
+
+```sql
+SET NOCOUNT OFF;
+```
+
+This allows you to continue seeing `(n rows affected)` messages while experimenting with SQL statements.
+
+### Key takeaways
+
+- SQL Server keeps track of how many rows are affected by a statement.
+- `@@ROWCOUNT` provides the number of rows affected by the previous statement.
+- Read or save `@@ROWCOUNT` immediately after the statement you want to check.
+- `SET NOCOUNT ON` suppresses the `(n rows affected)` messages sent to the client.
+- `SET NOCOUNT ON` does **not** affect the value of `@@ROWCOUNT`.
+- `SET NOCOUNT ON` is commonly used in stored procedures and triggers.
+
 ------------------------------------------------------------------------
 
 # Exercises

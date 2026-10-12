@@ -53,7 +53,8 @@ as one unit.
 
 `GO` marks the end of a batch in tools such as SSMS.
 
-> **Important:** `GO` is **not** a T-SQL statement. It is a batch
+> \[!IMPORTANT]
+> `GO` is **not** a T-SQL statement. It is a batch
 > separator recognized by client tools such as SSMS and `sqlcmd`.
 
 ### Identifying batches
@@ -283,6 +284,7 @@ However, SQL Server does **not** guarantee a useful row-processing order
 here. Therefore, do not use this technique when the query may return
 multiple rows and you care which row supplies the value.
 
+> \[!IMPORTANT]
 > **Rule of thumb:** When using `SELECT` to load variables, design the
 > query so that it returns the single row you actually need.
 
@@ -539,6 +541,7 @@ Without `BEGIN ... END`, only the **next statement** belongs to the
 `IF`. Adding another statement later can silently change the intended
 logic.
 
+> \[!TIP]
 > **Recommended habit:** Always use `BEGIN ... END` for `IF / ELSE`
 > branches.
 
@@ -632,7 +635,8 @@ GO
 
 Both cities reference exactly the state inserted by this batch.
 
-> **Important:** This example demonstrates how to reuse a generated ID.
+> \[!IMPORTANT]
+> This example demonstrates how to reuse a generated ID.
 > It does not by itself make the statements one atomic transaction.
 > Transactions are covered separately.
 
@@ -671,6 +675,7 @@ SQL Server also provides other identity functions:
 For the parent-row/child-row pattern used here, `SCOPE_IDENTITY()` is
 the appropriate choice.
 
+> \[!TIP]
 > **Good practice:** Capture the value immediately after the `INSERT`
 > whose generated identity you need.
 
@@ -799,6 +804,7 @@ SELECT FORMAT(GETDATE(), 'dd.MM.yyyy');
 T-SQL supports repetition with `WHILE`. The statements inside the loop
 run as long as the condition is `TRUE`.
 
+> \[!NOTE]
 > **No `FOR` loop:** Unlike many programming languages, T-SQL has no
 > `FOR` loop. `WHILE` is the only general-purpose loop construct.
 
@@ -826,7 +832,8 @@ GO
 
 This prints the numbers 1 through 5.
 
-> **Important:** Something inside the loop must eventually make the
+> \[!IMPORTANT]
+> Something inside the loop must eventually make the
 > condition `FALSE`. If `@Counter` were never incremented, the loop
 > would run forever.
 
@@ -902,7 +909,8 @@ END
 GO
 ```
 
-> **Note:** A plain `SELECT` is normally the better tool for working
+> \[!NOTE]
+> A plain `SELECT` is normally the better tool for working
 > with a set of rows. `WHILE` becomes useful when the task is genuinely
 > iterative (for example, generating a sequence of values, or repeating
 > an action until a condition changes), not as a row-by-row replacement
@@ -1012,7 +1020,8 @@ FROM Product;
 GO
 ```
 
-> **Important:** The `WHEN` conditions are evaluated top to bottom. The
+> \[!IMPORTANT]
+> The `WHEN` conditions are evaluated top to bottom. The
 > first one that is `TRUE` determines the result, so order matters.
 
 ### CASE inside PRINT

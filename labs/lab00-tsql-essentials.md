@@ -1458,7 +1458,7 @@ No
 - `CASE` and `IF...ELSE` serve different purposes.
 - `CASE` returns `NULL` when no condition matches and no `ELSE` is provided.
 
---
+---
 
 ## Section 9 - `SET NOCOUNT ON` and `@@ROWCOUNT`
 

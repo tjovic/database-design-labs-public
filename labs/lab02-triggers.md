@@ -1459,6 +1459,8 @@ BEGIN
 END;
 GO
 ```
+> \[!NOTE]
+>  SET NO
 
 Let's examine the important part:
 

@@ -1410,6 +1410,7 @@ This allows the database to check a business rule that depends on data stored in
 ```sql
 INSERT INTO Employee (Name, Area, Salary)
 VALUES ('Anna', 'IT', 2500.00);
+GO
 ```
 
 For `IT`, the allowed range is:
@@ -1425,6 +1426,7 @@ so no warning is printed.
 ```sql
 INSERT INTO Employee (Name, Area, Salary)
 VALUES ('John', 'IT', 9000.00);
+GO
 ```
 
 The salary is above the allowed maximum, so the trigger prints:
@@ -1443,6 +1445,7 @@ Warning: salary is outside the allowed range.
 UPDATE Employee
 SET Salary = 7000.00
 WHERE Name = 'Anna';
+GO
 ```
 
 The trigger fires again because it is defined for both:
@@ -1459,6 +1462,7 @@ VALUES
     ('Alice', 'IT',          3000.00),
     ('Bob',   'Chemistry',   9000.00),
     ('Carol', 'Mathematics', 2500.00);
+GO
 ```
 
 The trigger still fires only **once**, but `inserted` contains all three rows.
@@ -1599,6 +1603,7 @@ Check the initial inventory:
 SELECT *
 FROM Product
 ORDER BY IDProduct;
+GO
 ```
 
 The result should be:
@@ -1625,6 +1630,7 @@ INSERT INTO InvoiceItem
     (IDInvoice, IDProduct, Quantity, UnitPrice)
 VALUES
     (1001, 10, 3, 25.00);
+GO
 ```
 
 The inventory should automatically change from:
@@ -1653,6 +1659,7 @@ Remove the test row before continuing:
 ```sql
 DELETE FROM InvoiceItem
 WHERE IDInvoice = 1001;
+GO
 ```
 
 ---
@@ -1723,6 +1730,7 @@ Check the inventory before the sale:
 SELECT *
 FROM Product
 ORDER BY IDProduct;
+GO
 ```
 
 Now sell 3 keyboards:
@@ -1732,6 +1740,7 @@ INSERT INTO InvoiceItem
     (IDInvoice, IDProduct, Quantity, UnitPrice)
 VALUES
     (1001, 10, 3, 25.00);
+GO
 ```
 
 Check the inventory again:
@@ -1740,6 +1749,7 @@ Check the inventory again:
 SELECT *
 FROM Product
 ORDER BY IDProduct;
+GO
 ```
 
 The result should now be:
@@ -1773,6 +1783,7 @@ VALUES
     (1002, 10, 4, 25.00),
     (1002, 20, 1, 15.00),
     (1002, 40, 5, 8.00);
+GO
 ```
 
 The `inserted` table conceptually contains:
@@ -1833,6 +1844,7 @@ Check the inventory:
 SELECT *
 FROM Product
 ORDER BY IDProduct;
+GO
 ```
 
 The trigger correctly handles both single-row and multi-row inserts.
@@ -1904,6 +1916,7 @@ Check the invoice items:
 SELECT *
 FROM InvoiceItem
 ORDER BY IDInvoiceItem;
+GO
 ```
 
 Now delete all items belonging to invoice `1002`:
@@ -1911,6 +1924,7 @@ Now delete all items belonging to invoice `1002`:
 ```sql
 DELETE FROM InvoiceItem
 WHERE IDInvoice = 1002;
+GO
 ```
 
 This may delete several rows with a single statement.
@@ -1923,6 +1937,7 @@ Check the inventory:
 SELECT *
 FROM Product
 ORDER BY IDProduct;
+GO
 ```
 
 ---
@@ -1947,6 +1962,7 @@ UPDATE InvoiceItem
 SET Quantity = 5
 WHERE IDInvoice = 1001
   AND IDProduct = 10;
+GO
 ```
 
 During the trigger execution:
@@ -2062,6 +2078,7 @@ Check the current invoice item:
 SELECT *
 FROM InvoiceItem
 WHERE IDInvoice = 1001;
+GO
 ```
 
 Change the quantity:
@@ -2071,6 +2088,7 @@ UPDATE InvoiceItem
 SET Quantity = 5
 WHERE IDInvoice = 1001
   AND IDProduct = 10;
+GO
 ```
 
 Now check both the invoice item and the product:
@@ -2079,10 +2097,12 @@ Now check both the invoice item and the product:
 SELECT *
 FROM InvoiceItem
 WHERE IDInvoice = 1001;
+GO
 
 SELECT *
 FROM Product
 WHERE IDProduct = 10;
+GO
 ```
 
 The invoice quantity should now be `5`, and the inventory should have been reduced by only the additional `2` keyboards.

@@ -58,12 +58,9 @@ flowchart LR
 A database trigger works in a similar way.
 
 Instead of a door opening, the event is usually a change to data:
-
-```text
-INSERT
-UPDATE
-DELETE
-```
+- INSERT
+- UPDATE
+- DELETE
 
 For example, imagine that we want to keep a record of every new product added to the database.
 

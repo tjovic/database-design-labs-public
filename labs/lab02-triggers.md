@@ -227,6 +227,7 @@ trigger code executes
 ```
 
 In the next sections, we will create our first trigger and see exactly how this works in SQL Server.
+
 ---
 
 ## When are triggers useful?

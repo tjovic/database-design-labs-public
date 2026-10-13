@@ -1572,9 +1572,9 @@ Conceptually:
 
 ```mermaid
 flowchart LR
-    A["UPDATE Product"] --> B["SQL Server counts<br/>affected rows"]
+    A["UPDATE Product"] --> B["SQL Server counts affected rows"]
     B --> C["@@ROWCOUNT"]
-    C --> D["Save or use<br/>the value"]
+    C --> D["Save or use the value"]
 ```
 
 ---

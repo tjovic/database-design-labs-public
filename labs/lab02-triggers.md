@@ -96,18 +96,20 @@ This lab uses **AFTER triggers**.
 
 Typical uses include:
 
-* **audit and activity logging**;
-* **enforcing rules that are difficult to express with normal constraints**;
-* **maintaining related data that must always remain consistent**.
+- **audit and activity logging**;
+- **enforcing rules that are difficult to express with normal constraints**;
+- **maintaining related data that must always remain consistent**.
 
-Today, most of these responsibilities are commonly handled in application code instead. Triggers remain useful for the cases where that isn't enough — when a rule must hold no matter which application, script, or tool changes the data.
+In modern systems, many business rules and workflows are implemented in the **application or service layer** rather than with database triggers.
+
+Triggers are still useful when a rule or action must be enforced **at the database level**, regardless of which application, script, or tool modifies the data.
 
 However, triggers also introduce **hidden behavior**.
 
-A developer can run a simple `INSERT` without immediately seeing that additional code will execute automatically.
+A developer can execute a simple `INSERT`, `UPDATE`, or `DELETE` without immediately seeing that additional code will execute automatically.
 
 > [!WARNING]
-> **Use triggers deliberately.** They are useful when automatic database-level behavior is required, but overusing them can make systems harder to understand and debug.
+> **Use triggers deliberately.** They are useful when automatic database-level behavior is required, but overusing them can make systems harder to understand, test, and debug.
 
 ---
 
@@ -161,7 +163,7 @@ GO
 ```
 
 > [!TIP]
-> `SET NOCOUNT ON` stops SQL Server from sending `(n rows affected)` messages for each statement inside the trigger. It has nothing to do with the trigger's own event — it is the same `SET NOCOUNT ON` from Lab 00, Section 9. You will see it again later in this lab, especially once a trigger's body runs more than one statement, such as the inventory triggers in Section 11.
+> `SET NOCOUNT ON` stops SQL Server from sending `(n rows affected)` messages for each statement inside the trigger. It has nothing to do with the trigger's own event — it is the same `SET NOCOUNT ON` from Lab 00, Section 9. 
 
 Breakdown:
 

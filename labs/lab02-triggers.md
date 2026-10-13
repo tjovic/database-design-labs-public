@@ -67,7 +67,7 @@ For example, imagine that we want to keep a record of every new product added to
 An application executes:
 
 ```sql
-INSERT INTO Product (Name, Price)
+INSERT INTO Product (Name, PriceWithoutVAT)
 VALUES ('Keyboard', 25.00);
 ```
 

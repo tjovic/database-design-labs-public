@@ -96,11 +96,9 @@ This lab uses **AFTER triggers**.
 
 Typical uses include:
 
-* **audit logging** – for example, recording who changed a customer's address and when;
-* **recording important data changes** – for example, storing the old and new salary whenever an employee's salary is updated;
-* **enforcing rules that are difficult to express with normal constraints** – for example, preventing an update when it would violate a business rule involving multiple tables;
-* **maintaining related data that must always remain consistent** – for example, updating a summary or status table automatically when the underlying data changes.
-
+* **audit and activity logging** – recording that a row was inserted, updated, or deleted, and often what actually changed, such as logging only a real city rename rather than every `UPDATE` statement, even one that leaves the value unchanged (Sections 2–3, 5);
+* **enforcing rules that are difficult to express with normal constraints** – for example, rejecting a change that would violate a business rule spanning multiple tables, such as an employee's salary falling outside the allowed range for their area (Section 10);
+* **maintaining related data that must always remain consistent** – for example, updating a related table automatically whenever the data it depends on changes, such as adjusting product stock whenever invoice items are inserted, updated, or deleted (Section 11).
 
 However, triggers also introduce **hidden behavior**.
 

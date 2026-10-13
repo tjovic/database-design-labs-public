@@ -1322,6 +1322,18 @@ SQL Server supports up to 32 levels of nesting.
 
 ## Example – Checking a business rule with a trigger
 
+For this example, we will use a separate database so that the business-rule example is completely independent of the AdventureWorksENG database.
+
+Create a new database:
+
+```sql
+CREATE DATABASE EmployeeDemo;
+GO
+
+USE EmployeeDemo;
+GO
+```
+
 Suppose each employee belongs to an area, and each area has an allowed salary range.
 
 First, create a table with the allowed ranges:

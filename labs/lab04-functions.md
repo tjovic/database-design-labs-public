@@ -1,4 +1,4 @@
-# Lab 04 – Functions
+# Lab 4 – Functions
 
 **Database:** `AdventureWorksENG`
 
@@ -7,6 +7,7 @@ inside another SQL statement. In this lab, you will create functions
 that return either a single value or an entire table, and you will see
 how functions differ from stored procedures.
 
+> [!IMPORTANT]
 > **Core idea:** A function returns a value. You use it where a value
 > goes.
 
@@ -102,7 +103,8 @@ FROM dbo.fn_Something(...);
 | Use as an expression | No | Yes, scalar functions |
 | Use in `FROM` | No | Yes, table-valued functions |
 
-> **Key idea:** Use a function when its result must become part of
+> [!TIP]
+> Use a function when its result must become part of
 > another query. Use a stored procedure when you need to perform an
 > operation.
 
@@ -592,7 +594,8 @@ UDF inlining**, but not every scalar function is eligible.
 Therefore, do not automatically replace every expression or query with a
 scalar function.
 
-> **Key idea:** Scalar functions are convenient and reusable, but always
+> [!WARNING]
+> Scalar functions are convenient and reusable, but always
 > consider how often the function may need to be evaluated.
 
 Remove the example:
@@ -644,6 +647,7 @@ An inline TVF:
 
 A useful mental model is:
 
+> [!NOTE]
 > **Inline TVF = parameterised View**
 
 Consider this query:
@@ -745,7 +749,8 @@ Inline TVF
 Inline TVFs are also generally optimizer-friendly because SQL Server can
 incorporate the function's query definition into the surrounding query.
 
-> **Key idea:** If a table-valued function can naturally be expressed as
+> [!TIP]
+> If a table-valued function can naturally be expressed as
 > one `SELECT`, prefer an inline TVF.
 
 Remove the example:
@@ -787,7 +792,7 @@ A **multi-statement table-valued function** allows you to:
 -   execute multiple statements;
 -   insert rows into the returned table.
 
-You have already seen **table variables** in Lab 00.
+You have already seen **table variables** in Lab 0.
 
 A multi-statement TVF uses the same idea: the function declares a table
 variable that represents its result.
@@ -1020,7 +1025,27 @@ For now, remember the difference:
 | Scalar function used for many rows | How many times may this function need to be evaluated? |
 | Function applied to a column in `WHERE` | Can SQL Server efficiently search the column using an index? |
 
-> **Key idea:** These are two different performance concerns. Do not confuse repeated scalar function evaluation with SARGability.
+> [!IMPORTANT]
+> These are two different performance concerns. Do not confuse repeated scalar function evaluation with SARGability.
+
+---
+
+## Check your understanding
+
+1. Why can a scalar function become expensive when it is used in the `SELECT` list of a query over many rows?
+2. Why does `WHERE YEAR(InvoiceDate) = 2011` behave differently from `WHERE InvoiceDate >= '20110101' AND InvoiceDate < '20120101'` from a performance point of view?
+3. What does SARGable mean?
+4. Are "many function evaluations" and "poor SARGability" the same problem?
+
+<details>
+<summary>Show answers</summary>
+
+1. The function may need to run once for every row the query processes, and not every scalar function can be inlined by SQL Server.
+2. The first form wraps the column in a function, which can prevent SQL Server from using an index efficiently on `InvoiceDate`. The second form compares the column directly to boundary values, leaving it in a form the index can be searched with.
+3. A condition is SARGable ("Search ARGument ABLE") when it is written so that SQL Server can use an index to seek matching rows, rather than having to evaluate an expression for every row.
+4. No. They are two distinct concerns: how many times a scalar function runs, versus whether a `WHERE` condition allows efficient index use.
+
+</details>
 
 ---
 
@@ -1107,6 +1132,25 @@ Remove it before starting the exercises:
 DROP FUNCTION dbo.fn_ProductPriceCategory;
 GO
 ```
+
+---
+
+## Check your understanding
+
+1. Why is `fn_ProductPriceCategory` a good candidate for a scalar function rather than a stored procedure?
+2. Why can the same function be used both in the `SELECT` list and in a `WHERE` clause?
+3. Why doesn't this function modify the `Product` table?
+4. What would change if the classification needed to return several columns instead of one category string?
+
+<details>
+<summary>Show answers</summary>
+
+1. The requirement is a calculation that receives one value (a price) and returns one value (a category) — exactly what a scalar function is for. The result must also be usable inside other queries, which rules out a stored procedure.
+2. A scalar function can be used anywhere a value of its return type is expected, including an expression in `SELECT` or a comparison in `WHERE`.
+3. T-SQL user-defined functions cannot modify application tables with `INSERT`, `UPDATE`, or `DELETE` — they can only calculate and return a result.
+4. Returning several columns means the result is no longer a single scalar value, so the function would need to become a table-valued function instead.
+
+</details>
 
 ---
 
@@ -1644,17 +1688,17 @@ such as:
 dbo.Product
 ```
 
-SQL Server prevents changes to referenced objects that would invalidate
-the schema-bound function.
+> [!NOTE]
+> SQL Server prevents changes to referenced objects that would invalidate
+> the schema-bound function.
 
 ## WITH ENCRYPTION
 
 `WITH ENCRYPTION` obscures the stored module definition.
 
-It should not be treated as a substitute for proper security or source
-control.
-
-Keep the original function definition in version control.
+> [!WARNING]
+> `WITH ENCRYPTION` should not be treated as a substitute for proper security or source
+> control. Keep the original function definition in version control.
 
 ---
 
@@ -1674,6 +1718,7 @@ DROP FUNCTION IF EXISTS dbo.fn_ProductCount;
 GO
 ```
 
+> [!TIP]
 > Keep cleanup targeted to objects created in this lab.
 
 ---

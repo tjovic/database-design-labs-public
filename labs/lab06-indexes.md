@@ -67,6 +67,9 @@ flowchart TD
     I1 --> L2[Leaf page]
     I2 --> L3[Leaf page]
     I2 --> L4[Leaf page]
+    L1 -.-> L2
+    L2 -.-> L3
+    L3 -.-> L4
 ```
 
 The tree contains:
@@ -74,6 +77,8 @@ The tree contains:
 - root level
 - internal levels
 - leaf level
+
+The dotted arrows show another important detail: leaf pages are also linked to each other (in both directions, not just left to right as drawn here). Once SQL Server reaches the first relevant leaf page, it can walk directly to neighboring leaf pages without going back up through the tree. This is what makes range scans and the `Index Scan` operator efficient, and is one reason a query can sometimes return rows in index order without a separate `Sort` operator.
 
 To search for a key, SQL Server follows one path through the tree.
 
@@ -165,17 +170,19 @@ later in the lab so the physical choice is clear.
 ## Check your understanding
 
 1. What is the key benefit of a B+-tree that lets SQL Server avoid examining every index entry sequentially?
-2. What is the difference between a heap, a clustered index, and a nonclustered index?
-3. How many clustered indexes can one table have? How many nonclustered indexes?
-4. Does creating a primary key automatically give SQL Server an efficient access path for every query against that table?
+2. Why are leaf pages also linked to each other, not just reachable from the tree above them?
+3. What is the difference between a heap, a clustered index, and a nonclustered index?
+4. How many clustered indexes can one table have? How many nonclustered indexes?
+5. Does creating a primary key automatically give SQL Server an efficient access path for every query against that table?
 
 <details>
 <summary>Show answers</summary>
 
 1. SQL Server follows one path from the root through internal pages to the relevant leaf page, so a very large index can still be only a few levels deep.
-2. A heap is a table without a clustered index — rows live on data pages with no defined leaf-level order. A clustered index stores the actual table rows at its leaf level, sorted by the index key. A nonclustered index is a separate structure with its own key, a row locator, and optional included columns.
-3. Only one clustered index, but multiple nonclustered indexes.
-4. No. It enforces uniqueness and gives one efficient access path (by the primary key), but other filters and joins may still need their own indexes.
+2. So that once the first relevant leaf page is found, SQL Server can walk directly to neighboring leaf pages for a range scan, instead of going back up through the tree for every page.
+3. A heap is a table without a clustered index — rows live on data pages with no defined leaf-level order. A clustered index stores the actual table rows at its leaf level, sorted by the index key. A nonclustered index is a separate structure with its own key, a row locator, and optional included columns.
+4. Only one clustered index, but multiple nonclustered indexes.
+5. No. It enforces uniqueness and gives one efficient access path (by the primary key), but other filters and joins may still need their own indexes.
 
 </details>
 

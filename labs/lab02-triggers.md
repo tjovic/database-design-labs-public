@@ -1,4 +1,4 @@
-# Lab 3 – Triggers
+# Lab 2 – Triggers
 
 **Database:** `AdventureWorksENG`
 
@@ -10,6 +10,7 @@ In this lab, we focus on **DML AFTER triggers** that react to:
 - `UPDATE`
 - `DELETE`
 
+> [!IMPORTANT]
 > **Core idea:** A trigger fires automatically. You do not call it.
 
 ---
@@ -105,6 +106,7 @@ However, triggers also introduce **hidden behavior**.
 
 A developer can run a simple `INSERT` without immediately seeing that additional code will execute automatically.
 
+> [!WARNING]
 > **Use triggers deliberately.** They are useful when automatic database-level behavior is required, but overusing them can make systems harder to understand and debug.
 
 ---
@@ -211,7 +213,7 @@ EXEC dbo.trg_City_Insert;
 
 SQL Server returns an error.
 
-`EXEC` is used to run a stored procedure explicitly. Stored procedures are covered in Lab 4.
+`EXEC` is used to run a stored procedure explicitly. Stored procedures are covered in Lab 3.
 
 A trigger works differently:
 
@@ -325,6 +327,7 @@ The trigger reads the inserted row from `inserted`.
 
 This is one of the most important trigger rules.
 
+> [!IMPORTANT]
 > **A trigger fires once per statement, not once per row.**
 
 Consider:
@@ -383,6 +386,7 @@ SET @CityID = (
 
 fails when `inserted` contains more than one row.
 
+> [!IMPORTANT]
 > **Rule:** Always design triggers as if `inserted` and `deleted` may contain many rows.
 
 ---
@@ -862,7 +866,7 @@ return true.
 
 To detect a real value change, compare `inserted` and `deleted`.
 
-> \[!NOTE]
+> [!NOTE]
 > SQL Server does not provide matching `INSERT()` or `DELETE()` functions.
 >
 > `UPDATE(column)` is a special trigger function used to check whether a column was targeted by an `INSERT` or `UPDATE` statement.
@@ -1050,7 +1054,9 @@ trg_City_Delete
 
 may be clearer than putting three unrelated responsibilities into one large trigger.
 
-> Use a multi-event trigger when the logic belongs together.  
+> [!TIP]
+> Use a multi-event trigger when the logic belongs together.
+>
 > Do not combine events only because SQL Server allows it.
 
 ---
@@ -1096,19 +1102,19 @@ This can be useful during carefully controlled maintenance or bulk loading.
 
 However:
 
-> Anything the trigger normally enforces or records is also disabled.
-
-Never disable a trigger casually, and do not forget to re-enable it.
+> [!WARNING]
+> Anything the trigger normally enforces or records is also disabled while it is disabled.
+>
+> Never disable a trigger casually, and do not forget to re-enable it.
 
 ### Multiple triggers on the same event
 
 SQL Server allows multiple triggers for the same event on the same table.
 
-Do **not** assume that they will run in creation order.
-
-SQL Server allows one trigger to be marked `FIRST` and one `LAST` for an event using `sp_settriggerorder`, but the order of the remaining triggers is not guaranteed.
-
-If your design depends heavily on trigger order, reconsider the design.
+> [!WARNING]
+> Do not assume that multiple triggers for the same event run in creation order. SQL Server lets you mark one trigger `FIRST` and one `LAST` for an event using `sp_settriggerorder`, but the order of the remaining triggers is not guaranteed.
+>
+> If your design depends heavily on trigger order, reconsider the design.
 
 ### Nested triggers
 
@@ -1128,7 +1134,8 @@ This is called **trigger nesting**.
 
 SQL Server supports up to 32 levels of nesting.
 
-Deep trigger chains are difficult to reason about and are usually a sign that the design should be simplified.
+> [!WARNING]
+> Deep trigger chains are difficult to reason about and are usually a sign that the design should be simplified.
 
 ---
 
@@ -1234,7 +1241,8 @@ The salary is above the allowed maximum, so the trigger prints:
 ```text
 Warning: salary is outside the allowed range.
 ```
->In a real system, we would usually reject the invalid change or record it properly. Here we only print a warning because the goal is to understand the trigger logic
+> [!NOTE]
+> In a real system, we would usually reject the invalid change or record it properly. Here we only print a warning because the goal is to understand the trigger logic.
 
 ### The same trigger also works for UPDATE
 
@@ -1266,7 +1274,28 @@ The `EXISTS` condition finds that at least one row has a salary outside the allo
 
 > This is another example of why trigger logic should be written to work with **sets of rows**, not with a single row.
 
-# Section 11 - Real-world example: Maintaining inventory
+---
+
+## Check your understanding
+
+1. Why does the trigger join `inserted` with `SalaryRange` instead of comparing against a fixed number?
+2. If an `INSERT` adds three employees and only one has an invalid salary, does the trigger still detect it?
+3. Why is `EXISTS` a good choice here instead of checking every row individually?
+4. Is printing a warning a realistic way to enforce this rule in production?
+
+<details>
+<summary>Show answers</summary>
+
+1. The allowed range depends on the employee's `Area`, and that mapping is stored in another table, so the trigger must look it up per row instead of hardcoding a value.
+2. Yes. `EXISTS` only needs one matching row among everything in `inserted` to trigger the warning.
+3. `EXISTS` stops as soon as it finds one row outside the allowed range; it does not need to process every row individually like a scalar check would.
+4. No. A real system would normally reject the change (for example, with `ROLLBACK` or `RAISERROR`) or log it properly instead of only printing a message.
+
+</details>
+
+---
+
+# Section 11 – Real-world example: Maintaining inventory
 
 Triggers are often useful when a change in one table must automatically cause a related change in another table.
 
@@ -1460,7 +1489,7 @@ BEGIN
 END;
 GO
 ```
-> \[!NOTE]
+> [!NOTE]
 > `SET NOCOUNT ON` prevents SQL Server from sending `(n rows affected)` messages to the client after each statement. This reduces unnecessary communication and is commonly used in stored procedures and triggers. 
 
 Let's examine the important part:
@@ -1963,6 +1992,23 @@ flowchart LR
 
 This example also demonstrates why `inserted` and `deleted` must always be treated as **tables**, not as individual rows.
 
+### Check your understanding
+
+1. Why does the `INSERT` trigger subtract from `StockQuantity`, while the `DELETE` trigger adds to it?
+2. Why does the `UPDATE` trigger need to use both `deleted` and `inserted`, instead of just `inserted`?
+3. In the multi-row `INSERT` example, why does the trigger use `SUM(Quantity)` instead of just `Quantity`?
+4. What would go wrong if the `INSERT` trigger assumed exactly one row in `inserted`?
+
+<details>
+<summary>Show answers</summary>
+
+1. Selling a product (`INSERT`) removes it from stock, while removing a sale (`DELETE`) returns it to stock — the two operations are opposites.
+2. `deleted` holds the old quantity that was already subtracted from stock, and `inserted` holds the new quantity; the trigger must add back the old amount and subtract the new one to adjust by only the difference.
+3. A single `INSERT` statement can add several rows for the same product, so the quantities for that product must be added together before updating `Product`.
+4. It would only account for one of the inserted rows, leaving stock incorrect for every other product or row covered by the same statement.
+
+</details>
+
 ### Key takeaways
 
 - Triggers can automatically maintain related data.
@@ -1973,7 +2019,6 @@ This example also demonstrates why `inserted` and `deleted` must always be treat
 - Aggregate functions such as `SUM()` can be used when several affected rows belong to the same product.
 - Triggers should be written to handle the complete set of affected rows.
 - A trigger can enforce the same rule regardless of which application or SQL statement changes the data.
-```
 
 ## Preparation
 
@@ -2244,11 +2289,10 @@ JOIN deleted AS d
 
 And the most important rule:
 
+> [!IMPORTANT]
 > **A trigger fires once per statement, not once per row.**
-
-Therefore:
-
-> **Always write trigger logic to handle sets of rows.**
+>
+> Therefore: always write trigger logic to handle sets of rows.
 
 ---
 

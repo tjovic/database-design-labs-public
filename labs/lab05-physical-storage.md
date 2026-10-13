@@ -128,6 +128,20 @@ The main file types are:
 | `.ndf` | Optional secondary data file |
 | `.ldf` | Transaction log file |
 
+### `.mdf` – primary data file
+
+Every database has exactly one `.mdf` file. It belongs to the **primary filegroup**, and unless a database is deliberately split across multiple files, this single file holds all of the database's pages — tables, indexes, and system metadata alike.
+
+### `.ndf` – optional secondary data file
+
+A database can optionally add one or more `.ndf` files, typically to spread data across several physical disks for parallel I/O, or to separate data into different storage tiers. A small teaching database like `IndexLab` has no real need for one, which is why this lab uses only an `.mdf`.
+
+### `.ldf` – transaction log file
+
+The log file is not just a record of "what happened" — it implements **write-ahead logging**: before SQL Server modifies a data page, it first writes a record of that change to the log. If the server crashes before the data page itself is safely written, SQL Server can replay or undo logged changes on restart to bring the database back to a consistent state.
+
+This is also why a read-only workload (`SELECT`) does not grow the log, while `INSERT`/`UPDATE`/`DELETE` do — only changes need to be logged. The `IndexLab` setup script uses the `SIMPLE` recovery model specifically so that logged space can be reused via `CHECKPOINT` once each batch is safely applied, instead of growing indefinitely during the bulk data generation.
+
 A simplified `IndexLab` layout is:
 
 ```text
@@ -141,12 +155,6 @@ IndexLab
 └── IndexLab_log.ldf
        transaction log
 ```
-
-The data file contains database pages.
-
-The log file records changes and supports transaction recovery.
-
-Additional `.ndf` files can be used in larger database layouts, but they are not important for this lab.
 
 ```mermaid
 flowchart LR
@@ -163,14 +171,16 @@ flowchart LR
 
 1. What is the difference between the logical view of a table and how SQL Server physically stores it?
 2. Name the three main SQL Server database file types and what each is used for.
-3. Which file records changes and supports transaction recovery?
+3. Why doesn't a read-only `SELECT` query grow the transaction log, while an `UPDATE` does?
+4. Why might a database add an `.ndf` file?
 
 <details>
 <summary>Show answers</summary>
 
 1. A query like `SELECT * FROM dbo.Customer` looks as if it simply reads rows, but physically SQL Server reads and writes fixed-size pages inside database files.
 2. `.mdf` – primary data file; `.ndf` – optional secondary data file; `.ldf` – transaction log file.
-3. The `.ldf` transaction log file.
+3. Write-ahead logging only needs to record *changes*. A `SELECT` doesn't change any data, so there is nothing to log; an `UPDATE` modifies a page, so that change is written to the log first.
+4. To spread data across multiple physical disks for parallel I/O, or to separate data into different storage tiers — it is optional and most small databases don't need one.
 
 </details>
 

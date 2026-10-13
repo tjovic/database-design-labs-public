@@ -38,9 +38,26 @@ This lab assumes you already know:
 
 # Section 1 – What is a trigger?
 
-A **trigger** is code attached to a table or view that runs automatically when a specified event occurs.
+A **trigger** is code that runs automatically when a specified event occurs.
 
-For the triggers in this lab, the events are data changes:
+Unlike normal SQL statements that we execute explicitly, a trigger waits for an event and reacts to it automatically.
+
+## A simple analogy
+
+Think about a **security alarm** in a building.
+
+You do not manually activate the alarm when someone breaks in. Instead, the alarm system is connected to sensors and reacts automatically when a specific event occurs.
+
+```mermaid
+flowchart LR
+    A["Door opens"] --> B["Sensor detects the event"]
+    B --> C["Alarm is triggered"]
+    C --> D["Alarm sounds"]
+```
+
+A database trigger works in a similar way.
+
+Instead of a door opening, the event is usually a change to data:
 
 ```text
 INSERT
@@ -48,48 +65,168 @@ UPDATE
 DELETE
 ```
 
-Conceptually:
+For example, imagine that we want to keep a record of every new product added to the database.
+
+An application executes:
+
+```sql
+INSERT INTO Product (Name, Price)
+VALUES ('Keyboard', 25.00);
+```
+
+The application does not need to explicitly execute the logging code.
+
+The `INSERT` itself causes the trigger to fire automatically:
 
 ```mermaid
 flowchart LR
-    A["DML event<br/>INSERT / UPDATE / DELETE"]
-    B["Target table"]
-    C["Trigger fires automatically"]
-    D["Trigger code executes"]
-
-    A --> B
-    B --> C
-    C --> D
+    A["INSERT new Product"] --> B["Product table"]
+    B --> C["Trigger fires automatically"]
+    C --> D["Write entry to audit log"]
 ```
 
-A trigger is different from a stored procedure:
+The important idea is:
 
-- you do **not** call a trigger with `EXEC`;
-- a trigger has no input parameters;
-- a trigger fires because an event occurred on its parent table or view;
-- an `AFTER` trigger executes as part of the same transaction as the statement that fired it.
+> **An event happens → the trigger reacts automatically.**
 
-### DML and DDL triggers
+The SQL statement that caused the event does not explicitly call the trigger.
+
+---
+
+## Triggers are attached to database objects
+
+A DML trigger is attached to a particular **table or view**.
+
+For example, a trigger attached to the `Product` table could react when rows in that table are:
+
+- inserted,
+- updated,
+- deleted.
+
+```mermaid
+flowchart TD
+    A["Product table"]
+
+    B["INSERT"]
+    C["UPDATE"]
+    D["DELETE"]
+
+    B --> A
+    C --> A
+    D --> A
+
+    A --> E["Trigger"]
+    E --> F["Trigger code executes"]
+```
+
+A trigger can react to one or more of these events.
+
+For example:
+
+```sql
+AFTER INSERT
+```
+
+means:
+
+> Execute the trigger after an `INSERT` occurs.
+
+A trigger can also react to multiple events:
+
+```sql
+AFTER INSERT, UPDATE, DELETE
+```
+
+---
+
+## DML and DDL triggers
 
 SQL Server supports several kinds of triggers.
 
-In this course we focus on **DML triggers**, which react to changes in table data:
+In this course, we focus on **DML triggers**.
+
+DML triggers react to changes in **table data**:
 
 - `INSERT`
 - `UPDATE`
 - `DELETE`
 
-SQL Server also supports **DDL triggers**, which react to schema changes such as `CREATE TABLE` or `DROP TABLE`. They are outside the scope of this lab.
+```mermaid
+flowchart LR
+    A["Data changes"] --> B["INSERT"]
+    A --> C["UPDATE"]
+    A --> D["DELETE"]
 
-### AFTER and INSTEAD OF
+    B --> E["DML trigger"]
+    C --> E
+    D --> E
+```
 
-Two common trigger types are:
+SQL Server also supports **DDL triggers**.
 
-- `AFTER` – runs after the DML operation has been applied;
-- `INSTEAD OF` – runs instead of the original DML operation.
+DDL triggers react to changes in the **database structure**, for example:
 
-This lab uses **AFTER triggers**.
+```sql
+CREATE TABLE
+ALTER TABLE
+DROP TABLE
+```
 
+A simple way to remember the difference is:
+
+| Trigger type | Reacts to | Examples |
+|---|---|---|
+| **DML trigger** | Changes to data | `INSERT`, `UPDATE`, `DELETE` |
+| **DDL trigger** | Changes to database structure | `CREATE`, `ALTER`, `DROP` |
+
+> [!NOTE]
+> DDL triggers are outside the scope of this lab. We will work with **DML triggers**.
+
+---
+
+## AFTER and INSTEAD OF triggers
+
+For DML operations, two important trigger types are:
+
+- `AFTER` – executes after the DML operation has been applied;
+- `INSTEAD OF` – executes instead of the original DML operation.
+
+Consider an `INSERT`.
+
+With an `AFTER` trigger:
+
+```mermaid
+flowchart LR
+    A["INSERT"] --> B["Row is inserted"]
+    B --> C["AFTER trigger executes"]
+```
+
+With an `INSTEAD OF` trigger:
+
+```mermaid
+flowchart LR
+    A["INSERT"] --> B["INSTEAD OF trigger executes"]
+    B -.-> C["Original INSERT does not execute automatically"]
+```
+
+This lab focuses on **AFTER triggers**.
+
+> [!IMPORTANT]
+> An `AFTER` trigger executes as part of the **same transaction** as the statement that caused it. If the trigger fails and the transaction is rolled back, the original data change is rolled back as well.
+
+For now, remember the basic pattern:
+
+```text
+DML statement
+     ↓
+data changes
+     ↓
+AFTER trigger fires
+     ↓
+trigger code executes
+```
+
+In the next sections, we will create our first trigger and see exactly how this works in SQL Server.
 ---
 
 ## When are triggers useful?

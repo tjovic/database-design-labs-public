@@ -1,4 +1,4 @@
-# Lab 04 – Stored Procedures
+# Lab 3 – Stored Procedures
 
 **Database:** `AdventureWorksENG`
 
@@ -6,6 +6,7 @@ A stored procedure is a named program stored in the database. Unlike a view, whi
 
 Stored procedures are especially useful when several SQL statements together represent a single database operation.
 
+> [!IMPORTANT]
 > **Core idea:** A stored procedure packages a database operation behind a name and parameters.
 
 ---
@@ -27,6 +28,7 @@ USE AdventureWorksENG;
 GO
 ```
 
+> [!NOTE]
 > **Prerequisites:** This lab assumes that you are already familiar with batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, and basic `CAST` expressions from Lab 00.
 
 ---
@@ -139,7 +141,8 @@ sequenceDiagram
 
 This can reduce network round-trips.
 
-> **Important:** A stored procedure is not automatically faster than equivalent SQL. The performance benefit here comes from reducing communication between the application and the database when one operation requires several statements.
+> [!IMPORTANT]
+> A stored procedure is not automatically faster than equivalent SQL. The performance benefit here comes from reducing communication between the application and the database when one operation requires several statements.
 
 ### A database interface
 
@@ -252,7 +255,8 @@ GO
 
 Dropping the procedure removes the procedure itself. It does not remove the underlying tables or data.
 
-> **Key idea:** Use `EXEC` to call a procedure. In this lab, use `CREATE OR ALTER` so that your procedure can easily be executed again while you are developing it.
+> [!TIP]
+> Use `EXEC` to call a procedure. In this lab, use `CREATE OR ALTER` so that your procedure can easily be executed again while you are developing it.
 
 ---
 
@@ -345,7 +349,8 @@ EXEC dbo.usp_ProductsByPrice
 
 ### Common mistake
 
-Do not call a stored procedure like a function:
+> [!WARNING]
+> Do not call a stored procedure like a function:
 
 ```sql
 -- Incorrect:
@@ -459,6 +464,9 @@ The caller needs a variable because the procedure needs somewhere to store the r
 
 ### Common mistake
 
+> [!WARNING]
+> Forgetting `OUTPUT` in the call lets the procedure execute normally, but the returned value is silently lost.
+
 ```sql
 DECLARE @MyColor nvarchar(15);
 
@@ -520,7 +528,8 @@ nonzero -> another status
 
 Do not use `RETURN` to return normal application data such as names, dates, or prices. Use a result set or an output parameter for those values.
 
-> **Key idea:** `OUTPUT` returns data. `RETURN` is normally used for an integer status code.
+> [!IMPORTANT]
+> `OUTPUT` returns data. `RETURN` is normally used for an integer status code.
 
 ---
 
@@ -802,11 +811,31 @@ This is exactly the problem that **transactions** solve.
 
 Transactions are outside the scope of this lab, but this example shows why they are important when several data modifications form one logical operation.
 
-> **Key idea:** A stored procedure can group several statements into one callable operation. A transaction guarantees that related changes succeed or fail together.
-
+> [!NOTE]
+> A stored procedure can group several statements into one callable operation. A transaction guarantees that related changes succeed or fail together.
 
 ---
-# Section 6 - Real-world example: Calculating a loyalty discount
+
+## Check your understanding
+
+1. What does the stored procedure in this example encapsulate that the application would otherwise have to implement itself?
+2. Why does `usp_TransferMoney` check both accounts and the balance before performing either `UPDATE`?
+3. What does a `RETURN` code of `4` mean in this procedure, and does it change any data?
+4. Why doesn't the stored procedure alone guarantee that both updates succeed or fail together?
+
+<details>
+<summary>Show answers</summary>
+
+1. The sequence of validations and the two related `UPDATE` statements that together make up one transfer operation.
+2. So that an invalid request (missing account, invalid amount, insufficient funds) is rejected with a `RETURN` code before any data is modified.
+3. Insufficient funds. No data is changed — the procedure returns before either `UPDATE` runs.
+4. A stored procedure only groups statements behind one call; it does not by itself protect against a failure between the two `UPDATE` statements. That guarantee requires a transaction.
+
+</details>
+
+---
+
+# Section 6 – Real-world example: Calculating a loyalty discount
 
 Stored procedures are often used to implement **business rules**.
 
@@ -1089,6 +1118,23 @@ flowchart LR
     D --> E["OUTPUT parameter"]
 ```
 
+### Check your understanding
+
+1. Why does the procedure use `COALESCE(SUM(ii.TotalPrice), 0)` instead of just `SUM(ii.TotalPrice)`?
+2. Why is `@TotalSpent` declared as a local variable instead of a parameter?
+3. Why is `@DiscountPercent` declared as an `OUTPUT` parameter instead of being returned through a result set?
+4. What would happen to the caller's variable if `OUTPUT` were omitted from the `EXEC` call?
+
+<details>
+<summary>Show answers</summary>
+
+1. If the customer has no purchases in the period, `SUM()` returns `NULL`. `COALESCE` makes the total spending `0` instead, so the discount logic still works correctly.
+2. `@TotalSpent` is not supplied by the caller — it is calculated inside the procedure from the input parameters, so it is a local variable rather than a parameter.
+3. The result is a single value (a percentage), not a set of rows, so an `OUTPUT` parameter is the appropriate mechanism — the same distinction covered in Section 4.
+4. The procedure would still calculate the discount internally, but the caller's variable would not receive the value — the same mistake shown in Section 4's "Common mistake".
+
+</details>
+
 ### Key takeaways
 
 - Stored procedures can implement business rules.
@@ -1098,11 +1144,13 @@ flowchart LR
 - An `OUTPUT` parameter allows a stored procedure to return a value to the caller.
 - The caller must specify `OUTPUT` when receiving the value.
 - A procedure can combine queries, variables, control flow, and parameters into a reusable database operation.
+
 ---
 
 # Exercises
 
 Try each exercise before opening the solution.
+
 ---
 
 ## Exercise 1 – Your First Procedure
@@ -1428,6 +1476,7 @@ DROP TABLE IF EXISTS BankAccount;
 GO
 ```
 
+> [!TIP]
 > Keep cleanup targeted to objects and rows created during the lab.
 
 ---

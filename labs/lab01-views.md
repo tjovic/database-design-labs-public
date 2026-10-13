@@ -6,6 +6,7 @@ A View is a named query that behaves like a virtual table.
 
 It does not normally store a separate copy of the data.
 
+> [!IMPORTANT]
 > **Core idea:** Views store SQL. Tables store data.
 
 In the first part of this lab, Views are introduced as a way to simplify queries, hide complexity, provide a stable interface, and expose database metadata.
@@ -737,7 +738,8 @@ flowchart TD
     A --> B
 ```
 
-> **The database structure changed, but the interface remained the same.**
+> [!IMPORTANT]
+> The database structure changed, but the interface remained the same.
 
 The user does not need to know whether the data comes from one table or several tables.
 
@@ -1102,7 +1104,8 @@ This attempts to modify both:
 
 SQL Server rejects the statement because one View modification cannot update multiple base tables.
 
-> **Key idea:** A joined View is not automatically read-only, but modifications are limited to changes SQL Server can map unambiguously to one base table.
+> [!IMPORTANT]
+> A joined View is not automatically read-only, but modifications are limited to changes SQL Server can map unambiguously to one base table.
 
 ---
 
@@ -1273,6 +1276,7 @@ But by default, SQL Server may allow a change through the View that creates a ro
 
 The result can be surprising:
 
+> [!WARNING]
 > You insert a row through the View, but the row immediately disappears from the View.
 
 ---
@@ -1431,7 +1435,8 @@ flowchart LR
     B -->|No| D
 ```
 
-> **WITH CHECK OPTION ensures that rows modified through the View remain visible through that View.**
+> [!IMPORTANT]
+> `WITH CHECK OPTION` ensures that rows modified through the View remain visible through that View.
 
 ---
 
@@ -1478,7 +1483,8 @@ A normal View depends on underlying tables, but SQL Server may allow a schema ch
 
 `WITH SCHEMABINDING` creates a stronger dependency between the View and the objects it references.
 
-> **SCHEMABINDING prevents incompatible schema changes that would break the View.**
+> [!IMPORTANT]
+> `SCHEMABINDING` prevents incompatible schema changes that would break the View.
 
 For safety, we will use a temporary demonstration table.
 
@@ -1613,7 +1619,8 @@ GO
 
 `WITH ENCRYPTION` hides a View definition from normal metadata tools such as `sp_helptext`.
 
-> **Important:** This should not be treated as a security boundary. It hides the definition from normal inspection, but it is not a substitute for permissions or proper security controls.
+> [!WARNING]
+> This should not be treated as a security boundary. It hides the definition from normal inspection, but it is not a substitute for permissions or proper security controls.
 
 Create a normal View:
 
@@ -1665,6 +1672,7 @@ SELECT TOP (10) *
 FROM dbo.vActiveCards;
 ```
 
+> [!TIP]
 > Always keep the original View source in version control.
 
 ---
@@ -2396,7 +2404,8 @@ And remember:
 
 > **Views store SQL. Tables store data.**
 
-> **A View is not just a saved SELECT. Its definition also determines what can be modified through it and which rules apply.**
+> [!IMPORTANT]
+> A View is not just a saved SELECT. Its definition also determines what can be modified through it and which rules apply.
 
 ---
 

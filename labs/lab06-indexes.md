@@ -67,9 +67,6 @@ flowchart TD
     I1 --> L2[Leaf page]
     I2 --> L3[Leaf page]
     I2 --> L4[Leaf page]
-    L1 -.-> L2
-    L2 -.-> L3
-    L3 -.-> L4
 ```
 
 The tree contains:
@@ -78,7 +75,14 @@ The tree contains:
 - internal levels
 - leaf level
 
-The dotted arrows show another important detail: leaf pages are also linked to each other (in both directions, not just left to right as drawn here). Once SQL Server reaches the first relevant leaf page, it can walk directly to neighboring leaf pages without going back up through the tree. This is what makes range scans and the `Index Scan` operator efficient, and is one reason a query can sometimes return rows in index order without a separate `Sort` operator.
+There is another important detail this picture doesn't show: leaf pages are also linked directly to each other, in both directions:
+
+```mermaid
+flowchart LR
+    L1[Leaf page] --> L2[Leaf page] --> L3[Leaf page] --> L4[Leaf page]
+```
+
+Once SQL Server reaches the first relevant leaf page, it can walk directly to neighboring leaf pages without going back up through the tree. This is what makes range scans and the `Index Scan` operator efficient, and is one reason a query can sometimes return rows in index order without a separate `Sort` operator.
 
 To search for a key, SQL Server follows one path through the tree.
 

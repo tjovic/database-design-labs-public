@@ -807,6 +807,95 @@ The core connection between the two labs is:
 
 ---
 
+# Exercises
+
+Try each exercise before opening the solution.
+
+---
+
+## Exercise 1 – Page math
+
+A table contains `2,000,000 rows`. With the current row width, `40 rows` fit on each page.
+
+1. How many pages does the table need?
+2. A design change adds columns, reducing the rows per page to `25`. How many pages does the table need now?
+3. By what percentage did the page count increase?
+
+<details>
+<summary>Show solution</summary>
+
+1. `2,000,000 / 40 = 50,000 pages`.
+2. `2,000,000 / 25 = 80,000 pages`.
+3. `(80,000 − 50,000) / 50,000 = 60%` more pages — purely from making rows wider, with no change to the number of rows.
+
+</details>
+
+---
+
+## Exercise 2 – Logical vs. physical reads
+
+Run the following twice in the same session, without closing SSMS in between:
+
+```sql
+SET STATISTICS IO ON;
+
+SELECT *
+FROM dbo.Product;
+```
+
+1. What do you expect to see in the `physical reads` count the first time compared to the second time?
+2. Why can the numbers differ even though the query and the data are identical?
+
+<details>
+<summary>Show solution</summary>
+
+1. The first execution may show some physical reads, since the pages have to be brought in from storage. The second execution typically shows `physical reads = 0`, with all reads satisfied from the buffer pool.
+2. After the first execution, the pages are cached in the buffer pool. The second execution can read them with logical reads only, without going back to storage.
+
+</details>
+
+---
+
+## Exercise 3 – Investigate SalesOrder
+
+`SalesOrder` is a much larger table than `Category`, `Product`, or `Customer`.
+
+1. Run `DBCC IND('IndexLab', 'dbo.SalesOrder', -1);` and note approximately how many data pages it reports.
+2. Using that page count and the fact that `SalesOrder` contains `10,000,000 rows`, estimate the average number of rows per page.
+3. Compare this estimate with what you found for `Category`, `Product`, and `Customer` earlier in the lab. Why might the number be different?
+
+<details>
+<summary>Show solution</summary>
+
+1. The exact count depends on your database, but expect a very large number of pages given 10 million rows.
+2. Rows per page ≈ `10,000,000 / (number of pages reported)`.
+3. The row width is different — `SalesOrder` has its own mix of column types and sizes, so it does not necessarily pack the same number of rows per page as the smaller tables.
+
+</details>
+
+---
+
+## Exercise 4 – Predicting the impact of a wider row
+
+A table currently fits about `16 rows` on each `8 KB` page, and contains `1,000,000 rows`.
+
+A new `nvarchar(200)` column is added, using on average an extra `100 bytes` per row, which reduces the page to fitting only `10 rows`.
+
+1. How many pages did the table need before the change?
+2. How many pages does it need after the change?
+3. Would you expect a table scan on this table to become more or less expensive after the change? Why?
+
+<details>
+<summary>Show solution</summary>
+
+1. `1,000,000 / 16 ≈ 62,500 pages`.
+2. `1,000,000 / 10 = 100,000 pages`.
+3. More expensive. The same number of rows now requires more pages, so a scan must read more pages to return the same result set.
+
+</details>
+
+---
+
 # Key takeaways
 
 - SQL Server databases are represented by physical files.

@@ -1059,6 +1059,126 @@ Indexes should reflect real access patterns.
 
 ---
 
+# Exercises
+
+Try each exercise before opening the solution.
+
+---
+
+## Exercise 1 – Index for a filtered, sorted query
+
+Run this query with the actual execution plan enabled, before creating any new index:
+
+```sql
+SELECT
+    SalesOrderId,
+    CustomerId,
+    OrderDate,
+    TotalAmount
+FROM dbo.SalesOrder
+WHERE Status = 'Processing'
+ORDER BY OrderDate DESC;
+```
+
+Design and create a nonclustered index that lets this query avoid a full scan. Explain your choice of key column(s), key order, and any included columns. Re-run the query and confirm the plan improved.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrder_Status_OrderDate
+ON dbo.SalesOrder (Status, OrderDate DESC)
+INCLUDE (CustomerId, TotalAmount);
+GO
+```
+
+`Status` is the leading key because the query filters on it. `OrderDate DESC` is part of the key, not just included, because the query also needs the matching rows in that order — storing it in the key can let SQL Server avoid a separate `Sort`. `CustomerId` and `TotalAmount` are included because the query returns them but does not filter or sort by them.
+
+</details>
+
+---
+
+## Exercise 2 – Composite index column order
+
+The lab created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)`. For each query below, decide whether it can use that index via a seek on the full key, a seek on just the leading column, or not efficiently at all — then verify with an actual execution plan.
+
+```sql
+-- A
+SELECT * FROM dbo.SalesOrder WHERE OrderDate >= '20250101';
+
+-- B
+SELECT * FROM dbo.SalesOrder WHERE CustomerId = 500 ORDER BY OrderDate;
+
+-- C
+SELECT * FROM dbo.SalesOrder
+WHERE CustomerId = 500
+  AND OrderDate >= '20250101'
+  AND OrderDate <  '20250201';
+```
+
+<details>
+<summary>Show solution</summary>
+
+- **A** – Not efficiently. `OrderDate` is not the leading key column, so the index cannot be seeked on it alone.
+- **B** – Seek on the leading column (`CustomerId`). Because `OrderDate` is the second key column, the matching rows for that customer are already stored in `OrderDate` order, so the `ORDER BY` may be satisfied without an extra `Sort`.
+- **C** – Seek on the full key (`CustomerId` and `OrderDate` together) — the most selective use of the index of the three, and typically the cheapest.
+
+</details>
+
+---
+
+## Exercise 3 – Covering index design
+
+Write a query that returns `ProductId`, `Quantity`, and `UnitPrice` from `SalesOrderItem` for one specific `SalesOrderId`. Confirm with an actual execution plan that it does not need a `Key Lookup` back to the clustered index.
+
+```sql
+SELECT
+    ProductId,
+    Quantity,
+    UnitPrice
+FROM dbo.SalesOrderItem
+WHERE SalesOrderId = 12345;
+```
+
+<details>
+<summary>Show solution</summary>
+
+`IX_SalesOrderItem_SalesOrderId`, created earlier in the lab with `INCLUDE (ProductId, Quantity, UnitPrice)`, already covers this query — the key supports the `WHERE` clause, and every returned column is either the key or an included column. If any of those three columns were missing from the index, the plan would show a `Key Lookup` to fetch them from the clustered index.
+
+</details>
+
+---
+
+## Exercise 4 – Evaluate a Missing Index suggestion
+
+Run this query and look at any "Missing Index" recommendation SQL Server offers:
+
+```sql
+SELECT
+    SalesOrderId,
+    OrderDate
+FROM dbo.SalesOrder
+WHERE Status = 'Review'
+ORDER BY OrderDate;
+```
+
+Before creating anything, answer:
+
+1. Does a similar index already exist? (Check `IX_SalesOrder_Status` from Section 23.)
+2. Would a newly suggested index overlap or duplicate that existing one?
+3. Should you create a new index, extend the existing one, or do nothing? Justify your decision.
+
+<details>
+<summary>Show solution</summary>
+
+1. `IX_SalesOrder_Status` exists, but only on `Status` — it does not include `OrderDate`.
+2. A suggested index on `(Status, OrderDate)` would not be a pure duplicate; it supports both the filter and the sort, which the existing index does not.
+3. In a real workload, the better choice is usually to extend or replace `IX_SalesOrder_Status` with a `(Status, OrderDate)` version rather than keep two overlapping single-purpose indexes — fewer, well-designed indexes are easier to maintain than many narrow, overlapping ones.
+
+</details>
+
+---
+
 # Key takeaways
 
 - SQL Server indexes are physical structures made of pages.

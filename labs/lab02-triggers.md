@@ -96,9 +96,11 @@ This lab uses **AFTER triggers**.
 
 Typical uses include:
 
-* **audit and activity logging** – recording that a row was inserted, updated, or deleted, and often what actually changed, such as logging only a real city rename rather than every `UPDATE` statement, even one that leaves the value unchanged (Sections 2–3, 5);
-* **enforcing rules that are difficult to express with normal constraints** – for example, rejecting a change that would violate a business rule spanning multiple tables, such as an employee's salary falling outside the allowed range for their area (Section 10);
-* **maintaining related data that must always remain consistent** – for example, updating a related table automatically whenever the data it depends on changes, such as adjusting product stock whenever invoice items are inserted, updated, or deleted (Section 11).
+* **audit and activity logging**;
+* **enforcing rules that are difficult to express with normal constraints**;
+* **maintaining related data that must always remain consistent**.
+
+Today, most of these responsibilities are commonly handled in application code instead. Triggers remain useful for the cases where that isn't enough — when a rule must hold no matter which application, script, or tool changes the data.
 
 However, triggers also introduce **hidden behavior**.
 
@@ -150,11 +152,16 @@ ON dbo.City
 AFTER INSERT
 AS
 BEGIN
+    SET NOCOUNT ON;
+
     INSERT INTO ActivityLog (Message)
     VALUES ('A row was inserted into City.');
 END
 GO
 ```
+
+> [!TIP]
+> `SET NOCOUNT ON` stops SQL Server from sending `(n rows affected)` messages for each statement inside the trigger. It has nothing to do with the trigger's own event — it is the same `SET NOCOUNT ON` from Lab 00, Section 9. You will see it again later in this lab, especially once a trigger's body runs more than one statement, such as the inventory triggers in Section 11.
 
 Breakdown:
 
@@ -1488,7 +1495,7 @@ END;
 GO
 ```
 > [!NOTE]
-> `SET NOCOUNT ON` prevents SQL Server from sending `(n rows affected)` messages to the client after each statement. This reduces unnecessary communication and is commonly used in stored procedures and triggers. 
+> `SET NOCOUNT ON` again — same habit introduced in Section 2.
 
 Let's examine the important part:
 

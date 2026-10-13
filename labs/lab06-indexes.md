@@ -28,11 +28,9 @@ By the end of this lab, you should be able to:
 
 In Lab 05 we learned:
 
-```text
-SQL Server stores data in pages.
-Queries process pages.
-More pages processed means more I/O work.
-```
+- SQL Server stores data in pages.
+- Queries process pages.
+- More pages processed means more I/O work.
 
 Now we ask:
 
@@ -73,11 +71,9 @@ flowchart TD
 
 The tree contains:
 
-```text
-root level
-internal levels
-leaf level
-```
+- root level
+- internal levels
+- leaf level
 
 To search for a key, SQL Server follows one path through the tree.
 
@@ -98,11 +94,7 @@ A very large index can still be only a few levels deep.
 
 ## Heap
 
-A table without a clustered index is called a:
-
-```text
-heap
-```
+A table without a clustered index is called a `heap`.
 
 The rows still live on data pages, but there is no clustered index key that defines the leaf-level order.
 
@@ -150,10 +142,8 @@ A primary key is a logical constraint.
 
 It guarantees that:
 
-```text
-values are unique
-values are not NULL
-```
+- values are unique
+- values are not `NULL`
 
 SQL Server enforces the primary key using a unique index.
 
@@ -207,11 +197,7 @@ Query
 → Include Actual Execution Plan
 ```
 
-or press:
-
-```text
-Ctrl + M
-```
+or press `Ctrl + M`.
 
 Also enable:
 
@@ -258,26 +244,21 @@ On the reference system, the first execution took several seconds.
 
 Exact time depends on hardware and caching.
 
-Do not focus only on elapsed time.
+> [!TIP]
+> Do not focus only on elapsed time.
 
 Inspect:
 
-```text
-Execution Plan
-Messages
-STATISTICS IO
-STATISTICS TIME
-```
+- Execution Plan
+- Messages
+- `STATISTICS IO`
+- `STATISTICS TIME`
 
 ---
 
 # 7. Reading the execution plan
 
-Execution plans are usually read:
-
-```text
-right → left
-```
+Execution plans are usually read `right → left`.
 
 Start with the operators that access tables or indexes.
 
@@ -302,16 +283,15 @@ flowchart RL
     D --> E[Table / index access]
 ```
 
-The plan is not a list of "good" and "bad" operators.
+> [!NOTE]
+> The plan is not a list of "good" and "bad" operators.
 
 The important questions are:
 
-```text
-How many rows were read?
-How many rows were returned?
-Which access paths were available?
-How much I/O was required?
-```
+- How many rows were read?
+- How many rows were returned?
+- Which access paths were available?
+- How much I/O was required?
 
 ---
 
@@ -324,30 +304,16 @@ WHERE so.OrderDate >= '20250601'
   AND so.OrderDate <  '20250602'
 ```
 
-`SalesOrder` contains approximately:
-
-```text
-10,000,000 rows
-```
-
-but only about:
-
-```text
-5,477 rows
-```
-
-match one day in the reference data.
+`SalesOrder` contains approximately `10,000,000 rows`, but only about `5,477 rows` match one day in the reference data.
 
 Without an index on `OrderDate`, SQL Server cannot navigate directly to those rows.
 
 Inspect the operator properties:
 
-```text
-Actual Number of Rows
-Estimated Number of Rows
-Number of Rows Read
-Predicate
-```
+- Actual Number of Rows
+- Estimated Number of Rows
+- Number of Rows Read
+- Predicate
 
 The important pattern is:
 
@@ -367,19 +333,7 @@ The join is:
 soi.SalesOrderId = so.SalesOrderId
 ```
 
-`SalesOrderItem` contains approximately:
-
-```text
-40,000,000 rows
-```
-
-but only about:
-
-```text
-21,908 rows
-```
-
-are relevant on the reference database.
+`SalesOrderItem` contains approximately `40,000,000 rows`, but only about `21,908 rows` are relevant on the reference database.
 
 Without a suitable index on `SalesOrderId`, SQL Server must process a very large input.
 
@@ -415,11 +369,7 @@ This is the main performance problem.
 
 # 10. Why Hash Match?
 
-Without useful indexes, the plan may use:
-
-```text
-Hash Match (Inner Join)
-```
+Without useful indexes, the plan may use `Hash Match (Inner Join)`.
 
 Conceptually:
 
@@ -430,7 +380,8 @@ flowchart TD
     C --> D[Matching rows]
 ```
 
-A `Hash Match` is not automatically bad.
+> [!NOTE]
+> A `Hash Match` is not automatically bad.
 
 With a large unsorted input and no efficient lookup path, it can be a reasonable strategy.
 
@@ -440,17 +391,7 @@ The problem is primarily the size of the data flowing into the join.
 
 # 11. Why the Product scan is not a problem
 
-The plan may still scan:
-
-```text
-Product
-```
-
-which contains only about:
-
-```text
-30,000 rows
-```
+The plan may still scan `Product`, which contains only about `30,000 rows`.
 
 A scan of a small object may be extremely cheap.
 
@@ -501,7 +442,7 @@ These operators are not the main bottleneck in this query because they process a
 
 The plan may suggest something similar to:
 
-```text
+```sql
 CREATE NONCLUSTERED INDEX ...
 ON dbo.SalesOrder (OrderDate)
 INCLUDE (SalesOrderId)
@@ -518,13 +459,11 @@ It is not designing the complete indexing strategy for the database.
 
 Consider:
 
-```text
-existing indexes
-other queries
-storage
-write overhead
-redundant indexes
-```
+- existing indexes
+- other queries
+- storage
+- write overhead
+- redundant indexes
 
 before accepting any missing-index recommendation.
 
@@ -567,12 +506,7 @@ GO
 
 Refresh the `Indexes` folder in SSMS.
 
-You should see:
-
-```text
-PK_SalesOrder
-PK_SalesOrderItem
-```
+You should see `PK_SalesOrder` and `PK_SalesOrderItem`.
 
 ```mermaid
 flowchart LR
@@ -580,14 +514,7 @@ flowchart LR
     B --> C[Clustered in this lab]
 ```
 
-The primary-key indexes provide efficient access by:
-
-```text
-SalesOrderId
-SalesOrderItemId
-```
-
-but our query also needs other access paths.
+The primary-key indexes provide efficient access by `SalesOrderId` and `SalesOrderItemId`, but our query also needs other access paths.
 
 ---
 
@@ -603,11 +530,7 @@ GO
 
 Why?
 
-Because the query searches by:
-
-```text
-OrderDate
-```
+Because the query searches by `OrderDate`.
 
 ```mermaid
 flowchart LR
@@ -647,11 +570,9 @@ soi.SalesOrderId = so.SalesOrderId
 
 Why include:
 
-```text
-ProductId
-Quantity
-UnitPrice
-```
+- `ProductId`
+- `Quantity`
+- `UnitPrice`
 
 Because they are needed by the rest of the query.
 
@@ -677,23 +598,15 @@ Only the available physical access paths changed.
 
 Compare:
 
-```text
-elapsed time
-logical reads
-execution plan
-```
+- elapsed time
+- logical reads
+- execution plan
 
 ---
 
 # 18. New plan – Index Seek and Nested Loops
 
-The new plan should contain operators such as:
-
-```text
-Index Seek
-Nested Loops
-Index Seek
-```
+The new plan should contain operators such as `Index Seek → Nested Loops → Index Seek`.
 
 Conceptually:
 
@@ -786,11 +699,7 @@ The key lesson is:
 
 # 21. Inspect a real index in SSMS
 
-Inspect:
-
-```text
-IX_SalesOrderItem_SalesOrderId
-```
+Inspect `IX_SalesOrderItem_SalesOrderId`.
 
 In SSMS:
 
@@ -807,15 +716,13 @@ Databases
 
 Inspect:
 
-```text
-Index type
-Depth
-Pages
-Leaf-level rows
-Average row size
-Page fullness
-Fragmentation
-```
+- Index type
+- Depth
+- Pages
+- Leaf-level rows
+- Average row size
+- Page fullness
+- Fragmentation
 
 A large index can contain tens of millions of leaf-level entries while remaining only a few levels deep.
 
@@ -829,13 +736,7 @@ flowchart TD
 
 This is the physical reason an index can provide a short navigation path through a very large data set.
 
-Do not interpret:
-
-```text
-Depth = 4
-```
-
-as exactly four physical disk I/O operations.
+Do not interpret `Depth = 4` as exactly four physical disk I/O operations.
 
 Pages may already be cached, and storage I/O can be combined.
 
@@ -874,17 +775,7 @@ ON dbo.SalesOrder
 GO
 ```
 
-The index is ordered first by:
-
-```text
-CustomerId
-```
-
-and then by:
-
-```text
-OrderDate
-```
+The index is ordered first by `CustomerId` and then by `OrderDate`.
 
 ```mermaid
 flowchart TD
@@ -993,7 +884,8 @@ flowchart TD
 
 This is **selectivity**.
 
-A column with only a few distinct values is not automatically a bad index candidate.
+> [!NOTE]
+> A column with only a few distinct values is not automatically a bad index candidate.
 
 Distribution matters.
 
@@ -1014,11 +906,7 @@ INCLUDE
 );
 ```
 
-The key determines the search order:
-
-```text
-SalesOrderId
-```
+The key determines the search order: `SalesOrderId`.
 
 The included columns provide additional values at the leaf level.
 
@@ -1036,10 +924,8 @@ This can avoid an additional lookup to the clustered index.
 
 But wider indexes:
 
-```text
-consume more storage
-require more maintenance
-```
+- consume more storage
+- require more maintenance
 
 So do not try to cover every query.
 
@@ -1070,11 +956,9 @@ Every index is a real physical structure made of pages.
 
 More indexes mean:
 
-```text
-more storage
-more pages
-more maintenance
-```
+- more storage
+- more pages
+- more maintenance
 
 When a row is inserted, updated, or deleted, SQL Server may need to update several index structures.
 
@@ -1101,6 +985,7 @@ Good index design is therefore not:
 
 but:
 
+> [!TIP]
 > create indexes that support important access patterns.
 
 ---
@@ -1109,11 +994,7 @@ but:
 
 Return to `Product`.
 
-It contains only about:
-
-```text
-30,000 rows
-```
+It contains only about `30,000 rows`.
 
 The optimizer may still choose a scan.
 
@@ -1127,10 +1008,8 @@ flowchart TD
 
 Do not use:
 
-```text
-Seek = always good
-Scan = always bad
-```
+- Seek = always good
+- Scan = always bad
 
 Use:
 
@@ -1153,20 +1032,11 @@ When considering an index, ask:
 
 Examples:
 
-```text
-WHERE OrderDate ...
-→ key candidate: OrderDate
-```
-
-```text
-JOIN ... ON SalesOrderId
-→ key candidate: SalesOrderId
-```
-
-```text
-WHERE CustomerId ... AND OrderDate ...
-→ candidate: (CustomerId, OrderDate)
-```
+| Pattern | Key candidate |
+|---|---|
+| `WHERE OrderDate ...` | `OrderDate` |
+| `JOIN ... ON SalesOrderId` | `SalesOrderId` |
+| `WHERE CustomerId ... AND OrderDate ...` | `(CustomerId, OrderDate)` |
 
 Indexes should reflect real access patterns.
 

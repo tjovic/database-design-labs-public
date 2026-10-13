@@ -29,13 +29,11 @@ This lab contains relatively little coding. The main goal is to build a correct 
 
 Until now, most of our work has been at the **logical level**:
 
-```text
-tables
-views
-triggers
-procedures
-functions
-```
+- tables
+- views
+- triggers
+- procedures
+- functions
 
 A query such as:
 
@@ -71,20 +69,16 @@ Run the [setup script](setup/index-lab-data-setup.md) in SQL Server Management S
 
 The setup creates:
 
-```text
-Category
-Product
-Customer
-SalesOrder
-SalesOrderItem
-```
+- `Category`
+- `Product`
+- `Customer`
+- `SalesOrder`
+- `SalesOrderItem`
 
 The largest tables contain approximately:
 
-```text
-SalesOrder       10,000,000 rows
-SalesOrderItem   40,000,000 rows
-```
+- `SalesOrder` – 10,000,000 rows
+- `SalesOrderItem` – 40,000,000 rows
 
 Generation may take a few minutes depending on the computer.
 
@@ -196,11 +190,9 @@ If the SQL Server data files are stored on another drive, use that drive instead
 
 Look for:
 
-```text
-Bytes Per Sector
-Bytes Per Physical Sector
-Bytes Per Cluster
-```
+- `Bytes Per Sector`
+- `Bytes Per Physical Sector`
+- `Bytes Per Cluster`
 
 A typical system may show something similar to:
 
@@ -230,10 +222,10 @@ flowchart TD
 
 For example:
 
-```text
-NTFS cluster       commonly 4 KB
-SQL Server page    always 8 KB
-```
+| Layer | Typical size |
+|---|---|
+| NTFS cluster | commonly 4 KB |
+| SQL Server page | always 8 KB |
 
 These are different layers.
 
@@ -244,11 +236,7 @@ A SQL Server page is a database storage and I/O unit.
 > [!NOTE]
 > SQL Server always organizes its data into 8 KB pages, regardless of the NTFS cluster size underneath.
 
-Do not assume:
-
-```text
-1 SQL Server page = 1 physical disk I/O
-```
+Do not assume `1 SQL Server page = 1 physical disk I/O`.
 
 The operating system, SQL Server, storage controller, SSD cache, and read-ahead mechanisms can combine or cache I/O.
 
@@ -263,17 +251,9 @@ The important principle is:
 
 A SQL Server data file is divided into fixed-size pages.
 
-A page is always:
+A page is always `8 KB` (`8192 bytes`).
 
-```text
-8 KB = 8192 bytes
-```
-
-Eight pages form one extent:
-
-```text
-8 × 8 KB = 64 KB
-```
+Eight pages form one extent: `8 × 8 KB = 64 KB`.
 
 ```mermaid
 flowchart TD
@@ -329,11 +309,9 @@ flowchart TD
 
 Important values:
 
-```text
-Page size       = 8192 bytes
-Page header     = 96 bytes
-Extent          = 8 pages = 64 KB
-```
+- Page size = `8192 bytes`
+- Page header = `96 bytes`
+- Extent = `8 pages = 64 KB`
 
 The usable area for regular in-row records is therefore slightly smaller than the full 8192 bytes.
 
@@ -373,35 +351,11 @@ SQL Server does not normally retrieve one isolated row directly from storage.
 
 It works with pages.
 
-Suppose two tables both contain:
+Suppose two tables both contain `1,000,000 rows`.
 
-```text
-1,000,000 rows
-```
+Table A stores about `100 rows per page`. It therefore needs approximately `1,000,000 / 100 = 10,000 pages`.
 
-Table A stores about:
-
-```text
-100 rows per page
-```
-
-It therefore needs approximately:
-
-```text
-1,000,000 / 100 = 10,000 pages
-```
-
-Table B stores about:
-
-```text
-50 rows per page
-```
-
-It therefore needs approximately:
-
-```text
-1,000,000 / 50 = 20,000 pages
-```
+Table B stores about `50 rows per page`. It therefore needs approximately `1,000,000 / 50 = 20,000 pages`.
 
 Both tables contain the same number of rows.
 
@@ -461,21 +415,7 @@ The page may already have been in memory.
 
 A **physical read** occurs when the required page is not already available in memory and must be brought in from storage.
 
-Therefore:
-
-```text
-every page SQL Server processes
-        ↓
-contributes to logical I/O
-```
-
-but:
-
-```text
-not every logical read
-        ↓
-requires a physical storage read
-```
+Therefore, every page SQL Server processes contributes to logical I/O, but not every logical read requires a physical storage read.
 
 This also explains why the first execution of a query can sometimes be slower than later executions: some required pages may already be cached.
 
@@ -573,21 +513,12 @@ The result contains many columns.
 
 Focus on:
 
-```text
-PageFID
-PagePID
-PageType
-IndexID
-```
-
-Interpret them as:
-
-```text
-PageFID   file identifier
-PagePID   page identifier
-PageType  page type
-IndexID   heap/index identifier
-```
+| Column | Meaning |
+|---|---|
+| `PageFID` | file identifier |
+| `PagePID` | page identifier |
+| `PageType` | page type |
+| `IndexID` | heap/index identifier |
 
 Conceptually:
 
@@ -628,11 +559,9 @@ Replace `123` with a real page ID from your database.
 
 Look for information such as:
 
-```text
-PAGE HEADER
-Slot
-Record Size
-```
+- `PAGE HEADER`
+- `Slot`
+- `Record Size`
 
 This is the low-level physical representation of data that is normally hidden behind:
 
@@ -674,11 +603,7 @@ flowchart LR
 
 # 13. Exercise 1 – Category
 
-Investigate:
-
-```text
-dbo.Category
-```
+Investigate `dbo.Category`.
 
 Use:
 
@@ -711,11 +636,7 @@ We will return to this idea in Lab 06.
 
 # 14. Exercise 2 – Product
 
-Investigate:
-
-```text
-dbo.Product
-```
+Investigate `dbo.Product`.
 
 Run:
 
@@ -739,11 +660,7 @@ Answer:
 
 Choose an approximate row size.
 
-Estimate:
-
-```text
-8060 / approximate row size
-```
+Estimate `8060 / approximate row size`.
 
 Compare this estimate with the actual number of rows on a page.
 
@@ -753,11 +670,7 @@ The result may differ because SQL Server also stores row overhead and slot-array
 
 # 15. Exercise 3 – Customer
 
-Investigate:
-
-```text
-dbo.Customer
-```
+Investigate `dbo.Customer`.
 
 Run:
 
@@ -799,17 +712,7 @@ Compare the result with `Category` and `Product`.
 
 Now connect everything.
 
-Suppose a query needs to inspect:
-
-```text
-100 pages
-```
-
-and another query needs to inspect:
-
-```text
-100,000 pages
-```
+Suppose a query needs to inspect `100 pages` and another query needs to inspect `100,000 pages`.
 
 Even when many pages are cached, the second query creates much more work:
 
@@ -834,10 +737,8 @@ But page count is one of the most important physical concepts for understanding 
 
 Now consider:
 
-```text
-SalesOrder       ~10,000,000 rows
-SalesOrderItem   ~40,000,000 rows
-```
+- `SalesOrder` – ~10,000,000 rows
+- `SalesOrderItem` – ~40,000,000 rows
 
 These objects occupy a very large number of pages.
 
@@ -874,15 +775,13 @@ flowchart LR
 
 Lab 06 will investigate:
 
-```text
-B+-tree structure
-clustered indexes
-nonclustered indexes
-table scans
-index seeks
-execution plans
-logical reads
-```
+- B+-tree structure
+- clustered indexes
+- nonclustered indexes
+- table scans
+- index seeks
+- execution plans
+- logical reads
 
 The core connection between the two labs is:
 

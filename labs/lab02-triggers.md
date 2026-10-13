@@ -453,6 +453,9 @@ END
 GO
 ```
 
+> [!NOTE]
+> This trigger intentionally does not use `SET NOCOUNT ON`, so SQL Server displays the `(n rows affected)` messages. In practice, `SET NOCOUNT ON` is commonly used in triggers to suppress these unnecessary messages.
+
 Test it:
 
 ```sql

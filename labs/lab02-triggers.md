@@ -388,18 +388,20 @@ So the only way to make this trigger run is to perform an `INSERT` on that table
 
 ---
 
-# Section 3 – The inserted and deleted tables
+# Section 3 – The `inserted` and `deleted` tables
 
-A useful trigger needs access to the rows affected by the DML statement.
+A useful trigger usually needs to know **which rows caused it to fire**.
 
-SQL Server provides two special tables inside a DML trigger:
+For example, if a new city is inserted, the trigger may need to know its ID and name.
+
+SQL Server provides this information through two special tables available inside DML triggers:
 
 - `inserted`
 - `deleted`
 
 There is no `updated` table.
 
-Their contents depend on the event:
+Their contents depend on the DML event:
 
 | Event | `inserted` | `deleted` |
 |---|---|---|
@@ -407,16 +409,31 @@ Their contents depend on the event:
 | `DELETE` | empty | old rows |
 | `UPDATE` | new versions | old versions |
 
+A simple way to remember this is:
+
+```mermaid
+flowchart LR
+    A["INSERT"] --> B["inserted<br/>new rows"]
+
+    C["DELETE"] --> D["deleted<br/>old rows"]
+
+    E["UPDATE"] --> F["deleted<br/>old versions"]
+    E --> G["inserted<br/>new versions"]
+```
+
 For an `UPDATE`, both versions are available:
 
 ```text
-deleted  -> value before UPDATE
-inserted -> value after UPDATE
+deleted  -> values before UPDATE
+inserted -> values after UPDATE
 ```
+
+> [!IMPORTANT]
+> Despite their names, `inserted` and `deleted` are **tables**, not individual rows. They can contain one row or many rows. We will examine this in detail in the next section.
 
 These tables exist only while the trigger is running.
 
-You can read from them inside the trigger:
+You can read from them inside a trigger:
 
 ```sql
 SELECT *
@@ -431,7 +448,7 @@ but you cannot query them as normal tables outside a trigger.
 
 The first trigger only recorded that *something* was inserted.
 
-We can now log the actual inserted data:
+Now that we know about `inserted`, we can log the actual inserted data:
 
 ```sql
 CREATE OR ALTER TRIGGER dbo.trg_City_Insert
@@ -450,6 +467,21 @@ END
 GO
 ```
 
+The important part is:
+
+```sql
+FROM inserted;
+```
+
+The trigger does not need to search the `City` table to find out what was inserted. SQL Server already provides the affected rows through `inserted`.
+
+```mermaid
+flowchart LR
+    A["INSERT INTO City"] --> B["inserted"]
+    B --> C["Trigger reads<br/>inserted"]
+    C --> D["ActivityLog"]
+```
+
 > [!NOTE]
 > This trigger intentionally does not use `SET NOCOUNT ON`, so SQL Server displays the `(n rows affected)` messages. In practice, `SET NOCOUNT ON` is commonly used in triggers to suppress these unnecessary messages.
 
@@ -464,7 +496,9 @@ FROM ActivityLog
 ORDER BY LoggedAt DESC;
 ```
 
-The trigger reads the inserted row from `inserted`.
+The trigger reads the inserted row from `inserted` and uses its values to create the log message.
+
+In the next section, we will see what happens when a single statement inserts **more than one row**.
 
 ---
 

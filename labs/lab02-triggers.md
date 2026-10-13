@@ -2243,7 +2243,6 @@ DROP TRIGGER IF EXISTS dbo.trg_City_LogRename;
 DROP TRIGGER IF EXISTS dbo.trg_City_Delete;
 DROP TRIGGER IF EXISTS dbo.trg_City_StateChange;
 DROP TRIGGER IF EXISTS dbo.trg_City_All;
-DROP TRIGGER IF EXISTS dbo.trg_Employee_CheckSalary;
 GO
 ```
 

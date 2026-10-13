@@ -212,7 +212,7 @@ flowchart LR
 This lab focuses on **AFTER triggers**.
 
 > [!IMPORTANT]
-> An `AFTER` trigger executes as part of the **same transaction** as the statement that caused it. If the trigger fails and the transaction is rolled back, the original data change is rolled back as well.
+> An `AFTER` trigger executes as part of the **same transaction** as the statement that caused it. If the trigger fails and the transaction is rolled back, the original data change is rolled back as well. Transactions will be covered in more detail later in this course. 
 
 For now, remember the basic pattern:
 

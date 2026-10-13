@@ -1433,7 +1433,9 @@ The salary is above the allowed maximum, so the trigger prints:
 Warning: salary is outside the allowed range.
 ```
 > [!NOTE]
-> In a real system, we would usually reject the invalid change or record it properly. Here we only print a warning because the goal is to understand the trigger logic.
+> In a real system, detecting an invalid value would usually not be enough — we would want to **reject the entire change** and leave the database in a consistent state. This requires an understanding of transactions and error handling, which will be covered later in this course.
+>
+> For now, the trigger only prints a warning so that we can focus on the trigger logic itself.
 
 ### The same trigger also works for UPDATE
 

@@ -9,42 +9,33 @@
 
 By the end of this lab, you should be able to:
 
-- explain how a SQL Server database is represented by physical files,
-- connect physical storage, NTFS, database files, extents, pages, and rows,
-- explain the role of `.mdf`, `.ndf`, and `.ldf` files,
-- explain why SQL Server works with **8 KB pages**,
-- explain the difference between a logical read and a physical read,
-- explain the role of the buffer pool,
-- explain why row size affects page count,
-- explain why processing more pages usually means more I/O work,
-- inspect real table pages using `DBCC IND`,
-- inspect the contents of an individual page using `DBCC PAGE`,
-- connect physical page access with the need for indexes in Lab 06.
+- explain how SQL Server stores databases in files,
+- distinguish disk sectors, NTFS clusters, SQL Server extents, and pages,
+- explain the roles of `.mdf`, `.ndf`, and `.ldf` files,
+- describe the structure of an 8 KB SQL Server data page,
+- explain why row width influences page count and query cost,
+- distinguish logical reads from physical reads and explain the buffer pool,
+- inspect table pages using `DBCC IND` and `DBCC PAGE`,
+- interpret simple page-count and I/O measurements,
+- explain why indexes can reduce the amount of data SQL Server must read.
 
-This lab contains relatively little coding. The main goal is to build a correct mental model of how SQL Server physically stores and accesses data.
+This lab involves relatively little coding. Its goal is to build a **mental model** of where data lives and how SQL Server accesses it. You will use this model in **Lab 06 – Indexes**.
+
+> [!NOTE]
+> The examples use **SQL Server 2022** and SQL Server Management Studio (SSMS). Values such as file size, page count, and page IDs can differ on your computer.
 
 ---
 
 # 1. From logical data to physical storage
 
-Until now, most of our work has been at the **logical level**:
-
-- tables
-- views
-- triggers
-- procedures
-- functions
-
-A query such as:
+Until now, we have mainly worked at the **logical level**: tables, views, triggers, procedures, and functions.
 
 ```sql
 SELECT *
 FROM dbo.Customer;
 ```
 
-looks as if SQL Server simply reads rows from a table.
-
-Physically, however, SQL Server works with files and pages.
+This query looks as though SQL Server simply retrieves rows from a table. In reality, those rows are stored inside **pages** in database files.
 
 ```mermaid
 flowchart TD
@@ -54,20 +45,16 @@ flowchart TD
     D --> E[Rows]
 ```
 
-The key idea for this lab is:
-
 > [!IMPORTANT]
-> Rows are logical objects. Pages are the physical units SQL Server works with.
+> A **row** is a logical unit of table data. An **8 KB page** is the fundamental unit SQL Server uses to organize that data in database files and the buffer pool.
 
 ---
 
 # 2. Create the IndexLab database
 
-We will use the same generated database in both Lab 05 and Lab 06.
+We will use the same generated database in Labs 05 and 06.
 
-Run the [setup script](setup/index-lab-data-setup.md) in SQL Server Management Studio.
-
-The setup creates:
+Run the [IndexLab setup script](setup/index-lab-data-setup.md) in SSMS. It creates the following tables:
 
 - `Category`
 - `Product`
@@ -75,120 +62,99 @@ The setup creates:
 - `SalesOrder`
 - `SalesOrderItem`
 
-The largest tables contain approximately:
-
-- `SalesOrder` – 10,000,000 rows
-- `SalesOrderItem` – 40,000,000 rows
-
-Generation may take a few minutes depending on the computer.
-
-After the script completes:
+The two largest tables contain approximately **10,000,000 orders** and **40,000,000 order items**. Generation may take several minutes.
 
 ```sql
 USE IndexLab;
 GO
+
+SELECT 'Category' AS TableName, COUNT_BIG(*) AS RowCount FROM dbo.Category
+UNION ALL
+SELECT 'Product', COUNT_BIG(*) FROM dbo.Product
+UNION ALL
+SELECT 'Customer', COUNT_BIG(*) FROM dbo.Customer
+UNION ALL
+SELECT 'SalesOrder', COUNT_BIG(*) FROM dbo.SalesOrder
+UNION ALL
+SELECT 'SalesOrderItem', COUNT_BIG(*) FROM dbo.SalesOrderItem;
 ```
 
-Verify the row counts:
+> [!TIP]
+> You only need to run the setup once. Do **not** recreate the database before Lab 06: we want to study indexing on the same data.
 
-```sql
-SELECT COUNT(*) AS CategoryRows
-FROM dbo.Category;
-
-SELECT COUNT(*) AS ProductRows
-FROM dbo.Product;
-
-SELECT COUNT(*) AS CustomerRows
-FROM dbo.Customer;
-
-SELECT COUNT(*) AS SalesOrderRows
-FROM dbo.SalesOrder;
-
-SELECT COUNT(*) AS SalesOrderItemRows
-FROM dbo.SalesOrderItem;
-```
-
-The important point is not only that the database contains many rows.
-
-The important question is:
-
-> **How are those rows physically stored?**
+Our question is not merely *how many rows exist?* It is **how are those rows stored, and what does SQL Server have to read to find them?**
 
 ---
 
 # 3. Database files
 
-A SQL Server database is represented by physical files.
+A SQL Server database consists of one or more operating-system files. The usual extensions are:
 
-The main file types are:
-
-| Extension | Purpose |
+| Extension | Role |
 |---|---|
 | `.mdf` | Primary data file |
 | `.ndf` | Optional secondary data file |
 | `.ldf` | Transaction log file |
 
-### `.mdf` – primary data file
+## 3.1 Primary and secondary data files
 
-Every database has exactly one `.mdf` file. It belongs to the **primary filegroup**, and unless a database is deliberately split across multiple files, this single file holds all of the database's pages — tables, indexes, and system metadata alike.
+Every database has **exactly one primary data file**, usually with the `.mdf` extension. It belongs to the primary filegroup. Additional data files (commonly `.ndf`) can hold tables, indexes, and other database pages. Their use and placement are configuration choices; more files do not automatically make a database faster.
 
-### `.ndf` – optional secondary data file
+## 3.2 Transaction log
 
-A database can optionally add one or more `.ndf` files, typically to spread data across several physical disks for parallel I/O, or to separate data into different storage tiers. A small teaching database like `IndexLab` has no real need for one, which is why this lab uses only an `.mdf`.
+The transaction log records changes needed for transaction recovery. SQL Server uses **write-ahead logging (WAL)**: the relevant log records must be hardened to durable storage **before the corresponding modified data pages are written to disk**.
 
-### `.ldf` – transaction log file
+A modified page can therefore remain in memory after a transaction commits. If SQL Server stops unexpectedly, recovery uses log records to restore a consistent database state. We will explore transactions in a later lab.
 
-The log file is not just a record of "what happened" — it implements **write-ahead logging**: before SQL Server modifies a data page, it first writes a record of that change to the log. If the server crashes before the data page itself is safely written, SQL Server can replay or undo logged changes on restart to bring the database back to a consistent state.
+> [!NOTE]
+> Ordinary read-only queries do not log row changes. However, this does **not** mean that every `SELECT` is guaranteed to generate no logging-related activity in every possible scenario.
 
-This is also why a read-only workload (`SELECT`) does not grow the log, while `INSERT`/`UPDATE`/`DELETE` do — only changes need to be logged. The `IndexLab` setup script uses the `SIMPLE` recovery model specifically so that logged space can be reused via `CHECKPOINT` once each batch is safely applied, instead of growing indefinitely during the bulk data generation.
-
-A simplified `IndexLab` layout is:
-
-```text
-IndexLab
-│
-├── IndexLab.mdf
-│      tables
-│      indexes
-│      metadata
-│
-└── IndexLab_log.ldf
-       transaction log
-```
+A simplified layout:
 
 ```mermaid
 flowchart LR
     A[IndexLab database] --> B[IndexLab.mdf]
     A --> C[IndexLab_log.ldf]
-    B --> D[Tables]
-    B --> E[Indexes]
-    C --> F[Transaction log records]
+    B --> D[Tables, indexes, metadata]
+    C --> E[Transaction log records]
 ```
 
----
+### Inspect your database files
+
+```sql
+USE IndexLab;
+GO
+
+SELECT
+    name AS LogicalFileName,
+    type_desc AS FileType,
+    physical_name AS PhysicalPath,
+    size * 8.0 / 1024 AS SizeMB
+FROM sys.database_files;
+```
+
+The `size` column is expressed in **8 KB pages**, so multiplying by 8 converts it to KB, and dividing by 1024 converts it to MB.
 
 ## Check your understanding
 
-1. What is the difference between the logical view of a table and how SQL Server physically stores it?
-2. Name the three main SQL Server database file types and what each is used for.
-3. Why doesn't a read-only `SELECT` query grow the transaction log, while an `UPDATE` does?
-4. Why might a database add an `.ndf` file?
+1. What is the difference between a table and the database file containing it?
+2. What is the purpose of a transaction log?
+3. Does a database always need secondary `.ndf` files?
 
 <details>
 <summary>Show answers</summary>
 
-1. A query like `SELECT * FROM dbo.Customer` looks as if it simply reads rows, but physically SQL Server reads and writes fixed-size pages inside database files.
-2. `.mdf` – primary data file; `.ndf` – optional secondary data file; `.ldf` – transaction log file.
-3. Write-ahead logging only needs to record *changes*. A `SELECT` doesn't change any data, so there is nothing to log; an `UPDATE` modifies a page, so that change is written to the log first.
-4. To spread data across multiple physical disks for parallel I/O, or to separate data into different storage tiers — it is optional and most small databases don't need one.
+1. A table is a logical database object. Its data resides in pages stored in database data files.
+2. It records the information required for transaction recovery; write-ahead logging ensures relevant log records become durable before changed data pages are written to disk.
+3. No. There is exactly one primary data file; secondary files are optional.
 
 </details>
 
 ---
 
-# 4. From the physical disk to a SQL Server page
+# 4. From the storage device to SQL Server
 
-Before looking at SQL Server pages, inspect the storage layer underneath SQL Server.
+SQL Server works with pages, but the storage layers beneath it use different units. Let us inspect them before examining SQL Server pages.
 
 Open **Command Prompt** or **PowerShell** and run:
 
@@ -196,15 +162,7 @@ Open **Command Prompt** or **PowerShell** and run:
 fsutil fsinfo ntfsinfo C:
 ```
 
-If the SQL Server data files are stored on another drive, use that drive instead.
-
-Look for:
-
-- `Bytes Per Sector`
-- `Bytes Per Physical Sector`
-- `Bytes Per Cluster`
-
-A typical system may show something similar to:
+If the database files are stored on another NTFS volume, use its drive letter. Find these entries (their exact names and values may differ):
 
 ```text
 Bytes Per Sector          : 512
@@ -212,142 +170,139 @@ Bytes Per Physical Sector : 4096
 Bytes Per Cluster         : 4096
 ```
 
-Your values may be different.
+## 4.1 Sectors: 512 B and 4 KB
 
-## 4.1 Different layers use different units
+Older hard disk drives traditionally used **512-byte sectors**. The value persists for compatibility even on many modern storage devices.
 
-At the physical and filesystem levels, storage is also block-based.
+- **Logical sector (512 B in this example):** the unit in which the device exposes addresses to the operating system.
+- **Reported physical sector (4096 B in this example):** the device's reported physical sector granularity.
 
-A simplified hierarchy is:
+A **512e** device presents 512-byte logical sectors while reporting 4096-byte physical sectors. Eight logical sectors therefore correspond to one reported 4 KB physical sector.
+
+> [!NOTE]
+> **What about SSDs?** SSDs do not have rotating platters or magnetic tracks. They still expose logical sectors, but internally organize NAND flash memory differently. A reported 4 KB physical sector is **not necessarily** the internal NAND page size.
+
+## 4.2 NTFS clusters
+
+A **cluster** (allocation unit) is the amount of space the NTFS file system allocates as a unit to a file. This is **not** the same concept as a disk sector.
+
+If the cluster size is **4096 bytes**, then a small file may require:
+
+| File size | Clusters allocated | Allocated space |
+|---:|---:|---:|
+| 1000 B | 1 | 4096 B |
+| 5000 B | 2 | 8192 B |
+| 10000 B | 3 | 12288 B |
+
+This is a simplified example of ordinary allocated file data; special NTFS features, including resident data, can behave differently.
+
+For large SQL Server data files, **64 KB NTFS allocation units are commonly recommended** in Microsoft storage guidance. This is a file-system configuration recommendation, not a change to SQL Server's page size.
+
+## 4.3 Different layers, different units
 
 ```mermaid
 flowchart TD
-    A[Physical storage] --> B[Disk sectors]
-    B --> C[NTFS clusters]
-    C --> D[Database file .mdf]
-    D --> E[SQL Server extents]
-    E --> F[SQL Server pages]
-    F --> G[Rows]
+    A[Storage device: logical sectors] --> B[NTFS: clusters]
+    B --> C[Database file: MDF / NDF]
+    C --> D[SQL Server: extents]
+    D --> E[SQL Server: 8 KB pages]
+    E --> F[Rows]
 ```
 
-For example:
-
-| Layer | Typical size |
+| Layer | Example unit |
 |---|---|
-| NTFS cluster | commonly 4 KB |
-| SQL Server page | always 8 KB |
-
-These are different layers.
-
-An NTFS cluster is a filesystem allocation unit.
-
-A SQL Server page is a database storage and I/O unit.
-
-> [!NOTE]
-> SQL Server always organizes its data into 8 KB pages, regardless of the NTFS cluster size underneath.
-
-Do not assume `1 SQL Server page = 1 physical disk I/O`.
-
-The operating system, SQL Server, storage controller, SSD cache, and read-ahead mechanisms can combine or cache I/O.
-
-The important principle is:
+| Device interface | 512 B logical sector |
+| Device-reported physical sector | 4 KB |
+| NTFS | 4 KB or 64 KB cluster |
+| SQL Server | 8 KB page; 64 KB extent |
 
 > [!IMPORTANT]
-> More pages to process means more I/O work, even though the exact number of physical storage operations can vary.
+> **One SQL Server page does not imply one physical disk I/O operation.** The buffer pool, read-ahead, operating-system cache, storage controller, and device can change how I/O requests are carried out. These sizes describe different layers, not a fixed count of hardware operations.
 
 ---
 
 # 5. Files, extents, and pages
 
-A SQL Server data file is divided into fixed-size pages.
+A SQL Server **data file** is organized into **8 KB pages** (8192 bytes). Eight consecutive pages form a **64 KB extent**.
 
-A page is always `8 KB` (`8192 bytes`).
-
-Eight pages form one extent: `8 × 8 KB = 64 KB`.
+| Unit | Size | Main role |
+|---|---:|---|
+| Page | 8 KB | Stores rows, index entries, or metadata |
+| Extent | 8 pages = 64 KB | Allocates groups of pages |
 
 ```mermaid
 flowchart TD
-    A[Data file] --> B[Extent 1 - 64 KB]
-    A --> C[Extent 2 - 64 KB]
-    B --> D[Page 1 - 8 KB]
-    B --> E[Page 2 - 8 KB]
-    B --> F[...]
-    B --> G[Page 8 - 8 KB]
+    F[Database data file] --> E[One extent: 64 KB]
+    E --> P1[Page 1: 8 KB]
+    E --> P2[Page 2: 8 KB]
+    E --> P3[Page 3: 8 KB]
+    E --> P4[Page 4: 8 KB]
+    E --> P5[Page 5: 8 KB]
+    E --> P6[Page 6: 8 KB]
+    E --> P7[Page 7: 8 KB]
+    E --> P8[Page 8: 8 KB]
 ```
 
-For this lab:
+An **extent** is primarily an allocation concept. A **page** is the important unit for the I/O measurements used later in this lab.
 
-- **extent** is mainly an allocation concept,
-- **page** is the key unit for understanding query I/O.
+> [!NOTE]
+> An extent and a 64 KB NTFS cluster may have the same size, but they belong to **different layers** and are not interchangeable.
 
 ---
 
 # 6. Inside a data page
 
-A data page contains a header, rows, free space, and a slot array.
+A regular SQL Server data page contains a **96-byte page header**, row data, free space, and a **slot array**.
 
 ```text
-+-----------------------------+
-| Page Header - 96 bytes      |
-+-----------------------------+
-| Row 1                       |
-+-----------------------------+
-| Row 2                       |
-+-----------------------------+
-| Row 3                       |
-+-----------------------------+
-| ...                         |
-| Free space                  |
-+-----------------------------+
-| Slot array                  |
-+-----------------------------+
++----------------------------------+
+| Page header (96 bytes)           |
++----------------------------------+
+| Row data                         |
+| Row data                         |
+| ...                              |
+| Free space                       |
++----------------------------------+
+| Slot array (2 bytes per row)     |
++----------------------------------+
+           Total = 8192 bytes
 ```
 
-The **page header** stores metadata about the page.
+- The **page header** contains metadata about the page.
+- The **rows** contain record data, including row-format overhead.
+- The **slot array** stores a 2-byte offset for each record, allowing SQL Server to locate rows within the page.
 
-The **rows** contain the actual record data.
+## 6.1 A simple row-count estimate
 
-The **slot array** contains offsets that tell SQL Server where each row begins inside the page.
+Start with the available bytes after the page header:
 
-```mermaid
-flowchart TD
-    A[8 KB page] --> B[96-byte page header]
-    A --> C[Rows]
-    A --> D[Free space]
-    A --> E[Slot array]
-```
+`8192 - 96 = 8096 bytes`
 
-Important values:
+Suppose each stored row, **including its row-format overhead**, occupies approximately **100 bytes**. The slot array needs another **2 bytes per row**.
 
-- Page size = `8192 bytes`
-- Page header = `96 bytes`
-- Extent = `8 pages = 64 KB`
+`8096 / (100 + 2) ≈ 79 rows per page`
 
-The usable area for regular in-row records is therefore slightly smaller than the full 8192 bytes.
+For one million rows:
 
-Large variable-length values may be moved outside the main row when required.
+`1,000,000 / 79 ≈ 12,659 pages` (rounded up).
 
-For this lab, remember:
+This is **only an estimate**. Real page utilization also depends on row formats, variable-length columns, allocation, and partially filled pages.
 
 > [!NOTE]
-> Smaller rows usually mean more rows per page.
-
----
+> Wider rows usually mean fewer rows per page. Some large values may also be stored outside the main in-row record.
 
 ## Check your understanding
 
-1. What is the difference between an NTFS cluster and a SQL Server page?
-2. Why shouldn't you assume that one SQL Server page equals exactly one physical disk I/O operation?
-3. How many pages make up one extent, and how large is an extent in total?
-4. What does a data page contain besides the actual row data?
+1. How many SQL Server pages form an extent?
+2. Why is the full 8192-byte page not available exclusively for row data?
+3. Why might two rows in the same table have different physical sizes?
 
 <details>
 <summary>Show answers</summary>
 
-1. An NTFS cluster is a filesystem allocation unit (commonly 4 KB); a SQL Server page is always a fixed 8 KB database storage and I/O unit, independent of the underlying filesystem.
-2. The operating system, SQL Server, storage controller, SSD cache, and read-ahead mechanisms can combine or cache I/O, so the mapping isn't 1:1.
-3. Eight pages form one 64 KB extent.
-4. A page header (96 bytes), free space, and a slot array that stores offsets telling SQL Server where each row begins.
+1. Eight pages, totaling 64 KB.
+2. Pages have a 96-byte header, slot-array entries, and record-format overhead.
+3. Variable-length values and storage features can change row size.
 
 </details>
 
@@ -355,209 +310,178 @@ For this lab, remember:
 
 # 7. Why pages matter
 
-This is the most important conceptual section of the lab.
+This is the central idea of the lab.
 
-SQL Server does not normally retrieve one isolated row directly from storage.
+Imagine two tables, both containing **1,000,000 rows**:
 
-It works with pages.
+| | Table A | Table B |
+|---|---:|---:|
+| Rows per page | 100 | 50 |
+| Approximate pages | 10,000 | 20,000 |
+| Data pages to process for a full scan | ~10,000 | ~20,000 |
 
-Suppose two tables both contain `1,000,000 rows`.
-
-Table A stores about `100 rows per page`. It therefore needs approximately `1,000,000 / 100 = 10,000 pages`.
-
-Table B stores about `50 rows per page`. It therefore needs approximately `1,000,000 / 50 = 20,000 pages`.
-
-Both tables contain the same number of rows.
-
-But scanning Table B requires SQL Server to process roughly twice as many pages.
+The tables have the same row count, but a scan of Table B must process roughly twice as many data pages.
 
 ```mermaid
 flowchart TD
-    A[Wider rows] --> B[Fewer rows fit on each page]
-    B --> C[More pages are required]
-    C --> D[More page reads]
-    D --> E[More memory and I/O work]
+    A[Wider rows] --> B[Fewer rows fit per page]
+    B --> C[More pages needed]
+    C --> D[More pages processed by a scan]
+    D --> E[More logical I/O and possible physical I/O]
 ```
 
-This gives us an important rule:
-
 > [!IMPORTANT]
-> Query performance is often strongly related to the number of pages SQL Server must process.
+> The **number of rows returned** is not the same as the **number of rows or pages examined**. A query returning ten rows may still scan thousands of pages to find them.
 
-The number of rows returned by a query does not tell the whole story.
-
-A query may return only 100 rows while still reading thousands of pages to find them.
-
-That distinction becomes extremely important in Lab 06.
+Not all page accesses have equal costs, and elapsed time also depends on CPU, memory, and the execution plan. But page count is an excellent starting point for understanding database performance.
 
 ---
 
 # 8. Buffer pool, logical reads, and physical reads
 
-SQL Server normally processes pages in memory.
-
-The main memory area used to cache database pages is called the **buffer pool**.
-
-```mermaid
-flowchart LR
-    A[Storage] -->|physical read when required| B[Buffer pool]
-    B -->|logical read| C[Query execution]
-```
-
-When a query needs a page, two situations are possible.
+SQL Server processes database pages in memory, using a cache called the **buffer pool**.
 
 ```mermaid
 flowchart TD
-    A[Query needs a page] --> B{Is the page already in the buffer pool?}
-    B -->|Yes| C[Logical read]
+    A[Query requires a page] --> B{Already in buffer pool?}
+    B -->|Yes| C[Access cached page: logical read]
     B -->|No| D[Read page from storage]
     D --> E[Place page in buffer pool]
     E --> C
 ```
 
-## Logical read
+### Logical read
 
-A **logical read** means that SQL Server accessed a page in the buffer pool.
+A **logical read** is an access to an 8 KB page in the buffer pool. **The same page can be accessed more than once**, so logical-read counts are not necessarily counts of distinct pages.
 
-The page may already have been in memory.
+### Physical read
 
-## Physical read
+A **physical read** is needed when SQL Server must obtain a page from storage rather than finding it in its buffer pool. Read-ahead can also bring in pages proactively.
 
-A **physical read** occurs when the required page is not already available in memory and must be brought in from storage.
+A second execution of the same query may be faster because the needed pages have already been cached. But a first execution **does not necessarily** produce physical reads: another query may have cached those pages earlier.
 
-Therefore, every page SQL Server processes contributes to logical I/O, but not every logical read requires a physical storage read.
-
-This also explains why the first execution of a query can sometimes be slower than later executions: some required pages may already be cached.
-
-> [!IMPORTANT]
-> More pages processed means more logical I/O and increases the potential amount of physical I/O.
-
-In Lab 06 we will measure this using:
+We can inspect some of this activity with:
 
 ```sql
 SET STATISTICS IO ON;
+GO
+
+SELECT *
+FROM dbo.Product;
+GO
+
+SET STATISTICS IO OFF;
+GO
 ```
+
+In SSMS, inspect the **Messages** tab. Find the `logical reads`, `physical reads`, and `read-ahead reads` values.
+
+> [!TIP]
+> `read-ahead reads` describe pages read in advance of immediate demand. They are reported separately from `physical reads` by `SET STATISTICS IO`, and both are relevant when discussing storage activity.
 
 ---
 
 # 9. Page types
 
-SQL Server uses different page types for different purposes.
+SQL Server uses different page types for different purposes. In this lab, focus on:
 
-For this lab, focus on two:
-
-| Page type | Purpose |
+| Type | What it stores |
 |---|---|
-| Data page | Stores table rows |
-| Index page | Stores index structure |
-
-Other page types exist for allocation and internal bookkeeping, but they are not the focus here.
+| Data page | Rows in a heap or leaf-level rows of a clustered index |
+| Index page | Index entries and navigation information |
+| Allocation/metadata page | Information used to manage pages and extents |
 
 ```mermaid
 flowchart TD
     A[SQL Server pages] --> B[Data pages]
     A --> C[Index pages]
-    A --> D[Allocation and internal pages]
-    B --> E[Table rows]
-    C --> F[Index keys and pointers]
+    A --> D[Allocation and metadata pages]
+    B --> E[Rows]
+    C --> F[Keys and references]
 ```
 
-The distinction between data pages and index pages creates the bridge to Lab 06.
-
----
+A **heap** is a table without a clustered index. We will study heaps and index structures in Lab 06.
 
 ## Check your understanding
 
-1. Why can two tables with the same number of rows require very different numbers of pages?
-2. What is the difference between a logical read and a physical read?
-3. Why can the first execution of a query be slower than later executions of the same query?
-4. What are the two page types this lab focuses on?
+1. Does every logical read correspond to a physical read?
+2. Why might the second execution of a query show fewer physical reads?
+3. Is a scan necessarily inefficient?
 
 <details>
 <summary>Show answers</summary>
 
-1. If one table has wider rows, fewer rows fit per page, so it needs more pages to store the same number of rows.
-2. A logical read accesses a page already in the buffer pool; a physical read is needed when the page is not already cached and must be brought in from storage.
-3. The first run may need physical reads to bring pages into the buffer pool; later runs can reuse those cached pages through logical reads only.
-4. Data pages (store table rows) and index pages (store index structure).
+1. No. Cached pages can be accessed without physical storage reads.
+2. Needed pages may already be present in the buffer pool.
+3. No. Scanning a small table or a large proportion of a table can be efficient.
 
 </details>
 
 ---
 
-# 10. Inspecting the physical reality
+# 10. Inspecting physical pages
 
-Until now, `Category`, `Product`, and `Customer` looked like logical tables.
+Now we will inspect the actual pages behind the `Category`, `Product`, and `Customer` tables.
 
-Physically, each table occupies a collection of pages.
+The purpose is **not to memorize diagnostic syntax**. We want to answer two questions:
 
-We will now use SQL Server diagnostic commands to see those pages directly.
+- Which pages are allocated to a table?
+- What is inside one of those pages?
 
-The goal is not to memorize DBCC syntax.
+> [!WARNING]
+> `DBCC IND` and `DBCC PAGE` are **undocumented diagnostic commands**. Use them only in this teaching database. Their output and behavior are not a stable interface for application code or production monitoring.
 
-The goal is to answer:
-
-> **Which pages belong to this table, and what is actually stored inside one of those pages?**
-
-First enable DBCC output in the current session:
+To print the diagnostic output to the SSMS session, run:
 
 ```sql
+USE IndexLab;
+GO
 DBCC TRACEON(3604);
 GO
 ```
 
-If you open a new query window, run it again.
+This enables the trace flag for the **current session**. Run it again if you open a new query window.
 
 ---
 
 # 11. DBCC IND – Which pages belong to a table?
 
-Start with:
+Start with a small table:
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Category', -1);
 GO
 ```
 
-The result contains many columns.
-
-Focus on:
+Focus on these columns:
 
 | Column | Meaning |
 |---|---|
-| `PageFID` | file identifier |
-| `PagePID` | page identifier |
-| `PageType` | page type |
-| `IndexID` | heap/index identifier |
+| `PageFID` | Database file ID |
+| `PagePID` | Page ID within that file |
+| `PageType` | Internal type of page |
+| `IndexID` | Heap or index identifier |
 
-Conceptually:
+For a **heap**, the ordinary in-row data pages typically have `PageType = 1` and `IndexID = 0`.
 
-```mermaid
-flowchart LR
-    A[Category table] --> B[Page 120]
-    A --> C[Page 121]
-    A --> D[Page 122]
-```
+> [!NOTE]
+> Actual page IDs vary between databases. Do not copy the example IDs from this manual into your commands.
 
-The page IDs are the physical units SQL Server uses to store that object.
-
-You do not need to understand every column returned by `DBCC IND`.
+Do not attempt to understand every field. Start by locating the data pages for `Category`.
 
 ---
 
 # 12. DBCC PAGE – Look inside one page
 
-Choose one data page from `DBCC IND`.
+From `DBCC IND`, select a row representing a data page (`PageType = 1`). Copy its **PageFID** and **PagePID** values.
 
-Then run:
+The syntax is:
 
-```sql
-DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
-WITH TABLERESULTS;
-GO
+```text
+DBCC PAGE('IndexLab', file_id, page_id, 3) WITH TABLERESULTS;
 ```
 
-Example:
+For example, **only if those IDs actually appear in your output**:
 
 ```sql
 DBCC PAGE('IndexLab', 1, 123, 3)
@@ -565,154 +489,122 @@ WITH TABLERESULTS;
 GO
 ```
 
-Replace `123` with a real page ID from your database.
+Look for:
 
-Look for information such as:
-
-- `PAGE HEADER`
-- `Slot`
-- `Record Size`
-
-This is the low-level physical representation of data that is normally hidden behind:
-
-```sql
-SELECT *
-FROM dbo.Category;
-```
-
-Think of `DBCC PAGE` as a microscope:
+- `PAGE HEADER` and page metadata,
+- `Slot` entries and their relationship to rows,
+- `Record Size` values.
 
 ```mermaid
 flowchart LR
-    A[Table] --> B[DBCC IND]
-    B --> C[Find a PagePID]
-    C --> D[DBCC PAGE]
-    D --> E[Inspect physical rows]
+    A[Logical table] --> B[DBCC IND: list pages]
+    B --> C[Choose a data page]
+    C --> D[DBCC PAGE: inspect contents]
 ```
 
----
+Compare the diagnostic output with the ordinary logical view:
+
+```sql
+SELECT TOP (10) *
+FROM dbo.Category;
+```
+
+The SQL query shows rows and columns. `DBCC PAGE` reveals part of the storage format behind them.
 
 ## Check your understanding
 
-1. What must you run once per session before using `DBCC IND` and `DBCC PAGE`?
-2. What does `DBCC IND` tell you about a table?
-3. What does `DBCC PAGE` let you inspect that `DBCC IND` does not?
-4. Do you need to understand every column returned by `DBCC IND`?
+1. What does `DBCC IND` tell you?
+2. Which two identifiers are needed for `DBCC PAGE`?
+3. Why should you use a page ID obtained from your own database?
 
 <details>
 <summary>Show answers</summary>
 
-1. `DBCC TRACEON(3604);` to enable DBCC output in the current session.
-2. Which pages belong to a given table, identified by `PageFID`, `PagePID`, `PageType`, and `IndexID`.
-3. The actual physical contents of one specific page — the page header, slots, and record size — the low-level representation normally hidden behind a `SELECT`.
-4. No. The lab only asks you to focus on a handful of key columns.
+1. It shows pages associated with a table or index, including their file IDs, page IDs, and types.
+2. File ID (`PageFID`) and page ID (`PagePID`).
+3. SQL Server chooses page locations during allocation, so IDs can differ between database instances and rebuilds.
 
 </details>
 
 ---
 
-# 13. Exercise 1 – Category
+# 13. Guided investigation 1 – Category
 
-Investigate `dbo.Category`.
+`Category` is our smallest example.
 
-Use:
-
-```sql
-DBCC IND('IndexLab', 'dbo.Category', -1);
-```
-
-and `DBCC PAGE`.
+1. Run `DBCC IND('IndexLab', 'dbo.Category', -1);`.
+2. Identify its ordinary in-row data pages (`PageType = 1`, `IndexID = 0` for a heap).
+3. Choose one and inspect it using `DBCC PAGE`.
 
 Answer:
 
-1. How many data pages does the table use?
-2. What are the `PageFID` and `PagePID` values?
-3. How many rows are stored on one selected data page?
-4. What is the approximate size of a row?
-5. Does the entire table fit into a small number of pages?
-
-### Discussion
-
-If the whole table occupies only a very small number of pages, scanning those pages may be extremely cheap.
-
-This is important because:
+1. How many data pages did you find?
+2. What are the `PageFID` and `PagePID` values for the selected page?
+3. How many rows are stored on that page?
+4. What is the approximate record size?
+5. Why might scanning this table be very cheap?
 
 > [!NOTE]
-> A scan is not automatically bad.
-
-We will return to this idea in Lab 06.
+> **A scan is not automatically bad.** Reading a few pages may cost less than navigating a more complicated access path.
 
 ---
 
-# 14. Exercise 2 – Product
-
-Investigate `dbo.Product`.
-
-Run:
+# 14. Guided investigation 2 – Product
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Product', -1);
 GO
 ```
 
-Inspect several pages using `DBCC PAGE`.
+Inspect two or three ordinary data pages using `DBCC PAGE`.
 
 Answer:
 
-1. Approximately how many data pages are used?
-2. What are the first three data page IDs?
-3. How many rows fit on one selected page?
-4. What are the sizes of several rows?
-5. Do all rows have exactly the same size?
-6. Which variable-length columns could explain any differences?
+1. Approximately how many data pages are allocated to `Product`?
+2. Record the first three data page IDs from your results.
+3. How many rows are on one selected page?
+4. Compare the sizes of several records. Are they identical?
+5. Which variable-length columns might explain differences?
 
-## Estimate rows per page
+### Estimate rows per page
 
-Choose an approximate row size.
+If the selected page contains rows averaging `R` bytes **including row-format overhead**, estimate:
 
-Estimate `8060 / approximate row size`.
+`Rows per page ≈ floor(8096 / (R + 2))`
 
-Compare this estimate with the actual number of rows on a page.
-
-The result may differ because SQL Server also stores row overhead and slot-array entries.
+The extra `2` accounts for one slot-array entry per row. Compare your estimate with the inspected page and explain why it may differ. Do not expect an exact match on partially filled pages.
 
 ---
 
-# 15. Exercise 3 – Customer
-
-Investigate `dbo.Customer`.
-
-Run:
+# 15. Guided investigation 3 – Customer
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Customer', -1);
 GO
 ```
 
-Answer:
+Using `DBCC IND` and `DBCC PAGE`, answer:
 
-1. Approximately how many data pages does the table use?
-2. What are the first five data page IDs?
-3. How many rows are stored on one selected page?
-4. What are the sizes of the first few rows?
-5. Why can rows from the same table have different physical sizes?
+1. Approximately how many data pages does `Customer` use?
+2. What are the first five data page IDs shown in your result?
+3. How many rows occupy one selected page?
+4. What sizes do the first few records have?
+5. Why might records in the same table occupy different amounts of space?
 
-Compare the result with `Category` and `Product`.
-
----
+Compare your observations with `Category` and `Product`.
 
 ## Check your understanding
 
-1. If a whole table fits into only a few data pages, why might scanning it be perfectly efficient?
-2. Why might two rows from the same table have different physical sizes?
-3. How can you roughly estimate how many rows fit on one page, and why might the real number differ from your estimate?
+1. Why can two tables with the same number of rows occupy different numbers of pages?
+2. Why can two records from the same table have different lengths?
+3. Why is a row-count estimate only approximate?
 
 <details>
 <summary>Show answers</summary>
 
-1. Because scanning a small number of pages is cheap regardless of access method — a scan is not automatically bad when the table itself is small.
-2. Variable-length columns can store different amounts of data per row, so row sizes vary even within the same table.
-3. Estimate ≈ 8060 / approximate row size. The real count may differ because SQL Server also stores row overhead and slot-array entries on each page.
+1. Row width, overhead, free space, and allocation patterns differ.
+2. Variable-length columns can store values of different lengths.
+3. Pages contain headers, slot arrays, row overhead, and sometimes free space; not all pages are equally full.
 
 </details>
 
@@ -720,187 +612,194 @@ Compare the result with `Category` and `Product`.
 
 # 16. From page count to I/O cost
 
-Now connect everything.
+Suppose Query A processes **100 pages**, while Query B processes **100,000 pages**.
 
-Suppose a query needs to inspect `100 pages` and another query needs to inspect `100,000 pages`.
+- Query A processes roughly `100 × 8 KB = 800 KB` of page content.
+- Query B processes roughly `100,000 × 8 KB = 781.25 MB` of page content.
 
-Even when many pages are cached, the second query creates much more work:
+This represents the **amount of page data involved in the comparison**, not a prediction of the exact bytes read from the storage device. Cached pages and repeated logical reads can change the observed I/O.
 
 ```mermaid
 flowchart TD
-    A[More pages required] --> B[More logical reads]
-    B --> C[More buffer-pool activity]
-    C --> D[Higher chance of physical reads]
-    D --> E[More I/O work]
-    B --> F[More CPU work to process rows]
+    A[More data pages to scan] --> B[More logical page accesses]
+    B --> C[More buffer-pool and CPU work]
+    B --> D[Potentially more storage reads]
 ```
 
-This does not mean that elapsed time is determined only by page count.
+**Important:** logical reads count page accesses, not necessarily unique pages. A storage device may service multiple pages in one I/O request, and an already cached page may need no physical storage access at all.
 
-Queries also use CPU, memory, joins, sorting, aggregation, and other operations.
-
-But page count is one of the most important physical concepts for understanding why a large scan can be expensive.
+Query time also depends on joins, predicates, CPU cost, memory, and the execution plan. Nevertheless, reducing unnecessary page access is a major goal of query optimization.
 
 ---
 
 # 17. Large tables and the problem we need to solve
 
-Now consider:
+Recall the two large tables:
 
-- `SalesOrder` – ~10,000,000 rows
-- `SalesOrderItem` – ~40,000,000 rows
+- `SalesOrder` – approximately 10 million rows,
+- `SalesOrderItem` – approximately 40 million rows.
 
-These objects occupy a very large number of pages.
-
-Imagine that a query needs order items for only one day.
-
-A table scan may still need to process a large part of the table to locate a small result set.
+Imagine that you need orders from one specific day. Without a suitable access path, SQL Server might need to examine many pages to find a relatively small set of matching rows.
 
 ```mermaid
 flowchart LR
-    A[Large table] --> B[Many pages]
-    B --> C[Scan]
-    C --> D[Many pages processed]
-    D --> E[Only a small result returned]
+    A[Large table] --> B[Many data pages]
+    B --> C[Scan many pages]
+    C --> D[Return only matching rows]
 ```
 
-The problem is now clear:
+> **Can SQL Server find the relevant rows without scanning most of the table?**
 
-> **How can SQL Server find the relevant rows without processing all those pages?**
+This question leads directly to indexing.
 
 ---
 
 # 18. Bridge to Lab 06 – Indexes
 
-An index provides another physical access path.
-
-Instead of scanning a large number of data pages, SQL Server may be able to navigate through a small number of index pages and reach only the relevant part of the data.
+An index provides another way to locate rows. For a selective query, SQL Server may navigate index pages and access only the relevant data pages instead of scanning a large table.
 
 ```mermaid
 flowchart LR
-    A[Without index] --> B[Scan many pages]
-    C[With index] --> D[Navigate index pages]
-    D --> E[Reach relevant rows/pages]
+    A[Without suitable index] --> B[Scan many data pages]
+    C[With suitable index] --> D[Navigate index pages]
+    D --> E[Access relevant rows/pages]
 ```
 
-Lab 06 will investigate:
+But indexes are not always the fastest option. A scan can be efficient for small tables or queries that need most rows.
 
-- B+-tree structure
-- clustered indexes
-- nonclustered indexes
-- table scans
-- index seeks
-- execution plans
-- logical reads
+Lab 06 will explore:
 
-The core connection between the two labs is:
+- B-tree index structures,
+- clustered and nonclustered indexes,
+- table scans, index scans, and index seeks,
+- execution plans and logical I/O,
+- when an index helps, and when it does not.
 
-> [!NOTE]
-> Lab 05 explains what SQL Server reads. Lab 06 explains how SQL Server can avoid reading what it does not need.
+> [!IMPORTANT]
+> **Lab 05 explains what SQL Server reads. Lab 06 explains how it can avoid reading unnecessary pages.**
 
 ---
 
-## Check your understanding
+# Practice exercises
 
-1. Does more I/O work always mean a query is automatically slow? What else does elapsed time depend on?
-2. Why can a table scan on `SalesOrderItem` be especially expensive compared to one on `Category`?
-3. How does an index change the number of pages SQL Server has to process for a selective query?
-
-<details>
-<summary>Show answers</summary>
-
-1. No. Page count is one of the most important factors, but elapsed time also depends on CPU, memory, joins, sorting, aggregation, and other work.
-2. `SalesOrderItem` has roughly 40 million rows spread across many pages, so a scan must process far more pages than scanning a small table like `Category`.
-3. Instead of scanning all data pages, SQL Server can navigate through a small number of index pages and go straight to the relevant rows/pages, avoiding the need to read irrelevant data.
-
-</details>
-
----
-
-# Exercises
-
-Try each exercise before opening the solution.
-
----
+Try each task before opening its solution. The first two use calculations and observation; the third uses a system view instead of generating a very large diagnostic result.
 
 ## Exercise 1 – Page math
 
-A table contains `2,000,000 rows`. With the current row width, `40 rows` fit on each page.
+A table contains **2,000,000 rows** and fits **40 rows per page**.
 
-1. How many pages does the table need?
-2. A design change adds columns, reducing the rows per page to `25`. How many pages does the table need now?
-3. By what percentage did the page count increase?
+1. How many pages are required?
+2. If wider rows reduce capacity to **25 rows per page**, how many pages are now required?
+3. By what percentage does the number of pages increase?
 
 <details>
 <summary>Show solution</summary>
 
 1. `2,000,000 / 40 = 50,000 pages`.
 2. `2,000,000 / 25 = 80,000 pages`.
-3. `(80,000 − 50,000) / 50,000 = 60%` more pages — purely from making rows wider, with no change to the number of rows.
+3. `(80,000 - 50,000) / 50,000 × 100 = 60%`.
 
 </details>
 
 ---
 
-## Exercise 2 – Logical vs. physical reads
+## Exercise 2 – Logical versus physical reads
 
-Run the following twice in the same session, without closing SSMS in between:
+In SSMS, execute the following **twice**, and inspect the **Messages** tab after each run:
 
 ```sql
+USE IndexLab;
+GO
 SET STATISTICS IO ON;
-
-SELECT *
-FROM dbo.Product;
+GO
+SELECT * FROM dbo.Product;
+GO
+SELECT * FROM dbo.Product;
+GO
+SET STATISTICS IO OFF;
+GO
 ```
 
-1. What do you expect to see in the `physical reads` count the first time compared to the second time?
-2. Why can the numbers differ even though the query and the data are identical?
+1. Record logical reads and physical reads for each execution.
+2. Did the physical-read count change?
+3. Why might both executions report zero physical reads?
+4. Can you conclude that the query accessed zero pages if `physical reads = 0`?
+
+> [!NOTE]
+> Pages may have been cached before you started this exercise. Do not expect the first query to show a nonzero physical-read count. **Do not clear the SQL Server buffer pool** just to force a difference on a shared classroom server.
 
 <details>
 <summary>Show solution</summary>
 
-1. The first execution may show some physical reads, since the pages have to be brought in from storage. The second execution typically shows `physical reads = 0`, with all reads satisfied from the buffer pool.
-2. After the first execution, the pages are cached in the buffer pool. The second execution can read them with logical reads only, without going back to storage.
+1. Values depend on the server and cache state.
+2. They may differ: pages read from storage can remain cached for subsequent executions.
+3. Another query or an earlier operation may already have loaded the required pages into memory.
+4. No. Inspect **logical reads** to see page accesses in the buffer pool. Also consider `read-ahead reads` when studying storage activity.
 
 </details>
 
 ---
 
-## Exercise 3 – Investigate SalesOrder
+## Exercise 3 – Investigate SalesOrder without listing every page
 
-`SalesOrder` is a much larger table than `Category`, `Product`, or `Customer`.
+`SalesOrder` is much larger than the tables we inspected with `DBCC IND`. Producing an individual row for every allocated page could overwhelm the SSMS result window.
 
-1. Run `DBCC IND('IndexLab', 'dbo.SalesOrder', -1);` and note approximately how many data pages it reports.
-2. Using that page count and the fact that `SalesOrder` contains `10,000,000 rows`, estimate the average number of rows per page.
-3. Compare this estimate with what you found for `Category`, `Product`, and `Customer` earlier in the lab. Why might the number be different?
+Instead, use the documented `sys.dm_db_partition_stats` view:
+
+```sql
+USE IndexLab;
+GO
+
+SELECT
+    i.name AS IndexName,
+    i.index_id,
+    SUM(ps.row_count) AS RowCount,
+    SUM(ps.in_row_data_page_count) AS InRowDataPages,
+    SUM(ps.used_page_count) AS UsedPages
+FROM sys.dm_db_partition_stats AS ps
+JOIN sys.indexes AS i
+    ON i.object_id = ps.object_id
+   AND i.index_id = ps.index_id
+WHERE ps.object_id = OBJECT_ID('dbo.SalesOrder')
+  AND i.index_id IN (0, 1)
+GROUP BY i.name, i.index_id;
+```
+
+`in_row_data_page_count` counts in-row data (leaf) pages. `used_page_count` includes other pages allocated to that index or heap and can be higher.
+
+1. What are the reported row count and in-row data page count?
+2. Estimate the **average rows per in-row data page**.
+3. Compare the estimate with `Category`, `Product`, and `Customer`.
+4. Why is this query better suited to counting pages in a very large table than displaying `DBCC IND` output?
 
 <details>
 <summary>Show solution</summary>
 
-1. The exact count depends on your database, but expect a very large number of pages given 10 million rows.
-2. Rows per page ≈ `10,000,000 / (number of pages reported)`.
-3. The row width is different — `SalesOrder` has its own mix of column types and sizes, so it does not necessarily pack the same number of rows per page as the smaller tables.
+1. Results depend on the generated database.
+2. Divide `RowCount` by `InRowDataPages`, provided the latter is nonzero. This is an average, not the exact occupancy of each page.
+3. Different row sizes and storage layouts lead to different page densities.
+4. The system view returns summary counts without producing a huge row-by-row list of page identifiers. Some environments may require `VIEW DATABASE STATE` or related DMV permissions.
 
 </details>
 
 ---
 
-## Exercise 4 – Predicting the impact of a wider row
+## Exercise 4 – Predict the effect of wider rows
 
-A table currently fits about `16 rows` on each `8 KB` page, and contains `1,000,000 rows`.
+A table contains **1,000,000 rows** and currently fits **16 rows per page**. After adding a populated variable-length column, it fits only **10 rows per page**.
 
-A new `nvarchar(200)` column is added, using on average an extra `100 bytes` per row, which reduces the page to fitting only `10 rows`.
-
-1. How many pages did the table need before the change?
-2. How many pages does it need after the change?
-3. Would you expect a table scan on this table to become more or less expensive after the change? Why?
+1. How many pages were needed before the change?
+2. How many pages are needed afterward?
+3. What is the percentage increase?
+4. What happens to the page-access cost of a full scan, assuming similar execution conditions?
 
 <details>
 <summary>Show solution</summary>
 
-1. `1,000,000 / 16 ≈ 62,500 pages`.
+1. `1,000,000 / 16 = 62,500 pages`.
 2. `1,000,000 / 10 = 100,000 pages`.
-3. More expensive. The same number of rows now requires more pages, so a scan must read more pages to return the same result set.
+3. `(100,000 - 62,500) / 62,500 × 100 = 60%`.
+4. A scan generally needs to process more pages, increasing logical I/O and potentially physical I/O. Elapsed time is not determined by page count alone.
 
 </details>
 
@@ -908,20 +807,16 @@ A new `nvarchar(200)` column is added, using on average an extra `100 bytes` per
 
 # Key takeaways
 
-- SQL Server databases are represented by physical files.
-- The filesystem and SQL Server both organize storage into fixed-size units.
-- SQL Server uses fixed-size **8 KB pages**.
-- Eight pages form a **64 KB extent**.
-- Rows live inside pages.
-- SQL Server processes pages in memory using the buffer pool.
-- A logical read is an access to a page in the buffer pool.
-- A physical read is required when a needed page must be brought from storage.
-- More pages to process means more logical I/O and potentially more physical I/O.
-- Wider rows usually mean fewer rows per page and therefore more pages.
-- `DBCC IND` shows which pages belong to an object.
-- `DBCC PAGE` lets us inspect the contents of an individual page.
-- Small scans may be cheap.
-- Large scans may require processing huge numbers of pages.
-- Indexes provide alternative access paths that can reduce page processing.
+- A SQL Server database is stored in **data and log files**.
+- **Logical sectors**, **physical sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
+- SQL Server pages are **8 KB**; eight consecutive pages form one **64 KB extent**.
+- A data page includes a header, records, free space, and a slot array.
+- Wider rows usually require more pages to store the same number of rows.
+- SQL Server uses the **buffer pool** to cache pages.
+- **Logical reads** count page accesses in memory; **physical reads** involve obtaining pages from storage. Read-ahead activity may be reported separately.
+- More pages processed generally mean more work, but **one page is not equivalent to one physical I/O operation**.
+- `DBCC IND` and `DBCC PAGE` are useful laboratory tools for examining page allocation and contents.
+- **A scan is not automatically bad**; its cost depends partly on how many pages must be processed.
+- Indexes provide alternative access paths that can reduce unnecessary page processing.
 
-> **SQL Server performance is often about how many pages must be processed, not simply how many rows a query returns.**
+> **The key performance question is often not how many rows a query returns, but how many pages SQL Server has to examine to produce the result.**

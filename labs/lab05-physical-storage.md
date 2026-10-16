@@ -22,7 +22,15 @@ By the end of this lab, you should be able to:
 This lab involves relatively little coding. Its goal is to build a **mental model** of where data lives and how SQL Server accesses it. You will use this model in **Lab 06 – Indexes**.
 
 > [!NOTE]
-> The examples use **SQL Server 2022** and SQL Server Management Studio (SSMS). Values such as file size, page count, and page IDs can differ on your computer.
+> **Demo Database – IndexLab**
+>
+> In this lab, you will create a demonstration database called `IndexLab`, containing several tables with millions of records.
+>
+> We will use this database to explore how SQL Server physically stores data, inspect data pages, and investigate disk I/O.
+>
+> The database will be created using the [IndexLab setup script](setup/index-lab-data-setup.md). 
+>
+> **Keep this database after completing the lab!** We will use it again in **Lab 06 – Indexes** to investigate query performance and demonstrate how indexes can reduce the number of pages SQL Server needs to read.
 
 ---
 

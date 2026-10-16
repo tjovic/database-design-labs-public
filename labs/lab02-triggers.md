@@ -1498,14 +1498,14 @@ Triggers are often useful when a change in one table must automatically cause a 
 
 A common real-world example is **inventory management**.
 
-Suppose we have products in stock and we create invoices when those products are sold.
+Suppose we have products in stock and we create invoice items when those products are sold.
 
 We will use two simple tables:
 
-- `Product` — stores products and the quantity currently available
-- `InvoiceItem` — stores products sold on invoices
+- `Product` — stores products and the quantity currently available;
+- `InvoiceItem` — stores products sold on invoices.
 
-But maintaining inventory involves more than just selling a product.
+Maintaining inventory involves more than just selling a product.
 
 Think about the following questions:
 
@@ -1536,13 +1536,13 @@ flowchart LR
     E --> F
 ```
 
-We can now create the tables needed for our inventory example.
-
 ---
 
 ## 11.1. Creating the tables
 
-For this example, we will create a separate test database. The AdventureWorks database already contains a `Product` table, so using a separate database allows us to keep this example simple and independent from the existing database structure.
+For this example, we will create a separate test database.
+
+The AdventureWorksENG database already contains a `Product` table, so using a separate database keeps this example simple and independent from the existing database structure.
 
 ```sql
 CREATE DATABASE InventoryDemo;
@@ -1555,10 +1555,10 @@ GO
 First, create the `Product` table:
 
 ```sql
-CREATE TABLE Product
+CREATE TABLE dbo.Product
 (
-    IDProduct int PRIMARY KEY,
-    Name varchar(100) NOT NULL,
+    IDProduct     int PRIMARY KEY,
+    Name          varchar(100) NOT NULL,
     StockQuantity int NOT NULL
 );
 GO
@@ -1567,17 +1567,17 @@ GO
 Now create the `InvoiceItem` table:
 
 ```sql
-CREATE TABLE InvoiceItem
+CREATE TABLE dbo.InvoiceItem
 (
     IDInvoiceItem int IDENTITY(1,1) PRIMARY KEY,
-    IDInvoice int NOT NULL,
-    IDProduct int NOT NULL,
-    Quantity int NOT NULL,
-    UnitPrice decimal(10,2) NOT NULL,
+    IDInvoice     int NOT NULL,
+    IDProduct     int NOT NULL,
+    Quantity      int NOT NULL,
+    UnitPrice     decimal(10,2) NOT NULL,
 
     CONSTRAINT FK_InvoiceItem_Product
         FOREIGN KEY (IDProduct)
-        REFERENCES Product(IDProduct)
+        REFERENCES dbo.Product(IDProduct)
 );
 GO
 ```
@@ -1587,7 +1587,7 @@ For this example, we do not need a complete `Invoice` table. `IDInvoice` is simp
 Insert several products:
 
 ```sql
-INSERT INTO Product
+INSERT INTO dbo.Product
     (IDProduct, Name, StockQuantity)
 VALUES
     (10, 'Keyboard', 20),
@@ -1601,7 +1601,7 @@ Check the initial inventory:
 
 ```sql
 SELECT *
-FROM Product
+FROM dbo.Product
 ORDER BY IDProduct;
 GO
 ```
@@ -1626,7 +1626,7 @@ Suppose a customer buys **3 keyboards**.
 The application creates an invoice item:
 
 ```sql
-INSERT INTO InvoiceItem
+INSERT INTO dbo.InvoiceItem
     (IDInvoice, IDProduct, Quantity, UnitPrice)
 VALUES
     (1001, 10, 3, 25.00);
@@ -1657,7 +1657,7 @@ However, we have not created the trigger yet.
 Remove the test row before continuing:
 
 ```sql
-DELETE FROM InvoiceItem
+DELETE FROM dbo.InvoiceItem
 WHERE IDInvoice = 1001;
 GO
 ```
@@ -1666,59 +1666,79 @@ GO
 
 ## 11.3. Creating the INSERT trigger
 
-We can use an `AFTER INSERT` trigger to automatically decrease the inventory:
+We can use an `AFTER INSERT` trigger to automatically decrease the inventory.
+
+Remember that `inserted` can contain several rows, and several of those rows may refer to the same product.
+
+Therefore, we first calculate the **total quantity sold for each product**:
 
 ```sql
-CREATE OR ALTER TRIGGER trg_InvoiceItem_Insert
-ON InvoiceItem
+SELECT
+    IDProduct,
+    SUM(Quantity) AS TotalQuantity
+FROM inserted
+GROUP BY IDProduct;
+```
+
+For example, if `inserted` contains:
+
+| IDProduct | Quantity |
+|---:|---:|
+| 10 | 2 |
+| 10 | 4 |
+| 20 | 1 |
+
+the query produces:
+
+| IDProduct | TotalQuantity |
+|---:|---:|
+| 10 | 6 |
+| 20 | 1 |
+
+We can then join this result with `Product` and update the stock:
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_InvoiceItem_Insert
+ON dbo.InvoiceItem
 AFTER INSERT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    UPDATE Product
-    SET StockQuantity = StockQuantity - (
-        SELECT SUM(Quantity)
+    UPDATE p
+    SET p.StockQuantity = p.StockQuantity - i.TotalQuantity
+    FROM dbo.Product AS p
+    JOIN
+    (
+        SELECT
+            IDProduct,
+            SUM(Quantity) AS TotalQuantity
         FROM inserted
-        WHERE inserted.IDProduct = Product.IDProduct
-    )
-    WHERE IDProduct IN (
-        SELECT IDProduct
-        FROM inserted
-    );
+        GROUP BY IDProduct
+    ) AS i
+        ON i.IDProduct = p.IDProduct;
 END;
 GO
 ```
+
 > [!NOTE]
-> `SET NOCOUNT ON` again — same habit introduced in Section 2.
+> `SET NOCOUNT ON` again — the same habit introduced earlier in this lab.
 
-Let's examine the important part:
-
-```sql
-SELECT SUM(Quantity)
-FROM inserted
-WHERE inserted.IDProduct = Product.IDProduct
-```
-
-For each affected product, the subquery calculates the total quantity sold.
-
-The `WHERE` condition limits the update to products that appear in `inserted`:
-
-```sql
-WHERE IDProduct IN (
-    SELECT IDProduct
-    FROM inserted
-);
-```
-
-The process is:
+The trigger follows a simple pattern:
 
 ```mermaid
 flowchart LR
-    A["INSERT<br/>InvoiceItem"] --> B["inserted"]
-    B --> C["SUM Quantity<br/>per product"]
-    C --> D["UPDATE<br/>Product"]
+    A["inserted"] --> B["GROUP BY<br/>IDProduct"]
+    B --> C["SUM<br/>Quantity"]
+    C --> D["JOIN with<br/>Product"]
+    D --> E["Decrease<br/>StockQuantity"]
 ```
+
+The important idea is:
+
+1. calculate how much of each product was sold;
+2. match those totals with the corresponding products;
+3. subtract the quantities from stock.
 
 ---
 
@@ -1728,7 +1748,7 @@ Check the inventory before the sale:
 
 ```sql
 SELECT *
-FROM Product
+FROM dbo.Product
 ORDER BY IDProduct;
 GO
 ```
@@ -1736,7 +1756,7 @@ GO
 Now sell 3 keyboards:
 
 ```sql
-INSERT INTO InvoiceItem
+INSERT INTO dbo.InvoiceItem
     (IDInvoice, IDProduct, Quantity, UnitPrice)
 VALUES
     (1001, 10, 3, 25.00);
@@ -1747,7 +1767,7 @@ Check the inventory again:
 
 ```sql
 SELECT *
-FROM Product
+FROM dbo.Product
 ORDER BY IDProduct;
 GO
 ```
@@ -1776,7 +1796,7 @@ Our trigger must also work when one SQL statement inserts multiple invoice items
 For example:
 
 ```sql
-INSERT INTO InvoiceItem
+INSERT INTO dbo.InvoiceItem
     (IDInvoice, IDProduct, Quantity, UnitPrice)
 VALUES
     (1002, 10, 2, 25.00),
@@ -1801,48 +1821,41 @@ Remember:
 
 Therefore, the trigger executes **once**, and `inserted` contains all four rows.
 
-For product `10`, there are even two rows:
+For product `10`, there are two rows:
 
 ```text
 Keyboard: 2 + 4 = 6
 ```
 
-This is why the trigger uses:
+The `GROUP BY` and `SUM()` inside the trigger turn the rows into:
 
-```sql
-SUM(Quantity)
-```
+| IDProduct | TotalQuantity |
+|---:|---:|
+| 10 | 6 |
+| 20 | 1 |
+| 40 | 5 |
 
-The inventory changes are:
+The inventory changes are therefore:
 
 | Product | Quantity sold | Inventory change |
 |---|---:|---:|
-| Keyboard | 2 + 4 = 6 | -6 |
+| Keyboard | 6 | -6 |
 | Mouse | 1 | -1 |
 | USB-C Cable | 5 | -5 |
 
 ```mermaid
 flowchart TD
-    A["One INSERT statement"] --> B["Keyboard × 2"]
-    A --> C["Keyboard × 4"]
-    A --> D["Mouse × 1"]
-    A --> E["USB-C Cable × 5"]
-
-    B --> F["inserted"]
-    C --> F
-    D --> F
-    E --> F
-
-    F --> G["One trigger execution"]
-    G --> H["SUM Quantity per product"]
-    H --> I["UPDATE Product"]
+    A["One INSERT statement"] --> B["inserted<br/>4 rows"]
+    B --> C["GROUP BY IDProduct"]
+    C --> D["SUM Quantity"]
+    D --> E["UPDATE Product"]
 ```
 
 Check the inventory:
 
 ```sql
 SELECT *
-FROM Product
+FROM dbo.Product
 ORDER BY IDProduct;
 GO
 ```
@@ -1875,26 +1888,30 @@ The rule is the opposite of `INSERT`:
 | `INSERT` | `StockQuantity - Quantity` |
 | `DELETE` | `StockQuantity + Quantity` |
 
-Create the trigger:
+Again, `deleted` may contain several rows, including several rows for the same product.
+
+Therefore, we use the same pattern:
 
 ```sql
-CREATE OR ALTER TRIGGER trg_InvoiceItem_Delete
-ON InvoiceItem
+CREATE OR ALTER TRIGGER dbo.trg_InvoiceItem_Delete
+ON dbo.InvoiceItem
 AFTER DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    UPDATE Product
-    SET StockQuantity = StockQuantity + (
-        SELECT SUM(Quantity)
+    UPDATE p
+    SET p.StockQuantity = p.StockQuantity + d.TotalQuantity
+    FROM dbo.Product AS p
+    JOIN
+    (
+        SELECT
+            IDProduct,
+            SUM(Quantity) AS TotalQuantity
         FROM deleted
-        WHERE deleted.IDProduct = Product.IDProduct
-    )
-    WHERE IDProduct IN (
-        SELECT IDProduct
-        FROM deleted
-    );
+        GROUP BY IDProduct
+    ) AS d
+        ON d.IDProduct = p.IDProduct;
 END;
 GO
 ```
@@ -1908,13 +1925,23 @@ inserted  → deleted
 -         → +
 ```
 
+The pattern is still the same:
+
+```mermaid
+flowchart LR
+    A["deleted"] --> B["GROUP BY<br/>IDProduct"]
+    B --> C["SUM<br/>Quantity"]
+    C --> D["JOIN with<br/>Product"]
+    D --> E["Increase<br/>StockQuantity"]
+```
+
 ### Testing the DELETE trigger
 
 Check the invoice items:
 
 ```sql
 SELECT *
-FROM InvoiceItem
+FROM dbo.InvoiceItem
 ORDER BY IDInvoiceItem;
 GO
 ```
@@ -1922,20 +1949,22 @@ GO
 Now delete all items belonging to invoice `1002`:
 
 ```sql
-DELETE FROM InvoiceItem
+DELETE FROM dbo.InvoiceItem
 WHERE IDInvoice = 1002;
 GO
 ```
 
-This may delete several rows with a single statement.
+This deletes several rows with a single statement.
 
-The trigger executes once, `deleted` contains all deleted rows, and the corresponding quantities are returned to stock.
+The trigger executes once, but `deleted` contains all deleted rows.
+
+The trigger groups them by product, calculates the total quantity for each product, and returns those quantities to stock.
 
 Check the inventory:
 
 ```sql
 SELECT *
-FROM Product
+FROM dbo.Product
 ORDER BY IDProduct;
 GO
 ```
@@ -1944,10 +1973,10 @@ GO
 
 ## 11.7. UPDATE — changing the sold quantity
 
-An `UPDATE` is particularly interesting because SQL Server provides **both versions** of each affected row:
+An `UPDATE` is slightly more interesting because SQL Server provides **both versions** of each affected row:
 
-- `deleted` contains the **old values**
-- `inserted` contains the **new values**
+- `deleted` contains the **old values**;
+- `inserted` contains the **new values**.
 
 Suppose our invoice contains:
 
@@ -1958,7 +1987,7 @@ Suppose our invoice contains:
 The customer actually bought 5 keyboards, so we correct the quantity:
 
 ```sql
-UPDATE InvoiceItem
+UPDATE dbo.InvoiceItem
 SET Quantity = 5
 WHERE IDInvoice = 1001
   AND IDProduct = 10;
@@ -1976,13 +2005,13 @@ The stock should **not** be reduced by another 5.
 
 The original 3 keyboards were already removed from stock.
 
-We need to account only for the difference:
+We only need to account for the difference:
 
 ```text
 5 - 3 = 2
 ```
 
-Another simple way to think about it is:
+Another way to think about it is:
 
 ```text
 current stock
@@ -2011,35 +2040,68 @@ For simplicity, we assume that an update can change the **quantity**, but not th
 
 ## 11.8. Creating the UPDATE trigger
 
-We can apply the same approach that we used for `INSERT` and `DELETE`.
+For an `UPDATE`, we first need to match the old and new versions of each invoice item.
 
-First, return the old quantity from `deleted`, and then subtract the new quantity from `inserted`:
+We already used this pattern earlier in the lab:
 
 ```sql
-CREATE OR ALTER TRIGGER trg_InvoiceItem_Update
-ON InvoiceItem
+FROM inserted AS i
+JOIN deleted AS d
+    ON d.IDInvoiceItem = i.IDInvoiceItem
+```
+
+The primary key connects the old and new version of the same row.
+
+Now suppose one statement updates several invoice items.
+
+We can calculate the total old and new quantities for each product:
+
+```sql
+SELECT
+    i.IDProduct,
+    SUM(d.Quantity) AS OldQuantity,
+    SUM(i.Quantity) AS NewQuantity
+FROM inserted AS i
+JOIN deleted AS d
+    ON d.IDInvoiceItem = i.IDInvoiceItem
+GROUP BY i.IDProduct;
+```
+
+Conceptually, this could produce:
+
+| IDProduct | OldQuantity | NewQuantity |
+|---:|---:|---:|
+| 10 | 5 | 8 |
+| 20 | 2 | 3 |
+
+We can then use those totals to update the inventory:
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_InvoiceItem_Update
+ON dbo.InvoiceItem
 AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    UPDATE Product
-    SET StockQuantity =
-        StockQuantity
-        + (
-            SELECT SUM(Quantity)
-            FROM deleted
-            WHERE deleted.IDProduct = Product.IDProduct
-        )
-        - (
-            SELECT SUM(Quantity)
-            FROM inserted
-            WHERE inserted.IDProduct = Product.IDProduct
-        )
-    WHERE IDProduct IN (
-        SELECT IDProduct
-        FROM inserted
-    );
+    UPDATE p
+    SET p.StockQuantity =
+        p.StockQuantity
+        + u.OldQuantity
+        - u.NewQuantity
+    FROM dbo.Product AS p
+    JOIN
+    (
+        SELECT
+            i.IDProduct,
+            SUM(d.Quantity) AS OldQuantity,
+            SUM(i.Quantity) AS NewQuantity
+        FROM inserted AS i
+        JOIN deleted AS d
+            ON d.IDInvoiceItem = i.IDInvoiceItem
+        GROUP BY i.IDProduct
+    ) AS u
+        ON u.IDProduct = p.IDProduct;
 END;
 GO
 ```
@@ -2056,19 +2118,18 @@ For our example:
 17 + 3 - 5 = 15
 ```
 
-The relationship between `deleted` and `inserted` is:
+The complete process is:
 
 ```mermaid
-flowchart TD
-    A["UPDATE InvoiceItem"] --> B["deleted<br/>old values"]
-    A --> C["inserted<br/>new values"]
-
-    B --> D["Return old quantity"]
-    C --> E["Subtract new quantity"]
-
-    D --> F["Adjust inventory"]
-    E --> F
+flowchart LR
+    A["deleted<br/>old rows"] --> C["JOIN by<br/>IDInvoiceItem"]
+    B["inserted<br/>new rows"] --> C
+    C --> D["GROUP BY<br/>IDProduct"]
+    D --> E["SUM old and<br/>new quantities"]
+    E --> F["UPDATE Product"]
 ```
+
+This trigger is also set-based and can handle several updated invoice items in one statement.
 
 ### Testing the UPDATE trigger
 
@@ -2076,7 +2137,7 @@ Check the current invoice item:
 
 ```sql
 SELECT *
-FROM InvoiceItem
+FROM dbo.InvoiceItem
 WHERE IDInvoice = 1001;
 GO
 ```
@@ -2084,7 +2145,7 @@ GO
 Change the quantity:
 
 ```sql
-UPDATE InvoiceItem
+UPDATE dbo.InvoiceItem
 SET Quantity = 5
 WHERE IDInvoice = 1001
   AND IDProduct = 10;
@@ -2095,12 +2156,12 @@ Now check both the invoice item and the product:
 
 ```sql
 SELECT *
-FROM InvoiceItem
+FROM dbo.InvoiceItem
 WHERE IDInvoice = 1001;
 GO
 
 SELECT *
-FROM Product
+FROM dbo.Product
 WHERE IDProduct = 10;
 GO
 ```
@@ -2119,7 +2180,7 @@ We now have three triggers maintaining the inventory:
 | `DELETE` | `deleted` | Add old quantity |
 | `UPDATE` | `deleted` + `inserted` | Add old quantity, subtract new quantity |
 
-The complete process is:
+All three triggers follow the same general idea:
 
 ```mermaid
 flowchart TD
@@ -2129,17 +2190,13 @@ flowchart TD
     A --> C["DELETE"]
     A --> D["UPDATE"]
 
-    B --> E["inserted"]
-    C --> F["deleted"]
-    D --> G["deleted + inserted"]
+    B --> E["Aggregate inserted"]
+    C --> F["Aggregate deleted"]
+    D --> G["Match old and new<br/>then aggregate"]
 
-    E --> H["Subtract quantity"]
-    F --> I["Add quantity"]
-    G --> J["Add old quantity<br/>Subtract new quantity"]
-
-    H --> K["Product.StockQuantity"]
-    I --> K
-    J --> K
+    E --> H["UPDATE Product"]
+    F --> H
+    G --> H
 ```
 
 The application modifies `InvoiceItem`.
@@ -2173,10 +2230,10 @@ The inventory rule is implemented inside the database.
 
 The same rule is applied regardless of whether the change comes from:
 
-- an application,
-- a stored procedure,
-- an import process,
-- or a manually executed SQL statement.
+- an application;
+- a stored procedure;
+- an import process;
+- a manually executed SQL statement.
 
 > **Key idea:** A trigger can be useful when a data change must always cause another related data change.
 
@@ -2188,11 +2245,11 @@ This example is intentionally simplified.
 
 A real inventory system would usually require additional rules and mechanisms, such as:
 
-- preventing stock from becoming negative,
-- handling cancelled invoices,
-- handling product returns,
-- supporting multiple warehouses,
-- keeping a history of inventory movements,
+- preventing stock from becoming negative;
+- handling cancelled invoices;
+- handling product returns;
+- supporting multiple warehouses;
+- keeping a history of inventory movements;
 - handling concurrent transactions.
 
 For this lab, the important concept is simpler:
@@ -2208,17 +2265,19 @@ This example also demonstrates why `inserted` and `deleted` must always be treat
 ### Check your understanding
 
 1. Why does the `INSERT` trigger subtract from `StockQuantity`, while the `DELETE` trigger adds to it?
-2. Why does the `UPDATE` trigger need to use both `deleted` and `inserted`, instead of just `inserted`?
-3. In the multi-row `INSERT` example, why does the trigger use `SUM(Quantity)` instead of just `Quantity`?
-4. What would go wrong if the `INSERT` trigger assumed exactly one row in `inserted`?
+2. Why does the `UPDATE` trigger need both `deleted` and `inserted`?
+3. Why do the `INSERT` and `DELETE` triggers use `GROUP BY IDProduct` and `SUM(Quantity)`?
+4. Why do we join `inserted` and `deleted` using `IDInvoiceItem` in the `UPDATE` trigger?
+5. Would these triggers still work if one statement affected several invoice items?
 
 <details>
 <summary>Show answers</summary>
 
-1. Selling a product (`INSERT`) removes it from stock, while removing a sale (`DELETE`) returns it to stock — the two operations are opposites.
-2. `deleted` holds the old quantity that was already subtracted from stock, and `inserted` holds the new quantity; the trigger must add back the old amount and subtract the new one to adjust by only the difference.
-3. A single `INSERT` statement can add several rows for the same product, so the quantities for that product must be added together before updating `Product`.
-4. It would only account for one of the inserted rows, leaving stock incorrect for every other product or row covered by the same statement.
+1. Selling a product removes it from stock, while removing a sale returns that quantity to stock.
+2. `deleted` contains the old quantity and `inserted` contains the new quantity. The trigger must return the old quantity and subtract the new one.
+3. One statement may affect several invoice items for the same product, so their quantities must first be combined.
+4. `IDInvoiceItem` is the primary key and allows us to match each old row with its corresponding new row.
+5. Yes. The triggers are written using set-based logic and aggregate all affected rows by product.
 
 </details>
 
@@ -2229,9 +2288,20 @@ This example also demonstrates why `inserted` and `deleted` must always be treat
 - `AFTER DELETE` can restore inventory when an invoice item is removed.
 - `AFTER UPDATE` can use both `deleted` and `inserted` to adjust inventory.
 - `inserted` and `deleted` may contain multiple rows.
-- Aggregate functions such as `SUM()` can be used when several affected rows belong to the same product.
-- Triggers should be written to handle the complete set of affected rows.
-- A trigger can enforce the same rule regardless of which application or SQL statement changes the data.
+- `GROUP BY` and `SUM()` allow us to calculate the total change for each product.
+- `JOIN` can connect the affected rows with the related `Product` rows.
+- During an `UPDATE`, the primary key connects the old and new versions of the same row.
+- Trigger logic should be written to handle sets of rows, not individual rows.
+
+---
+
+Before continuing with the AdventureWorksENG exercises, switch back to the original database:
+
+```sql
+USE AdventureWorksENG;
+GO
+```
+
 
 ## Preparation
 

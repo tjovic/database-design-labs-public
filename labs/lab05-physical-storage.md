@@ -76,15 +76,15 @@ The two largest tables contain approximately **10,000,000 orders** and **40,000,
 USE IndexLab;
 GO
 
-SELECT 'Category' AS TableName, COUNT_BIG(*) AS RowCount FROM dbo.Category
+SELECT 'Category' AS TableName, COUNT(*) AS RowCnt FROM dbo.Category
 UNION ALL
-SELECT 'Product', COUNT_BIG(*) FROM dbo.Product
+SELECT 'Product', COUNT(*) FROM dbo.Product
 UNION ALL
-SELECT 'Customer', COUNT_BIG(*) FROM dbo.Customer
+SELECT 'Customer', COUNT(*) FROM dbo.Customer
 UNION ALL
-SELECT 'SalesOrder', COUNT_BIG(*) FROM dbo.SalesOrder
+SELECT 'SalesOrder', COUNT(*) FROM dbo.SalesOrder
 UNION ALL
-SELECT 'SalesOrderItem', COUNT_BIG(*) FROM dbo.SalesOrderItem;
+SELECT 'SalesOrderItem', COUNT(*) FROM dbo.SalesOrderItem;
 ```
 
 > [!TIP]

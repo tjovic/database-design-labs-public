@@ -507,7 +507,7 @@ In the next section, we will see what happens when a single statement inserts **
 This is one of the most important trigger rules.
 
 > [!IMPORTANT]
-> **A trigger fires once per statement, not once per row.**
+> **A trigger fires once per statement, not once per row.** Other database systems may support row-level triggers. For example, Oracle can execute a trigger once for each affected row using FOR EACH ROW
 
 Consider:
 

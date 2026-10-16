@@ -106,16 +106,21 @@ A SQL Server database consists of one or more operating-system files. The usual 
 
 ## 3.1 Primary and secondary data files
 
-Every database has **exactly one primary data file**, usually with the `.mdf` extension. It belongs to the primary filegroup. Additional data files (commonly `.ndf`) can hold tables, indexes, and other database pages. Their use and placement are configuration choices; more files do not automatically make a database faster.
+Every database has **exactly one primary data file**, usually with the `.mdf` extension. It belongs to the primary filegroup.
+
+Additional data files (commonly `.ndf`) can hold tables, indexes, and other database structures.
+
+Their use and placement are configuration choices; more files do not automatically make a database faster.
 
 ## 3.2 Transaction log
 
-The transaction log records changes needed for transaction recovery. SQL Server uses **write-ahead logging (WAL)**: the relevant log records must be hardened to durable storage **before the corresponding modified data pages are written to disk**.
+The transaction log records changes needed for transaction recovery.
 
-A modified page can therefore remain in memory after a transaction commits. If SQL Server stops unexpectedly, recovery uses log records to restore a consistent database state. We will explore transactions in a later lab.
+SQL Server uses **write-ahead logging (WAL)**: the relevant log records must be written to durable storage **before the corresponding modified data pages are written to disk**.
 
-> [!NOTE]
-> Ordinary read-only queries do not log row changes. However, this does **not** mean that every `SELECT` is guaranteed to generate no logging-related activity in every possible scenario.
+A modified page can therefore remain in memory after a transaction commits. If SQL Server stops unexpectedly, recovery uses log records to restore a consistent database state.
+
+We will explore transactions in a later lab.
 
 A simplified layout:
 
@@ -127,34 +132,106 @@ flowchart LR
     C --> E[Transaction log records]
 ```
 
-### Inspect your database files
+## 3.3 Exploring database storage in SSMS
 
-```sql
-USE IndexLab;
-GO
+Now that we have created the `IndexLab` database, let's examine how much disk space it occupies.
 
-SELECT
-    name AS LogicalFileName,
-    type_desc AS FileType,
-    physical_name AS PhysicalPath,
-    size * 8.0 / 1024 AS SizeMB
-FROM sys.database_files;
-```
+SQL Server Management Studio (SSMS) provides built-in reports that allow us to explore database storage without writing SQL queries.
 
-The `size` column is expressed in **8 KB pages**, so multiplying by 8 converts it to KB, and dividing by 1024 converts it to MB.
+### Step 1 – Database disk usage
+
+Let's examine how much disk space our `IndexLab` database occupies.
+
+1. In Object Explorer, right-click the `IndexLab` database.
+2. Select **Reports → Standard Reports → Disk Usage**.
+3. Examine the information displayed in the report.
+
+The report shows the total reserved space, the sizes of the data and transaction log files, and how much space is currently used.
+
+In our example:
+
+| Description | Size |
+|---|---:|
+| Total Space Reserved | 4.5 GB |
+| Data Files Space Reserved | 4096 MB (4 GB) |
+| Transaction Log Space Reserved | 512 MB |
+
+#### Understanding the results
+
+When we created the `IndexLab` database, we specified the initial sizes of its files: **4096 MB for the data file** and **512 MB for the transaction log**.
+
+These values determine how much disk space SQL Server initially reserves for the database.
+
+However, notice that approximately **half of the data file is still unallocated**.
+
+> [!IMPORTANT]
+> **File size is not the same as used space.**
+>
+> Although the data file occupies 4 GB on disk, SQL Server has allocated only about 2 GB to database structures. The remaining space is available for future allocations without increasing the file size.
+
+#### Why is choosing the right file size important?
+
+Choosing appropriate file sizes is an important part of **database capacity planning**.
+
+- **If files are too small**, SQL Server may need to grow them frequently, introducing additional overhead and potentially affecting performance.
+- **If files are unnecessarily large**, they reserve disk space that could otherwise be used for other purposes.
+
+SQL Server supports **autogrowth**, allowing database files to grow automatically when additional space is required.
+
+> [!NOTE]
+> Autogrowth is a useful safety mechanism, but it should not replace proper capacity planning.
+>
+> Also, larger database files do not automatically make queries faster. The goal is to allocate sufficient space while avoiding unnecessary file growth.
+
+### Step 2 – Disk usage by table
+
+1. Right-click the `IndexLab` database again.
+2. Select **Reports → Standard Reports → Disk Usage by Table**.
+3. Compare the number of records and disk space used by different tables.
+
+Pay attention to these columns:
+
+| Column | Description |
+|---|---|
+| Records | Number of rows in the table. |
+| Reserved (KB) | Total space reserved for the table and its indexes. |
+| Data (KB) | Space occupied by table data. |
+| Indexes (KB) | Space occupied by index structures. |
+| Unused (KB) | Reserved space not currently used. |
+
+For example, our database contains:
+
+| Table | Records | Data (KB) |
+|---|---:|---:|
+| Category | 100 | 8 |
+| Customer | 100,000 | 5,856 |
+| Product | 30,000 | 1,272 |
+| SalesOrder | 10,000,000 | 457,144 |
+| SalesOrderItem | 40,000,000 | 1,584,160 |
+
+Notice that `SalesOrderItem` contains four times as many rows as `SalesOrder` and occupies considerably more space.
+
+> [!NOTE]
+> A table's storage requirements depend on the number of rows, the size of each row, and additional storage overhead.
+>
+> We will explore how SQL Server physically organizes this data in the following sections.
 
 ## Check your understanding
 
 1. What is the difference between a table and the database file containing it?
 2. What is the purpose of a transaction log?
 3. Does a database always need secondary `.ndf` files?
+4. Why can a database file occupy 4 GB on disk even when only about 2 GB has been allocated internally?
+5. Does a table with twice as many rows necessarily require twice as much storage space?
 
 <details>
 <summary>Show answers</summary>
 
 1. A table is a logical database object. Its data resides in pages stored in database data files.
-2. It records the information required for transaction recovery; write-ahead logging ensures relevant log records become durable before changed data pages are written to disk.
-3. No. There is exactly one primary data file; secondary files are optional.
+2. It records the information required for transaction recovery. Write-ahead logging ensures relevant log records become durable before modified data pages are written to disk.
+3. No. Secondary data files are optional.
+4. SQL Server can reserve file space in advance. Space that has not yet been allocated internally remains available for future use.
+5. No. Storage requirements also depend on row size and additional overhead.
 
 </details>
 

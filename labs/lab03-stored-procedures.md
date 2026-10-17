@@ -1382,7 +1382,133 @@ SELECT @Color AS ProductColor;
 
 ---
 
-## Exercise 5 — Validate a card number using the Luhn algorithm
+Da. Iz ove datoteke odabrao bih **zadatak 7 — filtriranje kupaca uz vraćanje broja pronađenih redaka**. Dobro povezuje `LIKE`, ulazni parametar, `OUTPUT` i skup rezultata.
+
+U izvornom rješenju filtriranje se izvodi dvaput: jednom za `COUNT(*)`, a drugi put za dohvat kupaca. Ovdje možemo iskoristiti **`@@ROWCOUNT`**, pa studenti ponove i taj dio gradiva.
+
+Stavio bih ga kao **Exercise 5**, a Luhnov algoritam pomaknuo na **Exercise 6**.
+
+---
+
+## Exercise 5 — Find customers and return the number of matches
+
+A stored procedure can return both:
+
+- A **result set**, such as a list of customers.
+- Additional values through **`OUTPUT` parameters**, such as the number of customers found.
+
+### Your task
+
+Create a stored procedure named `dbo.usp_FindCustomersByLastName` with the following parameters:
+
+| Parameter | Type | Purpose |
+|---|---|---|
+| `@LastNamePattern` | `nvarchar(100)` | Pattern used to filter customer last names with `LIKE` |
+| `@CustomerCount` | `int OUTPUT` | Number of customers returned |
+
+The procedure must:
+
+1. Use `SET NOCOUNT ON`.
+2. Return `IDCustomer`, `FirstName`, and `LastName` from the `Customer` table.
+3. Filter customers using `LastName LIKE @LastNamePattern`.
+4. Sort the results by `LastName`, `FirstName`, and `IDCustomer`.
+5. Return the number of matching customers through `@CustomerCount`.
+
+Use **`@@ROWCOUNT`** to obtain the number of rows returned by the query.
+
+### Examples of search patterns
+
+| Pattern | Meaning |
+|---|---|
+| `N'A%'` | Last names beginning with A |
+| `N'%son'` | Last names ending with son |
+| `N'%son%'` | Last names containing son |
+| `N'%'` | All non-NULL last names |
+
+> [!TIP]
+> The caller supplies the complete search pattern, including any wildcard characters. The procedure does not add `%` automatically.
+
+### Test your procedure
+
+```sql
+DECLARE @Count int;
+
+EXEC dbo.usp_FindCustomersByLastName
+    @LastNamePattern = N'%son%',
+    @CustomerCount = @Count OUTPUT;
+
+SELECT @Count AS MatchingCustomers;
+GO
+```
+
+Try other patterns and compare the returned customers with the value of `MatchingCustomers`.
+
+### Questions
+
+1. What is the difference between the result set and the `OUTPUT` parameter?
+2. Why must `OUTPUT` also appear in the procedure call?
+3. What should `@CustomerCount` contain if no customers match?
+4. Does `SET NOCOUNT ON` prevent `@@ROWCOUNT` from being updated?
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_FindCustomersByLastName
+    @LastNamePattern nvarchar(100),
+    @CustomerCount int OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        IDCustomer,
+        FirstName,
+        LastName
+    FROM dbo.Customer
+    WHERE LastName LIKE @LastNamePattern
+    ORDER BY
+        LastName,
+        FirstName,
+        IDCustomer;
+
+    -- Capture the row count immediately after the query.
+    SET @CustomerCount = @@ROWCOUNT;
+END;
+GO
+```
+
+### Example call
+
+```sql
+DECLARE @Count int;
+
+EXEC dbo.usp_FindCustomersByLastName
+    @LastNamePattern = N'A%',
+    @CustomerCount = @Count OUTPUT;
+
+SELECT @Count AS MatchingCustomers;
+GO
+```
+
+SSMS displays two result grids:
+
+1. The customers returned by the procedure.
+2. The count displayed by the caller's `SELECT`.
+
+If no customers match, the first result set is empty and `@CustomerCount` is `0`.
+
+> [!IMPORTANT]
+> `@@ROWCOUNT` describes the most recent statement. Capture its value immediately after the query, because subsequent statements can change or reset it.
+
+> [!NOTE]
+> `SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does **not** prevent `@@ROWCOUNT` from being updated, and it does not hide query results.
+
+</details>
+
+---
+
+## Exercise 6 — Validate a card number using the Luhn algorithm
 
 In this exercise, you will combine input validation, `OUTPUT` parameters, variables, conditions, and a `WHILE` loop to solve a practical problem.
 

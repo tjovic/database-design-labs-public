@@ -1382,6 +1382,236 @@ SELECT @Color AS ProductColor;
 
 ---
 
+## Exercise 5 — Validate a card number using the Luhn algorithm
+
+In this exercise, you will combine input validation, `OUTPUT` parameters, variables, conditions, and a `WHILE` loop to solve a practical problem.
+
+### Background
+
+The **Luhn algorithm**, also called the **modulus 10 algorithm**, checks whether a numerical identifier has a valid checksum. It helps detect common typing errors.
+
+It is used for credit and debit card numbers and for the check digit of **IMEI numbers**, which identify mobile devices. [stripe.com](https://stripe.com/resources/more/how-to-use-the-luhn-algorithm-a-guide-in-applications-for-businesses)
+
+The final digit is called the **check digit**. It is calculated from the preceding digits.
+
+> [!NOTE]
+> Check digits are used in many identification systems.
+>
+> For example, the Croatian **OIB** includes a check digit calculated using **ISO 7064 MOD 11,10**. A Croatian **student card number (iksica)** also includes a check digit, in addition to the JMBAG contained within it. [regos.hr](https://regos.hr/app/uploads/2018/07/KONTROLA-OIB-a.pdf)
+>
+> These systems share the same idea: calculating a check value from the other digits helps detect typing errors. However, **different identifiers may use different algorithms**. The Luhn algorithm cannot be used to validate every identification number.
+
+> [!IMPORTANT]
+> Passing the Luhn check does **not** prove that a card exists, is active, or has sufficient funds. The algorithm checks only the checksum. It is not an encryption or authentication mechanism.
+
+### How the algorithm works
+
+Process the complete number, including its check digit:
+
+1. Start with the **rightmost digit**.
+2. Moving left, **double every second digit**, beginning with the second digit from the right.
+3. If a doubled value is greater than `9`, subtract `9`.
+4. Add all the resulting values.
+5. The checksum is valid if the total is divisible by `10`.
+
+Consider the demonstration sequence `12345674`:
+
+| Step | Digits from left to right |
+|---|---|
+| Original digits | 1, 2, 3, 4, 5, 6, 7, 4 |
+| Double every second digit from the right | 2, 2, 6, 4, 10, 6, 14, 4 |
+| Subtract 9 from values greater than 9 | 2, 2, 6, 4, 1, 6, 5, 4 |
+
+The total is:
+
+```text
+2 + 2 + 6 + 4 + 1 + 6 + 5 + 4 = 30
+30 % 10 = 0
+```
+
+Therefore, this sequence passes the Luhn check.
+
+> [!NOTE]
+> This short sequence demonstrates the calculation. It is not a payment card number.
+
+### Your task
+
+Create a stored procedure named `dbo.usp_ValidateCardNumber` with these parameters:
+
+| Parameter | Type | Purpose |
+|---|---|---|
+| `@CardNumber` | `varchar(100)` | Number to check |
+| `@IsValid` | `bit OUTPUT` | Result: `1` if the input meets the exercise rules and passes the checksum; otherwise `0` |
+
+Apply the following rules:
+
+1. Use `SET NOCOUNT ON`.
+2. Set `@IsValid` to `0` at the beginning.
+3. Reject `NULL`.
+4. Accept **exactly 16 characters**, all of which must be digits from `0` to `9`. Reject spaces, letters, and punctuation.
+5. Use a `WHILE` loop to implement the Luhn algorithm.
+6. Set `@IsValid` to `1` only if the input meets these rules and its checksum is valid.
+
+> [!NOTE]
+> The 16-digit requirement is a simplification for this exercise. The Luhn algorithm itself is not restricted to 16-digit numbers.
+
+Store the input as text because it is an **identifier**, not a numerical quantity. Convert individual digits to `int` only when performing calculations.
+
+### Hints
+
+You can use the following T-SQL features:
+
+| Feature | Purpose |
+|---|---|
+| `IF` and `RETURN` | Reject invalid input and exit the procedure |
+| `DATALENGTH(@CardNumber)` | Check the input length, including trailing spaces |
+| `LIKE '%[^0-9]%'` | Detect a character outside the digit range |
+| `SUBSTRING(@CardNumber, @Position, 1)` | Extract one digit |
+| `CAST(... AS int)` | Convert the extracted digit to an integer |
+| `WHILE` | Process the digits one at a time |
+| `%` | Calculate the remainder after division |
+
+For the accepted ASCII digits in this `varchar` parameter, each character occupies one byte.
+
+Check the input **before** converting its characters to integers.
+
+### Test your procedure
+
+Use the following published test card number: [docs.stripe.com](https://docs.stripe.com/testing?numbers-or-method-or-token=tokens)
+
+```sql
+DECLARE @Result bit;
+
+EXEC dbo.usp_ValidateCardNumber
+    @CardNumber = '4242424242424242',
+    @IsValid = @Result OUTPUT;
+
+SELECT @Result AS IsValid;
+-- Expected: 1
+GO
+```
+
+Change the last digit and test again:
+
+```sql
+DECLARE @Result bit;
+
+EXEC dbo.usp_ValidateCardNumber
+    @CardNumber = '4242424242424241',
+    @IsValid = @Result OUTPUT;
+
+SELECT @Result AS IsValid;
+-- Expected: 0
+GO
+```
+
+Also verify these cases:
+
+| Input | Expected result | Reason |
+|---|---:|---|
+| `NULL` | 0 | Missing input |
+| `''` | 0 | Empty input |
+| `'4242'` | 0 | Incorrect length |
+| `'424242424242424A'` | 0 | Contains a letter |
+| `'4242 4242 4242 4242'` | 0 | Contains spaces |
+| `'424242424242424 '` | 0 | Contains a trailing space |
+
+> [!WARNING]
+> Use only the supplied test values or invented demonstration sequences. Do not use real payment card data.
+
+### Questions
+
+1. Why does this procedure use a `varchar` parameter?
+2. Why is the rightmost digit not doubled?
+3. What does `@Total % 10 = 0` check?
+4. Why must the caller also specify `OUTPUT`?
+5. Can a number pass the Luhn check even if no corresponding card exists?
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_ValidateCardNumber
+    @CardNumber varchar(100),
+    @IsValid bit OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SET @IsValid = 0;
+
+    -------------------------------------------------------
+    -- Validate the input
+    -------------------------------------------------------
+    IF @CardNumber IS NULL
+        RETURN;
+
+    IF DATALENGTH(@CardNumber) <> 16
+        RETURN;
+
+    -- Reject input containing non-digit characters.
+    IF @CardNumber LIKE '%[^0-9]%'
+        RETURN;
+
+    -------------------------------------------------------
+    -- Calculate the Luhn checksum
+    -------------------------------------------------------
+    DECLARE @Position int = 16;
+    DECLARE @Digit int;
+    DECLARE @Total int = 0;
+    DECLARE @ShouldDouble bit = 0;
+
+    WHILE @Position >= 1
+    BEGIN
+        SET @Digit = CAST(
+            SUBSTRING(@CardNumber, @Position, 1) AS int
+        );
+
+        IF @ShouldDouble = 1
+        BEGIN
+            SET @Digit = @Digit * 2;
+
+            IF @Digit > 9
+                SET @Digit = @Digit - 9;
+        END;
+
+        SET @Total = @Total + @Digit;
+
+        -- Alternate between keeping and doubling a digit.
+        IF @ShouldDouble = 0
+            SET @ShouldDouble = 1;
+        ELSE
+            SET @ShouldDouble = 0;
+
+        SET @Position = @Position - 1;
+    END;
+
+    -------------------------------------------------------
+    -- Return the result through the OUTPUT parameter
+    -------------------------------------------------------
+    IF @Total % 10 = 0
+        SET @IsValid = 1;
+END;
+GO
+```
+
+### Understanding the solution
+
+- `@IsValid` starts at `0`, so every early `RETURN` produces an invalid result.
+- `DATALENGTH` counts trailing spaces, which `LEN` would ignore.
+- `LIKE '%[^0-9]%'` checks for characters outside the digit range.
+- `@Position` starts at `16`, so the loop processes the number from right to left.
+- `@ShouldDouble` starts at `0`, because the rightmost digit—the check digit—is **not doubled**.
+- After each iteration, `@ShouldDouble` switches between `0` and `1`.
+- `@Total % 10 = 0` checks whether the final sum is divisible by `10`.
+
+> [!NOTE]
+> A sequence containing sixteen zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
+
+</details>
+
+---
+
 ## Challenge – Choosing the Right Output
 
 Create a procedure named `dbo.usp_GetProductInfo`.

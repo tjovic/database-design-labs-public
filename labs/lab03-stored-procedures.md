@@ -1477,6 +1477,7 @@ BEGIN
 END;
 GO
 ```
+</details>
 
 ### Example call
 
@@ -1504,7 +1505,6 @@ If no customers match, the first result set is empty and `@CustomerCount` is `0`
 > [!NOTE]
 > `SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does **not** prevent `@@ROWCOUNT` from being updated, and it does not hide query results.
 
-</details>
 
 ---
 

@@ -31,7 +31,7 @@ The procedure collection is in [Stored Procedure Exercises](procedures.md) and f
 3. **Returning information** — return result sets and use `OUTPUT` parameters.
 4. **Status values** — use `RETURN` to report a simple outcome to the caller.
 
-These exercises use read-only procedures and require no test data setup.
+These exercises use read-only procedures and require no test data setup. They include direct result queries, input parameters, output values, and return status codes.
 
 ### Functions
 
@@ -42,7 +42,7 @@ The function collection is in [Function Exercises](functions.md) and follows the
 3. **Inline table-valued functions** — return a table from one query.
 4. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic.
 
-The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table.
+The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
 
 ## Difficulty labels
 

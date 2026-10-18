@@ -57,7 +57,46 @@ GO
 
 </details>
 
-## Exercise 2 — Calculate quantity sold for one product [INTERMEDIATE]
+## Exercise 2 — Shorten a product name [BEGINNER]
+
+Create a scalar function named `dbo.fn_Exercises_ShortName` that accepts `@Text nvarchar(max)` and returns `nvarchar(10)`. Return the original text when its length is at most 10 characters. For longer text, return its first 7 characters followed by `...`.
+
+Call the function with one short value and one value longer than 10 characters.
+
+<details>
+<summary>Hint</summary>
+
+Use `LEN` to check the input length and `LEFT` to take the first 7 characters.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_ShortName
+(
+    @Text nvarchar(max)
+)
+RETURNS nvarchar(10)
+AS
+BEGIN
+    RETURN CASE
+        WHEN LEN(@Text) <= 10 THEN @Text
+        ELSE LEFT(@Text, 7) + N'...'
+    END;
+END;
+GO
+
+SELECT
+    dbo.fn_Exercises_ShortName(N'Bike') AS ShortName,
+    dbo.fn_Exercises_ShortName(N'Mountain-200 Black') AS LongName;
+GO
+```
+
+</details>
+
+## Exercise 3 — Calculate quantity sold for one product [INTERMEDIATE]
 
 Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`.
 
@@ -110,7 +149,7 @@ Scalar functions are convenient for one value. Consider how repeatedly calling a
 
 </details>
 
-## Exercise 3 — Return a customer's invoices [INTERMEDIATE]
+## Exercise 4 — Return a customer's invoices [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_CustomerInvoices` with these input parameters:
 
@@ -180,7 +219,7 @@ The sample selects a customer with an invoice and uses a date range covering the
 
 </details>
 
-## Exercise 4 — Filter products by quantity sold [ADVANCED]
+## Exercise 5 — Filter products by quantity sold [ADVANCED]
 
 Create an MSTVF named `dbo.fn_Exercises_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
 
@@ -284,6 +323,7 @@ DROP FUNCTION IF EXISTS dbo.fn_Exercises_PriceBand;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductQuantitySold;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomerInvoices;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsByQuantitySold;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;
 GO
 ```
 

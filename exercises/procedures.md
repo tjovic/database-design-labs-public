@@ -103,7 +103,49 @@ GO
 
 </details>
 
-## Exercise 3 — Return invoices and a match count [INTERMEDIATE]
+## Exercise 3 — Find products in a price range [BEGINNER]
+
+Create `dbo.usp_Exercises_ProductsByPriceRange` with two input parameters, `@MinimumPrice money` and `@MaximumPrice money`. Return each matching product's `IDProduct`, `Name`, and `PriceWithoutVAT`. Include both endpoints of the range and sort by price, then product ID.
+
+Call the procedure for the range from `0` to `100000`.
+
+<details>
+<summary>Hint</summary>
+
+Use `BETWEEN` with the two parameters in the `WHERE` clause.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ProductsByPriceRange
+    @MinimumPrice money,
+    @MaximumPrice money
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        IDProduct,
+        Name,
+        PriceWithoutVAT
+    FROM dbo.Product
+    WHERE PriceWithoutVAT BETWEEN @MinimumPrice AND @MaximumPrice
+    ORDER BY PriceWithoutVAT, IDProduct;
+END;
+GO
+
+EXEC dbo.usp_Exercises_ProductsByPriceRange
+    @MinimumPrice = 0,
+    @MaximumPrice = 100000;
+GO
+```
+
+</details>
+
+## Exercise 4 — Return invoices and a match count [INTERMEDIATE]
 
 Create `dbo.usp_Exercises_CustomerInvoices` with these parameters:
 
@@ -187,7 +229,7 @@ The result set contains that customer's invoices in the selected date interval. 
 
 </details>
 
-## Exercise 4 — Return a product, price, and status [ADVANCED]
+## Exercise 5 — Return a product, price, and status [ADVANCED]
 
 Create `dbo.usp_Exercises_GetProduct` with an input parameter `@IDProduct int` and an output parameter `@Price money OUTPUT`.
 
@@ -266,6 +308,7 @@ DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ListCategories;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomersByLastName;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomerInvoices;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProduct;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ProductsByPriceRange;
 GO
 ```
 

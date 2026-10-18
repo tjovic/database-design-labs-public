@@ -1,6 +1,6 @@
 # Trigger Exercises
 
-These exercises use DML `AFTER` triggers on the verified `dbo.Product` table in `AdventureWorksENG`. They progress from auditing inserts, to comparing old and new values, to flagging a business-rule condition for review.
+These exercises use DML `AFTER` triggers on the verified `dbo.Product` table in `AdventureWorksENG`. They progress from auditing inserts, to comparing old and new values, to flagging a business-rule condition for review, to debugging a flawed trigger someone else wrote.
 
 The database already has triggers on `dbo.City` and a populated `dbo.ActivityLog`. These exercises leave both untouched. They create a dedicated audit table named `dbo.Exercise_ProductTriggerAudit` and triggers with the `trg_Exercises_` prefix. The test data remains in the database until you run the targeted cleanup section.
 
@@ -42,7 +42,8 @@ WHERE ProductNumber IN
     N'EX-TRG-I-001',
     N'EX-TRG-U-001', N'EX-TRG-U-002',
     N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002'
+    N'EX-TRG-R-001', N'EX-TRG-R-002',
+    N'EX-TRG-F-001', N'EX-TRG-F-002'
 );
 ```
 
@@ -373,6 +374,167 @@ This exercise records a review flag rather than rejecting the change. In a produ
 
 </details>
 
+## Exercise 5 — Debug a flawed price-audit trigger [ADVANCED]
+
+A teammate wrote this trigger, meant to do the same job as Exercise 2's trigger — log every update that changes a product's price:
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+ON dbo.Product
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF UPDATE(PriceWithoutVAT)
+    BEGIN
+        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        (
+            ProductID,
+            ProductNumber,
+            Operation,
+            OldPrice,
+            NewPrice
+        )
+        SELECT
+            i.IDProduct,
+            i.ProductNumber,
+            N'UPDATE',
+            d.PriceWithoutVAT,
+            i.PriceWithoutVAT
+        FROM inserted AS i
+        JOIN deleted AS d
+            ON d.IDProduct = i.IDProduct;
+    END;
+END;
+GO
+```
+
+Before running anything, answer:
+
+1. What does `UPDATE(PriceWithoutVAT)` actually test: that the column was assigned a value, or that the value changed?
+2. Suppose a caller always sends full-column `UPDATE` statements, so `PriceWithoutVAT = PriceWithoutVAT` appears in the `SET` list even when only `MinimumQuantityInStock` is meant to change. Will this trigger write an audit row for that statement? Should it?
+3. Compare this trigger with the one from Exercise 2. What single condition is missing?
+
+Then create the trigger, test your prediction, and fix it.
+
+<details>
+<summary>Hint</summary>
+
+`UPDATE(PriceWithoutVAT)` only reports that the column appeared in the statement's `SET` clause, not that its value changed. Compare `inserted` and `deleted` directly, the way Exercise 2's trigger does, to confirm a real change.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+**Answers:**
+
+1. `UPDATE(PriceWithoutVAT)` only reports that `PriceWithoutVAT` was included in the triggering statement's `SET` clause. It says nothing about whether the value actually changed.
+2. Yes, the flawed trigger writes an audit row for every affected product, even though `PriceWithoutVAT` kept its old value. Those rows are misleading: they record a price change that never happened.
+3. The flawed trigger is missing the `WHERE d.PriceWithoutVAT <> i.PriceWithoutVAT` condition that Exercise 2's trigger uses to confirm the value actually changed.
+
+**Reproduce the bug:**
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+ON dbo.Product
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF UPDATE(PriceWithoutVAT)
+    BEGIN
+        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        (
+            ProductID,
+            ProductNumber,
+            Operation,
+            OldPrice,
+            NewPrice
+        )
+        SELECT
+            i.IDProduct,
+            i.ProductNumber,
+            N'UPDATE',
+            d.PriceWithoutVAT,
+            i.PriceWithoutVAT
+        FROM inserted AS i
+        JOIN deleted AS d
+            ON d.IDProduct = i.IDProduct;
+    END;
+END;
+GO
+```
+
+```sql
+INSERT INTO dbo.Product
+(
+    Name,
+    ProductNumber,
+    Color,
+    MinimumQuantityInStock,
+    PriceWithoutVAT,
+    SubcategoryID
+)
+VALUES
+    (N'Exercise flawed-trigger test product 1', N'EX-TRG-F-001', NULL, 1, 50.00, NULL),
+    (N'Exercise flawed-trigger test product 2', N'EX-TRG-F-002', NULL, 1, 60.00, NULL);
+
+UPDATE dbo.Product
+SET PriceWithoutVAT = PriceWithoutVAT,
+    MinimumQuantityInStock = MinimumQuantityInStock + 1
+WHERE ProductNumber IN (N'EX-TRG-F-001', N'EX-TRG-F-002');
+
+SELECT *
+FROM dbo.Exercise_ProductTriggerAudit
+WHERE ProductNumber IN (N'EX-TRG-F-001', N'EX-TRG-F-002')
+ORDER BY AuditID;
+GO
+```
+
+This returns two `UPDATE` rows with `OldPrice` equal to `NewPrice`, confirmed by running the statements above: the flawed trigger only checks that `PriceWithoutVAT` was mentioned in the `SET` clause, not that its value changed, so a no-op price assignment still produces audit noise.
+
+**Fix:**
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+ON dbo.Product
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF UPDATE(PriceWithoutVAT)
+    BEGIN
+        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        (
+            ProductID,
+            ProductNumber,
+            Operation,
+            OldPrice,
+            NewPrice
+        )
+        SELECT
+            i.IDProduct,
+            i.ProductNumber,
+            N'UPDATE',
+            d.PriceWithoutVAT,
+            i.PriceWithoutVAT
+        FROM inserted AS i
+        JOIN deleted AS d
+            ON d.IDProduct = i.IDProduct
+        WHERE d.PriceWithoutVAT <> i.PriceWithoutVAT;
+    END;
+END;
+GO
+```
+
+Running the same no-op update again now writes zero new audit rows, confirmed by checking `AuditID` values added after the fix. A follow-up update that changes `EX-TRG-F-001`'s price from `50.00` to `55.00` still produces exactly one audit row, so the fix does not silently swallow real changes. This is the same trigger built in Exercise 2 — the point of this exercise is recognizing why the missing condition matters, not writing new logic from scratch.
+
+</details>
+
 ## Cleanup
 
 Run this only after finishing the exercises. It deletes only the sample products identified by their reserved product numbers. The product delete trigger records those deletions; the next statement removes all audit rows for the sample numbers. Then it drops only this collection's trigger names and audit table. It does not remove `dbo.ActivityLog` or any trigger on `dbo.City`.
@@ -384,7 +546,8 @@ WHERE ProductNumber IN
     N'EX-TRG-I-001',
     N'EX-TRG-U-001', N'EX-TRG-U-002',
     N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002'
+    N'EX-TRG-R-001', N'EX-TRG-R-002',
+    N'EX-TRG-F-001', N'EX-TRG-F-002'
 );
 GO
 
@@ -394,7 +557,8 @@ WHERE ProductNumber IN
     N'EX-TRG-I-001',
     N'EX-TRG-U-001', N'EX-TRG-U-002',
     N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002'
+    N'EX-TRG-R-001', N'EX-TRG-R-002',
+    N'EX-TRG-F-001', N'EX-TRG-F-002'
 );
 GO
 
@@ -402,6 +566,7 @@ DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_InsertAudit;
 DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceAudit;
 DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_DeleteAudit;
 DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceReview;
+DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceAudit_Flawed;
 DROP TABLE IF EXISTS dbo.Exercise_ProductTriggerAudit;
 GO
 ```

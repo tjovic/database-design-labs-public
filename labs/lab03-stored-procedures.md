@@ -1885,6 +1885,12 @@ It can also reduce **network round-trips** by allowing those statements to execu
 
 ---
 
+## Additional practice
+
+More stored procedure exercises, covering input parameters, output values, and return status codes, are available in [Stored Procedure Exercises](../exercises/procedures.md).
+
+---
+
 # Where to Go Next
 
 In the next lab, **Functions**, we will look at another type of reusable code stored inside the database.

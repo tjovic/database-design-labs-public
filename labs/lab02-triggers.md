@@ -2578,6 +2578,12 @@ And the most important rule:
 
 ---
 
+## Additional practice
+
+More trigger exercises, including auditing, multi-row logic, and a debugging exercise, are available in [Trigger Exercises](../exercises/triggers.md).
+
+---
+
 # Where to go next
 
 Triggers execute automatically.

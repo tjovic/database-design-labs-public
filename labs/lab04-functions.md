@@ -1776,6 +1776,12 @@ And remember:
 
 ---
 
+## Additional practice
+
+More function exercises, covering scalar functions, inline TVFs, and multi-statement TVFs, are available in [Function Exercises](../exercises/functions.md).
+
+---
+
 # Where to go next
 
 In the next lab, we will move from database programming objects toward

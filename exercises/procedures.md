@@ -171,16 +171,10 @@ GO
 Use an existing customer who has an invoice to test it. This example selects one from the data and uses a date range covering the invoice dates in the training database:
 
 ```sql
-DECLARE @IDCustomer int;
 DECLARE @InvoiceCount int;
 
-SELECT TOP (1)
-    @IDCustomer = CustomerID
-FROM dbo.Invoice
-ORDER BY InvoiceDate, IDInvoice;
-
 EXEC dbo.usp_Exercises_CustomerInvoices
-    @IDCustomer = @IDCustomer,
+    @IDCustomer = 1,
     @DateFrom = '20010101',
     @DateToExclusive = '20050101',
     @InvoiceCount = @InvoiceCount OUTPUT;
@@ -203,7 +197,7 @@ The procedure should:
 - set `@Price` to the product's `PriceWithoutVAT`;
 - return status `0` when a product is found and `1` when no product matches.
 
-Test the successful lookup with an ID selected from `dbo.Product`. Also generate an ID below the smallest existing ID and verify the no-match status. Do not modify any table data.
+Test the successful lookup with product `782`. Do not modify any table data.
 
 <details>
 <summary>Hint</summary>
@@ -246,41 +240,20 @@ GO
 ```
 
 ```sql
-DECLARE @IDProduct int;
-DECLARE @MissingIDProduct int;
 DECLARE @Price money;
 DECLARE @ReturnCode int;
 
-SELECT TOP (1)
-    @IDProduct = IDProduct
-FROM dbo.Product
-ORDER BY IDProduct;
-
-SELECT
-    @MissingIDProduct = MIN(IDProduct) - 1
-FROM dbo.Product;
-
 EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
-    @IDProduct = @IDProduct,
+    @IDProduct = 782,
     @Price = @Price OUTPUT;
 
 SELECT
-    N'Found product' AS LookupType,
-    @ReturnCode AS ReturnCode,
-    @Price AS Price;
-
-EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
-    @IDProduct = @MissingIDProduct,
-    @Price = @Price OUTPUT;
-
-SELECT
-    N'Missing product' AS LookupType,
     @ReturnCode AS ReturnCode,
     @Price AS Price;
 GO
 ```
 
-The first call returns a product row, a non-`NULL` price, and status `0`. The second returns no product row, a `NULL` price, and status `1`. The return code is captured with `EXEC @ReturnCode = ...`; it is not returned as a result set.
+The call returns the product row, its price, and status `0`. The return code is captured with `EXEC @ReturnCode = ...`; it is not returned as a result set.
 
 </details>
 

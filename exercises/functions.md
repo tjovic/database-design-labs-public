@@ -165,17 +165,10 @@ GO
 ```
 
 ```sql
-DECLARE @IDCustomer int;
-
-SELECT TOP (1)
-    @IDCustomer = CustomerID
-FROM dbo.Invoice
-ORDER BY InvoiceDate, IDInvoice;
-
 SELECT *
 FROM dbo.fn_Exercises_CustomerInvoices
 (
-    @IDCustomer,
+    1,
     '20010101',
     '20050101'
 )
@@ -268,11 +261,11 @@ GO
 ```
 
 ```sql
-SELECT *
+SELECT COUNT(*) AS ProductCount
 FROM dbo.fn_Exercises_ProductsByQuantitySold(NULL)
-ORDER BY QuantitySold DESC, ProductName;
+;
 
-SELECT *
+SELECT TOP (5) *
 FROM dbo.fn_Exercises_ProductsByQuantitySold(100)
 ORDER BY QuantitySold DESC, ProductName;
 GO

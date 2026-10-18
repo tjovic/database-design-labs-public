@@ -63,7 +63,7 @@ Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accep
 
 If no invoice items match the supplied product ID, return `0` rather than `NULL`.
 
-Use the function for one existing product. Then select an ID below the smallest ID in `dbo.Product` and call the function with it to check the no-match result.
+Use the function in a query for product `782`.
 
 <details>
 <summary>Hint</summary>
@@ -96,27 +96,15 @@ GO
 ```
 
 ```sql
-DECLARE @IDProduct int;
-DECLARE @NoMatchIDProduct int;
-
-SELECT TOP (1)
-    @IDProduct = IDProduct
-FROM dbo.Product
-ORDER BY IDProduct;
-
 SELECT
-    @NoMatchIDProduct = MIN(IDProduct) - 1
-FROM dbo.Product;
-
-SELECT
-    @IDProduct AS IDProduct,
-    dbo.fn_Exercises_ProductQuantitySold(@IDProduct) AS QuantitySold;
-
-SELECT dbo.fn_Exercises_ProductQuantitySold(@NoMatchIDProduct) AS QuantitySoldForNoMatches;
+    p.*,
+    dbo.fn_Exercises_ProductQuantitySold(782) AS QuantitySold
+FROM dbo.Product AS p
+WHERE p.IDProduct = 782;
 GO
 ```
 
-The second call returns `0`. The first call shows the total quantity recorded in `InvoiceItem` for the selected product.
+The query returns the product row together with the total quantity recorded for that product in `InvoiceItem`.
 
 Scalar functions are convenient for one value. Consider how repeatedly calling a scalar function for many rows can affect query performance; compare it with a set-based aggregate query.
 

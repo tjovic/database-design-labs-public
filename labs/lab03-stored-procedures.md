@@ -724,8 +724,11 @@ The application requested one operation, while the procedure performed validatio
 ```mermaid
 sequenceDiagram
     participant A as Application
-    participant P as usp_TransferMoney
-    participant T as BankAccount
+
+    box rgb(225, 240, 255) SQL Server
+        participant P as usp_TransferMoney
+        participant T as BankAccount
+    end
 
     A->>P: Transfer 3000 from 100 to 101
     P->>T: Check accounts and balance
@@ -1731,10 +1734,11 @@ GO
 - After each iteration, `@ShouldDouble` switches between `0` and `1`.
 - `@Total % 10 = 0` checks whether the final sum is divisible by `10`.
 
+</details>
+
 > [!NOTE]
 > A sequence containing sixteen zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
 
-</details>
 
 ---
 

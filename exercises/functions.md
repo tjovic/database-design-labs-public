@@ -96,7 +96,49 @@ GO
 
 </details>
 
-## Exercise 3 — Calculate quantity sold for one product [INTERMEDIATE]
+## Exercise 3 — Find a customer's latest invoice date [INTERMEDIATE]
+
+Create a scalar function named `dbo.fn_Exercises_LatestInvoiceDate` that accepts `@IDCustomer int` and returns the most recent `InvoiceDate` from `dbo.Invoice` for that customer. Return `NULL` if the customer has no invoices.
+
+Use the function in a query for customer `1`.
+
+<details>
+<summary>Hint</summary>
+
+Select the latest matching date with `TOP (1)` and sort `InvoiceDate` in descending order.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_LatestInvoiceDate
+(
+    @IDCustomer int
+)
+RETURNS datetime
+AS
+BEGIN
+    DECLARE @LatestInvoiceDate datetime;
+
+    SELECT TOP (1)
+        @LatestInvoiceDate = InvoiceDate
+    FROM dbo.Invoice
+    WHERE CustomerID = @IDCustomer
+    ORDER BY InvoiceDate DESC, IDInvoice DESC;
+
+    RETURN @LatestInvoiceDate;
+END;
+GO
+
+SELECT dbo.fn_Exercises_LatestInvoiceDate(1) AS LatestInvoiceDate;
+GO
+```
+
+</details>
+
+## Exercise 4 — Calculate quantity sold for one product [INTERMEDIATE]
 
 Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`.
 
@@ -149,7 +191,7 @@ Scalar functions are convenient for one value. Consider how repeatedly calling a
 
 </details>
 
-## Exercise 4 — Return a customer's invoices [INTERMEDIATE]
+## Exercise 5 — Return a customer's invoices [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_CustomerInvoices` with these input parameters:
 
@@ -219,7 +261,7 @@ The sample selects a customer with an invoice and uses a date range covering the
 
 </details>
 
-## Exercise 5 — Filter products by quantity sold [ADVANCED]
+## Exercise 6 — Filter products by quantity sold [ADVANCED]
 
 Create an MSTVF named `dbo.fn_Exercises_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
 
@@ -321,6 +363,7 @@ The functions do not change table data. Remove only the function definitions cre
 ```sql
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_PriceBand;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductQuantitySold;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_LatestInvoiceDate;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomerInvoices;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsByQuantitySold;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;

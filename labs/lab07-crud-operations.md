@@ -37,6 +37,20 @@ GO
 
 # Section 1 – What CRUD Means
 
+## Why not just let the application run SQL directly?
+
+Every table in a database needs the same basic things done to it: new rows get added, existing rows get looked up, changed, and eventually removed. Nothing stops an application from doing this with raw `INSERT`, `SELECT`, `UPDATE`, and `DELETE` statements sent straight from application code.
+
+In practice, that causes real problems once more than a trivial amount of code touches the data:
+
+- **Scattered rules.** If five different parts of an application each contain their own `DELETE FROM Customer ...`, who makes sure none of them deletes a customer that still has invoices? Either every one of those five places repeats the same check, or — more realistically — one of them eventually forgets.
+- **No single place to fix a bug.** If the rule for "which customers can be deleted" changes, you need to find and update every place that implemented it.
+- **Harder to control access.** Granting an application `DELETE` rights on `Customer` lets it delete *any* row, in *any* way. Granting it rights to execute one specific procedure lets it perform exactly the operation that procedure implements — nothing more.
+
+This is the same idea Lab 3 introduced as a **database interface**: the application asks for a named operation, and the database decides how that operation is actually carried out — including whatever validation belongs to it. CRUD is simply the recurring pattern of *which* operations almost every table ends up needing.
+
+## What CRUD means
+
 **CRUD** stands for four kinds of operations an application performs on data:
 
 | Letter | Operation | Typical SQL statement |
@@ -46,7 +60,7 @@ GO
 | **U**pdate | modify an existing record | `UPDATE` |
 | **D**elete | remove a record | `DELETE` |
 
-You already know all four statements. What this lab adds is **how to package them behind a stable, reusable database interface** — the same idea introduced in Lab 3.
+You already know all four statements. What this lab adds is **how to package them behind a stable, reusable database interface** — the same idea introduced in Lab 3, now applied systematically to all four operations, for real tables, including the problems that only show up once you start changing data.
 
 ```mermaid
 flowchart LR
@@ -70,6 +84,7 @@ Equally, a single procedure can sometimes support more than one operation. Secti
 1. What do the four letters of CRUD stand for?
 2. Does CRUD require exactly four stored procedures per table?
 3. Which SQL statement typically implements the "Read" operation?
+4. Give one concrete problem that can happen if several parts of an application each send their own raw `DELETE` statement against a table, instead of going through one shared procedure.
 
 <details>
 <summary>Show answers</summary>
@@ -77,6 +92,7 @@ Equally, a single procedure can sometimes support more than one operation. Secti
 1. Create, Read, Update, Delete.
 2. No. CRUD describes four categories of operations; a table may need more than one procedure for "Read" (one record vs. several), and some operations may be combined into one procedure.
 3. `SELECT`.
+4. Any validation the delete should respect (e.g., "do not delete a customer who still has invoices") has to be repeated correctly in every one of those places, and a later rule change has to be found and fixed everywhere it was duplicated.
 
 </details>
 

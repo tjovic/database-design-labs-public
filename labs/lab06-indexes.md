@@ -281,6 +281,7 @@ For this lab, focus on:
 | `Clustered Index Scan` | Scan a clustered index |
 | `Index Scan` | Scan a nonclustered index |
 | `Index Seek` | Navigate directly to a relevant key range |
+| `Key Lookup` | For each row found via a nonclustered index, fetch additional columns from the clustered index (`RID Lookup` is the equivalent on a heap) |
 | `Nested Loops` | For each outer row, find matching inner rows |
 | `Hash Match` | Hash-based join or aggregation |
 | `Compute Scalar` | Calculate an expression |
@@ -553,13 +554,46 @@ Because `SalesOrder` now has a clustered index on `SalesOrderId`, the clustered 
 
 That is enough for the join in this query.
 
+> [!IMPORTANT]
+> A table's clustering key is always present at the leaf level of **every** nonclustered index on that table — it is the row locator SQL Server uses to find the full row if it ever needs to. You never need to add it with `INCLUDE`; it is already there for free. This is exactly why `IX_SalesOrder_OrderDate` needs no `INCLUDE (SalesOrderId)` of its own.
+
 ---
 
 # 16. Create an index for the order-item join
 
-Create:
+Before creating the index we will actually keep, it is worth seeing why `INCLUDE` matters, instead of taking it on faith.
+
+Create an index on **only** the join column:
 
 ```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
+ON dbo.SalesOrderItem (SalesOrderId);
+GO
+```
+
+Run a small, isolated query against just this one table — not the full multi-table demo query:
+
+```sql
+SELECT ProductId, Quantity, UnitPrice
+FROM dbo.SalesOrderItem
+WHERE SalesOrderId = 1;
+GO
+```
+
+Look at the plan. You should see `Index Seek` on `IX_SalesOrderItem_SalesOrderId`, followed by a `Key Lookup` — one extra operation per matching row, needed only because `ProductId`, `Quantity`, and `UnitPrice` are not part of this index.
+
+```mermaid
+flowchart LR
+    A[Index Seek on SalesOrderId] --> B[Key Lookup]
+    B --> C["Fetch ProductId, Quantity, UnitPrice<br/>from the clustered index"]
+```
+
+Now rebuild the index with the columns this query — and the main demo query — actually need:
+
+```sql
+DROP INDEX IX_SalesOrderItem_SalesOrderId ON dbo.SalesOrderItem;
+GO
+
 CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
 ON dbo.SalesOrderItem (SalesOrderId)
 INCLUDE
@@ -570,6 +604,8 @@ INCLUDE
 );
 GO
 ```
+
+Run the isolated query again. The `Key Lookup` is gone.
 
 Why is `SalesOrderId` the key?
 
@@ -585,7 +621,7 @@ Why include:
 - `Quantity`
 - `UnitPrice`
 
-Because they are needed by the rest of the query.
+Because they are needed by the rest of the query — and, as just demonstrated, leaving any of them out brings the `Key Lookup` back.
 
 ```mermaid
 flowchart TD
@@ -638,7 +674,8 @@ Instead of processing huge inputs, SQL Server can navigate directly to relevant 
 1. Why doesn't creating the clustered primary keys alone fully solve the performance problem?
 2. Why is `OrderDate` chosen as the key for the new index on `SalesOrder`, and why is `SalesOrderId` included?
 3. Why is `SalesOrderId` the key for the new index on `SalesOrderItem`, and why are `ProductId`, `Quantity`, and `UnitPrice` included?
-4. After creating the new indexes, did the SQL query itself change?
+4. What operator appeared when `IX_SalesOrderItem_SalesOrderId` existed without its `INCLUDE` columns, and what made it disappear?
+5. After creating the new indexes, did the SQL query itself change?
 
 <details>
 <summary>Show answers</summary>
@@ -646,7 +683,8 @@ Instead of processing huge inputs, SQL Server can navigate directly to relevant 
 1. The primary-key indexes provide efficient access by `SalesOrderId`/`SalesOrderItemId`, but the query filters by `OrderDate` and joins by `SalesOrderId` — different access patterns that the primary keys alone do not support.
 2. `OrderDate` is the key because the query filters by it; `SalesOrderId` is included because the join needs it afterward.
 3. `SalesOrderId` is the key because the join searches by it; `ProductId`, `Quantity`, and `UnitPrice` are included because the rest of the query needs them, letting the index cover everything required from `SalesOrderItem`.
-4. No. The SQL did not change — only the available physical access paths changed.
+4. A `Key Lookup`, because the index without `INCLUDE` could find matching rows but not supply `ProductId`, `Quantity`, or `UnitPrice` from its own leaf level. Adding those columns to `INCLUDE` removed it.
+5. No. The SQL did not change — only the available physical access paths changed.
 
 </details>
 
@@ -940,6 +978,14 @@ But wider indexes:
 
 So do not try to cover every query.
 
+"Everything a query needs" is broader than just the `SELECT` list:
+
+- An included column can also be filtered on. If a query added `AND ProductId = 500` to its `WHERE` clause, SQL Server could check that condition directly at the leaf level, as a **residual predicate** — no lookup needed, because `ProductId` is already sitting right there.
+- Coverage applies to `GROUP BY` and aggregate expressions just as much as to `SELECT` and `WHERE`. A query that groups by `ProductId` needs `ProductId` to be in the key or `INCLUDE`, exactly like a query that merely returns it.
+
+> [!NOTE]
+> A column counts as "covered" the moment it is part of the index — as a key column or an included column — regardless of which clause of the query actually uses it.
+
 ---
 
 ## Check your understanding
@@ -948,6 +994,7 @@ So do not try to cover every query.
 2. Does the order of predicates written in a `WHERE` clause determine index key order?
 3. What is selectivity, and why isn't a column with few distinct values automatically a bad index candidate?
 4. What does it mean for an index to "cover" a query, and what is the trade-off of making an index wider to cover more?
+5. Can an included column be used for anything besides appearing in the `SELECT` list?
 
 <details>
 <summary>Show answers</summary>
@@ -956,6 +1003,7 @@ So do not try to cover every query.
 2. No. The index's own column definition order determines its key order, regardless of how predicates are written in the query.
 3. Selectivity measures how much of the table matches a given predicate value. A column with few distinct values can still be a good index candidate if the distribution is skewed — a rare value can be highly selective even when the column overall has few distinct values.
 4. A covering index contains everything a particular query needs from that table, avoiding an extra lookup to the clustered index. The trade-off is that wider indexes consume more storage and require more maintenance.
+5. Yes. SQL Server can evaluate an additional `WHERE` condition on an included column directly at the leaf level (a residual predicate), and an included column can support a `GROUP BY` or aggregate just as well as a `SELECT` column — coverage isn't limited to columns that are merely returned.
 
 </details>
 
@@ -1206,9 +1254,17 @@ Before creating anything, answer:
 - Composite-index column order matters.
 - `WHERE` predicate order does not determine index key order.
 - Selectivity affects whether using an index is attractive.
-- Included columns can help an index cover a query.
+- A table's clustering key is always present at the leaf of every nonclustered index, for free — no `INCLUDE` needed.
+- A `Key Lookup` (or `RID Lookup` on a heap) fetches columns a nonclustered index doesn't have; missing `INCLUDE` columns bring it back.
+- Included columns can help an index cover a query — not just for `SELECT`, but also for extra `WHERE` predicates and for `GROUP BY`/aggregates.
 - Missing-index recommendations should be evaluated, not accepted automatically.
 - Every index consumes pages and adds write-maintenance cost.
 - Good index design reduces unnecessary page processing.
 
 > **A good index gives SQL Server a shorter physical path to the data it actually needs.**
+
+---
+
+## Additional practice
+
+More index exercises, using `AdventureWorksENG` instead of `IndexLab`, are available in [Index Exercises](../exercises/indexes.md).

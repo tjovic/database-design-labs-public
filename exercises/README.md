@@ -4,11 +4,11 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, and **functions**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
-Exercises are grouped by topic and arranged from introductory concepts to more involved applications. The current topic is:
+Exercises are grouped by topic and arranged from introductory concepts to more involved applications. The current topics are:
 
 ### Triggers
 
@@ -44,6 +44,18 @@ The function collection is in [Function Exercises](functions.md) and follows the
 
 The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
 
+### Indexes
+
+The index collection is in [Index Exercises](indexes.md) and follows the learning goals in [Lab 06 – Indexes](../labs/lab06-indexes.md):
+
+1. **What `INCLUDE` actually buys you** — staged exercise measuring `STATISTICS IO` before and after: a filter-only index, why returning the clustering key is always free, proof that one more returned column reintroduces a `Key Lookup`, the `INCLUDE` fix, and why an included column also covers an extra filter predicate.
+2. **Composite index column order** — reason about which queries a multi-column index can and cannot seek on.
+3. **Covering indexes** — design an index so a query needs no `Key Lookup`.
+4. **Selectivity** — judge when a low-cardinality column is still a good index candidate, including covering a `GROUP BY` column.
+5. **Evaluating suggestions** — decide whether a "Missing Index" recommendation is worth creating, given indexes that already exist.
+
+Unlike Lab 06, which uses the large generated `IndexLab` database to make performance differences obvious, these exercises intentionally use `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Each exercise creates one real index on an existing table (see the database safety note below) rather than an isolated new object.
+
 ## Difficulty labels
 
 Every exercise uses one of these labels:
@@ -67,6 +79,8 @@ Difficulty describes the reasoning and SQL work expected. It does not indicate t
 
 The inspected `AdventureWorksENG` database already contains four enabled triggers on `dbo.City` and a populated `dbo.ActivityLog` table. Do not assume these are temporary exercise objects. An exercise must not drop, replace, disable, or clear existing objects or data as part of setup or cleanup. Prefer isolated test objects or a dedicated database; if an exercise must use an existing object, document a safe, reversible procedure that preserves its original state.
 
+The index exercises are a deliberate, narrow exception to "prefer isolated test objects": by nature, an index exercise creates a real physical index on an existing table. Each one uses the `IX_Exercises_` naming prefix and is listed in that file's cleanup section — never leave one of these indexes in place after finishing, since it can change the execution plan observed by a later, unrelated exercise or lab.
+
 ## References
 
 - [Lab 02 – Triggers](../labs/lab02-triggers.md)
@@ -75,4 +89,6 @@ The inspected `AdventureWorksENG` database already contains four enabled trigger
 - [Stored Procedure Exercises](procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
 - [Function Exercises](functions.md)
+- [Lab 06 – Indexes](../labs/lab06-indexes.md)
+- [Index Exercises](indexes.md)
 - [Repository overview](../README.md)

@@ -37,7 +37,7 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 > Additional labs will be added as the course progresses.
 
-For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions).
+For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, indexes).
 
 ---
 

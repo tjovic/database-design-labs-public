@@ -2,10 +2,12 @@
 
 These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md) and use `AdventureWorksENG` — the same database the midterm is written against — instead of `IndexLab`.
 
-`AdventureWorksENG` is much smaller than `IndexLab`. That has one consequence worth stating up front:
+`AdventureWorksENG` is much smaller than `IndexLab` (hundreds to low tens-of-thousands of rows per table here, versus tens of millions there). That has one consequence worth stating up front:
 
 > [!IMPORTANT]
-> On a small table, SQL Server may still choose a scan even after you create a "correct" index — and that can be the right choice (Lab 06, Section 26). The point of these exercises is not to force a dramatic `Scan → Seek` flip like the `IndexLab` demo. It is to practice **designing** the right index for a given query, and correctly **reasoning** about execution plans, column order, and coverage — skills that transfer regardless of table size.
+> On a table this size, SQL Server sometimes chooses a plain scan even where a "correct" index exists — and that can be the right choice (Lab 06, Section 26). Exercise 4 below produces exactly that outcome for real. The point of these exercises is not to force a dramatic `Scan → Seek` flip like the `IndexLab` demo. It is to practice **designing** the right index for a given query, and correctly **reasoning** about execution plans, column order, and coverage — skills that transfer regardless of table size.
+
+Every number quoted in this file (`logical reads`, row counts, which color is rarest, ...) was measured directly against this course's `AdventureWorksENG` — the same fixed dataset you have. Every exercise therefore uses literal values instead of looking an ID up first; you do not need a `DECLARE` block to reproduce any of this.
 
 Each exercise creates one real, physical index on an existing `AdventureWorksENG` table — unlike the trigger/procedure/function exercises, these are not new, isolated objects. Use the naming convention below and run the cleanup section when you are done, so you don't accumulate leftover indexes across study sessions.
 
@@ -41,33 +43,19 @@ All indexes created here use the prefix `IX_Exercises_` so they are easy to find
 
 ## Exercise 1 — What `INCLUDE` actually buys you [BEGINNER]
 
-This exercise walks through the full story in stages: a filter-only index, proof that it stops helping the moment the query needs one more column, and the fix. Watch **logical reads** in the Messages tab (`SET STATISTICS IO ON`, from Setup) at every step, not just the plan icons — on a table this small, the read count is often the clearer signal.
+This exercise walks through the full story in stages: a filter-only index, proof that it stops helping the moment the query needs one more column, and the fix. Watch **logical reads** in the Messages tab (`SET STATISTICS IO ON`, from Setup) at every step, not just the plan icons — on a table this small, the read count is often the clearer signal. The numbers quoted below are what this exact query returns against this course's `AdventureWorksENG` — you should see the same ones.
 
-First, pick a `SubcategoryID` that has more than one product:
-
-```sql
-DECLARE @SubcategoryID int;
-
-SELECT TOP (1) @SubcategoryID = SubcategoryID
-FROM Product
-WHERE SubcategoryID IS NOT NULL
-GROUP BY SubcategoryID
-HAVING COUNT(*) > 1;
-
-SELECT @SubcategoryID AS SubcategoryID;
-```
-
-Use that same `@SubcategoryID` value as a literal in every query below.
+We will use `SubcategoryID = 12` throughout, which has 28 products.
 
 **a) Baseline.** Run, with no index yet beyond the default clustered primary key:
 
 ```sql
 SELECT IDProduct, SubcategoryID
 FROM Product
-WHERE SubcategoryID = 1; -- replace 1 with the ID you found above
+WHERE SubcategoryID = 12;
 ```
 
-Note the logical reads.
+Expect `logical reads 8`.
 
 **b) Create an index on the filter column alone:**
 
@@ -77,7 +65,7 @@ ON Product (SubcategoryID);
 GO
 ```
 
-**c) Re-run the exact query from (a).** The logical reads should now be lower.
+**c) Re-run the exact query from (a).** Expect `logical reads 2`.
 
 <details>
 <summary>Why did this work without an `INCLUDE`?</summary>
@@ -91,17 +79,17 @@ The query only returns `IDProduct` and `SubcategoryID`. `SubcategoryID` is the i
 ```sql
 SELECT IDProduct, SubcategoryID, Name
 FROM Product
-WHERE SubcategoryID = 1; -- same ID as before
+WHERE SubcategoryID = 12;
 ```
 
-Compare the logical reads with step (c). They should go back up — `Name` is neither the key nor included, so SQL Server must look each matching row up in the clustered index to fetch it.
+Expect `logical reads 8` again — back up from step (c). `Name` is neither the key nor included, so SQL Server must look each matching row up in the clustered index to fetch it.
 
 **e) Fix it.** Design and create a nonclustered index that supports the query from (d) **and** returns the results sorted by `PriceWithoutVAT DESC`:
 
 ```sql
 SELECT IDProduct, SubcategoryID, Name, PriceWithoutVAT
 FROM Product
-WHERE SubcategoryID = 1 -- same ID as before
+WHERE SubcategoryID = 12
 ORDER BY PriceWithoutVAT DESC;
 ```
 
@@ -124,7 +112,7 @@ INCLUDE (Name);
 GO
 ```
 
-Re-run the query from (e). Logical reads should drop again, and no `Sort` operator should be needed.
+Re-run the query from (e). Expect `logical reads 2` again, and the plan should show a single `Index Seek, ORDERED FORWARD` — no `Key Lookup`, no separate `Sort`.
 
 </details>
 
@@ -133,15 +121,17 @@ Re-run the query from (e). Logical reads should drop again, and no `Sort` operat
 ```sql
 SELECT IDProduct, SubcategoryID, Name, PriceWithoutVAT
 FROM Product
-WHERE SubcategoryID = 1 -- same ID as before
-  AND Name LIKE N'A%'
+WHERE SubcategoryID = 12
+  AND Name LIKE N'HL%'
 ORDER BY PriceWithoutVAT DESC;
 ```
+
+Expect `logical reads 2` here too — unchanged from (e), even with the extra condition.
 
 <details>
 <summary>Why does this stay covered?</summary>
 
-`Name` is physically present at the leaf level as an included column, so SQL Server can check `LIKE N'A%'` right there — as a **residual predicate** on the index itself — without a separate lookup to the clustered index. An included column is not just for the `SELECT` list; anything already sitting at the leaf can also be filtered on for free.
+`Name` is physically present at the leaf level as an included column, so SQL Server can check `LIKE N'HL%'` right there — as a **residual predicate** on the index itself, visible in the plan as a `WHERE:` clause attached to the same `Index Seek` — without a separate lookup to the clustered index. An included column is not just for the `SELECT` list; anything already sitting at the leaf can also be filtered on for free.
 
 </details>
 
@@ -157,25 +147,18 @@ ON Invoice (CustomerID, InvoiceDate);
 GO
 ```
 
-For each query below, decide whether it can use the index via a seek on the **full key**, a seek on just the **leading column**, or **not efficiently at all** — then check with an actual execution plan.
+For each query below, decide whether it can use the index via a seek on the **full key**, a seek on just the **leading column**, or **not efficiently at all** — then check with an actual execution plan. `CustomerID = 15194` has 28 invoices in this dataset.
 
 ```sql
-DECLARE @CustomerID int;
-
-SELECT TOP (1) @CustomerID = CustomerID
-FROM Invoice
-GROUP BY CustomerID
-HAVING COUNT(*) > 1;
-
 -- A
 SELECT * FROM Invoice WHERE InvoiceDate >= '20030101';
 
 -- B
-SELECT * FROM Invoice WHERE CustomerID = @CustomerID ORDER BY InvoiceDate;
+SELECT * FROM Invoice WHERE CustomerID = 15194 ORDER BY InvoiceDate;
 
 -- C
 SELECT * FROM Invoice
-WHERE CustomerID = @CustomerID
+WHERE CustomerID = 15194
   AND InvoiceDate >= '20030101'
   AND InvoiceDate <  '20040101';
 ```
@@ -190,11 +173,14 @@ The index is sorted first by `CustomerID`, then by `InvoiceDate` within each cus
 <details>
 <summary>Solution</summary>
 
-- **A** — Not efficiently. `InvoiceDate` is not the leading key column, so the index cannot be seeked on it alone.
+- **A** — Not efficiently. `InvoiceDate` is not the leading key column, so the plan shows a `Clustered Index Scan` with a residual predicate instead of a seek on this index.
 - **B** — Seek on the leading column (`CustomerID`). Because `InvoiceDate` is the second key column, that customer's rows are already stored in `InvoiceDate` order, so the `ORDER BY` may be satisfied without an extra `Sort`.
-- **C** — Seek on the full key (`CustomerID` and `InvoiceDate` together) — the most selective of the three, and typically the cheapest, though on a small table the difference in cost from B may be negligible.
+- **C** — Seek on the full key (`CustomerID` and `InvoiceDate` together) — the most selective of the three, and typically the cheapest.
 
 The written order of the predicates in the `WHERE` clause (B puts `CustomerID` first, but that wouldn't matter if it were written the other way around) never determines index key order — only the index definition does.
+
+> [!NOTE]
+> All three queries use `SELECT *`, so expect a `Key Lookup` after the seek in B and C regardless — this index only has `CustomerID` and `InvoiceDate`, and `SELECT *` needs every other column too. That lookup is a separate issue from the one this exercise is about (whether the *seek itself* can use the leading column, the full key, or neither); Exercise 3 is where covering comes in.
 
 </details>
 
@@ -202,23 +188,18 @@ The written order of the predicates in the `WHERE` clause (B puts `CustomerID` f
 
 ## Exercise 3 — Covering index design [INTERMEDIATE]
 
-Run this query with the actual execution plan enabled:
+Run this query with the actual execution plan enabled — `InvoiceID = 51201` has 2 line items in this dataset:
 
 ```sql
-DECLARE @InvoiceID int;
-
-SELECT TOP (1) @InvoiceID = InvoiceID
-FROM InvoiceItem;
-
 SELECT
     ProductID,
     Quantity,
     TotalPrice
 FROM InvoiceItem
-WHERE InvoiceID = @InvoiceID;
+WHERE InvoiceID = 51201;
 ```
 
-Design a nonclustered index so this query does not need a `Key Lookup` back to the clustered index. Confirm with an actual execution plan.
+Before creating anything, run it and note the logical reads (expect `logical reads 847` — `InvoiceItem` is the largest table here, and nothing indexes `InvoiceID` yet). Design a nonclustered index so this query does not need a `Key Lookup` back to the clustered index. Confirm with an actual execution plan.
 
 <details>
 <summary>Hint</summary>
@@ -237,7 +218,7 @@ INCLUDE (ProductID, Quantity, TotalPrice);
 GO
 ```
 
-`InvoiceID` is the key because the query filters on it. `ProductID`, `Quantity`, and `TotalPrice` are included because the query returns them but does not filter or sort by them — with all three present, every column the query needs is either the key or an included column, so no `Key Lookup` is required.
+`InvoiceID` is the key because the query filters on it. `ProductID`, `Quantity`, and `TotalPrice` are included because the query returns them but does not filter or sort by them — with all three present, every column the query needs is either the key or an included column, so no `Key Lookup` is required. Re-run the query: `logical reads` should drop from 847 to 3, and the plan should show a single `Index Seek`.
 
 </details>
 
@@ -265,12 +246,11 @@ ON Product (Color);
 GO
 ```
 
-Pick the most common color from your distribution and the least common one, then run the same shape of query for each:
+In this dataset, the most common actual color value is `Crna` (93 products out of 504), and the rarest is `Siva` (1 product) — run the same shape of query for each, with the actual execution plan enabled:
 
 ```sql
-SELECT IDProduct, Name
-FROM Product
-WHERE Color = N'...'; -- try the most common, then the least common
+SELECT IDProduct, Name FROM Product WHERE Color = N'Crna'; -- most common
+SELECT IDProduct, Name FROM Product WHERE Color = N'Siva'; -- rarest
 ```
 
 Answer: for which of the two colors is this index more likely to be useful, and why?
@@ -285,13 +265,15 @@ Selectivity is about how much of the table matches one value — not about how m
 <details>
 <summary>Solution</summary>
 
-The index is more attractive for the **least common** color: a seek returns only a handful of rows out of the whole table. For the **most common** color, a large share of all rows match — at that point scanning the table (or the index) may cost about the same as, or even more than, seeking plus looking up every matching row, so the optimizer may reasonably choose a scan instead.
+For `Crna`, the plan is a plain `Clustered Index Scan` — the optimizer does not even use `IX_Exercises_Product_Color`. With 93 of 504 rows matching (about 18%), seeking the index and then looking up every one of those rows in the clustered index is not obviously cheaper than just scanning the table once, so SQL Server skips the new index entirely.
 
-`Color` can have very few distinct values and still be a good index candidate, as long as the distribution is skewed — a rare value stays highly selective even when the column overall has few distinct values.
+For `Siva`, the plan is `Index Seek` on `IX_Exercises_Product_Color`, then `Nested Loops` into a `Clustered Index Seek ... LOOKUP` for `Name` — one lookup, because only one row matches. The index is clearly worth using here.
+
+`Color` can have very few distinct values and still be a good index candidate, as long as the distribution is skewed — a rare value stays highly selective even when the column overall has few distinct values. This also shows, concretely, the Lab 06 Section 26 point: SQL Server choosing a scan is not automatically wrong.
 
 </details>
 
-**Bonus — covering a `GROUP BY` instead of a `WHERE`.** Covering isn't limited to filtered or sorted columns; a column used only in `GROUP BY` needs to be covered too:
+**Bonus — covering a `GROUP BY` instead of a `WHERE`.** Covering isn't limited to filtered or sorted columns; a column used only in `GROUP BY` needs to be covered too. Using `IX_Exercises_Product_SubcategoryID_Price` from Exercise 1 (key: `SubcategoryID`, `PriceWithoutVAT DESC`; included: `Name`):
 
 ```sql
 SELECT
@@ -299,14 +281,14 @@ SELECT
     Color,
     COUNT(*) AS NumberOfProducts
 FROM Product
-WHERE SubcategoryID = 1 -- use the same SubcategoryID as in Exercise 1
+WHERE SubcategoryID = 12
 GROUP BY SubcategoryID, Color;
 ```
 
 <details>
 <summary>Think about it</summary>
 
-Does `IX_Exercises_Product_SubcategoryID_Price` from Exercise 1 cover this query? It does not — `Color` is in neither its key nor its `INCLUDE` list, so SQL Server still needs a `Key Lookup` for every matching row before it can group by `Color`. The fix is the same idea as before: add `Color` to `INCLUDE` (or the key) of whichever index is meant to support this query.
+`Color` is in neither the key nor the `INCLUDE` list of `IX_Exercises_Product_SubcategoryID_Price`, so that index cannot fully support this `GROUP BY` — in practice, with only 28 matching rows, the optimizer here simply falls back to a plain `Clustered Index Scan` rather than seeking the nonclustered index and looking `Color` up row by row; on a larger table, a `Key Lookup` per row is the more typical shape of this same problem. Either way, the fix is the same idea as before: add `Color` to `INCLUDE` (or the key) of whichever index is meant to support this query.
 
 </details>
 
@@ -339,9 +321,11 @@ Before creating anything, answer:
 <details>
 <summary>Solution</summary>
 
+Without any index beyond the Exercise 2 one, the plan for this query is `Sort → Hash Match (Inner Join) → Clustered Index Scan (Invoice) / Clustered Index Scan (Customer)` — both tables scanned in full, then hashed together. SQL Server's missing-index feature suggests an index on `Invoice (InvoiceDate) INCLUDE (InvoiceNumber, CustomerID)`.
+
 1. `IX_Exercises_Invoice_CustomerID_InvoiceDate` (Exercise 2) exists on `Invoice (CustomerID, InvoiceDate)`, but this query filters and sorts by `InvoiceDate` **without** a `CustomerID` predicate — so that index's leading column does not help here.
-2. A suggested index on `Invoice (InvoiceDate)` would not duplicate the Exercise 2 index — it serves a different access pattern (no customer filter at all).
-3. In a real workload, the better choice is usually to evaluate whether this query pattern (all invoices in a date range, regardless of customer) is actually common enough to justify a new index, given that `IX_Exercises_Invoice_CustomerID_InvoiceDate` already exists for the customer-scoped case. Creating both means `Invoice` now has two overlapping nonclustered indexes on `InvoiceDate` in different roles — a reasonable call if both access patterns genuinely occur, but worth a deliberate decision rather than accepting every suggestion automatically.
+2. The suggested index on `Invoice (InvoiceDate)` would not duplicate the Exercise 2 index — it serves a different access pattern (no customer filter at all).
+3. In a real workload, the better choice is usually to evaluate whether this query pattern (all invoices in a date range, regardless of customer) is actually common enough to justify a new index, given that `IX_Exercises_Invoice_CustomerID_InvoiceDate` already exists for the customer-scoped case. Creating both means `Invoice` now has two overlapping nonclustered indexes in different roles — a reasonable call if both access patterns genuinely occur, but worth a deliberate decision rather than accepting every suggestion automatically.
 
 </details>
 

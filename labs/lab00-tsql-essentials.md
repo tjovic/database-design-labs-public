@@ -14,12 +14,14 @@ used throughout the course:
 7. `WHILE` loops
 8. `CASE WHEN`
 9. `SET NOCOUNT ON` and `@@ROWCOUNT`
+10. Basic error handling with `TRY/CATCH`
 
 These concepts are prerequisites for **Triggers (Lab 2)**, **Stored
-Procedures (Lab 3)**, and **Functions (Lab 4)**.\
-**Lab 7 – T-SQL Programming** continues with `CONVERT`, `FORMAT`, and
-`TRY/CATCH`, building on the `WHILE` and `CASE` patterns introduced
-here.
+Procedures (Lab 3)**, **Functions (Lab 4)**, and **CRUD Operations
+(Lab 7)**.\
+**Lab 8 – T-SQL Programming** continues with `CONVERT` and `FORMAT`,
+and goes deeper into `TRY/CATCH`, building on the `WHILE` and `CASE`
+patterns introduced here.
 
 ## Learning objectives
 
@@ -34,7 +36,9 @@ After completing this lab, you should be able to:
 - repeat statements with `WHILE`, including `BREAK` and `CONTINUE`;
 - compute a value based on conditions with `CASE WHEN`;
 - check how many rows a statement affected with `@@ROWCOUNT`, and
-    suppress row-count messages with `SET NOCOUNT ON`.
+    suppress row-count messages with `SET NOCOUNT ON`;
+- catch a runtime error with a basic `TRY/CATCH` block and inspect it
+    with `ERROR_MESSAGE()` and `ERROR_NUMBER()`.
 
 Start by selecting the database used in the exercises:
 
@@ -1709,6 +1713,141 @@ This allows you to continue seeing `(n rows affected)` messages while experiment
 
 ------------------------------------------------------------------------
 
+## Section 10 – Basic Error Handling with `TRY/CATCH`
+
+Some statements fail while they are running. For example, SQL Server
+raises an error for an invalid conversion:
+
+```sql
+SELECT CAST('not a number' AS int);
+```
+
+```text
+Msg 245, Level 16, State 1
+Conversion failed when converting the varchar value
+'not a number' to data type int.
+```
+
+Without any handling, this error stops the batch.
+
+`TRY/CATCH` lets us run a block of statements and react if one of them
+fails, instead of letting the error stop the batch.
+
+```sql
+BEGIN TRY
+    SELECT CAST('not a number' AS int);
+END TRY
+BEGIN CATCH
+    PRINT 'Something went wrong.';
+END CATCH
+```
+
+The general structure is:
+
+```sql
+BEGIN TRY
+    -- statements that might fail
+END TRY
+BEGIN CATCH
+    -- statements that run only if an error occurred
+END CATCH
+```
+
+```mermaid
+flowchart TD
+    A["BEGIN TRY"] --> B["Statements"]
+    B -->|"No error"| C["Continue after CATCH block"]
+    B -->|"Error"| D["BEGIN CATCH"]
+    D --> E["Handle the error"]
+    E --> C
+```
+
+### Inspecting the error
+
+Inside `CATCH`, SQL Server provides several functions that describe the
+error that just occurred.
+
+The two you will use most often are:
+
+| Function | Returns |
+|---|---|
+| `ERROR_NUMBER()` | The SQL Server error number |
+| `ERROR_MESSAGE()` | The text of the error message |
+
+```sql
+BEGIN TRY
+    SELECT CAST('not a number' AS int);
+END TRY
+BEGIN CATCH
+    SELECT
+        ERROR_NUMBER()  AS ErrorNumber,
+        ERROR_MESSAGE() AS ErrorMessage;
+END CATCH
+```
+
+Example result:
+
+| ErrorNumber | ErrorMessage |
+|---:|---|
+| 245 | Conversion failed when converting the varchar value 'not a number' to data type int. |
+
+These functions are only meaningful **inside** a `CATCH` block. Outside
+of one, they return `NULL`.
+
+> [!IMPORTANT]
+> `TRY/CATCH` does not fix the error. It lets your code detect that an
+> error occurred and decide what to do next, instead of letting the
+> batch simply stop.
+
+### Not every unwanted result is an error
+
+`TRY/CATCH` only reacts to statements that SQL Server treats as errors.
+
+An `UPDATE` or `DELETE` that matches zero rows is **not** an error — it
+completes normally, and `CATCH` does not run. Use `@@ROWCOUNT`, which
+you already saw in Section 9, to detect that case.
+
+```text
+Statement raises an error
+    -> CATCH runs
+
+Statement completes but affects zero rows
+    -> CATCH does not run
+    -> check @@ROWCOUNT instead
+```
+
+This lab only introduces the basic `TRY/CATCH` block. **Lab 8 – T-SQL
+Programming** goes further, including `THROW` and re-raising errors.
+
+### Check your understanding
+
+1. What happens to a batch that raises an error without `TRY/CATCH`?
+2. Where can you call `ERROR_MESSAGE()` and get a meaningful result?
+3. Does an `UPDATE` that matches zero rows raise an error that `CATCH`
+    will handle?
+
+<details>
+<summary>Show answers</summary>
+
+1. The error stops the batch at the point of failure.
+2. Inside a `CATCH` block.
+3. No. It completes normally with zero rows affected; use `@@ROWCOUNT`
+    to detect it.
+
+</details>
+
+### Key takeaways
+
+- `BEGIN TRY ... END TRY` wraps statements that might fail.
+- `BEGIN CATCH ... END CATCH` runs only if a statement in the `TRY`
+    block raised an error.
+- `ERROR_NUMBER()` and `ERROR_MESSAGE()` describe the error and are only
+    meaningful inside `CATCH`.
+- A statement that runs successfully but affects zero rows is not an
+    error — check `@@ROWCOUNT` for that case instead.
+
+------------------------------------------------------------------------
+
 # Exercises
 
 Try each exercise before opening the solution.
@@ -2096,6 +2235,37 @@ GO
 
 </details>
 
+## Exercise 11 – TRY/CATCH
+
+Write a script that:
+
+1. Tries to `CAST('N/A' AS int)` inside a `TRY` block.
+2. In the `CATCH` block, selects `ERROR_NUMBER()` and `ERROR_MESSAGE()`.
+
+Run it, then change the value being cast to a valid integer, such as
+`'42'`, and run it again.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+BEGIN TRY
+    SELECT CAST('N/A' AS int) AS ConvertedValue;
+END TRY
+BEGIN CATCH
+    SELECT
+        ERROR_NUMBER()  AS ErrorNumber,
+        ERROR_MESSAGE() AS ErrorMessage;
+END CATCH
+GO
+```
+
+With `'N/A'`, the `CATCH` block runs and returns the error number and
+message. With `'42'`, the `TRY` block completes successfully and the
+`CATCH` block does not run.
+
+</details>
+
 ------------------------------------------------------------------------
 
 # What you should know after this lab
@@ -2164,6 +2334,16 @@ WHERE IDProduct <= 5;
 DECLARE @RowsUpdated int = @@ROWCOUNT;
 
 SET NOCOUNT OFF;
+
+-- Basic error handling
+BEGIN TRY
+    SELECT CAST('N/A' AS int);
+END TRY
+BEGIN CATCH
+    SELECT
+        ERROR_NUMBER()  AS ErrorNumber,
+        ERROR_MESSAGE() AS ErrorMessage;
+END CATCH
 ```
 
 You do not need to memorize every detail. You should understand what
@@ -2180,9 +2360,12 @@ These building blocks will reappear throughout the course:
     identity handling, type conversion, and `SET NOCOUNT ON`;
 - **Lab 4 – Functions**: variables, table variables, control flow, and
     type handling;
-- **Lab 7 – T-SQL Programming**: `CONVERT`, `FORMAT`, `TRY/CATCH`, and
-    more complete procedural T-SQL, building on the `WHILE` and `CASE`
-    patterns from this lab.
+- **Lab 7 – CRUD Operations**: input parameters, control flow,
+    `@@ROWCOUNT`, and the basic `TRY/CATCH` block, applied to insert,
+    read, update, and delete operations;
+- **Lab 8 – T-SQL Programming**: `CONVERT`, `FORMAT`, and a deeper look
+    at `TRY/CATCH`, building on the `WHILE` and `CASE` patterns from
+    this lab.
 
 If any of these concepts becomes unclear later, return to this lab and
 run the examples again.

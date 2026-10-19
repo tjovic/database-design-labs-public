@@ -1767,12 +1767,16 @@ flowchart TD
 Inside `CATCH`, SQL Server provides several functions that describe the
 error that just occurred.
 
-The two you will use most often are:
+The two you will use most often are `ERROR_NUMBER()` and
+`ERROR_MESSAGE()`, but SQL Server provides a few more:
 
 | Function | Returns |
 |---|---|
 | `ERROR_NUMBER()` | The SQL Server error number |
 | `ERROR_MESSAGE()` | The text of the error message |
+| `ERROR_SEVERITY()` | The severity level of the error (see below) |
+| `ERROR_LINE()` | The line number where the error occurred |
+| `ERROR_PROCEDURE()` | The name of the procedure where the error occurred, or `NULL` if the error did not occur inside one |
 
 ```sql
 BEGIN TRY
@@ -1798,6 +1802,29 @@ of one, they return `NULL`.
 > `TRY/CATCH` does not fix the error. It lets your code detect that an
 > error occurred and decide what to do next, instead of letting the
 > batch simply stop.
+
+### Not every error can be caught
+
+Every SQL Server error has a **severity level**, and `TRY/CATCH` does
+not catch all of them:
+
+| Severity | Meaning | Caught by `TRY/CATCH`? |
+|---:|---|:---:|
+| 1–10 | Informational messages | No |
+| 11–16 | User errors (e.g., object not found, bad syntax, division by zero) | Yes |
+| 17–19 | Software errors that need administrator attention (e.g., out of disk space) | Yes |
+| 20–25 | Fatal errors; may close the connection | No |
+
+The conversion error from the example above is severity 16, which is
+exactly the range `TRY/CATCH` is designed to handle. A severity 20+
+error is serious enough that SQL Server may terminate the connection
+before your `CATCH` block gets a chance to run.
+
+> [!NOTE]
+> You do not need to memorize these ranges. The practical takeaway is
+> that `TRY/CATCH` reliably handles the everyday errors you will cause
+> yourself — bad input, constraint violations, conversion failures —
+> but is not a universal safety net for every possible failure.
 
 ### Not every unwanted result is an error
 
@@ -1825,6 +1852,8 @@ Programming** goes further, including `THROW` and re-raising errors.
 2. Where can you call `ERROR_MESSAGE()` and get a meaningful result?
 3. Does an `UPDATE` that matches zero rows raise an error that `CATCH`
     will handle?
+4. Which severity range does `TRY/CATCH` **not** catch, and why does
+    that make sense for severities 20–25?
 
 <details>
 <summary>Show answers</summary>
@@ -1833,6 +1862,10 @@ Programming** goes further, including `THROW` and re-raising errors.
 2. Inside a `CATCH` block.
 3. No. It completes normally with zero rows affected; use `@@ROWCOUNT`
     to detect it.
+4. Severities 1–10 (informational messages, not errors) and 20–25
+    (fatal errors). A severity 20+ error is serious enough that SQL
+    Server may close the connection, leaving no session left in which a
+    `CATCH` block could run.
 
 </details>
 
@@ -1841,8 +1874,12 @@ Programming** goes further, including `THROW` and re-raising errors.
 - `BEGIN TRY ... END TRY` wraps statements that might fail.
 - `BEGIN CATCH ... END CATCH` runs only if a statement in the `TRY`
     block raised an error.
-- `ERROR_NUMBER()` and `ERROR_MESSAGE()` describe the error and are only
-    meaningful inside `CATCH`.
+- `ERROR_NUMBER()` and `ERROR_MESSAGE()` describe the error; `ERROR_SEVERITY()`,
+    `ERROR_LINE()`, and `ERROR_PROCEDURE()` give further detail. All are
+    only meaningful inside `CATCH`.
+- `TRY/CATCH` catches errors of severity 11–19. Severity 1–10 is just
+    informational, and severity 20–25 is fatal and may close the
+    connection before `CATCH` can run.
 - A statement that runs successfully but affects zero rows is not an
     error — check `@@ROWCOUNT` for that case instead.
 

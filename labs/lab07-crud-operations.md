@@ -501,6 +501,75 @@ Note that the `@IDCity` check and the `Customer` check are both business-rule pr
 
 </details>
 
+## Exercise 5 — Save a state: Create and Update combined [ADVANCED]
+
+Section 5 introduces "Create + Update combined" as one of the common ways to group CRUD operations: one "save" procedure that inserts a new row when the caller has no ID yet, and updates the existing row when it does.
+
+Create `dbo.usp_SaveState` with parameters `@IDState int OUTPUT` and `@Name nvarchar(50)`:
+
+- if `@IDState` is `NULL`, **insert** a new state and return its generated ID through `@IDState`;
+- otherwise, **update** the `Name` of the state with that ID.
+
+Test it by calling it once to create a state, then again — passing back the ID you got the first time — to rename it.
+
+<details>
+<summary>Hint</summary>
+
+`State.IDState` is an identity column, so you cannot insert a specific ID value. That is exactly why the "create" branch ignores any incoming value and produces a fresh one with `SCOPE_IDENTITY()`, while the "update" branch trusts the ID the caller already has.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_SaveState
+    @IDState int OUTPUT,
+    @Name    nvarchar(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @IDState IS NULL
+    BEGIN
+        INSERT INTO State (Name)
+        VALUES (@Name);
+
+        SET @IDState = SCOPE_IDENTITY();
+    END
+    ELSE
+    BEGIN
+        UPDATE State
+        SET Name = @Name
+        WHERE IDState = @IDState;
+    END
+END
+GO
+```
+
+```sql
+DECLARE @IDState int = NULL;
+
+EXEC dbo.usp_SaveState
+    @IDState = @IDState OUTPUT,
+    @Name    = N'ZZ_LabTestState_Saved';
+
+SELECT @IDState AS NewStateID;
+
+EXEC dbo.usp_SaveState
+    @IDState = @IDState OUTPUT,
+    @Name    = N'ZZ_LabTestState_SavedRenamed';
+
+SELECT * FROM State WHERE IDState = @IDState;
+-- same row, Name is now 'ZZ_LabTestState_SavedRenamed'
+```
+
+The same `@IDState` variable is passed in and received back via `OUTPUT` in the same call — a common idiom for this pattern. The first call leaves it `NULL` on the way in, so the procedure inserts; the second call supplies the value the first call produced, so the procedure updates.
+
+This procedure makes one simplification worth naming: it does not check whether the `@IDState` passed to the "update" branch actually exists. If it does not, `UPDATE` simply matches zero rows — the same "not an error, just zero rows" case from Section 2.
+
+</details>
+
 ---
 
 # Section 4 – Functions and Data Access
@@ -639,7 +708,24 @@ This is why every Create, Update, and Delete operation in this lab is implemente
 
 So far, every operation has had its own procedure. An alternative is **one procedure that performs several operations**, selected by a parameter.
 
-This section builds that pattern for `Subcategory` (`IDSubcategory`, `CategoryID`, `Name`), supporting both "Read" and "Delete" through a single procedure.
+## Common ways to group CRUD operations
+
+In practice, you will usually see one of a few recognizable groupings:
+
+| Style | Create | Read | Update | Delete |
+|---|---|---|---|---|
+| Fully separate | own procedure | own procedure (or function, Section 4) | own procedure | own procedure |
+| Create + Update combined | combined into one procedure | own procedure (or function) | *(same procedure as Create)* | own procedure |
+| Create + Update + Delete combined | combined into one procedure | own procedure (or function) | *(same procedure)* | *(same procedure)* |
+
+Notice what stays constant across all three: **Read is always its own procedure, or a function.** Since a function cannot modify data (Section 4), it can only ever stand in for the "R" — never for Create, Update, or Delete, in any of these groupings.
+
+`Create + Update combined` typically takes the shape of a "save" procedure: if the caller passes no ID (or `NULL`), the procedure inserts a new row; if the caller passes an existing ID, it updates that row instead. `Create + Update + Delete combined` extends the same idea with an explicit `@Action` (or similar) parameter to tell the three write operations apart.
+
+This section builds a **different** combination: one procedure that supports **Read and Delete** together, for `Subcategory` (`IDSubcategory`, `CategoryID`, `Name`). This is not one of the three groupings above — it is a grouping that fits a specific requirement you will meet again in Section 8. The underlying lesson is the same either way:
+
+> [!IMPORTANT]
+> There is no single correct way to group CRUD operations into procedures. Pick the grouping that matches what a specific requirement actually needs, not a fixed rule. Section 3's Exercise 5 lets you practice the "Create + Update combined" style directly.
 
 ## Setup
 
@@ -764,6 +850,107 @@ flowchart TD
 
 </details>
 
+## Challenge — Create + Update + Delete combined
+
+`usp_ManageSubcategory` combines Read and Delete. Now try the grouping from the comparison table at the start of this section: **Create, Update, and Delete combined in one procedure, with Read kept separate.**
+
+Create `dbo.usp_ManageCategory` with parameters `@Action nvarchar(10)`, `@IDCategory int OUTPUT`, and `@Name nvarchar(50) = NULL`, supporting:
+
+| `@Action` | Behavior | `RETURN` |
+|---|---|---|
+| `N'INSERT'` | insert a new category with `@Name`; return its ID through `@IDCategory` | `0` |
+| `N'UPDATE'` | update the `Name` of the category identified by `@IDCategory` | `0` on success, `1` if no row matched |
+| `N'DELETE'` | delete the category identified by `@IDCategory`, unless it has subcategories | `0` deleted, `1` not found, `2` has subcategories |
+
+Reuse `usp_GetCategory` and `usp_FindCategoriesByName` from Section 2 for "Read" — this procedure does not need to implement it again.
+
+<details>
+<summary>Hint</summary>
+
+`@IDCategory` plays two roles depending on `@Action`: for `INSERT` it is purely an output (the caller does not know the ID yet); for `UPDATE` and `DELETE` it is also an input, the same idiom used by `usp_SaveState` in Section 3. Combine the `DELETE` branch with the same `IF NOT EXISTS` / `IF EXISTS` pre-check structure already used by `usp_DeleteCity` (Section 3) and `usp_ManageSubcategory` (this section) — no `TRY/CATCH` needed yet; Section 6 introduces that next, using a different category.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_ManageCategory
+    @Action     nvarchar(10),
+    @IDCategory int OUTPUT,
+    @Name       nvarchar(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @Action = N'INSERT'
+    BEGIN
+        INSERT INTO Category (Name)
+        VALUES (@Name);
+
+        SET @IDCategory = SCOPE_IDENTITY();
+        RETURN 0;
+    END
+
+    IF @Action = N'UPDATE'
+    BEGIN
+        UPDATE Category
+        SET Name = @Name
+        WHERE IDCategory = @IDCategory;
+
+        IF @@ROWCOUNT = 0
+            RETURN 1;
+
+        RETURN 0;
+    END
+
+    IF @Action = N'DELETE'
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM Category WHERE IDCategory = @IDCategory)
+            RETURN 1;
+
+        IF EXISTS (SELECT 1 FROM Subcategory WHERE CategoryID = @IDCategory)
+            RETURN 2;
+
+        DELETE FROM Category
+        WHERE IDCategory = @IDCategory;
+
+        RETURN 0;
+    END
+
+    RETURN 99;
+END
+GO
+```
+
+```sql
+DECLARE @IDCategory int, @Result int;
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'INSERT',
+    @IDCategory = @IDCategory OUTPUT,
+    @Name       = N'ZZ_LabTestCategory_Combined';
+
+SELECT @IDCategory AS NewCategoryID, @Result AS InsertResult; -- 0
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'UPDATE',
+    @IDCategory = @IDCategory OUTPUT,
+    @Name       = N'ZZ_LabTestCategory_CombinedRenamed';
+
+SELECT @Result AS UpdateResult; -- 0
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'DELETE',
+    @IDCategory = @IDCategory OUTPUT;
+
+SELECT @Result AS DeleteResult; -- 0, no subcategories, so it is deleted
+```
+
+`@IDCategory` is `OUTPUT` throughout: for `INSERT`, the procedure sets it; for `UPDATE` and `DELETE`, the procedure only reads it, so it simply keeps the value the caller passed in.
+
+</details>
+
 ---
 
 # Section 6 – Error Handling in CRUD Operations
@@ -843,6 +1030,40 @@ Instead of stopping the batch, the procedure now returns `ErrorNumber = 547` and
 > [!IMPORTANT]
 > `TRY/CATCH` does not bypass a foreign key constraint. The `DELETE` is still rejected. The only thing that changes is that your code — rather than the raw SQL Server error — decides what the caller sees.
 
+## Where should `TRY/CATCH` live?
+
+`TRY/CATCH` does not have to live inside the procedure. The caller can wrap the `EXEC` call instead. Using the version of `usp_DeleteCategory` *without* its own `TRY/CATCH` (the one from Section 2):
+
+```sql
+DECLARE @CategoryID int;
+
+SELECT @CategoryID = IDCategory
+FROM Category
+WHERE Name = N'ZZ_LabTestCategory_WithSub';
+
+BEGIN TRY
+    EXEC dbo.usp_DeleteCategory @IDCategory = @CategoryID;
+END TRY
+BEGIN CATCH
+    SELECT
+        ERROR_NUMBER()    AS ErrorNumber,
+        ERROR_MESSAGE()   AS ErrorMessage,
+        ERROR_PROCEDURE() AS FailedIn;
+END CATCH
+```
+
+`ERROR_PROCEDURE()` reports `usp_DeleteCategory` here — it names where the error actually occurred, not where it was caught. This is exactly why it is useful at the caller's site: without it, you would only know that *something* the caller invoked had failed.
+
+Both placements are valid, and the choice has real consequences:
+
+| | `TRY/CATCH` inside the procedure | `TRY/CATCH` at the caller |
+|---|---|---|
+| Consistency | Every caller gets the same handling automatically | Each caller must remember to add it |
+| What the caller sees | Whatever the procedure decides to return (e.g., a `RETURN` code) | The raw SQL Server error, unless the caller translates it |
+| Risk | Easy to forget in one procedure among many | Easy to forget in one call site among many |
+
+The procedures in this lab (Section 6 onward) put `TRY/CATCH` **inside** the procedure, so every caller automatically gets the same, already-translated status code instead of a raw SQL Server error.
+
 ## Four different "nothing happened," side by side
 
 This lab has now produced four distinct situations. They look similar from the outside but mean different things:
@@ -857,6 +1078,11 @@ This lab has now produced four distinct situations. They look similar from the o
 > [!WARNING]
 > Do not reach for `TRY/CATCH` as a general substitute for checking `@@ROWCOUNT` or validating business rules first. Use it for genuine SQL Server errors — constraint violations, conversion failures, and similar cases — not for "this matched no rows," which is normal, error-free behavior.
 
+> [!NOTE]
+> A `REFERENCE` constraint conflict (547) is one example of "SQL Server rejected the statement," but not the only one. Attempting to insert a duplicate `PRIMARY KEY` or `UNIQUE` value raises a different error (2627) — the "C" in CRUD can fail this way too. Every `INSERT` in this lab relies on an `IDENTITY` column, which is exactly what avoids this: the caller never supplies the key, so it cannot collide. A table where the caller supplies its own primary key would need the same kind of `TRY/CATCH` protection shown here, just for a different error number.
+
+As a reminder from [Lab 0](lab00-tsql-essentials.md): `TRY/CATCH` catches errors of severity 11–19, which covers both 547 and 2627. It does not catch severity 1–10 (informational) or 20–25 (fatal) errors.
+
 ## Clean up this section's test data
 
 Delete children before parents:
@@ -870,16 +1096,20 @@ DELETE FROM Category WHERE Name = N'ZZ_LabTestCategory_WithSub';
 
 1. Why does the first `EXEC dbo.usp_DeleteCategory` in this section fail?
 2. After adding `TRY/CATCH`, is the category deleted when the procedure is called again?
-3. Which SQL Server function gives you the text of the error inside `CATCH`?
+3. Which SQL Server function gives you the text of the error inside `CATCH`? Which one tells you where the error happened?
 4. Give one case where `CATCH` runs, and one case where it does not even though zero rows were affected.
+5. What is one advantage of putting `TRY/CATCH` inside the procedure instead of at every caller?
+6. Besides a `REFERENCE` constraint conflict, name another kind of error `TRY/CATCH` can catch in a CRUD procedure.
 
 <details>
 <summary>Show answers</summary>
 
 1. `Subcategory.CategoryID` is a required foreign key referencing this category; SQL Server refuses to delete a row that is still referenced.
 2. No. `TRY/CATCH` only changes how the failure is reported; the constraint still blocks the `DELETE`.
-3. `ERROR_MESSAGE()`.
+3. `ERROR_MESSAGE()` gives the text; `ERROR_PROCEDURE()` gives the name of the procedure where the error occurred.
 4. `CATCH` runs when SQL Server raises an error, such as the 547 constraint violation above. It does not run for an `UPDATE` or `DELETE` that executes successfully but matches zero rows — that case is detected with `@@ROWCOUNT`, not `TRY/CATCH`.
+5. Every caller automatically gets the same, already-translated handling, instead of each caller having to remember to wrap the `EXEC` call itself.
+6. A `PRIMARY KEY` or `UNIQUE` constraint violation (error 2627), for example when an `INSERT` supplies a key value that already exists.
 
 </details>
 
@@ -1216,9 +1446,11 @@ DROP PROCEDURE IF EXISTS dbo.usp_InsertState;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCity;
 DROP PROCEDURE IF EXISTS dbo.usp_GetCitiesByState;
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCity;
+DROP PROCEDURE IF EXISTS dbo.usp_SaveState;
 DROP PROCEDURE IF EXISTS dbo.usp_GetCustomersByCity;
 DROP FUNCTION  IF EXISTS dbo.fn_CustomersByCity;
 DROP PROCEDURE IF EXISTS dbo.usp_ManageSubcategory;
+DROP PROCEDURE IF EXISTS dbo.usp_ManageCategory;
 DROP FUNCTION  IF EXISTS dbo.fn_GetCustomer;
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomer;
 DROP PROCEDURE IF EXISTS dbo.usp_ManageProduct;
@@ -1272,6 +1504,15 @@ Separate procedures
 
 Combined procedure
     -> one entry point, an @Action parameter, shared validation logic
+    -> common groupings: Create+Update, or Create+Update+Delete
+    -> Read stays separate (or becomes a function) in every grouping
+```
+
+```text
+TRY/CATCH
+    -> catches severity 11-19; not 1-10 (informational) or 20-25 (fatal)
+    -> can live inside the procedure (consistent for every caller)
+       or at the caller (ERROR_PROCEDURE() still names where it failed)
 ```
 
 ```text

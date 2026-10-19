@@ -60,6 +60,9 @@ This is the same idea Lab 3 introduced as a **database interface**: the applicat
 | **U**pdate | modify an existing record | `UPDATE` |
 | **D**elete | remove a record | `DELETE` |
 
+> [!NOTE]
+> You may also see the "R" spelled out as **Retrieve** rather than Read — same meaning, both in common use.
+
 You already know all four statements. What this lab adds is **how to package them behind a stable, reusable database interface** — the same idea introduced in Lab 3, now applied systematically to all four operations, for real tables, including the problems that only show up once you start changing data.
 
 ```mermaid
@@ -730,9 +733,9 @@ In practice, you will usually see one of a few recognizable groupings:
 
 | Style | Create | Read | Update | Delete |
 |---|---|---|---|---|
-| Fully separate | own procedure | own procedure (or function, Section 4) | own procedure | own procedure |
-| Create + Update combined | combined into one procedure | own procedure (or function) | *(same procedure as Create)* | own procedure |
-| Create + Update + Delete combined | combined into one procedure | own procedure (or function) | *(same procedure)* | *(same procedure)* |
+| Fully separate (a.k.a. "one procedure per operation") | own procedure | own procedure (or function, Section 4) | own procedure | own procedure |
+| Create + Update combined (a.k.a. "combined write / separate reads") | combined into one procedure | own procedure (or function) | *(same procedure as Create)* | own procedure |
+| Create + Update + Delete combined (a.k.a. "single write procedure") | combined into one procedure | own procedure (or function) | *(same procedure)* | *(same procedure)* |
 
 Notice what stays constant across all three: **Read is always its own procedure, or a function.** Since a function cannot modify data (Section 4), it can only ever stand in for the "R" — never for Create, Update, or Delete, in any of these groupings.
 

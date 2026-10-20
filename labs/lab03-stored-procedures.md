@@ -447,7 +447,7 @@ The caller must first declare a variable:
 DECLARE @MyColor nvarchar(15);
 
 EXEC dbo.usp_GetProductColor
-    @IDProduct = 1,
+    @IDProduct = 742,
     @Color     = @MyColor OUTPUT;
 
 SELECT @MyColor AS ProductColor;
@@ -524,7 +524,8 @@ A common convention is:
 nonzero -> another status
 ```
 
-`RETURN` also immediately ends execution of the procedure.
+> [!NOTE]
+> **`RETURN` also immediately ends execution of the procedure.**
 
 Do not use `RETURN` to return normal application data such as names, dates, or prices. Use a result set or an output parameter for those values.
 

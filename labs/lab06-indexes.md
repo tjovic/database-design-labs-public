@@ -251,9 +251,15 @@ ORDER BY
 GO
 ```
 
-On the reference system, the first execution took several seconds.
+On SQL Server Express, the first execution took around 15–17 seconds on the reference machine.
 
 Exact time depends on hardware and caching.
+
+> [!NOTE]
+> **About the reference numbers in this lab:** every timing and I/O figure here comes from one specific machine — SQL Server 2025 (build 17.0.1135.8), 31 GB RAM, running Developer edition and Express edition as two separate instances on the same computer. Your own numbers will be different, possibly by a lot, depending on your CPU, RAM, storage, and what else is running at the time. What should stay consistent across machines is the *direction* and rough *scale* of the change — scans getting replaced by seeks, and a large drop in rows processed and time taken — not the exact seconds or read counts.
+
+> [!NOTE]
+> SQL Server Express limits parallelism, so this query normally runs on a single CPU core. In the `STATISTICS TIME` output, that means `CPU time` and `elapsed time` stay close to each other — there is no second core to absorb extra work. (On an edition that allows more parallelism, you might instead see `CPU time` reported much higher than `elapsed time`, since several cores can share the work.)
 
 > [!TIP]
 > Do not focus only on elapsed time.
@@ -724,8 +730,11 @@ This demonstrates an important principle:
 | `SalesOrderItem` access | Table Scan | Index Seek |
 | Large item input | ~40,000,000 rows | ~21,908 relevant rows |
 | Main join | Hash Match | Nested Loops |
-| Logical I/O | high | much lower |
-| Elapsed time | several seconds | much lower |
+| Logical reads, `SalesOrderItem`* | ~198,000 | ~54,000 |
+| Logical reads, `SalesOrder`* | ~57,000 | ~15 |
+| Elapsed time* | ~17 s | ~0.5 s |
+
+\* One reference run on SQL Server Express — the edition used in this lab. Your own numbers will differ with hardware, cache state, and data distribution, but expect the *before* numbers to look dramatically worse on Express than on an edition with parallel query execution (such as Developer or Enterprise), since Express runs this query on a single core. The important part is the direction and scale of the change, not the exact figures.
 
 ```mermaid
 flowchart LR
@@ -743,6 +752,28 @@ The key lesson is:
 
 > [!IMPORTANT]
 > The indexes did not make SQL Server faster at processing tens of millions of rows. They helped SQL Server avoid processing most of those rows.
+
+---
+
+## Edition matters too, not just hardware
+
+The numbers above come from SQL Server Express. The same database, same query, and same missing indexes behave very differently on an edition that allows parallel query execution, such as Developer or Enterprise:
+
+| | Express | Developer / Enterprise |
+|---|---:|---:|
+| Execution, before indexes | Serial (one core) | Parallel (several cores) |
+| Elapsed time, before indexes* | ~17 s | ~1.3 s |
+| Elapsed time, after indexes* | ~0.5 s | ~0.17 s |
+| Speedup from adding the indexes | ~33× | ~8× |
+
+\* Same reference measurements as above, run on identical data and the identical query on both editions.
+
+Edition alone accounts for roughly a 13× difference in elapsed time here — before any index existed — with no change to hardware, data, or query. Express is restricted to a lower degree of parallelism (and a smaller memory grant for operations like the hash join), so it cannot compensate for a bad plan by spreading the work across cores the way Developer or Enterprise can.
+
+> [!NOTE]
+> A missing index is not forgiven by weaker hardware or a more limited edition — it is punished more severely. The gap between editions shrinks sharply once the indexes exist, because there is simply much less work left to parallelize or wait for.
+
+This matters beyond the classroom: many production environments run on licensing tiers or cloud SKUs (such as Standard edition or a smaller Azure SQL Database tier) with similar parallelism and memory ceilings to Express. A query that "runs fine" on a developer's workstation can be far more painful for actual users if the indexing problem was never fixed.
 
 ---
 
@@ -795,16 +826,18 @@ Pages may already be cached, and storage I/O can be combined.
 
 1. Why does `Nested Loops` become an efficient strategy only after the new indexes are created?
 2. In the "before and after" comparison, what actually changed about the number of relevant rows retrieved from `SalesOrder` and `SalesOrderItem`?
-3. How can an index with tens of millions of leaf-level entries still have a depth of only a few levels?
-4. Should `Depth = 4` be interpreted as exactly four physical disk reads?
+3. Why is the *before-indexes* elapsed time so much worse on Express than on Developer or Enterprise, given identical data and queries?
+4. How can an index with tens of millions of leaf-level entries still have a depth of only a few levels?
+5. Should `Depth = 4` be interpreted as exactly four physical disk reads?
 
 <details>
 <summary>Show answers</summary>
 
 1. `Nested Loops` works by finding matching inner rows for each outer row. This is efficient only when the inner side (`SalesOrderItem`) has a suitable index to seek into, instead of being scanned in full for every outer row.
 2. The number of relevant rows did not change (~5,477 orders, ~21,908 items) — what changed was how SQL Server reached them: `Index Seek` instead of a large scan, and far less data processed overall.
-3. Each index page contains many key values and pointers, so each internal page can direct SQL Server toward a large part of the tree; a seek follows just one path from root to leaf rather than examining entries sequentially.
-4. No. Pages may already be cached in the buffer pool, and storage I/O can be combined, so depth does not map directly to a physical I/O count.
+3. Express is limited to serial (single-core) execution, so it cannot spread a bad plan's work across several cores the way Developer or Enterprise can. The missing indexes are the real problem either way; weaker editions just make the cost of that problem more visible.
+4. Each index page contains many key values and pointers, so each internal page can direct SQL Server toward a large part of the tree; a seek follows just one path from root to leaf rather than examining entries sequentially.
+5. No. Pages may already be cached in the buffer pool, and storage I/O can be combined, so depth does not map directly to a physical I/O count.
 
 </details>
 

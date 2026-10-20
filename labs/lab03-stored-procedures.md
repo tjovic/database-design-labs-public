@@ -1385,14 +1385,6 @@ SELECT @Color AS ProductColor;
 
 ---
 
-Da. Iz ove datoteke odabrao bih **zadatak 7 — filtriranje kupaca uz vraćanje broja pronađenih redaka**. Dobro povezuje `LIKE`, ulazni parametar, `OUTPUT` i skup rezultata.
-
-U izvornom rješenju filtriranje se izvodi dvaput: jednom za `COUNT(*)`, a drugi put za dohvat kupaca. Ovdje možemo iskoristiti **`@@ROWCOUNT`**, pa studenti ponove i taj dio gradiva.
-
-Stavio bih ga kao **Exercise 5**, a Luhnov algoritam pomaknuo na **Exercise 6**.
-
----
-
 ## Exercise 5 — Find customers and return the number of matches
 
 A stored procedure can return both:

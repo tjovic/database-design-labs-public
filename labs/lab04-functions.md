@@ -2,6 +2,8 @@
 
 **Database:** `AdventureWorksENG`
 
+**Additional example database:** `PayrollLab` (created in Section 3).
+
 Functions package reusable logic and return a result that can be used
 inside another SQL statement. In this lab, you will create functions
 that return either a single value or an entire table, and you will see
@@ -496,6 +498,187 @@ GO
 5. `RETURN @IsLeapYear` ends the function and returns the calculated `bit` value to the caller.
 
 </details>
+
+---
+
+## Example 3 – Simplified net salary calculation
+
+A scalar function can package a business calculation. Here, the input is a **monthly gross salary (gross 1)** and a tax rate; the result is a net salary in euros.
+
+> [!NOTE]
+> This teaching model uses Croatian payroll rules checked on **24 October 2026**. It assumes one employer, membership in both pension pillars, the full basic personal allowance of **EUR 600**, and no additional allowances or special payroll situations. It calculates monthly net salary before any annual tax settlement. The simple function supports gross salaries from **EUR 1,300 to EUR 7,000**, inclusive.
+
+At these salary levels, the model uses:
+
+- pension pillar I: **15%** of gross salary;
+- pension pillar II: **5%** of gross salary;
+- basic personal allowance: **EUR 600**;
+- the lower local income tax rate. For Zagreb, this is **23%**.
+
+The higher rate applies to the part of the monthly **tax base** above EUR 5,000. With only the basic allowance, a gross salary of EUR 7,000 produces a tax base of EUR 5,000. Below EUR 1,300, the calculation needs an additional rule for pension pillar I.
+
+For a gross salary of EUR 2,000 and a tax rate of 23%:
+
+| Step | Calculation | EUR |
+| --- | --- | ---: |
+| Pension pillar I | 2,000 × 15% | 300.00 |
+| Pension pillar II | 2,000 × 5% | 100.00 |
+| Income after pension contributions | 2,000 − 300 − 100 | 1,600.00 |
+| Tax base | 1,600 − 600 | 1,000.00 |
+| Income tax | 1,000 × 23% | 230.00 |
+| Net salary | 2,000 − 300 − 100 − 230 | **1,370.00** |
+
+The personal allowance reduces the tax base; it is not another amount deducted from the final net salary.
+
+### Create a small payroll database
+
+Run the setup below. It creates a separate **PayrollLab** database with fictional employees. Tax jurisdiction represents the employee's relevant residence, not the employer's office location. The reference table stores tax **rates**, while the function calculates the actual tax amount.
+
+Only Zagreb is seeded so that every local rate in this example has a cited source. The child and dependent counts will be used in the advanced exercise; the simple function always uses only the basic allowance.
+
+```sql
+USE master;
+GO
+CREATE DATABASE PayrollLab;
+GO
+USE PayrollLab;
+GO
+
+CREATE TABLE dbo.TaxJurisdiction
+(
+    TaxJurisdictionID int PRIMARY KEY,
+    Name nvarchar(100) NOT NULL,
+    LowerRate decimal(5,2) NOT NULL CHECK (LowerRate BETWEEN 0 AND 100),
+    HigherRate decimal(5,2) NOT NULL CHECK (HigherRate BETWEEN 0 AND 100)
+);
+GO
+
+CREATE TABLE dbo.Employee
+(
+    IDEmployee int PRIMARY KEY,
+    FirstName nvarchar(50) NOT NULL,
+    LastName nvarchar(50) NOT NULL,
+    GrossSalary decimal(10,2) NOT NULL CHECK (GrossSalary BETWEEN 0 AND 10000),
+    TaxJurisdictionID int NOT NULL REFERENCES dbo.TaxJurisdiction(TaxJurisdictionID),
+    ChildCount tinyint NOT NULL DEFAULT 0,
+    OtherDependentCount tinyint NOT NULL DEFAULT 0
+);
+GO
+
+INSERT INTO dbo.TaxJurisdiction (TaxJurisdictionID, Name, LowerRate, HigherRate)
+VALUES (1, N'Zagreb', 23.00, 33.00);
+
+INSERT INTO dbo.Employee
+    (IDEmployee, FirstName, LastName, GrossSalary, TaxJurisdictionID,
+     ChildCount, OtherDependentCount)
+VALUES
+    (1, N'Ana', N'Horvat', 2000.00, 1, 0, 0),
+    (2, N'Marko', N'Novak', 3000.00, 1, 2, 0),
+    (3, N'Iva', N'Kovac', 1300.00, 1, 0, 0),
+    (4, N'Luka', N'Babic', 6000.00, 1, 1, 1),
+    (5, N'Ema', N'Maric', 7000.00, 1, 0, 0);
+GO
+```
+
+### Create the function
+
+Keep `PayrollLab` selected when creating and calling the function.
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_NetSalarySimple
+(
+    @GrossSalary decimal(10,2),
+    @LowerRate decimal(5,2)
+)
+RETURNS decimal(10,2)
+AS
+BEGIN
+    IF @GrossSalary IS NULL OR @LowerRate IS NULL
+        RETURN NULL;
+
+    IF @GrossSalary < 1300 OR @GrossSalary > 7000
+       OR @LowerRate < 0 OR @LowerRate > 100
+        RETURN NULL;
+
+    -- Calculate each pension contribution separately, rounded to cents.
+    DECLARE @PensionI decimal(10,2) = ROUND(@GrossSalary * 0.15, 2);
+    DECLARE @PensionII decimal(10,2) = ROUND(@GrossSalary * 0.05, 2);
+
+    DECLARE @TaxBase decimal(10,2) =
+        @GrossSalary - @PensionI - @PensionII - 600;
+
+    IF @TaxBase < 0
+        SET @TaxBase = 0;
+
+    DECLARE @IncomeTax decimal(10,2) = ROUND(@TaxBase * @LowerRate / 100, 2);
+
+    RETURN @GrossSalary - @PensionI - @PensionII - @IncomeTax;
+END;
+GO
+```
+
+`decimal` stores the monetary values. `ROUND(..., 2)` rounds each pension contribution and tax amount to cents. The validation returns `NULL` for missing inputs, an invalid rate, or a salary outside the simplified model's supported range.
+
+Call the function for one employee's salary:
+
+```sql
+SELECT dbo.fn_NetSalarySimple(2000, 23) AS NetSalary; -- 1370.00
+SELECT dbo.fn_NetSalarySimple(1250, 23) AS OutsideSupportedRange; -- NULL
+```
+
+### Use the function in a query
+
+```sql
+SELECT
+    e.IDEmployee,
+    e.FirstName,
+    e.LastName,
+    e.GrossSalary,
+    t.Name AS TaxJurisdiction,
+    t.LowerRate,
+    dbo.fn_NetSalarySimple(e.GrossSalary, t.LowerRate) AS SimpleNetSalary
+FROM dbo.Employee AS e
+INNER JOIN dbo.TaxJurisdiction AS t
+    ON t.TaxJurisdictionID = e.TaxJurisdictionID
+ORDER BY e.IDEmployee;
+```
+
+The query supplies each employee's salary and the rate from the reference table. The function returns one calculated value for each result row. For employees with children or other dependents, this is a basic-allowance comparison rather than their extended calculation.
+
+> [!TIP]
+> [Exercise 7 in Function Exercises](../exercises/functions.md#exercise-7--extended-net-salary-calculation-advanced) extends this model with personal allowances, reduced pension contribution bases, and two tax brackets. Its main function calls a helper function.
+
+Keep `PayrollLab` for that exercise. Switch back before continuing this lab:
+
+```sql
+USE AdventureWorksENG;
+GO
+```
+
+### Check your understanding – Payroll example
+
+1. Why is net salary a suitable scalar function result?
+2. Why are tax rates stored in a table rather than repeated in every query?
+3. Does the function subtract the personal allowance from net salary?
+4. Why does the call with a gross salary of EUR 1,250 return `NULL`?
+
+<details>
+<summary>Show answers</summary>
+
+1. Each call calculates and returns one monetary value.
+2. Queries can reuse the same reference data and pass the appropriate rate to the calculation.
+3. No. The allowance reduces the tax base. Net salary is gross salary minus pension contributions and income tax.
+4. That input needs the reduced pension-base rule, which is outside the simple function's supported range.
+
+</details>
+
+Payroll rule sources (checked 24 October 2026):
+
+- [Personal allowance — Croatian Tax Administration](https://porezna-uprava.gov.hr/hr/osobni-odbitak/4134)
+- [Income tax and the tax threshold — gov.hr](https://gov.hr/hr/porez-na-dohodak/1466)
+- [Zagreb tax rates, NN 28/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/full/2025_02_28_291.html)
+- [Reduction of the pension contribution base — Croatian Tax Administration](https://porezna-uprava.gov.hr/en/brosura-umanjenje-mjesecne-osnovice/7618)
+- [Contribution bases for 2026, NN 150/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/2025_12_150_2237.html)
 
 ---
 
@@ -1717,6 +1900,21 @@ DROP FUNCTION IF EXISTS dbo.fn_InvoicesBetween_Multi;
 DROP FUNCTION IF EXISTS dbo.fn_ProductCount;
 GO
 ```
+
+The payroll example uses a separate database. If you also completed the advanced payroll exercise, remove its main function before its helper:
+
+```sql
+USE PayrollLab;
+GO
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_NetSalary;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_PersonalAllowance;
+DROP FUNCTION IF EXISTS dbo.fn_NetSalarySimple;
+GO
+USE AdventureWorksENG;
+GO
+```
+
+Keep the fictional payroll tables for additional practice. No database is dropped by this cleanup.
 
 > [!TIP]
 > Keep cleanup targeted to objects created in this lab.

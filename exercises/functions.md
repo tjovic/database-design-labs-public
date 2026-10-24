@@ -499,7 +499,7 @@ Use the following independent cases to check the branches. Rates are 23% and 33%
 | 7000.00 | 0 | 0 | 4450.00 | Tax base exactly EUR 5,000 |
 | 8000.00 | 0 | 0 | 4986.00 | Higher tax bracket |
 
-Also try values immediately below and above EUR 700 and EUR 1,300, missing inputs, and gross salary above EUR 10,000. Check that Part A returns `1620.00` for `(2, 1)` `12660.00` for `(9, 0)`, and `NULL` for `(10, 0)`.
+Also try values immediately below and above EUR 700 and EUR 1,300, missing inputs, and gross salary above EUR 10,000. Check that Part A returns `1620.00` for `(2, 1)`, `12660.00` for `(9, 0)`, and `NULL` for `(10, 0)`.
 
 <details>
 <summary>Hint</summary>
@@ -664,7 +664,7 @@ GO
 
 An OIB is a Croatian personal identification number containing 11 digits. Its last digit checks the preceding ten using **ISO 7064 MOD 11,10**. This is a different checksum algorithm from Luhn.
 
-Create a scalar function named `dbo.fn_Exercises_IsValidOIB` that accepts `@OIB varchar(max)` and returns `bit`:
+Create a scalar function named `dbo.fn_Exercises_IsValidOIB` that accepts `@OIB varchar(50)` and returns `bit`:
 
 - return `1` when the input has exactly 11 ASCII digits and the last digit matches the calculated check digit;
 - return `0` for `NULL`, an incorrect length, any non-digit character, or an incorrect check digit.
@@ -693,7 +693,7 @@ IF @OIB COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
     RETURN 0;
 ```
 
-Use a sufficiently wide parameter to inspect the complete input. With `char(11)`, an overlong input can be truncated before the function checks it.
+Use a sufficiently wide parameter to inspect the complete input. With `char(11)`, an overlong input can be truncated before the function checks it. A generously sized, but still bounded, `varchar(50)` avoids that truncation just as well as `varchar(max)` would, without declaring an unbounded large-object parameter for an identifier that is always 11 characters.
 
 ### Apply the function to multiple inputs
 
@@ -714,7 +714,7 @@ USE AdventureWorksENG;
 GO
 CREATE OR ALTER FUNCTION dbo.fn_Exercises_IsValidOIB
 (
-    @OIB varchar(max)
+    @OIB varchar(50)
 )
 RETURNS bit
 AS

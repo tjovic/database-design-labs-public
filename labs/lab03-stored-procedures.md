@@ -1812,6 +1812,7 @@ DROP PROCEDURE IF EXISTS dbo.usp_GetProductInfo;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityInState;
 DROP PROCEDURE IF EXISTS dbo.usp_TransferMoney;
 DROP PROCEDURE IF EXISTS dbo.usp_GetLoyaltyDiscount;
+DROP PROCEDURE IF EXISTS dbo.usp_ValidateCardNumber;
 GO
 ```
 

@@ -682,6 +682,23 @@ Start with an accumulator of `10`. Process only the first ten digits, from left 
 
 After the tenth digit, the check digit is `0` when the accumulator equals `1`; otherwise it is `11 - accumulator`. Compare this calculated digit with the eleventh input digit.
 
+Consider the OIB `04296383653`:
+
+| Position | Digit | Accumulator + digit | % 10 (0 → 10) | × 2, % 11 |
+|---:|---:|---:|---:|---:|
+| 1 | 0 | 10 | 10 | 9 |
+| 2 | 4 | 13 | 3 | 6 |
+| 3 | 2 | 8 | 8 | 5 |
+| 4 | 9 | 14 | 4 | 8 |
+| 5 | 6 | 14 | 4 | 8 |
+| 6 | 3 | 11 | 1 | 2 |
+| 7 | 8 | 10 | 10 | 9 |
+| 8 | 3 | 12 | 2 | 4 |
+| 9 | 6 | 10 | 10 | 9 |
+| 10 | 5 | 14 | 4 | 8 |
+
+After the tenth digit, the accumulator is `8`. Since it is not `1`, the check digit is `11 - 8 = 3`, which matches the eleventh digit of `04296383653`. The checksum is valid.
+
 ### Input validation
 
 Validate the input before using `CAST` on individual characters. Use `DATALENGTH` to check length, since `LEN` ignores trailing spaces. With `varchar`, 11 ASCII digits occupy 11 bytes.

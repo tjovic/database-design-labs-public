@@ -680,18 +680,13 @@ Start with an accumulator of `10`. Process only the first ten digits, from left 
 3. Multiply by `2`, then take the remainder after division by `11`.
 4. Continue with the next digit using the updated accumulator.
 
-After the tenth digit, calculate `11 - accumulator`. Replace a result of `10` with `0`. Compare this calculated digit with the eleventh input digit.
+After the tenth digit, the check digit is `0` when the accumulator equals `1`; otherwise it is `11 - accumulator`. Compare this calculated digit with the eleventh input digit.
 
 ### Input validation
 
 Validate the input before using `CAST` on individual characters. Use `DATALENGTH` to check length, since `LEN` ignores trailing spaces. With `varchar`, 11 ASCII digits occupy 11 bytes.
 
-A binary collation makes the digit check explicitly match ASCII characters `0`–`9`:
-
-```sql
-IF @OIB COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
-    RETURN 0;
-```
+Use `LIKE '%[^0-9]%'` to reject any non-digit character before it reaches `CAST`.
 
 Use a sufficiently wide parameter to inspect the complete input. With `char(11)`, an overlong input can be truncated before the function checks it. A generously sized, but still bounded, `varchar(50)` avoids that truncation just as well as `varchar(max)` would, without declaring an unbounded large-object parameter for an identifier that is always 11 characters.
 
@@ -719,15 +714,19 @@ CREATE OR ALTER FUNCTION dbo.fn_Exercises_IsValidOIB
 RETURNS bit
 AS
 BEGIN
+    -- Reject obviously invalid input before using CAST on its characters.
     IF @OIB IS NULL
         RETURN 0;
 
     IF DATALENGTH(@OIB) <> 11
         RETURN 0;
 
-    IF @OIB COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
+    IF @OIB LIKE '%[^0-9]%'
         RETURN 0;
 
+    -------------------------------------------------------
+    -- Calculate the ISO 7064 MOD 11,10 checksum
+    -------------------------------------------------------
     DECLARE @Position int = 1;
     DECLARE @Accumulator int = 10;
     DECLARE @Digit int;
@@ -737,6 +736,7 @@ BEGIN
         SET @Digit = CAST(SUBSTRING(@OIB, @Position, 1) AS int);
         SET @Accumulator = (@Accumulator + @Digit) % 10;
 
+        -- A zero remainder is treated as 10, not 0.
         IF @Accumulator = 0
             SET @Accumulator = 10;
 
@@ -744,10 +744,15 @@ BEGIN
         SET @Position = @Position + 1;
     END;
 
-    DECLARE @CheckDigit int = 11 - @Accumulator;
+    -------------------------------------------------------
+    -- Compare the calculated check digit with the input
+    -------------------------------------------------------
+    DECLARE @CheckDigit int;
 
-    IF @CheckDigit = 10
+    IF @Accumulator = 1
         SET @CheckDigit = 0;
+    ELSE
+        SET @CheckDigit = 11 - @Accumulator;
 
     IF @CheckDigit = CAST(SUBSTRING(@OIB, 11, 1) AS int)
         RETURN 1;

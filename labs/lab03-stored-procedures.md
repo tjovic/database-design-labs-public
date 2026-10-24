@@ -1732,6 +1732,9 @@ GO
 > [!NOTE]
 > A sequence containing sixteen zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
 
+> [!TIP]
+> [Lab 4, Section 9](lab04-functions.md#section-9--composing-a-function-with-a-procedure-and-a-trigger) moves this same Luhn calculation into a scalar function, then reuses it from this procedure, from a query over every row of `CreditCard`, and from a trigger that rejects an invalid `CardNumber` on `INSERT`/`UPDATE`.
+
 
 ---
 

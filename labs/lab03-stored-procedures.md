@@ -1742,6 +1742,130 @@ If no customers match, the first result set is empty and `@CustomerCount` is `0`
 > [!NOTE]
 > `SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does **not** prevent `@@ROWCOUNT` from being updated, and it does not hide query results.
 
+---
+
+## Exercise 6 – Validate All Stored Card Numbers
+
+In [Section 7](#section-7--practical-example-validating-a-card-number), you created `dbo.usp_ValidateCardNumber`, which checks one card number.
+
+Your task is to reuse this procedure to check **all existing card numbers** in the demonstration database.
+
+### Your task
+
+1. Declare a table variable named `@Cards` with these columns:
+
+   | Column | Type | Purpose |
+   |---|---|---|
+   | `IDCreditCard` | `int PRIMARY KEY` | Identifies the card |
+   | `CardNumber` | `varchar(100)` | Number to check |
+   | `IsValid` | `bit NULL` | `NULL` = not processed, `0` = rejected, `1` = accepted |
+
+2. Copy `IDCreditCard` and `CardNumber` from `dbo.CreditCard` into `@Cards`. Leave `IsValid` as `NULL`.
+3. Use a `WHILE` loop to process rows whose `IsValid` is still `NULL`.
+4. In each iteration:
+   - select one unprocessed row;
+   - call `dbo.usp_ValidateCardNumber`;
+   - capture its `OUTPUT` value;
+   - update the corresponding row in `@Cards`.
+5. Display `IDCreditCard` and `IsValid` for every processed row.
+6. Display the number of rows for each validation result.
+
+> [!IMPORTANT]
+> Reuse the existing procedure. Do not copy the Luhn calculation into the loop.
+>
+> Store the results only in the table variable. Do not modify `dbo.CreditCard`.
+
+> [!NOTE]
+> A result of `0` means that the number does not meet the rules of our procedure. It may have an incorrect checksum, contain non-digit characters, or fail the example's requirement of exactly 16 digits.
+
+### Hints
+
+- `WHILE EXISTS (...)` can continue while unprocessed rows remain.
+- `SELECT TOP (1) ... ORDER BY IDCreditCard` selects one row at a time.
+- Use `IS NULL` to find unprocessed rows. A result of `0` means **processed and rejected**.
+- The caller must specify `OUTPUT` to receive the validation result.
+- Use `GROUP BY IsValid` and `COUNT(*)` for the summary.
+
+### Questions
+
+1. Why do we initially use `NULL` instead of `0` for `IsValid`?
+2. How many times is the validation procedure called?
+3. What would happen if we forgot to update the processed row?
+4. Does this script change the original `CreditCard` table?
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+DECLARE @Cards TABLE
+(
+    IDCreditCard int PRIMARY KEY,
+    CardNumber   varchar(100),
+    IsValid      bit NULL
+);
+
+INSERT INTO @Cards (IDCreditCard, CardNumber)
+SELECT IDCreditCard, CardNumber
+FROM dbo.CreditCard;
+
+DECLARE @IDCreditCard int;
+DECLARE @CardNumber varchar(100);
+DECLARE @IsValid bit;
+
+WHILE EXISTS
+(
+    SELECT 1
+    FROM @Cards
+    WHERE IsValid IS NULL
+)
+BEGIN
+    -- Select one unprocessed card.
+    SELECT TOP (1)
+        @IDCreditCard = IDCreditCard,
+        @CardNumber = CardNumber
+    FROM @Cards
+    WHERE IsValid IS NULL
+    ORDER BY IDCreditCard;
+
+    -- Reuse the procedure from Section 7.
+    EXEC dbo.usp_ValidateCardNumber
+        @CardNumber = @CardNumber,
+        @IsValid = @IsValid OUTPUT;
+
+    -- Store the result and mark the row as processed.
+    UPDATE @Cards
+    SET IsValid = @IsValid
+    WHERE IDCreditCard = @IDCreditCard;
+END;
+
+-- Individual results.
+SELECT IDCreditCard, IsValid
+FROM @Cards
+ORDER BY IDCreditCard;
+
+-- Summary: 0 = rejected, 1 = accepted.
+SELECT
+    IsValid,
+    COUNT(*) AS CardCount
+FROM @Cards
+GROUP BY IsValid
+ORDER BY IsValid;
+GO
+```
+
+Run the complete script as **one batch**. The table variable and local variables must remain available throughout the loop and the final queries.
+
+### Answers
+
+1. `NULL` represents an unprocessed row. `0` represents a completed check with a rejected result.
+2. Once for each row copied from `CreditCard`.
+3. The row would remain unprocessed, so the loop would repeatedly select it and would not finish.
+4. No. The script reads the original table and updates only `@Cards`.
+
+</details>
+
+> [!TIP]
+> This example calls a procedure once for each card. In [Lab 4, Section 9](lab04-functions.md#section-9--composing-a-function-with-a-procedure-and-a-trigger), we will move the checksum calculation into a scalar function and call it directly from a `SELECT` statement.
 
 ---
 

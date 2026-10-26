@@ -1339,7 +1339,7 @@ GO
 
 # Section 9 – Composing a Function with a Procedure and a Trigger
 
-[Lab 3's Exercise 6](lab03-stored-procedures.md#exercise-6--validate-a-card-number-using-the-luhn-algorithm) built the Luhn checksum entirely inside `dbo.usp_ValidateCardNumber`. Section 1 of this lab claimed that procedures and triggers can use a function's result wherever it is needed. This section makes that claim concrete: the Luhn calculation moves into one scalar function, and a query, a procedure, and a trigger all reuse it.
+[Lab 3, Section 7](lab03-stored-procedures.md#section-7--practical-example-validating-a-card-number) built the Luhn checksum entirely inside `dbo.usp_ValidateCardNumber`. Section 1 of this lab claimed that procedures and triggers can use a function's result wherever it is needed. This section makes that claim concrete: the Luhn calculation moves into one scalar function, and a query, a procedure, and a trigger all reuse it.
 
 ## From procedure to function
 

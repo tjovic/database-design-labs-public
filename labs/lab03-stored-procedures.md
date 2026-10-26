@@ -752,7 +752,7 @@ sequenceDiagram
 This example demonstrates several reasons for using a stored procedure:
 
 - **encapsulation** — the application requests a transfer without implementing every SQL statement;
-- **reusability** — the same procedure works for different accounts and amounts;
+- **reusability** — different applications, such as internet banking and mobile banking apps, can call the same procedure with different accounts and amounts;
 - **validation** — invalid requests can be rejected before data is modified;
 - **fewer network round-trips** — the application sends one procedure call instead of coordinating each SQL statement separately;
 - **one logical database operation** — the related statements are grouped behind one meaningful name.

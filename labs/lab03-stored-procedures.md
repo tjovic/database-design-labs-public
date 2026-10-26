@@ -1861,7 +1861,7 @@ BEGIN
 END;
 
 -- Individual results.
-SELECT CreditCard, IsValid
+SELECT CardNumber, IsValid
 FROM @Cards;
 
 -- Summary: 0 = rejected, 1 = accepted.

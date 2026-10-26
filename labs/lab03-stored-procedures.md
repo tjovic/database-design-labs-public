@@ -1216,13 +1216,13 @@ Apply the following rules:
 
 1. Use `SET NOCOUNT ON`.
 2. Set `@IsValid` to `0` at the beginning.
-3. Reject `NULL`.
-4. Accept **exactly 16 characters**, all of which must be digits from `0` to `9`. Reject spaces, letters, and punctuation.
+3. Reject `NULL` and empty input.
+4. Accept only digits from `0` to `9`. Reject spaces, letters, and punctuation.
 5. Use a `WHILE` loop to implement the Luhn algorithm.
 6. Set `@IsValid` to `1` only if the input meets these rules and its checksum is valid.
 
 > [!NOTE]
-> The 16-digit requirement is a simplification for this example. The Luhn algorithm itself is not restricted to 16-digit numbers.
+> The Luhn algorithm is not restricted to 16-digit numbers. This example accepts different input lengths within the capacity of the parameter. It does not enforce card-brand-specific lengths or prefixes.
 
 Store the input as text because it is an **identifier**, not a numerical quantity. Convert individual digits to `int` only when performing calculations.
 
@@ -1233,7 +1233,7 @@ The implementation uses the following T-SQL features:
 | Feature | Purpose |
 |---|---|
 | `IF` and `RETURN` | Reject invalid input and exit the procedure |
-| `DATALENGTH(@CardNumber)` | Check the input length, including trailing spaces |
+| `DATALENGTH(@CardNumber)` | Detect empty input and determine the starting position |
 | `LIKE '%[^0-9]%'` | Detect a character outside the digit range |
 | `SUBSTRING(@CardNumber, @Position, 1)` | Extract one digit |
 | `CAST(... AS int)` | Convert the extracted digit to an integer |
@@ -1245,6 +1245,7 @@ For the accepted ASCII digits in this `varchar` parameter, each character occupi
 Check the input **before** converting its characters to integers.
 
 ### Creating the procedure
+
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ValidateCardNumber
     @CardNumber varchar(100),
@@ -1261,7 +1262,7 @@ BEGIN
     IF @CardNumber IS NULL
         RETURN;
 
-    IF DATALENGTH(@CardNumber) <> 16
+    IF DATALENGTH(@CardNumber) = 0
         RETURN;
 
     -- Reject input containing non-digit characters.
@@ -1271,7 +1272,7 @@ BEGIN
     -------------------------------------------------------
     -- Calculate the Luhn checksum
     -------------------------------------------------------
-    DECLARE @Position int = 16;
+    DECLARE @Position int = DATALENGTH(@CardNumber);
     DECLARE @Digit int;
     DECLARE @Total int = 0;
     DECLARE @ShouldDouble bit = 0;
@@ -1312,10 +1313,11 @@ GO
 
 ### Understanding the procedure
 
-- `@IsValid` starts at `0`, so every early `RETURN` produces an invalid result.
-- `DATALENGTH` counts trailing spaces, which `LEN` would ignore.
-- `LIKE '%[^0-9]%'` checks for characters outside the digit range.
-- `@Position` starts at `16`, so the loop processes the number from right to left.
+- `@IsValid` starts at `0`, so every early `RETURN` leaves the output value at `0`.
+- Empty input is rejected before the calculation. Otherwise, the initial total of `0` would incorrectly pass the final divisibility check.
+- `LIKE '%[^0-9]%'` rejects input containing characters outside the digit range, including spaces.
+- `@Position` starts at the input length, so the loop processes the number from right to left regardless of its length.
+- `DATALENGTH` includes trailing spaces. Such input is rejected by the non-digit check.
 - `@ShouldDouble` starts at `0`, because the rightmost digit—the check digit—is **not doubled**.
 - After each iteration, `@ShouldDouble` switches between `0` and `1`.
 - `@Total % 10 = 0` checks whether the final sum is divisible by `10`.
@@ -1350,41 +1352,61 @@ SELECT @Result AS IsValid;
 GO
 ```
 
+Now test the shorter demonstration sequence used earlier:
+
+```sql
+DECLARE @Result bit;
+
+EXEC dbo.usp_ValidateCardNumber
+    @CardNumber = '12345674',
+    @IsValid = @Result OUTPUT;
+
+SELECT @Result AS IsValid;
+-- Expected: 1
+GO
+```
+
+This confirms that the calculation does not require exactly 16 digits.
+
 Also verify these cases:
 
 | Input | Expected result | Reason |
 |---|---:|---|
 | `NULL` | 0 | Missing input |
 | `''` | 0 | Empty input |
-| `'4242'` | 0 | Incorrect length |
+| `'4242'` | 0 | Incorrect checksum |
+| `'12345674'` | 1 | Valid checksum |
+| `'12345675'` | 0 | Incorrect checksum |
 | `'424242424242424A'` | 0 | Contains a letter |
 | `'4242 4242 4242 4242'` | 0 | Contains spaces |
 | `'424242424242424 '` | 0 | Contains a trailing space |
-
-> [!WARNING]
-> Use only the supplied test values or invented demonstration sequences. Do not use real payment card data.
 
 ### Check your understanding
 
 1. Why does this procedure use a `varchar` parameter?
 2. Why is the rightmost digit not doubled?
-3. What does `@Total % 10 = 0` check?
-4. Why must the caller also specify `OUTPUT`?
-5. Can a number pass the Luhn check even if no corresponding card exists?
+3. How does the procedure determine where to start processing?
+4. What does `@Total % 10 = 0` check?
+5. Why must the caller also specify `OUTPUT`?
+6. Can a number pass the Luhn check even if no corresponding card exists?
 
 <details>
 <summary>Show answers</summary>
 
 1. The value is an identifier, not a numerical quantity. Text also preserves leading zeros.
 2. It is the check digit. When validating the complete number, doubling starts with the second digit from the right.
-3. It checks whether the calculated total is divisible by 10.
-4. Without `OUTPUT` in the call, the modified value is not copied back to the caller's variable.
-5. Yes. A valid checksum does not prove that a card exists or is usable.
+3. It sets `@Position` to `DATALENGTH(@CardNumber)`. After validation, the input contains only ASCII digits, so this is also the number of digits.
+4. It checks whether the calculated total is divisible by 10.
+5. Without `OUTPUT` in the call, the modified value is not copied back to the caller's variable.
+6. Yes. A valid checksum does not prove that a card exists or is usable.
 
 </details>
 
 > [!NOTE]
-> A sequence containing sixteen zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
+> A nonempty sequence containing only zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
+
+> [!TIP]
+> In [Exercise 6](#exercise-6--validate-all-stored-card-numbers), you will reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
 
 > [!TIP]
 > [Lab 4, Section 9](lab04-functions.md#section-9--composing-a-function-with-a-procedure-and-a-trigger) moves this same Luhn calculation into a scalar function, then reuses it from this procedure, from a query over every row of `CreditCard`, and from a trigger that rejects an invalid `CardNumber` on `INSERT`/`UPDATE`.

@@ -86,7 +86,11 @@ This gives us several practical benefits.
 
 ### Encapsulation
 
-The caller asks the database to perform an operation without having to know every SQL statement used to implement it.
+A stored procedure hides the implementation details of a database operation behind a name and a set of parameters.
+
+For example, an application requests a money transfer by providing the source account, destination account, and amount. It does not need to know which tables to read, how to check the balance, or which `UPDATE` statements to execute. These steps are implemented inside the procedure.
+
+The caller needs to know how to call the procedure and interpret its result. The implementation can change without requiring changes to the caller, as long as the parameters and expected behavior remain compatible.
 
 ```mermaid
 flowchart TD
@@ -103,7 +107,11 @@ flowchart TD
 
 ### Reusability
 
-The same operation can be called repeatedly with different parameter values and from different applications.
+Once a stored procedure is created, the same operation can be reused wherever it is needed.
+
+For example, a money transfer procedure can be called by a mobile banking app, a web application, or an internal banking system. Each caller provides the account numbers and the amount, while the procedure performs the same validation and updates.
+
+This avoids duplicating SQL logic across applications. If the operation needs to change, its implementation can be updated in one place.
 
 ### Fewer network round-trips
 
@@ -146,7 +154,11 @@ This can reduce network round-trips.
 
 ### A database interface
 
-Applications can call a well-defined database operation instead of directly implementing all of its SQL logic.
+Stored procedures can provide a defined interface through which applications work with the database. Each procedure exposes an operation with a name, input parameters, and expected results.
+
+For example, an application can call `dbo.usp_TransferMoney` to request a transfer. The procedure defines what information the application must provide and how the outcome is reported.
+
+Database permissions can also allow an application to execute selected procedures without granting it direct access to the underlying tables. This helps control which operations the application is allowed to perform.
 
 ```mermaid
 flowchart LR
@@ -161,8 +173,6 @@ flowchart LR
 
     A -->|"EXEC procedure"| P
 ```
-
-This can also be useful for controlling how applications interact with data.
 
 > **Key idea:** Think of a stored procedure as a **callable database operation**.
 

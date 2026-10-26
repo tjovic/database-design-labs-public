@@ -1861,17 +1861,15 @@ BEGIN
 END;
 
 -- Individual results.
-SELECT IDCreditCard, IsValid
-FROM @Cards
-ORDER BY IDCreditCard;
+SELECT CreditCard, IsValid
+FROM @Cards;
 
 -- Summary: 0 = rejected, 1 = accepted.
 SELECT
     IsValid,
     COUNT(*) AS CardCount
 FROM @Cards
-GROUP BY IsValid
-ORDER BY IsValid;
+GROUP BY IsValid;
 GO
 ```
 

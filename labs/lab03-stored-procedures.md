@@ -1195,11 +1195,11 @@ Process the complete number, including its check digit:
 
 Consider the demonstration sequence `12345674`:
 
-| Step | Digits from left to right |
-|---|---|
-| Original digits | 1, 2, 3, 4, 5, 6, 7, 4 |
-| Double every second digit from the right | 2, 2, 6, 4, 10, 6, 14, 4 |
-| Subtract 9 from values greater than 9 | 2, 2, 6, 4, 1, 6, 5, 4 |
+| Step / Position from the right | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Original digits | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 4 |
+| Double digits at even positions | 2 | 2 | 6 | 4 | 10 | 6 | 14 | 4 |
+| Subtract 9 from values greater than 9 | 2 | 2 | 6 | 4 | 1 | 6 | 5 | 4 |
 
 The total is:
 

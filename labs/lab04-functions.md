@@ -576,7 +576,9 @@ VALUES
     (2, N'Marko', N'Novak', 3000.00, 1, 2, 0),
     (3, N'Iva', N'Kovac', 1300.00, 1, 0, 0),
     (4, N'Luka', N'Babic', 6000.00, 1, 1, 1),
-    (5, N'Ema', N'Maric', 7000.00, 1, 0, 0);
+    (5, N'Ema', N'Maric', 7000.00, 1, 0, 0),
+    (6, N'Lana', N'Tabak', 8000.00, 1, 3, 3),
+    (7, N'Lovro', N'Pavic', 1050.00, 1, 2, 1);
 GO
 ```
 

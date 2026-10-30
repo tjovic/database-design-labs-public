@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="650" viewBox="0 0 1440 650" role="img" aria-labelledby="title desc">
+  <title id="title">SQL Server database data files and transaction log file</title>
+  <desc id="desc">A simple comparison of SQL Server data files, which store database pages containing tables, indexes and metadata, and the transaction log file, which stores transaction log records used for recovery.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <style>
+      .font { font-family: Inter, 'Segoe UI', Arial, sans-serif; }
+      .label { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+      .filename { font-size: 28px; font-weight: 700; }
+      .subtitle { font-size: 17px; font-weight: 500; }
+      .item { font-size: 19px; font-weight: 650; }
+      .detail { font-size: 16px; font-weight: 500; }
+      .micro { font-size: 14px; font-weight: 500; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="650" fill="#ffffff"/>
+
+  <!-- Data files panel -->
+  <rect x="48" y="42" width="850" height="566" rx="24" fill="#f8faff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="78" y="66" width="190" height="40" rx="20" fill="#e0e7ff"/>
+  <text class="font label" x="173" y="92" text-anchor="middle" fill="#3730a3">DATA FILES</text>
+
+  <!-- Primary data file -->
+  <rect x="82" y="132" width="782" height="196" rx="17" fill="#ffffff" stroke="#818cf8" stroke-width="2" filter="url(#shadow)"/>
+  <path d="M82 149 Q82 132 99 132 H847 Q864 132 864 149 V190 H82 Z" fill="#e0e7ff"/>
+  <g transform="translate(110 149)">
+    <path d="M0 0 H31 L45 14 V38 H0 Z" fill="#c7d2fe" stroke="#4f46e5" stroke-width="1.7"/>
+    <path d="M31 0 V14 H45" fill="none" stroke="#4f46e5" stroke-width="1.7"/>
+  </g>
+  <text class="font filename" x="174" y="178" fill="#312e81">IndexLab.mdf</text>
+  <rect x="684" y="151" width="145" height="27" rx="13.5" fill="#c7d2fe"/>
+  <text class="font micro" x="756.5" y="170" text-anchor="middle" fill="#3730a3">PRIMARY DATA FILE</text>
+
+  <!-- Data pages visual -->
+  <rect x="112" y="213" width="330" height="91" rx="11" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
+  <text class="font item" x="134" y="241" fill="#3730a3">Database pages</text>
+  <g>
+    <rect x="134" y="255" width="85" height="31" rx="5" fill="#c7d2fe"/>
+    <rect x="228" y="255" width="85" height="31" rx="5" fill="#c7d2fe"/>
+    <rect x="322" y="255" width="85" height="31" rx="5" fill="#c7d2fe"/>
+    <g class="font micro" text-anchor="middle" fill="#3730a3">
+      <text x="176.5" y="275">Page</text><text x="270.5" y="275">Page</text><text x="364.5" y="275">Page</text>
+    </g>
+  </g>
+
+  <!-- Stored objects -->
+  <rect x="464" y="213" width="366" height="91" rx="11" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text class="font item" x="488" y="241" fill="#5b21b6">Database objects</text>
+  <text class="font detail" x="488" y="270" fill="#6b21a8">Tables · Indexes · Metadata</text>
+
+  <!-- Secondary data file -->
+  <rect x="82" y="352" width="782" height="214" rx="17" fill="#ffffff" stroke="#a5b4fc" stroke-width="2" filter="url(#shadow)"/>
+  <path d="M82 369 Q82 352 99 352 H847 Q864 352 864 369 V410 H82 Z" fill="#eef2ff"/>
+  <g transform="translate(110 369)">
+    <path d="M0 0 H31 L45 14 V38 H0 Z" fill="#dbeafe" stroke="#4f46e5" stroke-width="1.7"/>
+    <path d="M31 0 V14 H45" fill="none" stroke="#4f46e5" stroke-width="1.7"/>
+  </g>
+  <text class="font filename" x="174" y="398" fill="#312e81">IndexLab_Secondary.ndf</text>
+  <rect x="690" y="371" width="139" height="27" rx="13.5" fill="#dbeafe"/>
+  <text class="font micro" x="759.5" y="390" text-anchor="middle" fill="#1e40af">SECONDARY FILE</text>
+  <text class="font item" x="116" y="455" fill="#3730a3">Additional data file</text>
+  <text class="font detail" x="116" y="485" fill="#475569">Optional · can store database pages as part of the database</text>
+  <rect x="116" y="510" width="710" height="34" rx="8" fill="#eef2ff"/>
+  <text class="font micro" x="471" y="532" text-anchor="middle" fill="#4f46e5">Data files contain the database's pages</text>
+
+  <!-- Log file panel -->
+  <rect x="930" y="42" width="462" height="566" rx="24" fill="#fcfaff" stroke="#d8b4fe" stroke-width="2"/>
+  <rect x="960" y="66" width="174" height="40" rx="20" fill="#f3e8ff"/>
+  <text class="font label" x="1047" y="92" text-anchor="middle" fill="#7e22ce">LOG FILE</text>
+
+  <rect x="964" y="132" width="394" height="434" rx="17" fill="#ffffff" stroke="#c084fc" stroke-width="2" filter="url(#shadow)"/>
+  <path d="M964 149 Q964 132 981 132 H1341 Q1358 132 1358 149 V190 H964 Z" fill="#f3e8ff"/>
+  <g transform="translate(992 149)">
+    <path d="M0 0 H31 L45 14 V38 H0 Z" fill="#e9d5ff" stroke="#9333ea" stroke-width="1.7"/>
+    <path d="M31 0 V14 H45" fill="none" stroke="#9333ea" stroke-width="1.7"/>
+  </g>
+  <text class="font filename" x="1056" y="178" fill="#6b21a8">IndexLab_log.ldf</text>
+
+  <text class="font item" x="1000" y="231" fill="#6b21a8">Transaction log records</text>
+  <text class="font detail" x="1000" y="259" fill="#7e22ce">Record the changes made to the database</text>
+
+  <!-- Sequential log records -->
+  <g>
+    <rect x="1000" y="292" width="322" height="55" rx="9" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+    <rect x="1000" y="361" width="322" height="55" rx="9" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+    <rect x="1000" y="430" width="322" height="55" rx="9" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+    <g class="font" fill="#7e22ce">
+      <text x="1020" y="326" font-size="16" font-weight="700">Log record 1</text>
+      <text x="1020" y="395" font-size="16" font-weight="700">Log record 2</text>
+      <text x="1020" y="464" font-size="16" font-weight="700">Log record 3</text>
+    </g>
+    <g fill="#c084fc">
+      <circle cx="1292" cy="319" r="5"/><circle cx="1292" cy="388" r="5"/><circle cx="1292" cy="457" r="5"/>
+    </g>
+    <path d="M1161 350 V356 M1161 419 V425" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <rect x="1000" y="511" width="322" height="31" rx="15.5" fill="#f3e8ff"/>
+  <text class="font micro" x="1161" y="532" text-anchor="middle" fill="#7e22ce">Used for database recovery</text>
+
+  <!-- Keep files conceptually separate -->
+  <text class="font detail" x="720" y="632" text-anchor="middle" fill="#64748b">Data files and the transaction log file serve different purposes.</text>
+</svg>

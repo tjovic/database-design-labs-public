@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760" role="img" aria-labelledby="desc">
+  <desc id="desc">A diagram classifying SQL Server pages into data pages, index pages, and allocation or metadata pages, with a simplified illustration of the information stored in each type.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#1f2937" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .root { font: 700 27px 'Segoe UI', Arial, sans-serif; fill: #263449; }
+      .heading { font: 700 23px 'Segoe UI', Arial, sans-serif; letter-spacing: .6px; }
+      .body { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .small { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #64748b; }
+      .tiny { font: 600 13px 'Segoe UI', Arial, sans-serif; }
+      .mono { font: 600 15px Consolas, 'Courier New', monospace; }
+      .connector { fill: none; stroke: #94a3b8; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .card { fill: #ffffff; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="760" fill="#ffffff"/>
+
+  <!-- Classification root -->
+  <g filter="url(#shadow)">
+    <rect x="520" y="34" width="400" height="82" rx="16" fill="#eef2ff" stroke="#a5b4fc" stroke-width="2"/>
+  </g>
+  <text x="720" y="84" text-anchor="middle" class="root">SQL Server pages</text>
+
+  <!-- Branch connectors -->
+  <path class="connector" d="M720 116 V159 H240 V205" marker-end="url(#arrow)"/>
+  <path class="connector" d="M720 116 V205" marker-end="url(#arrow)"/>
+  <path class="connector" d="M720 159 H1200 V205" marker-end="url(#arrow)"/>
+
+  <!-- DATA PAGES CARD -->
+  <g filter="url(#shadow)">
+    <rect class="card" x="35" y="220" width="410" height="475" rx="18" stroke="#6bb6a0"/>
+    <path d="M53 220 H427 Q445 220 445 238 V290 H35 V238 Q35 220 53 220Z" fill="#e4f4ee"/>
+  </g>
+  <text x="240" y="264" text-anchor="middle" class="heading" fill="#17634f">DATA PAGES</text>
+
+  <!-- Data page illustration -->
+  <g transform="translate(85 330)">
+    <rect x="0" y="0" width="310" height="207" rx="10" fill="#f8fbfa" stroke="#6bb6a0" stroke-width="2"/>
+    <rect x="0" y="0" width="310" height="38" rx="9" fill="#d5eee4"/>
+    <path d="M0 29 H310" stroke="#6bb6a0" stroke-width="1.5"/>
+    <text x="16" y="25" class="tiny" fill="#17634f">DATA PAGE</text>
+    <g fill="#ffffff" stroke="#b7dacf" stroke-width="1.5">
+      <rect x="15" y="54" width="280" height="36" rx="5"/>
+      <rect x="15" y="99" width="280" height="36" rx="5"/>
+      <rect x="15" y="144" width="280" height="36" rx="5"/>
+    </g>
+    <g class="mono" fill="#17634f">
+      <text x="29" y="77">Row 1</text>
+      <text x="29" y="122">Row 2</text>
+      <text x="29" y="167">Row 3</text>
+    </g>
+    <g fill="#a7d8c5">
+      <rect x="191" y="64" width="88" height="16" rx="3"/>
+      <rect x="191" y="109" width="65" height="16" rx="3"/>
+      <rect x="191" y="154" width="101" height="16" rx="3"/>
+    </g>
+  </g>
+  <text x="240" y="582" text-anchor="middle" class="body">Store table rows</text>
+  <text x="240" y="612" text-anchor="middle" class="small">Heap rows or clustered-index</text>
+  <text x="240" y="635" text-anchor="middle" class="small">leaf-level rows</text>
+
+  <!-- INDEX PAGES CARD -->
+  <g filter="url(#shadow)">
+    <rect class="card" x="515" y="220" width="410" height="475" rx="18" stroke="#7b9bd2"/>
+    <path d="M533 220 H907 Q925 220 925 238 V290 H515 V238 Q515 220 533 220Z" fill="#e9effb"/>
+  </g>
+  <text x="720" y="264" text-anchor="middle" class="heading" fill="#31558e">INDEX PAGES</text>
+
+  <!-- Index page illustration -->
+  <g transform="translate(565 330)">
+    <rect x="0" y="0" width="310" height="207" rx="10" fill="#f8faff" stroke="#7b9bd2" stroke-width="2"/>
+    <rect x="0" y="0" width="310" height="38" rx="9" fill="#dbe6f8"/>
+    <path d="M0 29 H310" stroke="#7b9bd2" stroke-width="1.5"/>
+    <text x="16" y="25" class="tiny" fill="#31558e">INDEX PAGE</text>
+    <g fill="#ffffff" stroke="#c1d0ea" stroke-width="1.5">
+      <rect x="16" y="54" width="278" height="34" rx="5"/>
+      <rect x="16" y="101" width="278" height="34" rx="5"/>
+      <rect x="16" y="148" width="278" height="34" rx="5"/>
+    </g>
+    <g class="mono" fill="#31558e">
+      <text x="29" y="76">Key A</text>
+      <text x="29" y="123">Key B</text>
+      <text x="29" y="170">Key C</text>
+    </g>
+    <g stroke="#6f91c8" stroke-width="2" fill="none" stroke-linecap="round">
+      <path d="M115 71 H151 l10 -8 h48"/>
+      <path d="M115 118 H151 l10 0 h48"/>
+      <path d="M115 165 H151 l10 8 h48"/>
+    </g>
+    <g fill="#8ba8d5">
+      <rect x="225" y="56" width="54" height="28" rx="4"/>
+      <rect x="225" y="104" width="54" height="28" rx="4"/>
+      <rect x="225" y="151" width="54" height="28" rx="4"/>
+    </g>
+    <g class="tiny" fill="#183b70" text-anchor="middle">
+      <text x="252" y="75">Ref.</text>
+      <text x="252" y="123">Ref.</text>
+      <text x="252" y="170">Ref.</text>
+    </g>
+  </g>
+  <text x="720" y="582" text-anchor="middle" class="body">Store index entries</text>
+  <text x="720" y="612" text-anchor="middle" class="small">Keys, references, and</text>
+  <text x="720" y="635" text-anchor="middle" class="small">navigation information</text>
+
+  <!-- ALLOCATION / METADATA CARD -->
+  <g filter="url(#shadow)">
+    <rect class="card" x="995" y="220" width="410" height="475" rx="18" stroke="#d7ad62"/>
+    <path d="M1013 220 H1387 Q1405 220 1405 238 V290 H995 V238 Q995 220 1013 220Z" fill="#fbf1dc"/>
+  </g>
+  <text x="1200" y="252" text-anchor="middle" class="heading" fill="#8a5a12">ALLOCATION /</text>
+  <text x="1200" y="278" text-anchor="middle" class="heading" fill="#8a5a12">METADATA PAGES</text>
+
+  <!-- Allocation map illustration -->
+  <g transform="translate(1045 330)">
+    <rect x="0" y="0" width="310" height="207" rx="10" fill="#fffdf8" stroke="#d7ad62" stroke-width="2"/>
+    <rect x="0" y="0" width="310" height="38" rx="9" fill="#f7e8c7"/>
+    <path d="M0 29 H310" stroke="#d7ad62" stroke-width="1.5"/>
+    <text x="16" y="25" class="tiny" fill="#8a5a12">ALLOCATION MAP</text>
+    <g transform="translate(20 58)" stroke="#d5b778" stroke-width="1.2">
+      <rect x="0" y="0" width="58" height="42" rx="4" fill="#a8d8c5"/>
+      <rect x="68" y="0" width="58" height="42" rx="4" fill="#a8d8c5"/>
+      <rect x="136" y="0" width="58" height="42" rx="4" fill="#f6d995"/>
+      <rect x="204" y="0" width="58" height="42" rx="4" fill="#d6dce5"/>
+      <rect x="0" y="54" width="58" height="42" rx="4" fill="#f6d995"/>
+      <rect x="68" y="54" width="58" height="42" rx="4" fill="#a8d8c5"/>
+      <rect x="136" y="54" width="58" height="42" rx="4" fill="#d6dce5"/>
+      <rect x="204" y="54" width="58" height="42" rx="4" fill="#a8d8c5"/>
+    </g>
+    <g class="tiny" text-anchor="middle" fill="#334155">
+      <text x="49" y="84">P1</text><text x="117" y="84">P2</text><text x="185" y="84">P3</text><text x="253" y="84">P4</text>
+      <text x="49" y="138">P5</text><text x="117" y="138">P6</text><text x="185" y="138">P7</text><text x="253" y="138">P8</text>
+    </g>
+    <g class="tiny" fill="#64748b">
+      <rect x="24" y="170" width="12" height="12" rx="2" fill="#a8d8c5"/><text x="42" y="181">Allocated</text>
+      <rect x="145" y="170" width="12" height="12" rx="2" fill="#f6d995"/><text x="163" y="181">Available / tracked</text>
+    </g>
+  </g>
+  <text x="1200" y="582" text-anchor="middle" class="body">Manage page allocation</text>
+  <text x="1200" y="612" text-anchor="middle" class="small">Track pages and extents</text>
+  <text x="1200" y="635" text-anchor="middle" class="small">within the database</text>
+
+  <!-- Footer relationship -->
+  <path d="M70 722 H1370" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+  <text x="720" y="744" text-anchor="middle" class="small">Different page types serve different storage and management purposes.</text>
+</svg>

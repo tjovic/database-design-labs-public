@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="svgTitle svgDesc">
+  <title id="svgTitle">Logical table and physical storage in SQL Server</title>
+  <desc id="svgDesc">A logical customer table is contrasted with its physical representation as rows stored inside data pages in a SQL Server database data file.</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.09"/>
+    </filter>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .font { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .section { font-size: 22px; font-weight: 750; letter-spacing: 1.2px; }
+      .heading { font-size: 25px; font-weight: 700; fill: #172554; }
+      .subheading { font-size: 19px; font-weight: 650; fill: #334155; }
+      .body { font-size: 18px; fill: #334155; }
+      .small { font-size: 15px; fill: #64748b; }
+      .tiny { font-size: 13px; fill: #64748b; }
+      .arrow { stroke: #64748b; stroke-width: 4; fill: none; marker-end: url(#arrowHead); stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="760" fill="#ffffff"/>
+
+  <!-- Logical view -->
+  <rect x="38" y="38" width="500" height="684" rx="24" fill="#f7f8ff" stroke="#c7d2fe" stroke-width="2.5"/>
+  <rect x="74" y="68" width="270" height="48" rx="24" fill="#e0e7ff"/>
+  <text class="font section" x="209" y="99" text-anchor="middle" fill="#3730a3">LOGICAL VIEW</text>
+
+  <rect x="82" y="166" width="412" height="430" rx="16" fill="#ffffff" stroke="#a5b4fc" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="82" y="166" width="412" height="76" rx="16" fill="#eef2ff"/>
+  <path d="M82 226 V182 Q82 166 98 166 H478 Q494 166 494 182 V226" fill="#eef2ff"/>
+  <text class="font heading" x="288" y="213" text-anchor="middle">dbo.Customer</text>
+
+  <!-- Table header -->
+  <rect x="104" y="264" width="368" height="58" rx="7" fill="#dbeafe"/>
+  <path d="M220 264 V566 M350 264 V566" stroke="#cbd5e1" stroke-width="1.5"/>
+  <g class="font" font-size="16" font-weight="700" fill="#1e40af" text-anchor="middle">
+    <text x="162" y="299">CustomerID</text>
+    <text x="285" y="299">Name</text>
+    <text x="411" y="299">City</text>
+  </g>
+
+  <!-- Table rows -->
+  <g class="font" font-size="18" fill="#334155" text-anchor="middle">
+    <rect x="104" y="322" width="368" height="61" fill="#ffffff"/>
+    <text x="162" y="360">1</text><text x="285" y="360">John</text><text x="411" y="360">Zagreb</text>
+    <rect x="104" y="383" width="368" height="61" fill="#f8fafc"/>
+    <text x="162" y="421">2</text><text x="285" y="421">Mary</text><text x="411" y="421">Split</text>
+    <rect x="104" y="444" width="368" height="61" fill="#ffffff"/>
+    <text x="162" y="482">3</text><text x="285" y="482">Peter</text><text x="411" y="482">Rijeka</text>
+    <rect x="104" y="505" width="368" height="61" fill="#f8fafc"/>
+    <text x="162" y="543">4</text><text x="285" y="543">Ana</text><text x="411" y="543">Osijek</text>
+  </g>
+  <rect x="104" y="264" width="368" height="302" rx="7" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+  <path d="M104 322 H472 M104 383 H472 M104 444 H472 M104 505 H472" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text class="font small" x="288" y="638" text-anchor="middle">A table is represented as rows and columns</text>
+
+  <!-- Relationship / transformation -->
+  <path class="arrow" d="M566 375 H820"/>
+  <rect x="594" y="300" width="198" height="54" rx="27" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text class="font" x="693" y="334" text-anchor="middle" font-size="17" font-weight="650" fill="#475569">stored as</text>
+  <rect x="622" y="407" width="142" height="42" rx="21" fill="#e2e8f0"/>
+  <text class="font" x="693" y="434" text-anchor="middle" font-size="15" font-weight="650" fill="#475569">SQL Server</text>
+
+  <!-- Physical view -->
+  <rect x="862" y="38" width="500" height="684" rx="24" fill="#f4fcf8" stroke="#a7f3d0" stroke-width="2.5"/>
+  <rect x="898" y="68" width="320" height="48" rx="24" fill="#d1fae5"/>
+  <text class="font section" x="1058" y="99" text-anchor="middle" fill="#065f46">PHYSICAL STORAGE</text>
+
+  <!-- Database file card -->
+  <rect x="902" y="164" width="420" height="494" rx="18" fill="#ffffff" stroke="#6ee7b7" stroke-width="2" filter="url(#shadow)"/>
+  <g transform="translate(936 190)">
+    <path d="M0 0 H48 L70 22 V76 H0 Z" fill="#d1fae5" stroke="#0f766e" stroke-width="2"/>
+    <path d="M48 0 V22 H70" fill="none" stroke="#0f766e" stroke-width="2"/>
+    <path d="M13 38 H56 M13 50 H56 M13 62 H46" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text class="font subheading" x="1125" y="221" text-anchor="middle">DATABASE DATA FILE</text>
+  <text class="font small" x="1125" y="250" text-anchor="middle">e.g. IndexLab.mdf</text>
+  <path d="M924 274 H1300" stroke="#d1fae5" stroke-width="2"/>
+  <text class="font small" x="1112" y="306" text-anchor="middle" fill="#047857">Contains data pages</text>
+
+  <!-- Data pages within the file -->
+  <g filter="url(#shadow)">
+    <rect x="932" y="338" width="108" height="240" rx="10" fill="#ecfdf5" stroke="#34a38a" stroke-width="2"/>
+    <rect x="1058" y="338" width="108" height="240" rx="10" fill="#ecfdf5" stroke="#34a38a" stroke-width="2"/>
+    <rect x="1184" y="338" width="108" height="240" rx="10" fill="#ecfdf5" stroke="#34a38a" stroke-width="2"/>
+  </g>
+  <g class="font" text-anchor="middle">
+    <text x="986" y="370" font-size="17" font-weight="700" fill="#065f46">Page</text>
+    <text x="986" y="392" font-size="14" fill="#047857">1</text>
+    <text x="1112" y="370" font-size="17" font-weight="700" fill="#065f46">Page</text>
+    <text x="1112" y="392" font-size="14" fill="#047857">2</text>
+    <text x="1238" y="370" font-size="17" font-weight="700" fill="#065f46">Page</text>
+    <text x="1238" y="392" font-size="14" fill="#047857">3</text>
+  </g>
+
+  <!-- Records in pages -->
+  <g>
+    <rect x="946" y="410" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="946" y="456" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="946" y="502" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+
+    <rect x="1072" y="410" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="1072" y="456" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="1072" y="502" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+
+    <rect x="1198" y="410" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="1198" y="456" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+    <rect x="1198" y="502" width="80" height="38" rx="5" fill="#bbf7d0" stroke="#6ee7b7"/>
+  </g>
+  <g class="font" font-size="14" font-weight="650" fill="#166534" text-anchor="middle">
+    <text x="986" y="434">Row</text><text x="986" y="480">Row</text><text x="986" y="526">Row</text>
+    <text x="1112" y="434">Row</text><text x="1112" y="480">Row</text><text x="1112" y="526">Row</text>
+    <text x="1238" y="434">Row</text><text x="1238" y="480">Row</text><text x="1238" y="526">Row</text>
+  </g>
+  <text class="font" x="1112" y="613" text-anchor="middle" font-size="15" fill="#047857">… many more pages</text>
+  <text class="font small" x="1112" y="688" text-anchor="middle">Rows are stored inside data pages</text>
+</svg>

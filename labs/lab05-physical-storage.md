@@ -45,13 +45,7 @@ FROM dbo.Customer;
 
 This query looks as though SQL Server simply retrieves rows from a table. In reality, those rows are stored inside **pages** in database files.
 
-```mermaid
-flowchart TD
-    A[Logical table] --> B[Database file]
-    B --> C[Extents]
-    C --> D[8 KB pages]
-    D --> E[Rows]
-```
+![Logical data and physical storage](../images/lab05/logical-vs-physical-storage.svg)
 
 > [!IMPORTANT]
 > A **row** is a logical unit of table data. An **8 KB page** is the fundamental unit SQL Server uses to organize that data in database files and the buffer pool.
@@ -124,13 +118,7 @@ We will explore transactions in a later lab.
 
 A simplified layout:
 
-```mermaid
-flowchart LR
-    A[IndexLab database] --> B[IndexLab.mdf]
-    A --> C[IndexLab_log.ldf]
-    B --> D[Tables, indexes, metadata]
-    C --> E[Transaction log records]
-```
+![SQL Server database files](../images/lab05/sql-server-database-files.svg)
 
 ## 3.3 Exploring database storage in SSMS
 
@@ -285,14 +273,7 @@ For large SQL Server data files, **64 KB NTFS allocation units are commonly reco
 
 ## 4.3 Different layers, different units
 
-```mermaid
-flowchart TD
-    A[Storage device: logical sectors] --> B[NTFS: clusters]
-    B --> C[Database file: MDF / NDF]
-    C --> D[SQL Server: extents]
-    D --> E[SQL Server: 8 KB pages]
-    E --> F[Rows]
-```
+![Storage layers](../images/lab05/storage-layers.svg)
 
 | Layer | Example unit |
 |---|---|
@@ -315,18 +296,7 @@ A SQL Server **data file** is organized into **8 KB pages** (8192 bytes). Eight 
 | Page | 8 KB | Stores rows, index entries, or metadata |
 | Extent | 8 pages = 64 KB | Allocates groups of pages |
 
-```mermaid
-flowchart TD
-    F[Database data file] --> E[One extent: 64 KB]
-    E --> P1[Page 1: 8 KB]
-    E --> P2[Page 2: 8 KB]
-    E --> P3[Page 3: 8 KB]
-    E --> P4[Page 4: 8 KB]
-    E --> P5[Page 5: 8 KB]
-    E --> P6[Page 6: 8 KB]
-    E --> P7[Page 7: 8 KB]
-    E --> P8[Page 8: 8 KB]
-```
+![Files, extents, and pages](../images/lab05/sql-server-files-extents-pages.svg)
 
 An **extent** is primarily an allocation concept. A **page** is the important unit for the I/O measurements used later in this lab.
 
@@ -339,19 +309,7 @@ An **extent** is primarily an allocation concept. A **page** is the important un
 
 A regular SQL Server data page contains a **96-byte page header**, row data, free space, and a **slot array**.
 
-```text
-+----------------------------------+
-| Page header (96 bytes)           |
-+----------------------------------+
-| Row data                         |
-| Row data                         |
-| ...                              |
-| Free space                       |
-+----------------------------------+
-| Slot array (2 bytes per row)     |
-+----------------------------------+
-           Total = 8192 bytes
-```
+![SQL Server data page structure](../images/lab05/sql-server-data-page.svg)
 
 - The **page header** contains metadata about the page.
 - The **rows** contain record data, including row-format overhead.
@@ -476,14 +434,7 @@ SQL Server uses different page types for different purposes. In this lab, focus 
 | Index page | Index entries and navigation information |
 | Allocation/metadata page | Information used to manage pages and extents |
 
-```mermaid
-flowchart TD
-    A[SQL Server pages] --> B[Data pages]
-    A --> C[Index pages]
-    A --> D[Allocation and metadata pages]
-    B --> E[Rows]
-    C --> F[Keys and references]
-```
+![SQL Server page types](../images/lab05/sql-server-page-types.svg)
 
 A **heap** is a table without a clustered index. We will study heaps and index structures in Lab 06.
 
@@ -704,12 +655,7 @@ Suppose Query A processes **100 pages**, while Query B processes **100,000 pages
 
 This represents the **amount of page data involved in the comparison**, not a prediction of the exact bytes read from the storage device. Cached pages and repeated logical reads can change the observed I/O.
 
-```mermaid
-flowchart TD
-    A[More data pages to scan] --> B[More logical page accesses]
-    B --> C[More buffer-pool and CPU work]
-    B --> D[Potentially more storage reads]
-```
+![Page count and I/O cost](../images/lab05/page-count-to-io-cost.svg)
 
 **Important:** logical reads count page accesses, not necessarily unique pages. A storage device may service multiple pages in one I/O request, and an already cached page may need no physical storage access at all.
 

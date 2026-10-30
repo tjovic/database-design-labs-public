@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1510" viewBox="0 0 1100 1510" role="img" aria-labelledby="svgTitle svgDesc">
+  <title id="svgTitle">Storage layers from device sectors to SQL Server rows</title>
+  <desc id="svgDesc">Conceptual diagram showing device logical and reported physical sectors, NTFS clusters, a database data file, SQL Server extents and pages, and rows stored inside a page.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .font { font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .group { font-size: 19px; font-weight: 700; letter-spacing: 1.5px; }
+      .heading { font-size: 27px; font-weight: 700; fill: #172554; }
+      .sub { font-size: 19px; fill: #475569; }
+      .small { font-size: 16px; fill: #64748b; }
+      .tiny { font-size: 14px; fill: #64748b; }
+      .arrow { stroke: #64748b; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .device-box { fill: #eef2ff; stroke: #8b9be8; stroke-width: 2; }
+      .ntfs-box { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 2; }
+      .sql-box { fill: #ecfdf5; stroke: #34a38a; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1100" height="1510" fill="#ffffff"/>
+
+  <!-- Operating-system / file-system area -->
+  <rect x="38" y="34" width="1024" height="730" rx="24" fill="#f8faff" stroke="#c7d2fe" stroke-width="2"/>
+  <rect x="66" y="54" width="400" height="42" rx="21" fill="#e0e7ff"/>
+  <text class="font group" x="266" y="82" text-anchor="middle" fill="#3730a3">OPERATING SYSTEM / NTFS</text>
+
+  <!-- Storage device -->
+  <rect x="98" y="120" width="904" height="220" rx="18" class="device-box" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="160" text-anchor="middle">STORAGE DEVICE</text>
+  <text class="font sub" x="550" y="190" text-anchor="middle">512e example</text>
+
+  <rect x="166" y="216" width="768" height="72" rx="10" fill="#ffffff" stroke="#818cf8" stroke-width="2"/>
+  <g class="font" text-anchor="middle" font-size="17" fill="#312e81">
+    <rect x="166" y="216" width="96" height="72" rx="8" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="262" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="358" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="454" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="550" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="646" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="742" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
+    <rect x="838" y="216" width="96" height="72" rx="8" fill="#c7d2fe" stroke="#818cf8"/>
+    <text x="214" y="258">512 B</text><text x="310" y="258">512 B</text>
+    <text x="406" y="258">512 B</text><text x="502" y="258">512 B</text>
+    <text x="598" y="258">512 B</text><text x="694" y="258">512 B</text>
+    <text x="790" y="258">512 B</text><text x="886" y="258">512 B</text>
+  </g>
+  <path d="M166 301 V311 H934 V301" stroke="#4f46e5" stroke-width="2.5" fill="none"/>
+  <text class="font sub" x="550" y="330" text-anchor="middle" fill="#3730a3">8 logical sectors = 1 reported physical sector (4 KB)</text>
+
+  <path class="arrow" d="M550 341 V380"/>
+
+  <!-- NTFS -->
+  <rect x="98" y="390" width="904" height="190" rx="18" class="ntfs-box" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="432" text-anchor="middle">NTFS FILE SYSTEM</text>
+  <text class="font sub" x="550" y="462" text-anchor="middle">Clusters are the file-system allocation units</text>
+  <g>
+    <rect x="228" y="490" width="278" height="60" rx="10" fill="#e2e8f0" stroke="#64748b" stroke-width="2"/>
+    <text class="font" x="367" y="528" text-anchor="middle" font-size="22" font-weight="700" fill="#334155">4 KB</text>
+    <text class="font" x="367" y="573" text-anchor="middle" font-size="17" fill="#334155">Cluster size example</text>
+
+    <rect x="594" y="490" width="278" height="60" rx="10" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+    <text class="font" x="733" y="528" text-anchor="middle" font-size="22" font-weight="700" fill="#334155">64 KB</text>
+    <text class="font" x="733" y="573" text-anchor="middle" font-size="14" fill="#334155">Common recommendation for large data files</text>
+  </g>
+
+  <path class="arrow" d="M550 610 V620"/>
+
+  <!-- Database file -->
+  <rect x="200" y="626" width="700" height="112" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2.5" filter="url(#shadow)"/>
+  <g transform="translate(244 649)">
+    <path d="M0 0 H54 L74 20 V66 H0 Z" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+    <path d="M54 0 V20 H74" fill="none" stroke="#475569" stroke-width="2"/>
+    <path d="M13 34 H60 M13 45 H60 M13 56 H48" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text class="font heading" x="630" y="674" text-anchor="middle">DATABASE DATA FILE</text>
+  <text class="font sub" x="630" y="706" text-anchor="middle">IndexLab.mdf  ·  optional .ndf files</text>
+
+  <!-- Conceptual boundary -->
+  <path d="M38 778 H350 M750 778 H1062" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="10 9"/>
+  <rect x="366" y="754" width="368" height="48" rx="24" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+  <text class="font group" x="550" y="784" text-anchor="middle" fill="#475569">SQL SERVER INTERPRETS THE FILE</text>
+
+  <!-- SQL Server area -->
+  <rect x="38" y="824" width="1024" height="640" rx="24" fill="#f5fcf9" stroke="#a7f3d0" stroke-width="2"/>
+  <rect x="66" y="844" width="250" height="42" rx="21" fill="#d1fae5"/>
+  <text class="font group" x="191" y="872" text-anchor="middle" fill="#065f46">SQL SERVER</text>
+
+  <!-- Extent -->
+  <rect x="98" y="910" width="904" height="195" rx="18" class="sql-box" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="951" text-anchor="middle" fill="#065f46">EXTENT</text>
+  <text class="font sub" x="550" y="980" text-anchor="middle">64 KB allocation unit · 8 data pages</text>
+  <g class="font" text-anchor="middle" font-size="16" fill="#065f46">
+    <rect x="190" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="235" y="1040">Page 1</text>
+    <rect x="283" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="328" y="1040">Page 2</text>
+    <rect x="376" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="421" y="1040">Page 3</text>
+    <rect x="469" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="514" y="1040">Page 4</text>
+    <rect x="562" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="607" y="1040">Page 5</text>
+    <rect x="655" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="700" y="1040">Page 6</text>
+    <rect x="748" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="793" y="1040">Page 7</text>
+    <rect x="841" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="886" y="1040">Page 8</text>
+  </g>
+
+  <path class="arrow" d="M550 1106 V1140"/>
+
+  <!-- Page expanded to rows -->
+  <rect x="200" y="1150" width="700" height="240" rx="18" fill="#ffffff" stroke="#34a38a" stroke-width="2.5" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="1192" text-anchor="middle" fill="#065f46">DATA PAGE · 8 KB</text>
+  <rect x="275" y="1213" width="550" height="36" rx="6" fill="#d1fae5" stroke="#34a38a"/>
+  <text class="font" x="550" y="1237" text-anchor="middle" font-size="17" fill="#065f46">Page header</text>
+  <rect x="275" y="1258" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="1280" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
+  <rect x="275" y="1298" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="1320" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
+  <rect x="275" y="1338" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="1360" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
+  <text class="font tiny" x="550" y="1417" text-anchor="middle">Rows are stored inside data pages</text>
+
+  <!-- Technical caveat -->
+  <rect x="98" y="1478" width="904" height="1" fill="#ffffff"/>
+  <text class="font small" x="550" y="1496" text-anchor="middle">Different layers use different units; this is not a one-to-one physical I/O mapping.</text>
+</svg>

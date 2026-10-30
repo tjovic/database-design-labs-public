@@ -255,6 +255,12 @@ A **512e** device presents 512-byte logical sectors while reporting 4096-byte ph
 > [!NOTE]
 > **What about SSDs?** SSDs do not have rotating platters or magnetic tracks. They still expose logical sectors, but internally organize NAND flash memory differently. A reported 4 KB physical sector is **not necessarily** the internal NAND page size.
 
+The following illustration provides a conceptual overview of how logical table data relates to SQL Server data pages and physical disk storage. The individual storage layers are examined in more detail in the following sections.
+
+![Logical row to physical disk](../images/lab05/logical-row-to-physical-disk.svg)
+
+From a logical table row to SQL Server data pages and physical disk storage. The arrows illustrate conceptual relationships, not a direct one-to-one mapping between rows and disk sectors.
+
 ## 4.2 NTFS clusters
 
 A **cluster** (allocation unit) is the amount of space the NTFS file system allocates as a unit to a file. This is **not** the same concept as a disk sector.

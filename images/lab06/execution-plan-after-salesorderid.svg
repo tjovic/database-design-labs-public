@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="2600" height="1520" viewBox="0 0 2600 1520">
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1520" viewBox="0 0 2500 1520">
   <defs>
     <filter id="shadow" x="-15%" y="-15%" width="130%" height="145%">
       <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#20364f" flood-opacity=".10"/>
@@ -19,7 +19,7 @@
       .note { fill:#405670; font-size:20px; font-weight:550; }
     </style>
   </defs>
-  <rect x="42" y="28" width="2516" height="112" rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <rect x="42" y="28" width="2416" height="112" rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
   <rect x="42" y="28" width="9" height="112" rx="4" fill="#4778a8"/>
   <text x="76" y="73" class="heading">EXECUTION PLAN · AFTER SalesOrderId INDEX (WITHOUT INCLUDE)</text>
   <text x="76" y="111" class="subheading">Actual execution plan · data flows from right to left</text>
@@ -30,8 +30,8 @@
   <path d="M 1263 692 H 1203" class="connector"/>
   <path d="M 1587 922 H 1552 Q 1535 922 1535 905 V 709 Q 1535 692 1523 692" class="connector"/>
   <path d="M 1840 632 H 1725 Q 1708 632 1708 649 V 675 Q 1708 692 1691 692 H 1523" class="connector"/>
-  <path d="M 2110 1047 H 1985 Q 1968 1047 1968 1030 V 939 Q 1968 922 1951 922 H 1847" class="connector"/>
-  <path d="M 2110 1262 H 2020 Q 2003 1262 2003 1245 V 939 Q 2003 922 1986 922 H 1847" class="connector"/>
+  <path d="M 2010 1047 C 1940 1047 1938 884 1847 884" class="connector"/>
+  <path d="M 2010 1262 C 1940 1262 1938 960 1847 960" class="connector"/>
   <rect x="60" y="610" width="215" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.5" filter="url(#shadow)"/>
   <text x="75" y="653" fill="#19304b" class="op">Sort</text>
   <text x="75" y="706" fill="#19304b" class="detail">Revenue DESC</text>
@@ -64,14 +64,14 @@
   <text x="1855" y="593" fill="#19304b" class="op">Clustered Index Seek</text>
   <text x="1855" y="646" fill="#19304b" class="detail">PK_SalesOrderItem</text>
   <text x="1855" y="693" class="metric">21,908 executions</text>
-  <rect x="2110" y="965" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.5" filter="url(#shadow)"/>
-  <text x="2125" y="1008" fill="#19304b" class="op">Index Seek · SalesOrder</text>
-  <text x="2125" y="1061" fill="#19304b" class="detail">IX_SalesOrder_OrderDate</text>
-  <text x="2125" y="1108" class="metric">5,477 rows</text>
-  <rect x="2110" y="1180" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.5" filter="url(#shadow)"/>
-  <text x="2125" y="1223" fill="#19304b" class="op">Index Seek · SalesOrderItem</text>
-  <text x="2125" y="1276" fill="#19304b" class="detail">IX_SalesOrderItem_SalesOrderId</text>
-  <text x="2125" y="1323" class="metric">21,908 rows</text>
-  <rect x="56" y="1442" width="2450" height="58" rx="12" fill="#ffffff" stroke="#dbe4ee" stroke-width="1.5"/>
+  <rect x="2010" y="965" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.5" filter="url(#shadow)"/>
+  <text x="2025" y="1008" fill="#19304b" class="op">Index Seek · SalesOrder</text>
+  <text x="2025" y="1061" fill="#19304b" class="detail">IX_SalesOrder_OrderDate</text>
+  <text x="2025" y="1108" class="metric">5,477 rows</text>
+  <rect x="2010" y="1180" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.5" filter="url(#shadow)"/>
+  <text x="2025" y="1223" fill="#19304b" class="op">Index Seek · SalesOrderItem</text>
+  <text x="2025" y="1276" fill="#19304b" class="detail">IX_SalesOrderItem_SalesOrderId</text>
+  <text x="2025" y="1323" class="metric">21,908 rows</text>
+  <rect x="56" y="1442" width="2390" height="58" rx="12" fill="#ffffff" stroke="#dbe4ee" stroke-width="1.5"/>
   <text x="75" y="1481" class="note">WITHOUT INCLUDE: 21,908 additional clustered index accesses retrieve columns missing from the nonclustered index.</text>
 </svg>

@@ -150,6 +150,46 @@ WHERE MemberID BETWEEN 40 AND 70;
 > [!IMPORTANT]
 > **Nonclustered index ≠ heap-only index.** A nonclustered index can also be created on a table that has a clustered index. In that case its row locator is generally the **clustered key**, not a heap RID. We will use this fact in the performance demo.
 
+## 3.3 Why is an index so efficient?
+
+The previous example showed **how** SQL Server finds `MemberID = 61`. But why is navigating a B+ tree so much better than searching a large heap?
+
+Imagine a table with **1,000,000 rows**. For a simplified calculation, assume that a data page holds 100 rows, a leaf index page holds 100 index entries, and each internal index page can point to 100 child pages.
+
+![Full heap scan versus B+ tree index seek](../images/lab06/bplus-tree-efficiency.svg)
+
+**Without a useful index**, finding one row may require scanning approximately:
+
+```text
+1,000,000 rows / 100 rows per data page = 10,000 data pages
+```
+
+**With a nonclustered index on a heap**, the index can have a three-level structure:
+
+| Level | Approximate pages in that level | What happens during one seek? |
+|---|---:|---|
+| Root | 1 | Read the root page. |
+| Intermediate | 100 | Follow one pointer to the relevant intermediate page. |
+| Leaf | 10,000 | Follow one pointer to the relevant leaf page and find the key. |
+| Heap data | 10,000 | Use the RID to access the page containing the row, if necessary. |
+
+Only **one page at each index level** is needed along the search path, followed by **one heap data page** to retrieve a row not covered by the index. In this illustrative model, that is **about 4 page accesses instead of examining 10,000 data pages**.
+
+> [!IMPORTANT]
+> The power of a B+ tree comes from **fan-out**: each navigation page directs the search toward many possible pages. The engine follows one relevant path rather than reading every page.
+
+> [!NOTE]
+> This is a simplified comparison for finding **one matching row**. The page capacities are assumptions, not fixed SQL Server values. Logical page accesses are not the same as physical disk I/O; many pages may already be in memory. A range query returning many rows may favor a scan, and an index does not guarantee a particular execution plan or speedup.
+
+**Check your understanding:** Why does adding millions of index entries not necessarily add many new levels to a B+ tree?
+
+<details>
+<summary>Show answer</summary>
+
+Because an internal page can point to many child pages. Each extra level greatly increases the number of entries the tree can represent, so tree depth grows slowly compared with the number of indexed rows.
+
+</details>
+
 ---
 
 # 4. Clustered indexes

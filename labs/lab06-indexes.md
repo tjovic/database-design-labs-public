@@ -258,9 +258,6 @@ Enable **Query → Include Actual Execution Plan**, or press `Ctrl + M` before e
 
 The query calculates the number of sold items and revenue per product category for one day, then orders categories by revenue:
 
-GO
-```
-
 Read the SQL statement before you execute it:
 
 1. `WHERE so.OrderDate ...` restricts sales orders to **one day**.

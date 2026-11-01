@@ -9,224 +9,236 @@
 
 By the end of this lab, you should be able to:
 
-- explain how indexes reduce unnecessary page access,
-- explain the basic structure of a B+-tree,
-- distinguish a heap, clustered index, and nonclustered index,
-- explain what happens when a primary key is created,
-- read the most important operators in an Actual Execution Plan,
-- recognize `Table Scan`, `Clustered Index Scan`, `Index Seek`, `Hash Match`, `Nested Loops`, `Compute Scalar`, and `Sort`,
-- design indexes for common filters and joins,
-- explain the purpose of included columns,
-- explain why column order matters in composite indexes,
-- explain selectivity,
-- understand why too many indexes can hurt write performance,
-- inspect index depth, page count, and leaf-level rows in SSMS.
+- explain why an index can reduce unnecessary page reads;
+- identify root, intermediate, and leaf levels in a balanced B+ tree;
+- follow an index search and explain what happens when a key is inserted;
+- distinguish a heap, a nonclustered index on a heap, and a clustered index;
+- explain RID Lookup, Key Lookup, and the relationship between primary keys and indexes;
+- interpret relevant operators in an Actual Execution Plan;
+- compare query performance using `STATISTICS IO` and `STATISTICS TIME`;
+- design useful nonclustered, composite, and covering indexes;
+- explain selectivity, index maintenance, and the cost of additional indexes;
+- inspect the depth and page usage of an index.
+
+> [!NOTE]
+> **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database using the lab's preparation scripts before starting the SQL exercises below. This lab assumes the reference data and table names from those scripts.
 
 ---
 
-# 1. From Lab 05 to Lab 06
+# 1. Why do we need indexes?
 
-In Lab 05 we learned:
+In Lab 05, we saw that SQL Server stores data in **8 KB pages**. The database engine reads pages, not individual rows directly from storage. If a query needs only a few rows from a very large table, reading many unrelated pages is wasted work.
 
-- SQL Server stores data in pages.
-- Queries process pages.
-- More pages processed means more I/O work.
+Imagine a library with thousands of books. If books are not arranged by author, finding a particular title could require inspecting many shelves. Instead, the librarian uses an **alphabetical card catalog**. Each card identifies a book and points to its shelf.
 
-Now we ask:
+![Library catalog organized alphabetically by author](../images/lab06/library-catalog.svg)
 
-> **How can SQL Server avoid processing pages that are irrelevant to a query?**
+A typical search is:
 
-The answer is:
+1. Select the cabinet and drawer for the author's name.
+2. Find the card in alphabetical order.
+3. Read the shelf location.
+4. Go to that shelf and retrieve the book.
 
-> **Indexes.**
+**The catalog is separate from the books.** Its entries are ordered even if the books themselves are not. Another catalog could be organized by title instead of author, without moving any books.
 
-```mermaid
-flowchart LR
-    A[Large table] --> B[Many pages]
-    B --> C[Without useful index]
-    C --> D[Scan many pages]
+This is the central idea of a database index: an additional structure helps locate relevant data without examining the whole table.
 
-    B --> E[With useful index]
-    E --> F[Navigate index]
-    F --> G[Read relevant pages]
-```
-
----
-
-# 2. The B+-tree idea
-
-SQL Server rowstore indexes use a balanced tree structure.
-
-A simplified B+-tree:
-
-```mermaid
-flowchart TD
-    R[Root page] --> I1[Internal page]
-    R --> I2[Internal page]
-    I1 --> L1[Leaf page]
-    I1 --> L2[Leaf page]
-    I2 --> L3[Leaf page]
-    I2 --> L4[Leaf page]
-```
-
-The tree contains:
-
-- root level
-- internal levels
-- leaf level
-
-There is another important detail this picture doesn't show: leaf pages are also linked directly to each other, in both directions:
-
-```mermaid
-flowchart LR
-    L1[Leaf page] --> L2[Leaf page] --> L3[Leaf page] --> L4[Leaf page]
-```
-
-Once SQL Server reaches the first relevant leaf page, it can walk directly to neighboring leaf pages without going back up through the tree. This is what makes range scans and the `Index Scan` operator efficient, and is one reason a query can sometimes return rows in index order without a separate `Sort` operator.
-
-To search for a key, SQL Server follows one path through the tree.
-
-```mermaid
-flowchart TD
-    A[Root] --> B[Relevant internal page]
-    B --> C[Relevant leaf page]
-    C --> D[Matching key range]
-```
-
-The key benefit is that SQL Server does not need to examine every index entry sequentially.
-
-A very large index can still be only a few levels deep.
-
----
-
-# 3. Heap, clustered index, and nonclustered index
-
-## Heap
-
-A table without a clustered index is called a `heap`.
-
-The rows still live on data pages, but there is no clustered index key that defines the leaf-level order.
-
-At the beginning of this lab, the large tables are intentionally left without primary-key indexes so that we can observe the effect of adding them.
-
----
-
-## Clustered index
-
-A clustered index contains the actual table rows at its leaf level.
-
-```mermaid
-flowchart TD
-    A[Clustered index root] --> B[Internal level]
-    B --> C[Leaf pages]
-    C --> D[Actual table rows]
-```
-
-A table can have only one clustered index.
-
----
-
-## Nonclustered index
-
-A nonclustered index is a separate structure.
-
-```mermaid
-flowchart TD
-    A[Nonclustered root] --> B[Internal level]
-    B --> C[Leaf level]
-    C --> D[Index key]
-    C --> E[Row locator]
-    C --> F[Optional included columns]
-```
-
-A table can have multiple nonclustered indexes.
-
-Each one provides a different access path.
-
----
-
-# 4. Primary keys and indexes
-
-A primary key is a logical constraint.
-
-It guarantees that:
-
-- values are unique
-- values are not `NULL`
-
-SQL Server enforces the primary key using a unique index.
-
-If the table has no clustered index and the primary key is not explicitly declared `NONCLUSTERED`, SQL Server creates a clustered primary-key index by default.
-
-We will explicitly create:
-
-```sql
-PRIMARY KEY CLUSTERED
-```
-
-later in the lab so the physical choice is clear.
+| Library | Database analogy |
+|---|---|
+| Book | Data row |
+| Shelf | Data page or location (simplified) |
+| Author's name on the card | Index key |
+| Alphabetical catalog | Index structure |
+| Reference to a shelf | Row locator |
+| Search every shelf | Table/clustered index scan, depending on table structure |
+| Search catalog then find book | Index seek, optionally followed by a lookup |
 
 > [!IMPORTANT]
-> A primary key creates an index, but one index cannot efficiently support every possible access pattern.
+> A useful index can reduce I/O, but it does **not** guarantee that the optimizer will use it. For a query returning most rows, a scan can still be cheaper.
+
+**Think about it:** If a library already has an author catalog, why might it also need a title catalog?
 
 ---
+
+# 2. Trees and the B+ tree
+
+## 2.1 Tree terminology
+
+A tree is a hierarchy of nodes connected by links. Database rowstore indexes use a balanced B+ tree-like organization in which nodes correspond conceptually to **index pages**.
+
+![Tree terminology, levels and depth](../images/lab06/tree-terminology-levels.svg)
+
+- **Root:** the entry point to the tree.
+- **Internal (intermediate) nodes:** contain separator keys and links to child pages.
+- **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
+- **Tree depth:** the number of levels to traverse from root to leaves (counting conventions vary).
+
+An index may consist of a single page; it does not always need three levels. The examples below intentionally use three levels so that navigation is visible.
+
+## 2.2 Why balanced trees?
+
+![Balanced and unbalanced trees](../images/lab06/tree-balanced-vs-unbalanced.svg)
+
+For a B+ tree, **all leaves are at the same depth**. Therefore, finding any key requires traversing approximately the same number of levels. Because each internal page can direct the search to many child pages, even a large index can have relatively few levels.
+
+> [!NOTE]
+> “All leaves are at the same depth” describes the B+ tree property illustrated here, not every possible definition of a balanced tree.
+
+## 2.3 Keys, pointers, and leaf pages
+
+An internal page holds **separator keys** and child pointers. These keys divide the search space into ranges. For example, a separator `43` can direct keys smaller than 43 to the left and keys greater than or equal to 43 to the right.
+
+At the leaf level, entries are logically ordered by key. The leaf pages also have links to adjacent leaf pages. That is useful when a query asks for a **range**, such as all keys between 40 and 70.
+
+The rectangular empty slots in our diagrams show **available capacity**, not literal SQL Server page formatting. Actual SQL Server pages use an 8 KB structure with variable-length records and a slot array. Free space is measured in bytes; a new entry may fit without changing the tree, or a full page may need to split.
+
+> [!TIP]
+> Think of a B+ tree as a *navigation structure*, not as an arithmetic formula students need to implement. We will focus on how SQL Server uses it.
+
+---
+
+# 3. Heap tables and nonclustered indexes
+
+## 3.1 What is a heap?
+
+A **heap** is a SQL Server table without a clustered index. Its rows are stored in data pages but are not logically ordered by a clustered key.
+
+![Heap table data storage](../images/lab06/heap-table-storage.svg)
+
+The diagram illustrates several pages containing rows in no particular order by `MemberID`. A row's location can be described by a **RID (Row Identifier)**: *File ID, Page ID, Slot ID*.
+
+> [!NOTE]
+> A heap is not the same thing as a randomly ordered query result. Without `ORDER BY`, SQL does not guarantee output order for *any* table, including one with a clustered index.
+
+## 3.2 A nonclustered index on a heap
+
+Suppose we create a nonclustered index on `MemberID`. The index has sorted keys and stores a **RID locator** for each corresponding heap row. The heap data pages remain separate from the index.
+
+![B+ tree navigation and row lookups in a nonclustered index on a heap](../images/lab06/bplus-tree-search.svg)
+
+The black pointers lead from parent pages to child pages, the leaf entries carry key/row-location information, and the horizontal links connect neighboring leaf pages. The colored arrows to data pages are conceptual references to the underlying rows.
+
+### Finding `MemberID = 61`
+
+Consider this illustrative query (the `Member` table is used only for the diagram, not as part of `IndexLab`):
+
+```sql
+SELECT *
+FROM dbo.Member
+WHERE MemberID = 61;
+```
+
+Follow the path in the image:
+
+1. **Root:** compare 61 with 43. Since `61 >= 43`, take the right pointer.
+2. **Intermediate level:** compare 61 with 56 and 73. Since `56 <= 61 < 73`, take the middle pointer.
+3. **Leaf level:** locate the entry for key 61.
+4. **Heap row:** use its RID to retrieve the complete row if the query needs columns not present in the index.
+
+If the optimizer chooses this access path, the additional heap access appears in the plan as **RID Lookup**. If the index already contains everything needed, the extra lookup is unnecessary.
+
+For a range query, the engine can locate the first key and continue through the linked leaf pages:
+
+```sql
+-- Illustrative query: not executed against IndexLab
+SELECT *
+FROM dbo.Member
+WHERE MemberID BETWEEN 40 AND 70;
+```
+
+> [!IMPORTANT]
+> **Nonclustered index ≠ heap-only index.** A nonclustered index can also be created on a table that has a clustered index. In that case its row locator is generally the **clustered key**, not a heap RID. We will use this fact in the performance demo.
+
+---
+
+# 4. Clustered indexes
+
+A **clustered index** also has root and intermediate pages, but its **leaf level contains the actual data rows**. The data rows are logically ordered by the clustered key. They are not stored in a second heap that must be reached through an RID.
+
+![Clustered index search: actual table rows at the leaf level](../images/lab06/clustered-index-search.svg)
+
+### Finding `MemberID = 61`
+
+The search still follows the appropriate pointers from the root to a leaf page. But once the leaf entry for 61 is reached, **the full row is already there**.
+
+| Characteristic | Nonclustered index on a heap | Clustered index |
+|---|---|---|
+| Root and internal pages | Navigation keys and page pointers | Navigation keys and page pointers |
+| Leaf level | Index keys + RID row locators (and possibly included columns) | Actual table rows |
+| Additional fetch for missing columns | RID Lookup | No extra lookup when the clustered index itself supplies the row |
+| How many per table? | Multiple nonclustered indexes possible | Only one clustered index |
+
+A table cannot store its entire rowset in two different clustered-key orders at the same time. That is why a SQL Server table has **at most one clustered index**.
+
+> [!WARNING]
+> A clustered index defines a **logical ordering** by key. It does not guarantee adjacent physical positions on disk, and it does not guarantee output ordering without `ORDER BY`.
+
+## 4.1 Nonclustered indexes on clustered tables
+
+In our practical demo, we will create clustered primary keys and then add nonclustered indexes. A nonclustered index on a clustered table generally uses the clustered key as the row locator. If more columns are required, SQL Server may use a **Key Lookup** into the clustered index.
+
+For example, a nonclustered index on `SalesOrder(OrderDate)` can already make its clustered key `SalesOrderId` available. We do not need to explicitly `INCLUDE (SalesOrderId)` when `SalesOrderId` is the clustered key.
 
 ## Check your understanding
 
-1. What is the key benefit of a B+-tree that lets SQL Server avoid examining every index entry sequentially?
-2. Why are leaf pages also linked to each other, not just reachable from the tree above them?
-3. What is the difference between a heap, a clustered index, and a nonclustered index?
-4. How many clustered indexes can one table have? How many nonclustered indexes?
-5. Does creating a primary key automatically give SQL Server an efficient access path for every query against that table?
+1. Where does a B+ tree search start?
+2. Why are leaf pages linked?
+3. What does a heap lack?
+4. What is the difference between RID Lookup and Key Lookup?
+5. Why can a table have only one clustered index?
 
 <details>
 <summary>Show answers</summary>
 
-1. SQL Server follows one path from the root through internal pages to the relevant leaf page, so a very large index can still be only a few levels deep.
-2. So that once the first relevant leaf page is found, SQL Server can walk directly to neighboring leaf pages for a range scan, instead of going back up through the tree for every page.
-3. A heap is a table without a clustered index — rows live on data pages with no defined leaf-level order. A clustered index stores the actual table rows at its leaf level, sorted by the index key. A nonclustered index is a separate structure with its own key, a row locator, and optional included columns.
-4. Only one clustered index, but multiple nonclustered indexes.
-5. No. It enforces uniqueness and gives one efficient access path (by the primary key), but other filters and joins may still need their own indexes.
+1. At the root page, unless the tree has only a single level.
+2. They allow efficient traversal through neighboring key ranges.
+3. A clustered index.
+4. RID Lookup retrieves missing columns from a heap row via its RID; Key Lookup retrieves them from a clustered index using its clustering key.
+5. The table's full rows form one clustered leaf-level organization.
 
 </details>
 
 ---
 
-# 5. Main performance demo – prepare SSMS
+# 5. Primary keys and indexes
 
-Use:
+A **primary key** is a logical constraint: values must be unique and non-NULL. SQL Server enforces it using a **unique index**. By default, if a table has no clustered index and you do not specify `NONCLUSTERED`, a primary key is created using a clustered index.
+
+In this lab we will explicitly choose:
+
+```sql
+PRIMARY KEY CLUSTERED
+```
+
+This makes the physical design decision visible. A primary key is excellent for finding a row by its key, but it does not automatically make all other search patterns efficient.
+
+---
+
+# 6. Prepare the main performance demonstration
+
+The `IndexLab` tables contain approximately 10 million sales orders and 40 million sales-order items in the reference dataset. This is large enough for poor access paths to be noticeable.
+
+In SQL Server Management Studio (SSMS), open a query window:
 
 ```sql
 USE IndexLab;
 GO
-```
-
-Enable:
-
-```text
-Query
-→ Include Actual Execution Plan
-```
-
-or press `Ctrl + M`.
-
-Also enable:
-
-```sql
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
 GO
 ```
 
-Lab 05 introduced the meaning of page reads.
+Enable **Query → Include Actual Execution Plan** (`Ctrl + M`).
 
-Now `STATISTICS IO` will show the amount of logical I/O performed by the query.
+- **Actual Execution Plan:** the operators chosen and observed row counts.
+- **STATISTICS IO:** logical reads and other page-read metrics.
+- **STATISTICS TIME:** CPU time and elapsed execution time.
 
----
+> [!NOTE]
+> Reference timings in the original lab came from a particular machine (SQL Server 2025, build 17.0.1135.8, 31 GB RAM, Developer and Express instances). Your timings will differ. Compare the *access paths, pages read, and overall direction of change* rather than requiring identical seconds.
 
-# 6. Run the query before indexes
-
-Run:
+## 6.1 Baseline query: before adding indexes
 
 ```sql
 SELECT
@@ -251,264 +263,98 @@ ORDER BY
 GO
 ```
 
-On SQL Server Express, the first execution took around 15–17 seconds on the reference machine.
+On the reference Express instance, the original run took roughly 15–17 seconds. Make a note of your own measurements **before** creating any indexes.
 
-Exact time depends on hardware and caching.
-
-> [!NOTE]
-> **About the reference numbers in this lab:** every timing and I/O figure here comes from one specific machine — SQL Server 2025 (build 17.0.1135.8), 31 GB RAM, running Developer edition and Express edition as two separate instances on the same computer. Your own numbers will be different, possibly by a lot, depending on your CPU, RAM, storage, and what else is running at the time. What should stay consistent across machines is the *direction* and rough *scale* of the change — scans getting replaced by seeks, and a large drop in rows processed and time taken — not the exact seconds or read counts.
-
-> [!NOTE]
-> SQL Server Express limits parallelism, so this query normally runs on a single CPU core. In the `STATISTICS TIME` output, that means `CPU time` and `elapsed time` stay close to each other — there is no second core to absorb extra work. (On an edition that allows more parallelism, you might instead see `CPU time` reported much higher than `elapsed time`, since several cores can share the work.)
+| Metric | Before | After |
+|---|---|---|
+| Elapsed time | Record your result | Later |
+| Logical reads, SalesOrder | Record your result | Later |
+| Logical reads, SalesOrderItem | Record your result | Later |
+| Access operator for SalesOrder | Record your result | Later |
+| Access operator for SalesOrderItem | Record your result | Later |
+| Main join | Record your result | Later |
 
 > [!TIP]
-> Do not focus only on elapsed time.
-
-Inspect:
-
-- Execution Plan
-- Messages
-- `STATISTICS IO`
-- `STATISTICS TIME`
+> Do not evaluate performance from elapsed time alone. A warm cache and concurrent load can influence timing; logical reads and access paths are usually more informative for this exercise.
 
 ---
 
-# 7. Reading the execution plan
+# 7. Understand the execution plan before indexing
 
-Execution plans are usually read `right → left`.
+Execution plans generally show data flowing **from right to left**. Start at the access operators that read tables or indexes, then inspect joins and other operations.
 
-Start with the operators that access tables or indexes.
-
-For this lab, focus on:
-
-| Operator | Meaning |
+| Operator | What it does |
 |---|---|
-| `Table Scan` | Read rows from a heap |
-| `Clustered Index Scan` | Scan a clustered index |
-| `Index Scan` | Scan a nonclustered index |
-| `Index Seek` | Navigate directly to a relevant key range |
-| `Key Lookup` | For each row found via a nonclustered index, fetch additional columns from the clustered index (`RID Lookup` is the equivalent on a heap) |
-| `Nested Loops` | For each outer row, find matching inner rows |
-| `Hash Match` | Hash-based join or aggregation |
-| `Compute Scalar` | Calculate an expression |
-| `Sort` | Sort rows |
+| `Table Scan` | Reads rows from a heap |
+| `Clustered Index Scan` | Scans a clustered index |
+| `Index Scan` | Scans a nonclustered index |
+| `Index Seek` | Navigates to a key or key range |
+| `RID Lookup` | Fetches a heap row using its RID |
+| `Key Lookup` | Fetches more columns from the clustered index |
+| `Nested Loops` | Repeatedly matches inner-side rows to each outer row |
+| `Hash Match` | Implements hash join or aggregate operations |
+| `Compute Scalar` | Computes a scalar expression |
+| `Sort` | Orders rows |
 
-```mermaid
-flowchart RL
-    A[Final result] --> B[Sort]
-    B --> C[Aggregate]
-    C --> D[Join]
-    D --> E[Table / index access]
-```
+## 7.1 Why is SalesOrder expensive?
 
-> [!NOTE]
-> The plan is not a list of "good" and "bad" operators.
+The `OrderDate` predicate matches roughly 5,477 rows in the reference sample out of approximately 10 million orders. Without an index starting with `OrderDate`, SQL Server cannot navigate directly to that date range.
 
-The important questions are:
+Inspect **Actual Number of Rows**, **Estimated Number of Rows**, **Number of Rows Read**, and **Predicate** in the access operator properties.
 
-- How many rows were read?
-- How many rows were returned?
-- Which access paths were available?
-- How much I/O was required?
+## 7.2 Why is SalesOrderItem the main bottleneck?
 
----
-
-# 8. Why SalesOrder is expensive
-
-The query filters:
-
-```sql
-WHERE so.OrderDate >= '20250601'
-  AND so.OrderDate <  '20250602'
-```
-
-`SalesOrder` contains approximately `10,000,000 rows`, but only about `5,477 rows` match one day in the reference data.
-
-Without an index on `OrderDate`, SQL Server cannot navigate directly to those rows.
-
-Inspect the operator properties:
-
-- Actual Number of Rows
-- Estimated Number of Rows
-- Number of Rows Read
-- Predicate
-
-The important pattern is:
-
-```mermaid
-flowchart LR
-    A[Many rows/pages read] --> B[Predicate evaluated]
-    B --> C[Only a few thousand rows returned]
-```
-
----
-
-# 9. SalesOrderItem – the main bottleneck
-
-The join is:
+The join uses:
 
 ```sql
 soi.SalesOrderId = so.SalesOrderId
 ```
 
-`SalesOrderItem` contains approximately `40,000,000 rows`, but only about `21,908 rows` are relevant on the reference database.
+The reference dataset contains approximately 40 million order items, but only about 21,908 match the orders from the chosen day. Without an efficient index on `SalesOrderId`, a very large input may have to be scanned and joined.
 
-Without a suitable index on `SalesOrderId`, SQL Server must process a very large input.
+## 7.3 Joins, aggregation, and sorting
 
-```mermaid
-flowchart LR
-    A[40M SalesOrderItem rows] --> B[Large scan]
-    B --> C[Join]
-    C --> D[~21.9K matching rows]
-```
+A `Hash Match (Inner Join)` is a reasonable option for large inputs without efficient lookup paths. It is **not inherently bad**.
 
-This is the main performance problem.
-
----
-
-## Check your understanding
-
-1. What two things should you enable before running the demo query so you can observe its performance?
-2. In which direction are execution plans usually read?
-3. Why does filtering `SalesOrder` by `OrderDate` require processing a large amount of data even though only about 5,477 rows match?
-4. Why is `SalesOrderItem` described as the main bottleneck in this query?
-
-<details>
-<summary>Show answers</summary>
-
-1. The Actual Execution Plan (`Ctrl+M`) and `SET STATISTICS IO ON; SET STATISTICS TIME ON;`.
-2. Right to left, starting with the operators that access tables or indexes.
-3. Without an index on `OrderDate`, SQL Server has no access path to navigate directly to the matching rows, so it must process a large part of the 10 million rows to find them.
-4. It contains about 40 million rows but only about 21,908 are relevant to the join; without a suitable index on `SalesOrderId`, SQL Server must process the entire large input to find the matches.
-
-</details>
-
----
-
-# 10. Why Hash Match?
-
-Without useful indexes, the plan may use `Hash Match (Inner Join)`.
-
-Conceptually:
-
-```mermaid
-flowchart TD
-    A[Matching orders] --> C[Hash Match]
-    B[Large SalesOrderItem input] --> C
-    C --> D[Matching rows]
-```
-
-> [!NOTE]
-> A `Hash Match` is not automatically bad.
-
-With a large unsorted input and no efficient lookup path, it can be a reasonable strategy.
-
-The problem is primarily the size of the data flowing into the join.
-
----
-
-# 11. Why the Product scan is not a problem
-
-The plan may still scan `Product`, which contains only about `30,000 rows`.
-
-A scan of a small object may be extremely cheap.
-
-Therefore:
-
-> [!NOTE]
-> Seek is not always good, and scan is not always bad.
-
-Always consider scale.
-
----
-
-# 12. Compute Scalar, Aggregate, and Sort
-
-`Compute Scalar` corresponds to:
+`Compute Scalar` may calculate:
 
 ```sql
-CAST(soi.Quantity AS decimal(18,2))
-* soi.UnitPrice
+CAST(soi.Quantity AS decimal(18,2)) * soi.UnitPrice
 ```
 
-```mermaid
-flowchart LR
-    A[Quantity] --> C[Compute Scalar]
-    B[UnitPrice] --> C
-    C --> D[Line value]
-```
+`Hash Match (Aggregate)` may implement `GROUP BY p.CategoryId`, and `Sort` may implement `ORDER BY Revenue DESC`.
 
-`Hash Match (Aggregate)` implements:
+The `Product` table contains only about 30,000 rows. A scan of this comparatively small table may be perfectly reasonable. **Seek is not always better than scan**; the optimizer estimates costs, not labels.
 
-```sql
-GROUP BY p.CategoryId
-```
+## 7.4 Missing Index recommendations
 
-and the aggregate expressions.
-
-`Sort` implements:
-
-```sql
-ORDER BY Revenue DESC
-```
-
-These operators are not the main bottleneck in this query because they process a much smaller amount of data than the original large scans.
-
----
-
-# 13. Missing Index recommendation
-
-The plan may suggest something similar to:
-
-```sql
-CREATE NONCLUSTERED INDEX ...
-ON dbo.SalesOrder (OrderDate)
-INCLUDE (SalesOrderId)
-```
-
-Treat this as:
+SSMS may show an index recommendation such as a key on `SalesOrder(OrderDate)`.
 
 > [!WARNING]
-> A useful hint, not an instruction.
-
-SQL Server is considering the current query.
-
-It is not designing the complete indexing strategy for the database.
-
-Consider:
-
-- existing indexes
-- other queries
-- storage
-- write overhead
-- redundant indexes
-
-before accepting any missing-index recommendation.
-
----
+> A missing-index recommendation is a **hint**, not a complete indexing strategy. Check existing indexes, other queries, write overhead, index width, and possible duplication before applying it.
 
 ## Check your understanding
 
-1. Is a `Hash Match` always a bad sign in an execution plan?
-2. Why is scanning the `Product` table not a performance concern in this query?
-3. What does `Compute Scalar` do in this query's execution plan?
-4. Should you automatically create every index that SQL Server's "Missing Index" feature suggests?
+1. Why can a query return only 5,477 rows yet read millions of input rows?
+2. Why does an index on `SalesOrderId` help the order-item join?
+3. Is a `Hash Match` always a performance problem?
+4. Why may a scan of `Product` still be acceptable?
 
 <details>
 <summary>Show answers</summary>
 
-1. No. With a large unsorted input and no efficient lookup path, a `Hash Match` can be a reasonable strategy — the problem is usually the size of the data flowing into the join, not the join type itself.
-2. `Product` only contains about 30,000 rows, so scanning it is very cheap compared to processing the much larger `SalesOrder`/`SalesOrderItem` tables.
-3. It calculates an expression for each row — in this query, `CAST(soi.Quantity AS decimal(18,2)) * soi.UnitPrice`.
-4. No. It is a useful hint based only on the current query; you should consider existing indexes, other queries, storage, write overhead, and redundancy before accepting it.
+1. Without a useful access path the engine must inspect many unrelated rows/pages to evaluate the filter.
+2. It lets the engine find items for each relevant order instead of scanning the entire item table.
+3. No, it may be the cheapest join algorithm for the available inputs.
+4. Because a small scan may cost less than using an index plus additional lookups.
 
 </details>
 
 ---
 
-# 14. Create the clustered primary keys
+# 8. Create useful indexes
 
-Create:
+## 8.1 Create clustered primary keys
 
 ```sql
 ALTER TABLE dbo.SalesOrder
@@ -522,23 +368,11 @@ PRIMARY KEY CLUSTERED (SalesOrderItemId);
 GO
 ```
 
-Refresh the `Indexes` folder in SSMS.
+Refresh the **Indexes** folder in SSMS and confirm `PK_SalesOrder` and `PK_SalesOrderItem` exist.
 
-You should see `PK_SalesOrder` and `PK_SalesOrderItem`.
+These indexes organize the data by their ID columns. However, the baseline query filters orders by **OrderDate** and finds items by **SalesOrderId**. Primary keys alone do not fully address those two access patterns.
 
-```mermaid
-flowchart LR
-    A[PRIMARY KEY] --> B[Unique index]
-    B --> C[Clustered in this lab]
-```
-
-The primary-key indexes provide efficient access by `SalesOrderId` and `SalesOrderItemId`, but our query also needs other access paths.
-
----
-
-# 15. Create an index for the date filter
-
-Create:
+## 8.2 Nonclustered index for the order-date filter
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_OrderDate
@@ -546,30 +380,9 @@ ON dbo.SalesOrder (OrderDate);
 GO
 ```
 
-Why?
+The key `OrderDate` supports the date-range predicate. Because `SalesOrderId` is the clustered key, SQL Server already carries it as the row locator in this nonclustered index; an explicit `INCLUDE (SalesOrderId)` is unnecessary.
 
-Because the query searches by `OrderDate`.
-
-```mermaid
-flowchart LR
-    A[WHERE OrderDate ...] --> B[Index key: OrderDate]
-    B --> C[Index Seek]
-```
-
-Because `SalesOrder` now has a clustered index on `SalesOrderId`, the clustered key is also available as the row locator in the nonclustered index.
-
-That is enough for the join in this query.
-
-> [!IMPORTANT]
-> A table's clustering key is always present at the leaf level of **every** nonclustered index on that table — it is the row locator SQL Server uses to find the full row if it ever needs to. You never need to add it with `INCLUDE`; it is already there for free. This is exactly why `IX_SalesOrder_OrderDate` needs no `INCLUDE (SalesOrderId)` of its own.
-
----
-
-# 16. Create an index for the order-item join
-
-Before creating the index we will actually keep, it is worth seeing why `INCLUDE` matters, instead of taking it on faith.
-
-Create an index on **only** the join column:
+## 8.3 Nonclustered index for the join: first without INCLUDE
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
@@ -577,7 +390,7 @@ ON dbo.SalesOrderItem (SalesOrderId);
 GO
 ```
 
-Run a small, isolated query against just this one table — not the full multi-table demo query:
+Use this isolated query to inspect the lookup:
 
 ```sql
 SELECT ProductId, Quantity, UnitPrice
@@ -586,15 +399,12 @@ WHERE SalesOrderId = 1;
 GO
 ```
 
-Look at the plan. You should see `Index Seek` on `IX_SalesOrderItem_SalesOrderId`, followed by a `Key Lookup` — one extra operation per matching row, needed only because `ProductId`, `Quantity`, and `UnitPrice` are not part of this index.
+The optimizer may choose an **Index Seek** plus **Key Lookup**. The seek finds order-item rows using `SalesOrderId`, but the nonclustered index does not have `ProductId`, `Quantity`, and `UnitPrice`. SQL Server can fetch those values from the clustered index.
 
-```mermaid
-flowchart LR
-    A[Index Seek on SalesOrderId] --> B[Key Lookup]
-    B --> C["Fetch ProductId, Quantity, UnitPrice<br/>from the clustered index"]
-```
+> [!NOTE]
+> An execution plan is cost-based. If SQL Server chooses a different plan on your instance, inspect row counts and costs rather than assuming the diagram is wrong.
 
-Now rebuild the index with the columns this query — and the main demo query — actually need:
+## 8.4 Add the columns needed by the query
 
 ```sql
 DROP INDEX IX_SalesOrderItem_SalesOrderId ON dbo.SalesOrderItem;
@@ -611,555 +421,238 @@ INCLUDE
 GO
 ```
 
-Run the isolated query again. The `Key Lookup` is gone.
+Run the isolated query again. It should now be covered by the nonclustered index and normally no longer need a Key Lookup.
 
-Why is `SalesOrderId` the key?
+- **Key column** `SalesOrderId`: supports the search/join.
+- **Included columns** `ProductId`, `Quantity`, `UnitPrice`: provide additional data at leaf level, without becoming part of the index search key.
 
-Because the query joins by:
+A **covering index** supplies all columns required from a table for a particular query. Included columns can also support filters evaluated as residual predicates, `GROUP BY`, and aggregate expressions; they are not limited to the `SELECT` list.
+
+---
+
+# 9. Run the baseline query again
+
+Re-run **exactly the SQL statement from Section 6.1**. The SQL text is unchanged; only the available access paths have changed.
+
+Now compare the actual plans, logical reads, and elapsed time.
+
+The optimizer may choose a pattern involving an `Index Seek` on the date index, a join such as `Nested Loops`, and seeks into the indexed order items. Exact operators can vary with statistics, cardinalities, and cost estimates.
+
+A simplified view of nested loops is:
+
+```text
+for each matching order:
+    find matching order items using the SalesOrderId index
+```
+
+> [!IMPORTANT]
+> An index can change the strategy of the **entire execution plan**, not just replace one access operator.
+
+## Reference comparison
+
+These are approximate results from the original lab on one SQL Server Express instance, not guaranteed targets:
+
+| Metric | Before | After |
+|---|---:|---:|
+| SalesOrder access | Table Scan | Index Seek |
+| Relevant orders | ~5,477 | ~5,477 |
+| SalesOrderItem access | Table Scan | Index Seek |
+| Large item input | ~40 million rows | ~21,908 relevant rows |
+| Main join | Hash Match | Nested Loops |
+| SalesOrderItem logical reads | ~198,000 | ~54,000 |
+| SalesOrder logical reads | ~57,000 | ~15 |
+| Elapsed time | ~17 s | ~0.5 s |
+
+The point is not that SQL Server suddenly processes 40 million rows faster. **It avoids processing most of them.**
+
+## Check your understanding
+
+1. Why did clustered primary keys alone not solve the original query's main problem?
+2. Why is `OrderDate` the key of one index and `SalesOrderId` the key of the other?
+3. Which missing columns can cause a Key Lookup on the order-item index?
+4. Did the query itself change before and after adding the indexes?
+
+<details>
+<summary>Show answers</summary>
+
+1. The query filters by `OrderDate` and joins on `SalesOrderId`, not only by the primary-key values.
+2. They correspond to the filter and the join access pattern.
+3. `ProductId`, `Quantity`, and `UnitPrice` when they are not available in that index.
+4. No; indexes changed the available access paths.
+
+</details>
+
+---
+
+# 10. Inspect the physical index structure
+
+Now connect the execution plan back to Lab 05. Every level of a disk-based rowstore B+ tree consists of **8 KB pages**. More pages and a deeper tree can mean more page access, although cache behavior and the chosen plan also matter.
+
+You can inspect index metadata and physical characteristics. For example:
 
 ```sql
-soi.SalesOrderId = so.SalesOrderId
+SELECT
+    i.name AS IndexName,
+    ips.index_type_desc AS IndexType,
+    ips.index_level AS IndexLevel,
+    ips.page_count AS PageCount,
+    ips.record_count AS RecordCount,
+    ips.avg_page_space_used_in_percent AS PageUsedPercent
+FROM sys.dm_db_index_physical_stats
+(
+    DB_ID(),
+    OBJECT_ID('dbo.SalesOrder'),
+    NULL, NULL, 'DETAILED'
+) AS ips
+JOIN sys.indexes AS i
+    ON i.object_id = ips.object_id
+   AND i.index_id = ips.index_id
+ORDER BY i.name, ips.index_level DESC;
+GO
 ```
 
-Why include:
-
-- `ProductId`
-- `Quantity`
-- `UnitPrice`
-
-Because they are needed by the rest of the query — and, as just demonstrated, leaving any of them out brings the `Key Lookup` back.
-
-```mermaid
-flowchart TD
-    A[Index key: SalesOrderId] --> B[Find matching order items]
-    B --> C[Included: ProductId]
-    B --> D[Included: Quantity]
-    B --> E[Included: UnitPrice]
-```
-
-This index covers everything this query needs from `SalesOrderItem`.
-
----
-
-# 17. Run the same query again
-
-Run exactly the same SQL statement.
-
-The SQL did not change.
-
-Only the available physical access paths changed.
-
-Compare:
-
-- elapsed time
-- logical reads
-- execution plan
-
----
-
-# 18. New plan – Index Seek and Nested Loops
-
-The new plan should contain operators such as `Index Seek → Nested Loops → Index Seek`.
-
-Conceptually:
-
-```mermaid
-flowchart LR
-    A[IX_SalesOrder_OrderDate] -->|Seek| B[~5,477 orders]
-    B --> C[Nested Loops]
-    D[IX_SalesOrderItem_SalesOrderId] -->|Seek| C
-    C --> E[~21,908 order items]
-```
-
-Instead of processing huge inputs, SQL Server can navigate directly to relevant rows.
-
----
-
-## Check your understanding
-
-1. Why doesn't creating the clustered primary keys alone fully solve the performance problem?
-2. Why is `OrderDate` chosen as the key for the new index on `SalesOrder`, and why is `SalesOrderId` included?
-3. Why is `SalesOrderId` the key for the new index on `SalesOrderItem`, and why are `ProductId`, `Quantity`, and `UnitPrice` included?
-4. What operator appeared when `IX_SalesOrderItem_SalesOrderId` existed without its `INCLUDE` columns, and what made it disappear?
-5. After creating the new indexes, did the SQL query itself change?
-
-<details>
-<summary>Show answers</summary>
-
-1. The primary-key indexes provide efficient access by `SalesOrderId`/`SalesOrderItemId`, but the query filters by `OrderDate` and joins by `SalesOrderId` — different access patterns that the primary keys alone do not support.
-2. `OrderDate` is the key because the query filters by it; `SalesOrderId` is included because the join needs it afterward.
-3. `SalesOrderId` is the key because the join searches by it; `ProductId`, `Quantity`, and `UnitPrice` are included because the rest of the query needs them, letting the index cover everything required from `SalesOrderItem`.
-4. A `Key Lookup`, because the index without `INCLUDE` could find matching rows but not supply `ProductId`, `Quantity`, or `UnitPrice` from its own leaf level. Adding those columns to `INCLUDE` removed it.
-5. No. The SQL did not change — only the available physical access paths changed.
-
-</details>
-
----
-
-# 19. Why Nested Loops now makes sense
-
-A simplified mental model is:
-
-```text
-for each matching order
-    find its matching order items using the index
-```
-
-```mermaid
-flowchart TD
-    A[One matching order] --> B[Seek SalesOrderItem by SalesOrderId]
-    B --> C[Matching items]
-    C --> D[Next order]
-```
-
-This becomes efficient only because the inner side has a suitable index.
-
-This demonstrates an important principle:
-
-> [!IMPORTANT]
-> An index can change the strategy of the entire execution plan, not only one access operator.
-
----
-
-# 20. Before and after
-
-| | Before indexes | After indexes |
-|---|---:|---:|
-| `SalesOrder` access | Table Scan | Index Seek |
-| Relevant orders | ~5,477 | ~5,477 |
-| `SalesOrderItem` access | Table Scan | Index Seek |
-| Large item input | ~40,000,000 rows | ~21,908 relevant rows |
-| Main join | Hash Match | Nested Loops |
-| Logical reads, `SalesOrderItem`* | ~198,000 | ~54,000 |
-| Logical reads, `SalesOrder`* | ~57,000 | ~15 |
-| Elapsed time* | ~17 s | ~0.5 s |
-
-\* One reference run on SQL Server Express — the edition used in this lab. Your own numbers will differ with hardware, cache state, and data distribution, but expect the *before* numbers to look dramatically worse on Express than on an edition with parallel query execution (such as Developer or Enterprise), since Express runs this query on a single core. The important part is the direction and scale of the change, not the exact figures.
-
-```mermaid
-flowchart LR
-    A[Before] --> B[Scan many pages]
-    B --> C[Hash Match]
-    C --> D[Result]
-
-    E[After] --> F[Index Seek]
-    F --> G[Nested Loops]
-    G --> H[Index Seek]
-    H --> I[Result]
-```
-
-The key lesson is:
-
-> [!IMPORTANT]
-> The indexes did not make SQL Server faster at processing tens of millions of rows. They helped SQL Server avoid processing most of those rows.
-
----
-
-## Edition matters too, not just hardware
-
-The numbers above come from SQL Server Express. The same database, same query, and same missing indexes behave very differently on an edition that allows parallel query execution, such as Developer or Enterprise:
-
-| | Express | Developer / Enterprise |
-|---|---:|---:|
-| Execution, before indexes | Serial (one core) | Parallel (several cores) |
-| Elapsed time, before indexes* | ~17 s | ~1.3 s |
-| Elapsed time, after indexes* | ~0.5 s | ~0.17 s |
-| Speedup from adding the indexes | ~33× | ~8× |
-
-\* Same reference measurements as above, run on identical data and the identical query on both editions.
-
-Edition alone accounts for roughly a 13× difference in elapsed time here — before any index existed — with no change to hardware, data, or query. Express is restricted to a lower degree of parallelism (and a smaller memory grant for operations like the hash join), so it cannot compensate for a bad plan by spreading the work across cores the way Developer or Enterprise can.
+`index_level = 0` represents the leaf level, and larger values represent higher levels. The highest level is the root for that index/allocation-unit context. For very large indexes, `'DETAILED'` can be expensive; use it in this training database, not automatically on busy production systems.
 
 > [!NOTE]
-> A missing index is not forgiven by weaker hardware or a more limited edition — it is punished more severely. The gap between editions shrinks sharply once the indexes exist, because there is simply much less work left to parallelize or wait for.
+> `sys.dm_db_index_physical_stats` can return multiple rows for partitions or allocation units. Interpret its output in that context. For a quick summary, SQL Server also offers `sys.dm_db_index_physical_stats` with `'SAMPLED'` or `'LIMITED'`, but not every metric is available in every mode.
 
-This matters beyond the classroom: many production environments run on licensing tiers or cloud SKUs (such as Standard edition or a smaller Azure SQL Database tier) with similar parallelism and memory ceilings to Express. A query that "runs fine" on a developer's workstation can be far more painful for actual users if the indexing problem was never fixed.
-
----
-
-# 21. Inspect a real index in SSMS
-
-Inspect `IX_SalesOrderItem_SalesOrderId`.
-
-In SSMS:
-
-```text
-Databases
-→ IndexLab
-→ Tables
-→ dbo.SalesOrderItem
-→ Indexes
-→ IX_SalesOrderItem_SalesOrderId
-→ Properties
-→ Fragmentation
-```
-
-Inspect:
-
-- Index type
-- Depth
-- Pages
-- Leaf-level rows
-- Average row size
-- Page fullness
-- Fragmentation
-
-A large index can contain tens of millions of leaf-level entries while remaining only a few levels deep.
-
-```mermaid
-flowchart TD
-    R[Level 3 - Root] --> I1[Level 2 - Internal]
-    I1 --> I2[Level 1 - Internal]
-    I2 --> L[Level 0 - Leaf pages]
-    L --> E[Millions of leaf entries]
-```
-
-This is the physical reason an index can provide a short navigation path through a very large data set.
-
-Do not interpret `Depth = 4` as exactly four physical disk I/O operations.
-
-Pages may already be cached, and storage I/O can be combined.
+Observe how the page counts differ between the clustered primary-key index and the narrower nonclustered `OrderDate` index.
 
 ---
 
-## Check your understanding
+# 11. Index design principles
 
-1. Why does `Nested Loops` become an efficient strategy only after the new indexes are created?
-2. In the "before and after" comparison, what actually changed about the number of relevant rows retrieved from `SalesOrder` and `SalesOrderItem`?
-3. Why is the *before-indexes* elapsed time so much worse on Express than on Developer or Enterprise, given identical data and queries?
-4. How can an index with tens of millions of leaf-level entries still have a depth of only a few levels?
-5. Should `Depth = 4` be interpreted as exactly four physical disk reads?
+## 11.1 Composite indexes and column order
 
-<details>
-<summary>Show answers</summary>
-
-1. `Nested Loops` works by finding matching inner rows for each outer row. This is efficient only when the inner side (`SalesOrderItem`) has a suitable index to seek into, instead of being scanned in full for every outer row.
-2. The number of relevant rows did not change (~5,477 orders, ~21,908 items) — what changed was how SQL Server reached them: `Index Seek` instead of a large scan, and far less data processed overall.
-3. Express is limited to serial (single-core) execution, so it cannot spread a bad plan's work across several cores the way Developer or Enterprise can. The missing indexes are the real problem either way; weaker editions just make the cost of that problem more visible.
-4. Each index page contains many key values and pointers, so each internal page can direct SQL Server toward a large part of the tree; a seek follows just one path from root to leaf rather than examining entries sequentially.
-5. No. Pages may already be cached in the buffer pool, and storage I/O can be combined, so depth does not map directly to a physical I/O count.
-
-</details>
-
----
-
-# 22. Composite indexes
-
-Create:
+Create an index that supports searches starting with `CustomerId` and optionally narrowing by date:
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_CustomerId_OrderDate
-ON dbo.SalesOrder
-(
-    CustomerId,
-    OrderDate
-);
+ON dbo.SalesOrder (CustomerId, OrderDate);
 GO
 ```
 
-The index is ordered first by `CustomerId` and then by `OrderDate`.
-
-```mermaid
-flowchart TD
-    A[CustomerId] --> B[Within one customer]
-    B --> C[OrderDate]
-```
-
-Test:
+Compare these queries (enable Actual Execution Plan):
 
 ```sql
-SELECT
-    SalesOrderId,
-    CustomerId,
-    OrderDate
+-- Leading key only
+SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE CustomerId = 500;
 GO
-```
 
-Then:
-
-```sql
-SELECT
-    SalesOrderId,
-    CustomerId,
-    OrderDate
+-- Leading key followed by a range on the second key
+SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE CustomerId = 500
   AND OrderDate >= '20250101';
 GO
-```
 
-Then:
-
-```sql
-SELECT
-    SalesOrderId,
-    CustomerId,
-    OrderDate
+-- Second key without the first
+SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE OrderDate >= '20250101';
 GO
 ```
 
-The first two access patterns align naturally with the leading key.
-
-The third does not specify `CustomerId`.
+The first two patterns align with the leading key. The third does not provide `CustomerId`, so it generally cannot efficiently seek directly on `OrderDate` using this index alone. A scan may still use it for coverage.
 
 > [!IMPORTANT]
-> Column order in a composite index matters.
+> **Key column order matters.** Reordering predicates in the `WHERE` clause does not change an index's key order.
 
-The written order of predicates in the `WHERE` clause does not define index key order.
+## 11.2 Selectivity
 
----
-
-# 23. Selectivity
-
-Inspect the distribution:
+Inspect the values of `Status`:
 
 ```sql
-SELECT
-    Status,
-    COUNT(*) AS NumberOfOrders
+SELECT Status, COUNT(*) AS NumberOfOrders
 FROM dbo.SalesOrder
 GROUP BY Status
 ORDER BY NumberOfOrders DESC;
 GO
-```
 
-Create:
-
-```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_Status
-ON dbo.SalesOrder(Status);
+ON dbo.SalesOrder (Status);
 GO
 ```
 
-Compare:
+Compare the plans:
 
 ```sql
-SELECT
-    SalesOrderId,
-    Status
+SELECT SalesOrderId, Status
 FROM dbo.SalesOrder
 WHERE Status = 'Completed';
 GO
-```
 
-with:
-
-```sql
-SELECT
-    SalesOrderId,
-    Status
+SELECT SalesOrderId, Status
 FROM dbo.SalesOrder
 WHERE Status = 'Review';
 GO
 ```
 
-```mermaid
-flowchart TD
-    A[Predicate value] --> B{How much of the table matches?}
-    B -->|Large percentage| C[Index may be less attractive]
-    B -->|Small percentage| D[Index may be more attractive]
-```
+**Selectivity** describes how narrowly a predicate reduces the rows to be processed. A rare status may be a good index candidate even if the `Status` column has only a few distinct values. The optimizer considers the distribution of values and cost of alternative plans.
 
-This is **selectivity**.
+## 11.3 Included columns and index width
 
-> [!NOTE]
-> A column with only a few distinct values is not automatically a bad index candidate.
+Our index on `SalesOrderItem(SalesOrderId) INCLUDE (ProductId, Quantity, UnitPrice)` is a covering index for the order-item portion of the main query. An included column supplies data but does not extend the ordered search key.
 
-Distribution matters.
+Avoid making every index wide “just in case”: wider indexes consume storage, take more maintenance work, and may require more page reads.
 
 ---
 
-# 24. Covering indexes and INCLUDE
+# 12. Inserts, page splits, and maintenance
 
-Our order-item index is:
+Indexes use physical pages with finite capacity. If an insertion belongs in a page with enough free space, SQL Server can add the entry there. If the page cannot accommodate it, a **page split** may be required, moving entries between pages and updating parent pointers as necessary.
 
-```sql
-CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
-ON dbo.SalesOrderItem (SalesOrderId)
-INCLUDE
-(
-    ProductId,
-    Quantity,
-    UnitPrice
-);
-```
+The following illustrations simplify page capacity intentionally so that the operations are visible:
 
-The key determines the search order: `SalesOrderId`.
+![Step-by-step insertion into a simplified B+ tree](../images/lab06/bplus-tree-insert-steps.svg)
 
-The included columns provide additional values at the leaf level.
+![Final B+ tree after the insertions](../images/lab06/bplus-tree-after-insert.svg)
 
-```mermaid
-flowchart LR
-    A[Seek by SalesOrderId] --> B[Leaf entry]
-    B --> C[ProductId]
-    B --> D[Quantity]
-    B --> E[UnitPrice]
-```
+The next example shows insertion in the clustered-index case, where leaf pages hold the data rows themselves:
 
-A **covering index** contains everything a particular query needs from that table.
+![Insertion into a clustered index](../images/lab06/clustered-index-insert.svg)
 
-This can avoid an additional lookup to the clustered index.
+> [!WARNING]
+> These diagrams model a very small maximum number of entries per node. Real SQL Server pages are 8 KB and can hold variable numbers of records, depending on row size and available space. The drawings are **conceptual**, not physical page byte layouts.
 
-But wider indexes:
+Every additional index may also require work during `INSERT`, `UPDATE`, or `DELETE`. That creates a trade-off:
 
-- consume more storage
-- require more maintenance
+- Faster and more targeted reads for some access patterns.
+- Additional storage for index pages.
+- Extra writes and maintenance when indexed data changes.
+- Possible page splits and fragmentation.
 
-So do not try to cover every query.
-
-"Everything a query needs" is broader than just the `SELECT` list:
-
-- An included column can also be filtered on. If a query added `AND ProductId = 500` to its `WHERE` clause, SQL Server could check that condition directly at the leaf level, as a **residual predicate** — no lookup needed, because `ProductId` is already sitting right there.
-- Coverage applies to `GROUP BY` and aggregate expressions just as much as to `SELECT` and `WHERE`. A query that groups by `ProductId` needs `ProductId` to be in the key or `INCLUDE`, exactly like a query that merely returns it.
-
-> [!NOTE]
-> A column counts as "covered" the moment it is part of the index — as a key column or an included column — regardless of which clause of the query actually uses it.
+Do not index every column automatically. Choose indexes that support important, frequent queries.
 
 ---
 
-## Check your understanding
+# 13. Practical checklist
 
-1. In a composite index on `(CustomerId, OrderDate)`, which queries can use the index efficiently via a seek on the leading column?
-2. Does the order of predicates written in a `WHERE` clause determine index key order?
-3. What is selectivity, and why isn't a column with few distinct values automatically a bad index candidate?
-4. What does it mean for an index to "cover" a query, and what is the trade-off of making an index wider to cover more?
-5. Can an included column be used for anything besides appearing in the `SELECT` list?
+When deciding whether to add an index, ask:
 
-<details>
-<summary>Show answers</summary>
-
-1. Queries that filter on `CustomerId` alone, or on `CustomerId` and `OrderDate` together — because the index is sorted first by `CustomerId`. A query filtering only by `OrderDate` cannot use the leading key efficiently.
-2. No. The index's own column definition order determines its key order, regardless of how predicates are written in the query.
-3. Selectivity measures how much of the table matches a given predicate value. A column with few distinct values can still be a good index candidate if the distribution is skewed — a rare value can be highly selective even when the column overall has few distinct values.
-4. A covering index contains everything a particular query needs from that table, avoiding an extra lookup to the clustered index. The trade-off is that wider indexes consume more storage and require more maintenance.
-5. Yes. SQL Server can evaluate an additional `WHERE` condition on an included column directly at the leaf level (a residual predicate), and an included column can support a `GROUP BY` or aggregate just as well as a `SELECT` column — coverage isn't limited to columns that are merely returned.
-
-</details>
-
----
-
-# 25. Why not index every column?
-
-Every index is a real physical structure made of pages.
-
-More indexes mean:
-
-- more storage
-- more pages
-- more maintenance
-
-When a row is inserted, updated, or deleted, SQL Server may need to update several index structures.
-
-```mermaid
-flowchart TD
-    A[INSERT / UPDATE / DELETE] --> B[Clustered index]
-    A --> C[Nonclustered index 1]
-    A --> D[Nonclustered index 2]
-    A --> E[Nonclustered index 3]
-```
-
-This creates a trade-off:
-
-```text
-more indexes
-→ potentially faster reads
-→ potentially slower writes
-→ more storage
-```
-
-Good index design is therefore not:
-
-> create as many indexes as possible
-
-but:
+1. Which columns appear in selective `WHERE` predicates or joins?
+2. Does the index have an appropriate **leading key**?
+3. Which columns need to be returned, grouped, or aggregated?
+4. Could included columns avoid a costly lookup?
+5. Is a scan actually cheaper because many rows are needed?
+6. Is there already a similar index?
+7. What is the storage and write-maintenance cost?
+8. What do the **actual execution plan** and **STATISTICS IO** show?
 
 > [!TIP]
-> create indexes that support important access patterns.
-
----
-
-# 26. Small tables and scans
-
-Return to `Product`.
-
-It contains only about `30,000 rows`.
-
-The optimizer may still choose a scan.
-
-That can be correct.
-
-```mermaid
-flowchart TD
-    A[Small table] --> B[Only a small number of pages]
-    B --> C[Scan may be cheap]
-```
-
-Do not use:
-
-- Seek = always good
-- Scan = always bad
-
-Use:
-
-> [!NOTE]
-> The best access method depends on how much data must be processed.
-
----
-
-# 27. Practical index design checklist
-
-When considering an index, ask:
-
-1. How is the table filtered?
-2. How is it joined?
-3. Which columns must the query return?
-4. How selective is the predicate?
-5. Does a similar index already exist?
-6. How often is the table modified?
-7. How much additional storage will the index require?
-
-Examples:
-
-| Pattern | Key candidate |
-|---|---|
-| `WHERE OrderDate ...` | `OrderDate` |
-| `JOIN ... ON SalesOrderId` | `SalesOrderId` |
-| `WHERE CustomerId ... AND OrderDate ...` | `(CustomerId, OrderDate)` |
-
-Indexes should reflect real access patterns.
-
----
-
-## Check your understanding
-
-1. What is the cost side of adding more indexes to a table?
-2. Why might the optimizer still choose a scan on `Product` even though useful indexes exist elsewhere in the database?
-3. Name three questions from the practical index design checklist you should ask before creating an index.
-
-<details>
-<summary>Show answers</summary>
-
-1. More indexes mean more storage, more pages, and more write-maintenance — every `INSERT`/`UPDATE`/`DELETE` may need to update several index structures, trading faster reads for slower writes.
-2. `Product` only has about 30,000 rows and therefore occupies a small number of pages, so a scan can already be cheap enough that an index-based plan isn't needed.
-3. Any three of: how the table is filtered, how it is joined, which columns the query must return, how selective the predicate is, whether a similar index already exists, how often the table is modified, how much storage the index would require.
-
-</details>
+> Do not optimize by operator name alone. Optimize the actual workload, focusing on work avoided and the total cost of access paths.
 
 ---
 
 # Exercises
 
-Try each exercise before opening the solution.
-
----
+Try each exercise **before opening the solution**. Keep Actual Execution Plan enabled.
 
 ## Exercise 1 – Index for a filtered, sorted query
 
-Run this query with the actual execution plan enabled, before creating any new index:
+Run this query before creating a new index:
 
 ```sql
 SELECT
@@ -1172,7 +665,7 @@ WHERE Status = 'Processing'
 ORDER BY OrderDate DESC;
 ```
 
-Design and create a nonclustered index that lets this query avoid a full scan. Explain your choice of key column(s), key order, and any included columns. Re-run the query and confirm the plan improved.
+Design and create a nonclustered index that supports the filter and sort. Explain the key column order and any included columns. Re-run the query to verify your result.
 
 <details>
 <summary>Show solution</summary>
@@ -1184,7 +677,7 @@ INCLUDE (CustomerId, TotalAmount);
 GO
 ```
 
-`Status` is the leading key because the query filters on it. `OrderDate DESC` is part of the key, not just included, because the query also needs the matching rows in that order — storing it in the key can let SQL Server avoid a separate `Sort`. `CustomerId` and `TotalAmount` are included because the query returns them but does not filter or sort by them.
+`Status` is the leading key because of the equality filter. `OrderDate DESC` follows it to support the requested order. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
 
 </details>
 
@@ -1192,7 +685,7 @@ GO
 
 ## Exercise 2 – Composite index column order
 
-The lab created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)`. For each query below, decide whether it can use that index via a seek on the full key, a seek on just the leading column, or not efficiently at all — then verify with an actual execution plan.
+The lab created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)`. For each query below, predict whether the index supports a seek on both key columns, a seek on the leading column, or no efficient seek on the search condition. Verify your prediction in the plan.
 
 ```sql
 -- A
@@ -1211,9 +704,11 @@ WHERE CustomerId = 500
 <details>
 <summary>Show solution</summary>
 
-- **A** – Not efficiently. `OrderDate` is not the leading key column, so the index cannot be seeked on it alone.
-- **B** – Seek on the leading column (`CustomerId`). Because `OrderDate` is the second key column, the matching rows for that customer are already stored in `OrderDate` order, so the `ORDER BY` may be satisfied without an extra `Sort`.
-- **C** – Seek on the full key (`CustomerId` and `OrderDate` together) — the most selective use of the index of the three, and typically the cheapest.
+- **A:** no efficient seek on `OrderDate` alone using this index because the first key (`CustomerId`) is missing; the index can still be scanned.
+- **B:** seek on `CustomerId`; rows for that customer are then in `OrderDate` order, potentially avoiding `Sort`.
+- **C:** seek using the equality on `CustomerId` and the range on `OrderDate`.
+
+An actual plan may vary due to the cost of `SELECT *` and possible lookups.
 
 </details>
 
@@ -1221,21 +716,20 @@ WHERE CustomerId = 500
 
 ## Exercise 3 – Covering index design
 
-Write a query that returns `ProductId`, `Quantity`, and `UnitPrice` from `SalesOrderItem` for one specific `SalesOrderId`. Confirm with an actual execution plan that it does not need a `Key Lookup` back to the clustered index.
+Write and analyze a query that returns `ProductId`, `Quantity`, and `UnitPrice` for one `SalesOrderId`:
 
 ```sql
-SELECT
-    ProductId,
-    Quantity,
-    UnitPrice
+SELECT ProductId, Quantity, UnitPrice
 FROM dbo.SalesOrderItem
 WHERE SalesOrderId = 12345;
 ```
 
+Confirm whether it needs a Key Lookup.
+
 <details>
 <summary>Show solution</summary>
 
-`IX_SalesOrderItem_SalesOrderId`, created earlier in the lab with `INCLUDE (ProductId, Quantity, UnitPrice)`, already covers this query — the key supports the `WHERE` clause, and every returned column is either the key or an included column. If any of those three columns were missing from the index, the plan would show a `Key Lookup` to fetch them from the clustered index.
+The existing `IX_SalesOrderItem_SalesOrderId` index with `INCLUDE (ProductId, Quantity, UnitPrice)` covers the query. The engine should generally be able to use it without an extra Key Lookup.
 
 </details>
 
@@ -1243,29 +737,25 @@ WHERE SalesOrderId = 12345;
 
 ## Exercise 4 – Evaluate a Missing Index suggestion
 
-Run this query and look at any "Missing Index" recommendation SQL Server offers:
+Run:
 
 ```sql
-SELECT
-    SalesOrderId,
-    OrderDate
+SELECT SalesOrderId, OrderDate
 FROM dbo.SalesOrder
 WHERE Status = 'Review'
 ORDER BY OrderDate;
 ```
 
-Before creating anything, answer:
+Before creating anything, consider:
 
-1. Does a similar index already exist? (Check `IX_SalesOrder_Status` from Section 23.)
-2. Would a newly suggested index overlap or duplicate that existing one?
-3. Should you create a new index, extend the existing one, or do nothing? Justify your decision.
+1. Does a similar index already exist (`IX_SalesOrder_Status` from Section 11.2)?
+2. Would an index on `(Status, OrderDate)` overlap with it?
+3. Is it better to create a new index, replace the existing one, or do nothing?
 
 <details>
 <summary>Show solution</summary>
 
-1. `IX_SalesOrder_Status` exists, but only on `Status` — it does not include `OrderDate`.
-2. A suggested index on `(Status, OrderDate)` would not be a pure duplicate; it supports both the filter and the sort, which the existing index does not.
-3. In a real workload, the better choice is usually to extend or replace `IX_SalesOrder_Status` with a `(Status, OrderDate)` version rather than keep two overlapping single-purpose indexes — fewer, well-designed indexes are easier to maintain than many narrow, overlapping ones.
+`IX_SalesOrder_Status` supports the filter, but not ordering by `OrderDate` within the same `Status`. An index on `(Status, OrderDate)` can support both. It overlaps with the previous index, so consider **replacing** the earlier index instead of maintaining both. In a real system, inspect the entire workload before making this change.
 
 </details>
 
@@ -1273,31 +763,13 @@ Before creating anything, answer:
 
 # Key takeaways
 
-- SQL Server indexes are physical structures made of pages.
-- A heap is a table without a clustered index.
-- A clustered index contains table rows at the leaf level.
-- A table can have only one clustered index.
-- A table can have multiple nonclustered indexes.
-- A primary key is enforced by a unique index.
-- A primary-key index does not support every query.
-- `Index Seek` is useful when the index matches the access pattern.
-- A scan is not automatically bad.
-- A `Hash Match` is not automatically bad.
-- `Nested Loops` can become efficient when the inner side has a useful index.
-- Composite-index column order matters.
-- `WHERE` predicate order does not determine index key order.
-- Selectivity affects whether using an index is attractive.
-- A table's clustering key is always present at the leaf of every nonclustered index, for free — no `INCLUDE` needed.
-- A `Key Lookup` (or `RID Lookup` on a heap) fetches columns a nonclustered index doesn't have; missing `INCLUDE` columns bring it back.
-- Included columns can help an index cover a query — not just for `SELECT`, but also for extra `WHERE` predicates and for `GROUP BY`/aggregates.
-- Missing-index recommendations should be evaluated, not accepted automatically.
-- Every index consumes pages and adds write-maintenance cost.
-- Good index design reduces unnecessary page processing.
-
-> **A good index gives SQL Server a shorter physical path to the data it actually needs.**
-
----
-
-## Additional practice
-
-More index exercises, using `AdventureWorksENG` instead of `IndexLab`, are available in [Index Exercises](../exercises/indexes.md).
+- SQL Server indexes use pages, and useful access paths can avoid unnecessary I/O.
+- A B+ tree has navigation pages and a logically ordered leaf level.
+- A **heap** has no clustered index.
+- A nonclustered index on a heap uses **RID** locators; on a clustered table it generally uses the **clustered key** as the locator.
+- A clustered index stores **complete rows in its leaf level**; a table can have only one.
+- A primary key is a constraint enforced by a unique index; it does not replace all other indexes.
+- `Index Seek`, `Index Scan`, `Hash Match`, and `Nested Loops` are access/processing choices, not labels for inherently good or bad plans.
+- Composite key order, selectivity, and included columns determine which access patterns an index supports.
+- Indexes cost space and maintenance as well as providing potential read benefits.
+- Always validate an index against the **actual workload** using plans and I/O measurements.

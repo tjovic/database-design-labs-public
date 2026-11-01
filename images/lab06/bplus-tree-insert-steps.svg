@@ -1,0 +1,357 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2640" height="900" viewBox="0 0 2640 900" role="img" aria-labelledby="title desc">
+<title id="title">B+ tree growth after three insertions</title>
+<desc id="desc">Four stages show the initial B+ tree and the structural changes caused by inserting keys 58, 60, and 75. Each node has two fixed key slots.</desc>
+<defs>
+  <marker id="arrowTree" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#39434D"/></marker>
+  <marker id="arrowLeaf" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#3976B8"/></marker>
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #202832; }
+    .panel { fill:#FFFFFF; stroke:#D8DEE5; stroke-width:1.6; }
+    .stage-title { font-size:25px; font-weight:700; letter-spacing:.2px; }
+    .stage-sub { font-size:15px; fill:#64707D; }
+    .stage-num { font-size:17px; font-weight:700; fill:#FFFFFF; text-anchor:middle; dominant-baseline:middle; }
+    .level-label { font-size:11px; font-weight:700; letter-spacing:1.1px; fill:#7B8794; }
+    .key { font-size:18px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
+    .leaf-key { font-size:15px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
+    .tree-edge { fill:none; stroke:#39434D; stroke-width:1.8; stroke-linecap:round; marker-end:url(#arrowTree); }
+    .leaf-edge { fill:none; stroke:#3976B8; stroke-width:2.2; stroke-linecap:round; marker-end:url(#arrowLeaf); }
+    .note-head { font-size:20px; font-weight:700; letter-spacing:.25px; }
+    .note { font-size:18px; fill:#34404B; }
+    .node-outline { stroke-width:1.6; }
+    .slot-divider { stroke:#89939D; stroke-width:1.1; }
+  </style>
+</defs>
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<rect class="panel" x="15" y="18" width="630" height="864" rx="15"/>
+<rect x="16" y="19" width="628" height="6" rx="3" fill="#4779A8"/>
+<circle cx="54" cy="66" r="19" fill="#4779A8"/>
+<text class="stage-num" x="54" y="67">01</text>
+<text class="stage-title" x="85" y="63">Initial state</text>
+<text class="stage-sub" x="85" y="90">3 levels</text>
+<text class="level-label" x="39" y="157">ROOT</text>
+<text class="level-label" x="39" y="296">INTERMEDIATE</text>
+<text class="level-label" x="39" y="468">LEAF LEVEL</text>
+<path class="tree-edge" d="M 144.75 380 L 83.00 473"/>
+<path class="tree-edge" d="M 144.75 380 L 206.50 473"/>
+<path class="tree-edge" d="M 453.50 380 L 330.00 473"/>
+<path class="tree-edge" d="M 453.50 380 L 453.50 473"/>
+<path class="tree-edge" d="M 453.50 380 L 577.00 473"/>
+<path class="tree-edge" d="M 299.12 242 L 144.75 323"/>
+<path class="tree-edge" d="M 299.12 242 L 453.50 323"/>
+<g><rect x="97.75" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="144.75" y1="326" x2="144.75" y2="380"/>
+<text class="key" x="121.25" y="354.00">27</text>
+</g>
+<g><rect x="406.50" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="453.50" y1="326" x2="453.50" y2="380"/>
+<text class="key" x="430.00" y="354.00">56</text>
+<text class="key" x="477.00" y="354.00">73</text>
+</g>
+<g><rect x="252.12" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
+<line class="slot-divider" x1="299.12" y1="188" x2="299.12" y2="242"/>
+<text class="key" x="275.62" y="216.00">43</text>
+</g>
+<path class="leaf-edge" d="M 121.00 504.00 L 167.50 504.00"/>
+<path class="leaf-edge" d="M 244.50 504.00 L 291.00 504.00"/>
+<path class="leaf-edge" d="M 368.00 504.00 L 414.50 504.00"/>
+<path class="leaf-edge" d="M 491.50 504.00 L 538.00 504.00"/>
+<g><rect x="47.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="83.00" y1="476" x2="83.00" y2="532"/>
+<text class="key" x="65.00" y="505.00">11</text>
+<text class="key" x="101.00" y="505.00">19</text>
+</g>
+<g><rect x="170.50" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="206.50" y1="476" x2="206.50" y2="532"/>
+<text class="key" x="188.50" y="505.00">27</text>
+</g>
+<g><rect x="294.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="330.00" y1="476" x2="330.00" y2="532"/>
+<text class="key" x="312.00" y="505.00">43</text>
+</g>
+<g><rect x="417.50" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="453.50" y1="476" x2="453.50" y2="532"/>
+<text class="key" x="435.50" y="505.00">56</text>
+<text class="key" x="471.50" y="505.00">61</text>
+</g>
+<g><rect x="541.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="577.00" y1="476" x2="577.00" y2="532"/>
+<text class="key" x="559.00" y="505.00">73</text>
+<text class="key" x="595.00" y="505.00">79</text>
+</g>
+<rect x="33" y="590" width="594" height="260" rx="12" fill="#F1F6FB" stroke="#D6E2ED" stroke-width="1.3"/>
+<rect x="33" y="590" width="5" height="260" rx="2.5" fill="#4779A8"/>
+<text class="note-head" x="55" y="624">STRUCTURAL CHANGES</text>
+<circle cx="58" cy="655" r="4" fill="#4779A8"/>
+<text class="note" x="71" y="660">5 leaf pages</text>
+<circle cx="58" cy="698" r="4" fill="#4779A8"/>
+<text class="note" x="71" y="703">8 index pages in total</text>
+<circle cx="58" cy="741" r="4" fill="#4779A8"/>
+<text class="note" x="71" y="746">Root key: 43</text>
+<path d="M 647.0 448 L 662.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+<rect class="panel" x="665" y="18" width="630" height="864" rx="15"/>
+<rect x="666" y="19" width="628" height="6" rx="3" fill="#C45A52"/>
+<circle cx="704" cy="66" r="19" fill="#C45A52"/>
+<text class="stage-num" x="704" y="67">02</text>
+<text class="stage-title" x="735" y="63">INSERT 58</text>
+<text class="stage-sub" x="735" y="90">Leaf and parent split · still 3 levels</text>
+<text class="level-label" x="689" y="157">ROOT</text>
+<text class="level-label" x="689" y="296">INTERMEDIATE</text>
+<text class="level-label" x="689" y="468">LEAF LEVEL</text>
+<path class="tree-edge" d="M 782.40 380 L 733.00 473"/>
+<path class="tree-edge" d="M 782.40 380 L 831.80 473"/>
+<path class="tree-edge" d="M 980.00 380 L 930.60 473"/>
+<path class="tree-edge" d="M 980.00 380 L 1029.40 473"/>
+<path class="tree-edge" d="M 1177.60 380 L 1128.20 473"/>
+<path class="tree-edge" d="M 1177.60 380 L 1227.00 473"/>
+<path class="tree-edge" d="M 980.00 242 L 782.40 323"/>
+<path class="tree-edge" d="M 980.00 242 L 980.00 323"/>
+<path class="tree-edge" d="M 980.00 242 L 1177.60 323"/>
+<g><rect x="735.40" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="782.40" y1="326" x2="782.40" y2="380"/>
+<text class="key" x="758.90" y="354.00">27</text>
+</g>
+<g><rect x="933.00" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="980.00" y1="326" x2="980.00" y2="380"/>
+<text class="key" x="956.50" y="354.00">56</text>
+</g>
+<g><rect x="1130.60" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="1177.60" y1="326" x2="1177.60" y2="380"/>
+<text class="key" x="1154.10" y="354.00">73</text>
+</g>
+<g><rect x="933.00" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
+<line class="slot-divider" x1="980.00" y1="188" x2="980.00" y2="242"/>
+<text class="key" x="956.50" y="216.00">43</text>
+<text class="key" x="1003.50" y="216.00">58</text>
+</g>
+<path class="leaf-edge" d="M 771.00 504.00 L 792.80 504.00"/>
+<path class="leaf-edge" d="M 869.80 504.00 L 891.60 504.00"/>
+<path class="leaf-edge" d="M 968.60 504.00 L 990.40 504.00"/>
+<path class="leaf-edge" d="M 1067.40 504.00 L 1089.20 504.00"/>
+<path class="leaf-edge" d="M 1166.20 504.00 L 1188.00 504.00"/>
+<g><rect x="697.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="733.00" y1="476" x2="733.00" y2="532"/>
+<text class="key" x="715.00" y="505.00">11</text>
+<text class="key" x="751.00" y="505.00">19</text>
+</g>
+<g><rect x="795.80" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="831.80" y1="476" x2="831.80" y2="532"/>
+<text class="key" x="813.80" y="505.00">27</text>
+</g>
+<g><rect x="894.60" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="930.60" y1="476" x2="930.60" y2="532"/>
+<text class="key" x="912.60" y="505.00">43</text>
+</g>
+<g><rect x="993.40" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1029.40" y1="476" x2="1029.40" y2="532"/>
+<text class="key" x="1011.40" y="505.00">56</text>
+</g>
+<g><rect x="1092.20" y="476" width="72" height="56" rx="4" fill="#FCEBE9" stroke="#C45A52" class="node-outline"/>
+<line class="slot-divider" x1="1128.20" y1="476" x2="1128.20" y2="532"/>
+<text class="key" x="1110.20" y="505.00">58</text>
+<text class="key" x="1146.20" y="505.00">61</text>
+</g>
+<g><rect x="1191.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1227.00" y1="476" x2="1227.00" y2="532"/>
+<text class="key" x="1209.00" y="505.00">73</text>
+<text class="key" x="1245.00" y="505.00">79</text>
+</g>
+<rect x="683" y="590" width="594" height="260" rx="12" fill="#FCF2F1" stroke="#EED9D7" stroke-width="1.3"/>
+<rect x="683" y="590" width="5" height="260" rx="2.5" fill="#C45A52"/>
+<text class="note-head" x="705" y="624">STRUCTURAL CHANGES</text>
+<circle cx="708" cy="655" r="4" fill="#C45A52"/>
+<text class="note" x="721" y="660">Leaf [56, 61] splits into [56] and [58, 61]</text>
+<circle cx="708" cy="698" r="4" fill="#C45A52"/>
+<text class="note" x="721" y="703">Parent [56, 73] splits; separator 58 moves up</text>
+<circle cx="708" cy="741" r="4" fill="#C45A52"/>
+<text class="note" x="721" y="746">Root now contains [43, 58]</text>
+<path d="M 1297.0 448 L 1312.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+<rect class="panel" x="1315" y="18" width="630" height="864" rx="15"/>
+<rect x="1316" y="19" width="628" height="6" rx="3" fill="#4D8B59"/>
+<circle cx="1354" cy="66" r="19" fill="#4D8B59"/>
+<text class="stage-num" x="1354" y="67">03</text>
+<text class="stage-title" x="1385" y="63">INSERT 60</text>
+<text class="stage-sub" x="1385" y="90">Another leaf split · still 3 levels</text>
+<text class="level-label" x="1339" y="157">ROOT</text>
+<text class="level-label" x="1339" y="296">INTERMEDIATE</text>
+<text class="level-label" x="1339" y="468">LEAF LEVEL</text>
+<path class="tree-edge" d="M 1424.17 380 L 1383.00 473"/>
+<path class="tree-edge" d="M 1424.17 380 L 1465.33 473"/>
+<path class="tree-edge" d="M 1588.83 380 L 1547.67 473"/>
+<path class="tree-edge" d="M 1588.83 380 L 1630.00 473"/>
+<path class="tree-edge" d="M 1794.67 380 L 1712.33 473"/>
+<path class="tree-edge" d="M 1794.67 380 L 1794.67 473"/>
+<path class="tree-edge" d="M 1794.67 380 L 1877.00 473"/>
+<path class="tree-edge" d="M 1609.42 242 L 1424.17 323"/>
+<path class="tree-edge" d="M 1609.42 242 L 1588.83 323"/>
+<path class="tree-edge" d="M 1609.42 242 L 1794.67 323"/>
+<g><rect x="1377.17" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="1424.17" y1="326" x2="1424.17" y2="380"/>
+<text class="key" x="1400.67" y="354.00">27</text>
+</g>
+<g><rect x="1541.83" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="1588.83" y1="326" x2="1588.83" y2="380"/>
+<text class="key" x="1565.33" y="354.00">56</text>
+</g>
+<g><rect x="1747.67" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="1794.67" y1="326" x2="1794.67" y2="380"/>
+<text class="key" x="1771.17" y="354.00">60</text>
+<text class="key" x="1818.17" y="354.00">73</text>
+</g>
+<g><rect x="1562.42" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
+<line class="slot-divider" x1="1609.42" y1="188" x2="1609.42" y2="242"/>
+<text class="key" x="1585.92" y="216.00">43</text>
+<text class="key" x="1632.92" y="216.00">58</text>
+</g>
+<path class="leaf-edge" d="M 1421.00 504.00 L 1426.33 504.00"/>
+<path class="leaf-edge" d="M 1503.33 504.00 L 1508.67 504.00"/>
+<path class="leaf-edge" d="M 1585.67 504.00 L 1591.00 504.00"/>
+<path class="leaf-edge" d="M 1668.00 504.00 L 1673.33 504.00"/>
+<path class="leaf-edge" d="M 1750.33 504.00 L 1755.67 504.00"/>
+<path class="leaf-edge" d="M 1832.67 504.00 L 1838.00 504.00"/>
+<g><rect x="1347.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1383.00" y1="476" x2="1383.00" y2="532"/>
+<text class="key" x="1365.00" y="505.00">11</text>
+<text class="key" x="1401.00" y="505.00">19</text>
+</g>
+<g><rect x="1429.33" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1465.33" y1="476" x2="1465.33" y2="532"/>
+<text class="key" x="1447.33" y="505.00">27</text>
+</g>
+<g><rect x="1511.67" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1547.67" y1="476" x2="1547.67" y2="532"/>
+<text class="key" x="1529.67" y="505.00">43</text>
+</g>
+<g><rect x="1594.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1630.00" y1="476" x2="1630.00" y2="532"/>
+<text class="key" x="1612.00" y="505.00">56</text>
+</g>
+<g><rect x="1676.33" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1712.33" y1="476" x2="1712.33" y2="532"/>
+<text class="key" x="1694.33" y="505.00">58</text>
+</g>
+<g><rect x="1758.67" y="476" width="72" height="56" rx="4" fill="#EAF4E9" stroke="#4D8B59" class="node-outline"/>
+<line class="slot-divider" x1="1794.67" y1="476" x2="1794.67" y2="532"/>
+<text class="key" x="1776.67" y="505.00">60</text>
+<text class="key" x="1812.67" y="505.00">61</text>
+</g>
+<g><rect x="1841.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="1877.00" y1="476" x2="1877.00" y2="532"/>
+<text class="key" x="1859.00" y="505.00">73</text>
+<text class="key" x="1895.00" y="505.00">79</text>
+</g>
+<rect x="1333" y="590" width="594" height="260" rx="12" fill="#F1F7F0" stroke="#D8E8D6" stroke-width="1.3"/>
+<rect x="1333" y="590" width="5" height="260" rx="2.5" fill="#4D8B59"/>
+<text class="note-head" x="1355" y="624">STRUCTURAL CHANGES</text>
+<circle cx="1358" cy="655" r="4" fill="#4D8B59"/>
+<text class="note" x="1371" y="660">Leaf [58, 61] splits into [58] and [60, 61]</text>
+<circle cx="1358" cy="698" r="4" fill="#4D8B59"/>
+<text class="note" x="1371" y="703">Separator 60 is added to the right parent</text>
+<circle cx="1358" cy="741" r="4" fill="#4D8B59"/>
+<text class="note" x="1371" y="746">Right parent now contains [60, 73]</text>
+<path d="M 1947.0 448 L 1962.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+<rect class="panel" x="1965" y="18" width="630" height="864" rx="15"/>
+<rect x="1966" y="19" width="628" height="6" rx="3" fill="#8057A6"/>
+<circle cx="2004" cy="66" r="19" fill="#8057A6"/>
+<text class="stage-num" x="2004" y="67">04</text>
+<text class="stage-title" x="2035" y="63">INSERT 75</text>
+<text class="stage-sub" x="2035" y="90">Root split · tree grows to 4 levels</text>
+<text class="level-label" x="1989" y="157">ROOT</text>
+<text class="level-label" x="1989" y="258">INTERMEDIATE</text>
+<text class="level-label" x="1989" y="370">INTERMEDIATE</text>
+<text class="level-label" x="1989" y="468">LEAF LEVEL</text>
+<path class="tree-edge" d="M 2280.00 242 L 2136.79 273"/>
+<path class="tree-edge" d="M 2280.00 242 L 2423.21 273"/>
+<path class="tree-edge" d="M 2136.79 330 L 2065.18 385"/>
+<path class="tree-edge" d="M 2136.79 330 L 2208.39 385"/>
+<path class="tree-edge" d="M 2423.21 330 L 2351.61 385"/>
+<path class="tree-edge" d="M 2423.21 330 L 2494.82 385"/>
+<path class="tree-edge" d="M 2065.18 442 L 2029.38 473"/>
+<path class="tree-edge" d="M 2065.18 442 L 2100.98 473"/>
+<path class="tree-edge" d="M 2208.39 442 L 2172.59 473"/>
+<path class="tree-edge" d="M 2208.39 442 L 2244.20 473"/>
+<path class="tree-edge" d="M 2351.61 442 L 2315.80 473"/>
+<path class="tree-edge" d="M 2351.61 442 L 2387.41 473"/>
+<path class="tree-edge" d="M 2494.82 442 L 2459.02 473"/>
+<path class="tree-edge" d="M 2494.82 442 L 2530.62 473"/>
+<g><rect x="2018.18" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2065.18" y1="388" x2="2065.18" y2="442"/>
+<text class="key" x="2041.68" y="416.00">27</text>
+</g>
+<g><rect x="2161.39" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2208.39" y1="388" x2="2208.39" y2="442"/>
+<text class="key" x="2184.89" y="416.00">56</text>
+</g>
+<g><rect x="2304.61" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2351.61" y1="388" x2="2351.61" y2="442"/>
+<text class="key" x="2328.11" y="416.00">60</text>
+</g>
+<g><rect x="2447.82" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2494.82" y1="388" x2="2494.82" y2="442"/>
+<text class="key" x="2471.32" y="416.00">75</text>
+</g>
+<g><rect x="2089.79" y="276" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2136.79" y1="276" x2="2136.79" y2="330"/>
+<text class="key" x="2113.29" y="304.00">43</text>
+</g>
+<g><rect x="2376.21" y="276" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
+<line class="slot-divider" x1="2423.21" y1="276" x2="2423.21" y2="330"/>
+<text class="key" x="2399.71" y="304.00">73</text>
+</g>
+<g><rect x="2233.00" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
+<line class="slot-divider" x1="2280.00" y1="188" x2="2280.00" y2="242"/>
+<text class="key" x="2256.50" y="216.00">58</text>
+</g>
+<path class="leaf-edge" d="M 2063.75 504.00 L 2065.61 504.00"/>
+<path class="leaf-edge" d="M 2135.36 504.00 L 2137.21 504.00"/>
+<path class="leaf-edge" d="M 2206.96 504.00 L 2208.82 504.00"/>
+<path class="leaf-edge" d="M 2278.57 504.00 L 2280.43 504.00"/>
+<path class="leaf-edge" d="M 2350.18 504.00 L 2352.04 504.00"/>
+<path class="leaf-edge" d="M 2421.79 504.00 L 2423.64 504.00"/>
+<path class="leaf-edge" d="M 2493.39 504.00 L 2495.25 504.00"/>
+<g><rect x="1997.00" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2029.38" y1="476" x2="2029.38" y2="532"/>
+<text class="key" x="2013.19" y="505.00">11</text>
+<text class="key" x="2045.56" y="505.00">19</text>
+</g>
+<g><rect x="2068.61" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2100.98" y1="476" x2="2100.98" y2="532"/>
+<text class="key" x="2084.79" y="505.00">27</text>
+</g>
+<g><rect x="2140.21" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2172.59" y1="476" x2="2172.59" y2="532"/>
+<text class="key" x="2156.40" y="505.00">43</text>
+</g>
+<g><rect x="2211.82" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2244.20" y1="476" x2="2244.20" y2="532"/>
+<text class="key" x="2228.01" y="505.00">56</text>
+</g>
+<g><rect x="2283.43" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2315.80" y1="476" x2="2315.80" y2="532"/>
+<text class="key" x="2299.62" y="505.00">58</text>
+</g>
+<g><rect x="2355.04" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2387.41" y1="476" x2="2387.41" y2="532"/>
+<text class="key" x="2371.22" y="505.00">60</text>
+<text class="key" x="2403.60" y="505.00">61</text>
+</g>
+<g><rect x="2426.64" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
+<line class="slot-divider" x1="2459.02" y1="476" x2="2459.02" y2="532"/>
+<text class="key" x="2442.83" y="505.00">73</text>
+</g>
+<g><rect x="2498.25" y="476" width="64.75" height="56" rx="4" fill="#F3ECF9" stroke="#8057A6" class="node-outline"/>
+<line class="slot-divider" x1="2530.62" y1="476" x2="2530.62" y2="532"/>
+<text class="key" x="2514.44" y="505.00">75</text>
+<text class="key" x="2546.81" y="505.00">79</text>
+</g>
+<rect x="1983" y="590" width="594" height="260" rx="12" fill="#F6F2FA" stroke="#E4D9EF" stroke-width="1.3"/>
+<rect x="1983" y="590" width="5" height="260" rx="2.5" fill="#8057A6"/>
+<text class="note-head" x="2005" y="624">STRUCTURAL CHANGES</text>
+<circle cx="2008" cy="655" r="4" fill="#8057A6"/>
+<text class="note" x="2021" y="660">Leaf [73, 79] splits into [73] and [75, 79]</text>
+<circle cx="2008" cy="698" r="4" fill="#8057A6"/>
+<text class="note" x="2021" y="703">Parent [60, 73] splits; separator 73 moves up</text>
+<circle cx="2008" cy="741" r="4" fill="#8057A6"/>
+<text class="note" x="2021" y="746">Root [43, 58] splits</text>
+<circle cx="2008" cy="784" r="4" fill="#8057A6"/>
+<text class="note" x="2021" y="789">A new root [58] creates level 4</text>
+</svg>

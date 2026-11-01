@@ -574,8 +574,11 @@ The SQL query shows rows and columns. `DBCC PAGE` reveals part of the storage fo
 
 `Category` is our smallest example.
 
+> [!NOTE]
+> `Category`, `Product`, and `Customer` all have a `PRIMARY KEY CLUSTERED`, so their in-row data pages belong to a clustered index, not a heap. Expect `IndexID = 1`, not `IndexID = 0`. The `IndexID = 0` value applies only to the heap tables `SalesOrder` and `SalesOrderItem`, which have no clustered index yet.
+
 1. Run `DBCC IND('IndexLab', 'dbo.Category', -1);`.
-2. Identify its ordinary in-row data pages (`PageType = 1`, `IndexID = 0` for a heap).
+2. Identify its ordinary in-row data pages (`PageType = 1`, `IndexID = 1`).
 3. Choose one and inspect it using `DBCC PAGE`.
 
 Answer:
@@ -588,6 +591,23 @@ Answer:
 
 > [!NOTE]
 > **A scan is not automatically bad.** Reading a few pages may cost less than navigating a more complicated access path.
+
+Answer the five questions above before expanding the reference results below.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+Measured on one SQL Server 2025 Express instance:
+
+1. **1** in-row data page (`DBCC IND` returned only 2 rows total: 1 IAM page and 1 data page).
+2. `PageFID = 1`, `PagePID = 113736`.
+3. **100** rows — the entire table fits on this one page.
+4. **25 bytes** per record.
+5. The row-per-page formula predicts `floor(8096 / (25 + 2)) ≈ 299`, well above the table's 100 rows — so the whole table fits on a single page. Scanning `Category` means reading that one page regardless of which rows a query needs, which is why a scan here is cheap.
+
+Your own `PageFID`/`PagePID` values will differ — page allocation is instance-specific.
+
+</details>
 
 ---
 
@@ -616,6 +636,23 @@ If the selected page contains rows averaging `R` bytes **including row-format ov
 
 The extra `2` accounts for one slot-array entry per row. Compare your estimate with the inspected page and explain why it may differ. Do not expect an exact match on partially filled pages.
 
+Answer the five questions above and compute your own estimate before expanding the reference results below.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+Measured on one SQL Server 2025 Express instance:
+
+1. **159** in-row data pages (plus one root page and one IAM page — 161 total allocated to the clustered index).
+2. The first three leaf data page IDs were `121832`, `121848`, `121849` (the page in between, `121840`, is the root — not a leaf — so it does not count).
+3. **200** rows on the sampled leaf page.
+4. No. Record sizes were **38–39 bytes** — not identical.
+5. `ProductName` (`varchar(100)`) is the only variable-length column; its stored length changes slightly as the generated names go from `Product 1` to `Product 30000`, which accounts for the 1-byte difference. `CategoryId` (`int`) and `ListPrice` (`decimal(10,2)`) are fixed-length and do not contribute to the difference.
+
+The row-per-page formula predicts `floor(8096 / (38.5 + 2)) ≈ 202`, close to the observed 200. Your own page IDs will differ — page allocation is instance-specific.
+
+</details>
+
 ---
 
 # 15. Guided investigation 3 – Customer
@@ -634,6 +671,23 @@ Using `DBCC IND` and `DBCC PAGE`, answer:
 5. Why might records in the same table occupy different amounts of space?
 
 Compare your observations with `Category` and `Product`.
+
+Answer the five questions above before expanding the reference results below.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+Measured on one SQL Server 2025 Express instance:
+
+1. **732** in-row data pages (plus a root page at index level 1 and an IAM page).
+2. The first five leaf data page IDs were `130192`, `130208`, `130209`, `130210`, `130211` (note the gap between the first and second — the root page sits in between in page-ID order, though not in the leaf chain).
+3. **138** rows on the first leaf page (`130192`); the table-wide average is `100,000 / 732 ≈ 137`, so this page was close to typical.
+4. Record sizes on that page ranged from **52 to 62 bytes**.
+5. `FirstName`, `LastName`, and `City` are all variable-length (`varchar`) columns, and the generated values have different lengths — e.g., `FirstName1` through `FirstName5000` vary in digit count, and city names like `Zagreb` and `Rijeka` differ in length.
+
+`Category` (1 page), `Product` (159 pages), and `Customer` (732 pages) confirm that the same row count would not necessarily need the same number of pages — row width and total row count both matter. Your own page IDs will differ — page allocation is instance-specific.
+
+</details>
 
 ## Check your understanding
 
@@ -790,7 +844,7 @@ GO
 SELECT
     i.name AS IndexName,
     i.index_id,
-    SUM(ps.row_count) AS RowCount,
+    SUM(ps.row_count) AS [RowCount],
     SUM(ps.in_row_data_page_count) AS InRowDataPages,
     SUM(ps.used_page_count) AS UsedPages
 FROM sys.dm_db_partition_stats AS ps

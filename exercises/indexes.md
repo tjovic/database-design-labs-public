@@ -5,7 +5,7 @@ These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md) and use 
 `AdventureWorksENG` is much smaller than `IndexLab` (hundreds to low tens-of-thousands of rows per table here, versus tens of millions there). That has one consequence worth stating up front:
 
 > [!IMPORTANT]
-> On a table this size, SQL Server sometimes chooses a plain scan even where a "correct" index exists — and that can be the right choice (Lab 06, Section 26). Exercise 4 below produces exactly that outcome for real. The point of these exercises is not to force a dramatic `Scan → Seek` flip like the `IndexLab` demo. It is to practice **designing** the right index for a given query, and correctly **reasoning** about execution plans, column order, and coverage — skills that transfer regardless of table size.
+> On a table this size, SQL Server sometimes chooses a plain scan even where a "correct" index exists — and that can be the right choice (Lab 06, Section 7.1). Exercise 4 below produces exactly that outcome for real. The point of these exercises is not to force a dramatic `Scan → Seek` flip like the `IndexLab` demo. It is to practice **designing** the right index for a given query, and correctly **reasoning** about execution plans, column order, and coverage — skills that transfer regardless of table size.
 
 Every number quoted in this file (`logical reads`, row counts, which color is rarest, ...) was measured directly against this course's `AdventureWorksENG` — the same fixed dataset you have. Every exercise therefore uses literal values instead of looking an ID up first; you do not need a `DECLARE` block to reproduce any of this.
 
@@ -269,7 +269,7 @@ For `Crna`, the plan is a plain `Clustered Index Scan` — the optimizer does no
 
 For `Siva`, the plan is `Index Seek` on `IX_Exercises_Product_Color`, then `Nested Loops` into a `Clustered Index Seek ... LOOKUP` for `Name` — one lookup, because only one row matches. The index is clearly worth using here.
 
-`Color` can have very few distinct values and still be a good index candidate, as long as the distribution is skewed — a rare value stays highly selective even when the column overall has few distinct values. This also shows, concretely, the Lab 06 Section 26 point: SQL Server choosing a scan is not automatically wrong.
+`Color` can have very few distinct values and still be a good index candidate, as long as the distribution is skewed — a rare value stays highly selective even when the column overall has few distinct values. This also shows, concretely, the Lab 06 Section 7.1 point: SQL Server choosing a scan is not automatically wrong.
 
 </details>
 

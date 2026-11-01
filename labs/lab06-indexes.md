@@ -837,6 +837,27 @@ GO
 
 Do not index every column automatically. Choose indexes that support important, frequent queries.
 
+## Check your understanding
+
+1. Why does reordering predicates in a query's `WHERE` clause not change which column should be the leading key of a composite index?
+2. Why can a rare `Status` value be a good index candidate even when the column has few distinct values overall?
+3. What is the difference between a key column and an included column in a nonclustered index?
+4. What causes a page split, and what is its effect on index pages?
+5. What is the difference between `ALTER INDEX ... REORGANIZE` and `ALTER INDEX ... REBUILD`?
+6. Why isn't it a good idea to add an index for every column "just in case"?
+
+<details>
+<summary>Show answers</summary>
+
+1. An index's key order is fixed when the index is created; the optimizer can only use a composite index's leading column(s) to seek, regardless of how the `WHERE` clause predicates happen to be written.
+2. Selectivity depends on how many rows a specific value matches, not on how many distinct values the column has overall. A rare status value still filters out most rows, even if the column itself has only a handful of possible values.
+3. A key column defines the index's sort order and can be used for seeking and ordering. An included column is stored only at the leaf level to help cover a query; it does not participate in the sort order or support a seek on its own.
+4. A page split happens when a new or updated entry no longer fits on its current index page. SQL Server allocates a new page and redistributes entries, which can leave pages partially full and scatter logically adjacent pages, causing fragmentation.
+5. `REORGANIZE` reorders existing pages in place and is a lighter, online operation suited to mild fragmentation. `REBUILD` recreates the index from scratch, which is more thorough (and can refresh statistics with a full scan) but is more resource-intensive.
+6. Every additional index adds storage and must be maintained on every `INSERT`, `UPDATE`, or `DELETE` that touches its columns, so indexes should be chosen to support actual, frequent query patterns rather than added speculatively.
+
+</details>
+
 ---
 
 # 13. Practical checklist
@@ -984,3 +1005,9 @@ Before creating anything, consider:
 - Composite key order, selectivity, and included columns determine which access patterns an index supports.
 - Indexes cost space and maintenance as well as providing potential read benefits.
 - Always validate an index against the **actual workload** using plans and I/O measurements.
+
+---
+
+## Additional practice
+
+More index exercises, using `AdventureWorksENG` instead of `IndexLab`, are available in [Index Exercises](../exercises/indexes.md).

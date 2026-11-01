@@ -911,3 +911,9 @@ A table contains **1,000,000 rows** and currently fits **16 rows per page**. Aft
 - Indexes provide alternative access paths that can reduce unnecessary page processing.
 
 > **The key performance question is often not how many rows a query returns, but how many pages SQL Server has to examine to produce the result.**
+
+---
+
+## Additional practice
+
+More physical storage exercises, using `AdventureWorksENG` instead of `IndexLab`, are available in [Physical Storage Exercises](../exercises/physical-storage.md).

@@ -51,6 +51,7 @@ The physical storage collection is in [Physical Storage Exercises](physical-stor
 1. **A small clustered table** — use `DBCC IND`/`DBCC PAGE` to see how a `PRIMARY KEY CLUSTERED` determines physical row order, on a table of only 3 rows.
 2. **Page boundaries on a medium table** — identify data vs. root pages, and confirm that a clustered key's value stays consecutive across a page boundary.
 3. **A larger table, two ways** — compare listing every page with `DBCC IND` against summarizing page counts with `sys.dm_db_partition_stats`, motivating why the latter scales to very large tables.
+4. **Pages and logical reads** — connect the page counts from the first three exercises to `STATISTICS IO`'s `logical reads`, showing it counts every page type touched, not just leaf data pages.
 
 Like the index exercises, these intentionally use `AdventureWorksENG` instead of the large generated `IndexLab` database, so results are small enough to read in full while still showing real, non-trivial numbers.
 

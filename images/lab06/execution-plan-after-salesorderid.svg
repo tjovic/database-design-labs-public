@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1000" viewBox="0 0 1480 1000">
+<defs><marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8595a8"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="48" y="55" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="bold" fill="#19304b" text-anchor="start">EXECUTION PLAN · AFTER SalesOrderId INDEX (WITHOUT INCLUDE)</text>
+<text x="48" y="89" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="normal" fill="#566b82" text-anchor="start">Actual plan  •  5,477 orders  →  21,908 order items  →  100 categories</text>
+<path d="M742.5 244 V228.5 H742.5 V213" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M742.5 354 V338.0 H742.5 V322" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M742.5 467 V449.5 H742.5 V432" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M747.5 576 V557.5 H742.5 V539" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M445.0 704 V682.5 H747.5 V661" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M855.0 704 V682.5 H747.5 V661" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M200.0 838 V816.0 H445.0 V794" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M507.5 838 V816.0 H445.0 V794" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<path d="M1217.5 354 V393.0 H742.5 V432" stroke="#8595a8" stroke-width="2.4" fill="none" marker-end="url(#arr)"/>
+<rect x="620" y="135" width="245" height="78" rx="12" fill="#e6edf6" stroke="#7d94b4" stroke-width="2"/>
+<text x="637" y="163" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Sort</text>
+<text x="637" y="188" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Revenue DESC</text>
+<text x="637" y="204" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Output: 100 rows</text>
+<rect x="620" y="244" width="245" height="78" rx="12" fill="#fff0db" stroke="#d69b47" stroke-width="2"/>
+<text x="637" y="272" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Hash Match</text>
+<text x="637" y="297" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Aggregate by CategoryId</text>
+<text x="637" y="313" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Output: 100 groups</text>
+<rect x="620" y="354" width="245" height="78" rx="12" fill="#fff0db" stroke="#d69b47" stroke-width="2"/>
+<text x="637" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Hash Match</text>
+<text x="637" y="407" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Join Product</text>
+<text x="637" y="423" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Output: 21,908 rows</text>
+<rect x="620" y="467" width="245" height="72" rx="12" fill="#e6edf6" stroke="#7d94b4" stroke-width="2"/>
+<text x="637" y="495" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Compute Scalar</text>
+<text x="637" y="520" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Quantity × UnitPrice</text>
+<text x="637" y="536" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Revenue calculation</text>
+<rect x="620" y="576" width="255" height="85" rx="12" fill="#fff0db" stroke="#d69b47" stroke-width="2"/>
+<text x="637" y="604" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Nested Loops</text>
+<text x="637" y="629" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Fetch missing item columns</text>
+<text x="637" y="652" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Output: 21,908 rows</text>
+<rect x="315" y="704" width="260" height="90" rx="12" fill="#fff0db" stroke="#d69b47" stroke-width="2"/>
+<text x="332" y="732" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Nested Loops</text>
+<text x="332" y="757" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Orders → matching items</text>
+<text x="332" y="780" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">Output: 21,908 rows</text>
+<rect x="75" y="838" width="250" height="102" rx="12" fill="#e4f3e9" stroke="#64a981" stroke-width="2"/>
+<text x="92" y="866" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Index Seek</text>
+<text x="92" y="891" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">SalesOrder · OrderDate</text>
+<text x="92" y="914" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">5,477 rows / 5,477 read</text>
+<rect x="370" y="838" width="275" height="102" rx="12" fill="#e4f3e9" stroke="#64a981" stroke-width="2"/>
+<text x="387" y="866" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Index Seek</text>
+<text x="387" y="891" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">SalesOrderItem · SalesOrderId</text>
+<text x="387" y="914" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">21,908 rows · 5,477 executions</text>
+<rect x="705" y="704" width="300" height="104" rx="12" fill="#ffe4d7" stroke="#e58c59" stroke-width="2"/>
+<text x="722" y="732" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Clustered Index Seek</text>
+<text x="722" y="757" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">PK_SalesOrderItem (lookup)</text>
+<text x="722" y="780" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">21,908 executions</text>
+<rect x="1060" y="354" width="315" height="110" rx="12" fill="#e6edf6" stroke="#7d94b4" stroke-width="2"/>
+<text x="1077" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#19304b" text-anchor="start">Clustered Index Scan</text>
+<text x="1077" y="407" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#19304b" text-anchor="start">Product · PK_Product</text>
+<text x="1077" y="430" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#52647a" text-anchor="start">30,000 rows read</text>
+<text x="48" y="981" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" fill="#a15f36" text-anchor="start">Read bottom → top. Highlighted orange lookup: the narrow index lacks ProductId, Quantity and UnitPrice.</text>
+</svg>

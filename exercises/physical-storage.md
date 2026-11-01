@@ -36,27 +36,27 @@ GO
 
 Answer:
 
-a. On how many pages are the data from `State` stored (`PageType = 1`)?
-b. What are the `PageFID` and `PagePID` of that page?
-c. Using `DBCC PAGE('AdventureWorksENG', file_id, page_id, 3) WITH TABLERESULTS;` on that page, what is the length (in bytes) of the first, second, and third row?
-d. By which column are the rows on the page arranged?
-e. Find the row for `'Germany'`. What are the rows immediately before and after it?
+1. On how many pages are the data from `State` stored (`PageType = 1`)?
+2. What are the `PageFID` and `PagePID` of that page?
+3. Using `DBCC PAGE('AdventureWorksENG', file_id, page_id, 3) WITH TABLERESULTS;` on that page, what is the length (in bytes) of the first, second, and third row?
+4. By which column are the rows on the page arranged?
+5. Find the row for `'Germany'`. What are the rows immediately before and after it?
 
 <details>
 <summary>Hint</summary>
 
-`State` has a `PRIMARY KEY CLUSTERED (IDState)`, so its data pages belong to a clustered index — not a heap — and the physical row order follows the clustering key, not alphabetical order. For (e), look up `IDState` for `'Germany'` first, then check which rows have the neighboring `IDState` values.
+`State` has a `PRIMARY KEY CLUSTERED (IDState)`, so its data pages belong to a clustered index — not a heap — and the physical row order follows the clustering key, not alphabetical order. For question 5, look up `IDState` for `'Germany'` first, then check which rows have the neighboring `IDState` values.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-a. **1** data page (`DBCC IND` returns 2 rows total: one IAM page and one data page — there is no separate root page because one page is enough for the whole table).
-b. `PageFID = 1`, `PagePID = 232`.
-c. Row 1 (`Croatia`): **29 bytes**. Row 2 (`Germany`): **29 bytes**. Row 3 (`Italy`): **25 bytes**.
-d. `IDState` — the clustering key. Row order on the page follows `IDState` ascending (1, 2, 3), not the alphabetical order of `Name`.
-e. `'Germany'` has `IDState = 2`. The row before it is `'Croatia'` (`IDState = 1`); the row after it is `'Italy'` (`IDState = 3`) — based on `IDState`, not on alphabetical order.
+1. **1** data page (`DBCC IND` returns 2 rows total: one IAM page and one data page — there is no separate root page because one page is enough for the whole table).
+2. `PageFID = 1`, `PagePID = 232`.
+3. Row 1 (`Croatia`): **29 bytes**. Row 2 (`Germany`): **29 bytes**. Row 3 (`Italy`): **25 bytes**.
+4. `IDState` — the clustering key. Row order on the page follows `IDState` ascending (1, 2, 3), not the alphabetical order of `Name`.
+5. `'Germany'` has `IDState = 2`. The row before it is `'Croatia'` (`IDState = 1`); the row after it is `'Italy'` (`IDState = 3`) — based on `IDState`, not on alphabetical order.
 
 </details>
 
@@ -71,29 +71,29 @@ GO
 
 Answer:
 
-a. On how many data pages (`PageType = 1`) are `Product`'s 504 rows stored?
-b. Write down the `PagePID` values of those data pages, in order.
-c. Using `DBCC PAGE`, what is the length (in bytes) of the first, second, and third row in the table?
-d. What is the `IDProduct` of the last row on the first data page? What is the `IDProduct` of the first row on the second data page?
-e. What is the `IDProduct` of the last row on the second data page? What is the `IDProduct` of the first row on the third data page?
-f. By which column are the rows on the pages arranged?
+1. On how many data pages (`PageType = 1`) are `Product`'s 504 rows stored?
+2. Write down the `PagePID` values of those data pages, in order.
+3. Using `DBCC PAGE`, what is the length (in bytes) of the first, second, and third row in the table?
+4. What is the `IDProduct` of the last row on the first data page? What is the `IDProduct` of the first row on the second data page?
+5. What is the `IDProduct` of the last row on the second data page? What is the `IDProduct` of the first row on the third data page?
+6. By which column are the rows on the pages arranged?
 
 <details>
 <summary>Hint</summary>
 
-`DBCC IND` returns one row per allocated page, including the IAM page and — unlike `State` — a root page (`PageType = 2`). Filter for `PageType = 1` to find only the data (leaf) pages, and follow `PagePID` in the order `DBCC IND` lists them. For (d) and (e), open each page with `DBCC PAGE` and look at the `IDProduct` column of the first and last slot.
+`DBCC IND` returns one row per allocated page, including the IAM page and — unlike `State` — a root page (`PageType = 2`). Filter for `PageType = 1` to find only the data (leaf) pages, and follow `PagePID` in the order `DBCC IND` lists them. For questions 4 and 5, open each page with `DBCC PAGE` and look at the `IDProduct` column of the first and last slot.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-a. **6** data pages (out of 8 total allocated pages: 1 IAM page, 1 root page, 6 leaf/data pages).
-b. In order: `576`, `578`, `579`, `580`, `581`, `582`. (`577` is the root page, `PageType = 2` — not a data page.)
-c. Row 1 (`IDProduct = 1`): **75 bytes**. Row 2 (`IDProduct = 2`): **69 bytes**. Row 3 (`IDProduct = 3`): **75 bytes**.
-d. Last row on page `576`: `IDProduct = 425`. First row on page `578`: `IDProduct = 426`.
-e. Last row on page `578`: `IDProduct = 706`. First row on page `579`: `IDProduct = 707`.
-f. `IDProduct` — the clustering key. Notice in (d) and (e) that the key value increases by exactly 1 across the page boundary: the clustered index keeps rows in one continuous, gapless order even though they are split across physical pages.
+1. **6** data pages (out of 8 total allocated pages: 1 IAM page, 1 root page, 6 leaf/data pages).
+2. In order: `576`, `578`, `579`, `580`, `581`, `582`. (`577` is the root page, `PageType = 2` — not a data page.)
+3. Row 1 (`IDProduct = 1`): **75 bytes**. Row 2 (`IDProduct = 2`): **69 bytes**. Row 3 (`IDProduct = 3`): **75 bytes**.
+4. Last row on page `576`: `IDProduct = 425`. First row on page `578`: `IDProduct = 426`.
+5. Last row on page `578`: `IDProduct = 706`. First row on page `579`: `IDProduct = 707`.
+6. `IDProduct` — the clustering key. Notice in questions 4 and 5 that the key value increases by exactly 1 across the page boundary: the clustered index keeps rows in one continuous, gapless order even though they are split across physical pages.
 
 </details>
 
@@ -159,7 +159,7 @@ GROUP BY i.name, i.index_id;
 Answer:
 
 1. Does `InRowDataPages` match the data-page count you found with `DBCC IND` in (a)?
-2. Compute `[RowCount] / InRowDataPages`. Does it match the row count you observed on one page in (a.3)?
+2. Compute `[RowCount] / InRowDataPages`. Does it match the row count you observed on one page in part (a), question 3?
 3. Why is this view better suited to a table with millions of rows than `DBCC IND`?
 
 <details>

@@ -258,6 +258,23 @@ Enable **Query → Include Actual Execution Plan**, or press `Ctrl + M` before e
 
 The query calculates the number of sold items and revenue per product category for one day, then orders categories by revenue:
 
+```sql
+SELECT
+    p.CategoryId,
+    SUM(soi.Quantity) AS ItemsSold,
+    SUM(CAST(soi.Quantity AS decimal(18,2)) * soi.UnitPrice) AS Revenue
+FROM dbo.SalesOrder AS so
+JOIN dbo.SalesOrderItem AS soi
+    ON soi.SalesOrderId = so.SalesOrderId
+JOIN dbo.Product AS p
+    ON p.ProductId = soi.ProductId
+WHERE so.OrderDate >= '20250601'
+  AND so.OrderDate <  '20250602'
+GROUP BY p.CategoryId
+ORDER BY Revenue DESC;
+GO
+```
+
 Read the SQL statement before you execute it:
 
 1. `WHERE so.OrderDate ...` restricts sales orders to **one day**.
@@ -323,6 +340,13 @@ For each relevant operator:
 
 > [!NOTE]
 > Some properties vary by SQL Server version, operator, and whether the plan is estimated or actual. Do not assume every operator displays every property. Also, an operator's estimated percentage cost is **not an actual timing measurement**.
+
+> [!TIP]
+> A large gap between **Estimated** and **Actual Number of Rows** is not always caused by a missing index. It can also mean the optimizer's statistics are **out of date** for that table or index, so its row-count guesses no longer reflect the data. You can inspect a statistics object with:
+> ```sql
+> DBCC SHOW_STATISTICS ('dbo.SalesOrder', IX_SalesOrder_OrderDate);
+> ```
+> and refresh it with `UPDATE STATISTICS dbo.SalesOrder;` if needed. Creating a new index already generates fresh statistics for its key columns, so this matters more for columns and indexes that existed before large data changes.
 
 ## 7.2 Investigate the `SalesOrder` scan
 
@@ -796,6 +820,20 @@ Every additional index may also require work during `INSERT`, `UPDATE`, or `DELE
 - Additional storage for index pages.
 - Extra writes and maintenance when indexed data changes.
 - Possible page splits and fragmentation.
+
+Repeated page splits leave pages only partially full and scatter logically adjacent pages across the file, which is called **fragmentation**. You can inspect it with the same `sys.dm_db_index_physical_stats` call from Section 10 — its `avg_fragmentation_in_percent` column reports it directly. Two maintenance commands address it:
+
+```sql
+-- Reorders pages in place; an online, lower-impact operation
+ALTER INDEX IX_SalesOrder_OrderDate ON dbo.SalesOrder REORGANIZE;
+GO
+
+-- Rebuilds the index from scratch; more thorough, but more resource-intensive
+ALTER INDEX IX_SalesOrder_OrderDate ON dbo.SalesOrder REBUILD;
+GO
+```
+
+`REORGANIZE` is generally used for lighter fragmentation, `REBUILD` for heavier fragmentation or to also update statistics with a full scan. Neither is “free”: both consume I/O and CPU, so they are normally scheduled as periodic maintenance rather than run reactively after every change.
 
 Do not index every column automatically. Choose indexes that support important, frequent queries.
 

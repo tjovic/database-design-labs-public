@@ -331,6 +331,119 @@ Without any index beyond the Exercise 2 one, the plan for this query is `Sort �
 
 ---
 
+## Exercise 6 — The same pattern, on a different table [INTERMEDIATE]
+
+Exercise 5's missing-index suggestion was `Invoice (InvoiceDate) INCLUDE (InvoiceNumber, CustomerID)`. This exercise builds that same shape of index by hand, one step at a time, on a simpler query — the same staged pattern as Exercise 1, but on `Invoice` instead of `Product`, so you can check whether you recognize the pattern on a table and columns you have not seen it applied to yet.
+
+`InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59'` matches exactly 4 rows in this dataset. Watch **logical reads** at every step.
+
+**a) Baseline.** Run, with no index yet beyond the clustered primary key:
+
+```sql
+SELECT InvoiceDate
+FROM Invoice
+WHERE InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59';
+```
+
+Expect `logical reads 202` — a full scan of `Invoice`.
+
+**b) Create an index on the filter column alone:**
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Exercises_Invoice_InvoiceDate
+ON Invoice (InvoiceDate);
+GO
+```
+
+**c) Re-run the query from (a).** Expect `logical reads 2`.
+
+**d) Add the clustering key to the returned columns**, still using the index from (b):
+
+```sql
+SELECT IDInvoice, InvoiceDate
+FROM Invoice
+WHERE InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59';
+```
+
+<details>
+<summary>What do you expect, and why?</summary>
+
+Still `logical reads 2`. `IDInvoice` is `Invoice`'s clustering key, and the clustering key is always present at the leaf level of every nonclustered index — the same reason this worked for free in Exercise 1(c).
+
+</details>
+
+**e) Now add one more returned column**, still using the same index:
+
+```sql
+SELECT IDInvoice, InvoiceNumber, InvoiceDate
+FROM Invoice
+WHERE InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59';
+```
+
+What do you expect to happen to `logical reads`, and why?
+
+<details>
+<summary>Solution</summary>
+
+`logical reads` rises to **10**. `InvoiceNumber` is neither the key nor included, so SQL Server must look each of the 4 matching rows up in the clustered index to fetch it — the same `Key Lookup` pattern as Exercise 1(d).
+
+</details>
+
+**f) Fix it.** Design and create a nonclustered index that supports the query from (e) without a `Key Lookup`.
+
+<details>
+<summary>Hint</summary>
+
+The fix is the same shape as Exercise 1(e): keep the filter column as the key, and add the extra returned column with `INCLUDE`. You do not need to add `IDInvoice` — see (d).
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+DROP INDEX IF EXISTS IX_Exercises_Invoice_InvoiceDate ON Invoice;
+
+CREATE NONCLUSTERED INDEX IX_Exercises_Invoice_InvoiceDate
+ON Invoice (InvoiceDate)
+INCLUDE (InvoiceNumber);
+GO
+```
+
+Re-run the query from (e). Expect `logical reads 2` again, with a single `Index Seek` and no `Key Lookup`.
+
+</details>
+
+**g) Bonus — a residual filter on an included column.** Using the index from (f), run:
+
+```sql
+SELECT IDInvoice
+FROM Invoice
+WHERE InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59'
+  AND InvoiceNumber LIKE 'S%';
+```
+
+Expect `logical reads 2` — unchanged, for the same reason as Exercise 1(f): `InvoiceNumber` is already present at the leaf level, so SQL Server can evaluate `LIKE 'S%'` right there as a residual predicate. (All 4 matching invoice numbers happen to start with `SO`, so this particular filter does not reduce the row count — but it does not cost any extra reads either.)
+
+**h) Bonus — why did Exercise 5 also suggest `CustomerID`?** Still using the index from (f), run:
+
+```sql
+SELECT CustomerID, COUNT(*) AS Cnt
+FROM Invoice
+WHERE InvoiceDate BETWEEN '20010702' AND '20010702 23:59:59'
+GROUP BY CustomerID
+ORDER BY Cnt DESC;
+```
+
+<details>
+<summary>Think about it</summary>
+
+`logical reads` rises back to **10** — `CustomerID` is in neither the key nor the `INCLUDE` list of this index, so it is not covered, the same gap as Exercise 4's `Color` case. This is exactly why Exercise 5's missing-index suggestion included `CustomerID` in its `INCLUDE` list: that query also joined on `CustomerID`, so the optimizer's suggestion was shaped by a different query than this one. A recommendation only covers the query that produced it — the general point Exercise 5 itself makes.
+
+</details>
+
+---
+
 # Cleanup
 
 ```sql
@@ -338,6 +451,7 @@ DROP INDEX IF EXISTS IX_Exercises_Product_SubcategoryID_Price ON Product;
 DROP INDEX IF EXISTS IX_Exercises_Invoice_CustomerID_InvoiceDate ON Invoice;
 DROP INDEX IF EXISTS IX_Exercises_InvoiceItem_InvoiceID ON InvoiceItem;
 DROP INDEX IF EXISTS IX_Exercises_Product_Color ON Product;
+DROP INDEX IF EXISTS IX_Exercises_Invoice_InvoiceDate ON Invoice;
 GO
 ```
 

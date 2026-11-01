@@ -217,142 +217,249 @@ This makes the physical design decision visible. A primary key is excellent for 
 
 # 6. Prepare the main performance demonstration
 
-The `IndexLab` tables contain approximately 10 million sales orders and 40 million sales-order items in the reference dataset. This is large enough for poor access paths to be noticeable.
+This is the main practical part of the lab. We will execute **the same SQL query before and after adding indexes**, inspect both actual execution plans, and measure the work performed by SQL Server. The goal is to explain *why* a plan becomes faster, not simply to observe that its elapsed time decreases.
 
-In SQL Server Management Studio (SSMS), open a query window:
+The `IndexLab` reference database contains approximately **10 million** rows in `SalesOrder`, **40 million** rows in `SalesOrderItem`, and **30,000** products. These figures are large enough to make inefficient access paths visible.
+
+> [!IMPORTANT]
+> Complete the steps **in order**, using the database in its prepared initial state. Later sections create indexes that change the execution plan. If you already created these indexes in a previous attempt, restore the prepared lab state before repeating the *before indexes* measurement.
+
+## 6.1 Prepare SSMS and collect useful measurements
+
+Open a new query window in SSMS and select the database:
 
 ```sql
 USE IndexLab;
 GO
+
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
 GO
 ```
 
-Enable **Query → Include Actual Execution Plan** (`Ctrl + M`).
+Enable **Query → Include Actual Execution Plan**, or press `Ctrl + M` before executing the query. After execution inspect the **Results**, **Messages**, and **Execution Plan** tabs.
 
-- **Actual Execution Plan:** the operators chosen and observed row counts.
-- **STATISTICS IO:** logical reads and other page-read metrics.
-- **STATISTICS TIME:** CPU time and elapsed execution time.
+| Instrument | What to look for | Why it matters |
+|---|---|---|
+| Actual Execution Plan | Operators, row counts, estimates, joins, warnings | Shows how SQL Server executed the query |
+| `STATISTICS IO` | Logical reads, scan count, physical/read-ahead reads | Shows the data-access work performed |
+| `STATISTICS TIME` | CPU time and elapsed time | Helps distinguish CPU work from total duration |
+| Operator Properties | Predicate, Seek Predicates, Estimated/Actual rows, Number of Rows Read | Explains whether rows were found efficiently |
+
+**Logical reads** count 8 KB pages read from the buffer pool (including pages previously cached); they are *not* the same thing as physical disk reads. A query can perform many logical reads even when physical reads are near zero. Conversely, timing can vary with buffer cache, CPU availability, concurrent activity, and the selected plan.
+
+> [!TIP]
+> Hover over an execution-plan operator for its tooltip. For more detailed properties, click the operator and press **F4** (or right-click → **Properties**). In the plan, pay attention to **the arrows between operators**: thicker arrows usually represent larger row flows.
 
 > [!NOTE]
-> Reference timings in the original lab came from a particular machine (SQL Server 2025, build 17.0.1135.8, 31 GB RAM, Developer and Express instances). Your timings will differ. Compare the *access paths, pages read, and overall direction of change* rather than requiring identical seconds.
+> Reference timings come from the original lab's measurements on one computer running SQL Server 2025 (build 17.0.1135.8), 31 GB RAM, with separate Express and Developer instances. Your own numbers may be very different. Record your results; do not try to reproduce the exact timings.
 
-## 6.1 Baseline query: before adding indexes
+## 6.2 Run the baseline query before adding indexes
 
-```sql
-SELECT
-    p.CategoryId,
-    COUNT_BIG(*) AS ItemCount,
-    SUM
-    (
-        CAST(soi.Quantity AS decimal(18,2))
-        * soi.UnitPrice
-    ) AS Revenue
-FROM dbo.SalesOrder AS so
-JOIN dbo.SalesOrderItem AS soi
-    ON soi.SalesOrderId = so.SalesOrderId
-JOIN dbo.Product AS p
-    ON p.ProductId = soi.ProductId
-WHERE so.OrderDate >= '20250601'
-  AND so.OrderDate <  '20250602'
-GROUP BY
-    p.CategoryId
-ORDER BY
-    Revenue DESC;
+The query calculates the number of sold items and revenue per product category for one day, then orders categories by revenue:
+
 GO
 ```
 
-On the reference Express instance, the original run took roughly 15–17 seconds. Make a note of your own measurements **before** creating any indexes.
+Read the SQL statement before you execute it:
 
-| Metric | Before | After |
+1. `WHERE so.OrderDate ...` restricts sales orders to **one day**.
+2. The first `JOIN` finds the order items belonging to those orders.
+3. The second `JOIN` obtains each product's `CategoryId`.
+4. `Quantity * UnitPrice` calculates the value of each line.
+5. `GROUP BY` calculates the totals for each category.
+6. `ORDER BY Revenue DESC` sorts the final category totals.
+
+This query is useful because it combines **filtering, joining, calculation, aggregation, and sorting**. Different plan operators can be linked directly to parts of the SQL statement.
+
+In the reference Express instance, the baseline execution took approximately **15–17 seconds**. Do not focus on the time alone. Record these values before changing any index:
+
+| Metric | Before indexes | After indexes |
 |---|---|---|
-| Elapsed time | Record your result | Later |
-| Logical reads, SalesOrder | Record your result | Later |
-| Logical reads, SalesOrderItem | Record your result | Later |
-| Access operator for SalesOrder | Record your result | Later |
-| Access operator for SalesOrderItem | Record your result | Later |
-| Main join | Record your result | Later |
+| Elapsed time (ms) | Your value | To be measured |
+| CPU time (ms) | Your value | To be measured |
+| `SalesOrder` logical reads | Your value | To be measured |
+| `SalesOrderItem` logical reads | Your value | To be measured |
+| Access operator for `SalesOrder` | Your value | To be measured |
+| Access operator for `SalesOrderItem` | Your value | To be measured |
+| Main join operator | Your value | To be measured |
 
-> [!TIP]
-> Do not evaluate performance from elapsed time alone. A warm cache and concurrent load can influence timing; logical reads and access paths are usually more informative for this exercise.
+> [!NOTE]
+> SQL Server Express has resource and parallelism limitations. The original lab's reference query used serial execution in Express. On instances using parallel execution, the sum of CPU time across workers can be larger than elapsed time. The observed plan depends on edition, configuration, statistics, and data distribution; neither serial execution nor a particular operator is guaranteed for every installation.
 
 ---
 
-# 7. Understand the execution plan before indexing
+# 7. Investigate the execution plan before indexing
 
-Execution plans generally show data flowing **from right to left**. Start at the access operators that read tables or indexes, then inspect joins and other operations.
+Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
-| Operator | What it does |
-|---|---|
-| `Table Scan` | Reads rows from a heap |
-| `Clustered Index Scan` | Scans a clustered index |
-| `Index Scan` | Scans a nonclustered index |
-| `Index Seek` | Navigates to a key or key range |
-| `RID Lookup` | Fetches a heap row using its RID |
-| `Key Lookup` | Fetches more columns from the clustered index |
-| `Nested Loops` | Repeatedly matches inner-side rows to each outer row |
-| `Hash Match` | Implements hash join or aggregate operations |
-| `Compute Scalar` | Computes a scalar expression |
-| `Sort` | Orders rows |
+## 7.1 Learn the essential plan operators
 
-## 7.1 Why is SalesOrder expensive?
+| Operator | Meaning | What to inspect |
+|---|---|---|
+| `Table Scan` | Reads data from a heap | Rows read, rows returned, predicate |
+| `Clustered Index Scan` | Scans all or part of a clustered index | Scan direction, ordered property, rows |
+| `Index Scan` | Scans a nonclustered index | Rows read vs. returned, ordering |
+| `Index Seek` | Uses index key ranges to locate entries | **Seek Predicates**, rows read |
+| `RID Lookup` | Retrieves a heap row via its row identifier | Repetitions, output columns |
+| `Key Lookup` | Retrieves additional columns from a clustered index | Number of executions, requested columns |
+| `Nested Loops` | Invokes or searches the inner input for outer rows | Outer row count, inner repetitions |
+| `Hash Match (Inner Join)` | Builds/probes hash structures to join inputs | Build/probe inputs, memory, spills |
+| `Hash Match (Aggregate)` | Groups rows and computes aggregates | Rows received and groups returned |
+| `Compute Scalar` | Defines a calculated expression | Defined Values / scalar expression |
+| `Sort` | Orders its input | Sort keys, input rows, memory/spills |
 
-The `OrderDate` predicate matches roughly 5,477 rows in the reference sample out of approximately 10 million orders. Without an index starting with `OrderDate`, SQL Server cannot navigate directly to that date range.
+> [!IMPORTANT]
+> **A seek is not automatically good, and a scan is not automatically bad.** The useful question is whether the plan processes *much more data than the query needs* and whether an alternative access path would reduce total cost. An `Index Seek` may still read many rows, and repeated lookups can be expensive.
 
-Inspect **Actual Number of Rows**, **Estimated Number of Rows**, **Number of Rows Read**, and **Predicate** in the access operator properties.
+### A quick method for reading any plan
 
-## 7.2 Why is SalesOrderItem the main bottleneck?
+For each relevant operator:
 
-The join uses:
+1. Identify **the table or index** it accesses.
+2. Compare **Actual Number of Rows** with **Estimated Number of Rows** (where displayed).
+3. Find **Number of Rows Read** / **Actual Number of Rows Read**, if exposed, and compare it with rows produced.
+4. Inspect **Predicate** versus **Seek Predicates**.
+5. Check operator **executions**, particularly on the inner side of `Nested Loops`.
+6. Look for warnings such as spills, large estimation differences, or missing-index suggestions.
+7. Finally, relate the operator to `STATISTICS IO` and the cost of the full query.
+
+> [!NOTE]
+> Some properties vary by SQL Server version, operator, and whether the plan is estimated or actual. Do not assume every operator displays every property. Also, an operator's estimated percentage cost is **not an actual timing measurement**.
+
+## 7.2 Investigate the `SalesOrder` scan
+
+The filter is:
+
+```sql
+WHERE so.OrderDate >= '20250601'
+  AND so.OrderDate <  '20250602'
+```
+
+`SalesOrder` contains approximately **10,000,000** rows, while only about **5,477** orders match the selected day in the reference dataset. Without a useful index on `OrderDate`, SQL Server cannot efficiently navigate to this date range and may scan the heap.
+
+**In SSMS:** find the access operator for `dbo.SalesOrder`. Open Properties and identify its **Object**, **Actual Number of Rows**, **Estimated Number of Rows**, **Number of Rows Read**, and **Predicate**. If the predicate is applied while scanning, many rows may be inspected before a small fraction are returned.
+
+This distinction matters:
+
+- **Rows read:** the amount of data examined by the access operator.
+- **Rows returned:** the data passed on to the next operator after filtering.
+- **Logical reads:** page reads reported by `STATISTICS IO`, not a count of returned rows.
+
+A predicate can return only a few thousand rows yet require reading a very large table. This is exactly the situation an index on `OrderDate` may improve.
+
+**Check:** Why does the predicate use `< '20250602'` rather than `<= '20250601'`? The half-open interval is convenient for date/time values with a time component and is usually a good pattern for complete-day filtering.
+
+## 7.3 Investigate the `SalesOrderItem` scan — the main bottleneck
+
+The largest join is:
 
 ```sql
 soi.SalesOrderId = so.SalesOrderId
 ```
 
-The reference dataset contains approximately 40 million order items, but only about 21,908 match the orders from the chosen day. Without an efficient index on `SalesOrderId`, a very large input may have to be scanned and joined.
+`SalesOrderItem` contains approximately **40,000,000** rows, but the orders from the selected day refer to only about **21,908** order items in the reference data. Without a suitable access path on `SalesOrderItem(SalesOrderId)`, the optimizer may process a huge input to find those matching items.
 
-## 7.3 Joins, aggregation, and sorting
+**In SSMS:** locate the access operator for `dbo.SalesOrderItem`. Compare its rows read with the number of rows that eventually participate in the join. Look at the `STATISTICS IO` line for this table. It is the large input, not the fact that the query uses a join, that makes this expensive.
 
-A `Hash Match (Inner Join)` is a reasonable option for large inputs without efficient lookup paths. It is **not inherently bad**.
+Notice that the `SalesOrder` date filter does not automatically tell SQL Server where the matching rows are stored in `SalesOrderItem`. A **join key index** can provide that missing path.
 
-`Compute Scalar` may calculate:
+## 7.4 Why `Hash Match (Inner Join)` may be chosen
+
+A hash join is often suitable when the optimizer expects large inputs without a useful ordered or seekable access path. Conceptually, one input is used to build a hash structure on the join key, and the other input probes it for matches.
+
+```text
+Filtered SalesOrder rows  ──┐
+                            ├── Hash Match (Inner Join) ── matching order items
+Large SalesOrderItem input ─┘
+```
+
+This does **not** mean `Hash Match` is a bad operator. It may be the least expensive join algorithm under the circumstances. The real problem in this demonstration is the cost of reading and processing the huge order-item input.
+
+**In SSMS:** select the Hash Match operator. Identify the join condition, the two incoming row flows, and any warnings. The smaller input is often a good choice for building the hash table, but do not assume a specific build side without inspecting the actual plan.
+
+## 7.5 Why scanning `Product` may be fine
+
+The query also joins `Product`, which has approximately **30,000** rows. A scan of a relatively small table can be cheap, especially if a large proportion of its rows is needed or the table occupies comparatively few pages.
+
+**In SSMS:** compare the `Product` access operator with the order-item access operator. The fact that both say *Scan* does not mean they have the same cost or perform the same amount of work.
+
+> [!TIP]
+> Do not try to eliminate every scan you see. Optimize the **expensive work**, not the operator labels.
+
+## 7.6 `Compute Scalar`, aggregation, and sorting
+
+Look for the operators corresponding to the remaining SQL operations.
+
+**`Compute Scalar`** may define the expression:
 
 ```sql
 CAST(soi.Quantity AS decimal(18,2)) * soi.UnitPrice
 ```
 
-`Hash Match (Aggregate)` may implement `GROUP BY p.CategoryId`, and `Sort` may implement `ORDER BY Revenue DESC`.
+The plan may show this as a calculated expression in the **Defined Values** property. SQL Server can sometimes defer evaluation of scalar expressions, so the presence of this operator does not by itself tell you when every value is physically computed.
 
-The `Product` table contains only about 30,000 rows. A scan of this comparatively small table may be perfectly reasonable. **Seek is not always better than scan**; the optimizer estimates costs, not labels.
+**`Hash Match (Aggregate)`** may implement the grouping:
 
-## 7.4 Missing Index recommendations
+```sql
+GROUP BY p.CategoryId
+```
 
-SSMS may show an index recommendation such as a key on `SalesOrder(OrderDate)`.
+The aggregate produces totals by category. Compare the large incoming row flow with the much smaller number of output groups.
+
+**`Sort`** may implement:
+
+```sql
+ORDER BY Revenue DESC
+```
+
+Inspect the **Order By** property and the row count being sorted. The result has relatively few category groups, so the final sort may be cheap compared with the earlier scans. In other queries, sorting many rows or spilling to tempdb can be expensive.
+
+> [!NOTE]
+> The operator selected for grouping or ordering depends on available input order, cardinality, memory, and the optimizer. The specific plan is not a universal rule for every query with `GROUP BY` or `ORDER BY`.
+
+## 7.7 Missing Index recommendations
+
+A green missing-index suggestion may appear above the graphical plan. It may resemble:
+
+```sql
+-- Illustrative recommendation only, not a command to execute now
+CREATE NONCLUSTERED INDEX ...
+ON dbo.SalesOrder (OrderDate)
+INCLUDE (SalesOrderId);
+```
+
+This recommendation is based on the optimizer's view of a **particular query**, not on the complete database workload. It does not fully account for existing overlapping indexes, maintenance overhead, storage costs, or other queries.
 
 > [!WARNING]
-> A missing-index recommendation is a **hint**, not a complete indexing strategy. Check existing indexes, other queries, write overhead, index width, and possible duplication before applying it.
+> **Do not create suggested indexes yet.** We will add indexes deliberately in Section 8. After introducing a clustered primary key on `SalesOrderId`, its clustered key is already available as the row locator in the nonclustered `OrderDate` index. Explicit `INCLUDE (SalesOrderId)` is unnecessary in that design.
 
 ## Check your understanding
 
-1. Why can a query return only 5,477 rows yet read millions of input rows?
-2. Why does an index on `SalesOrderId` help the order-item join?
-3. Is a `Hash Match` always a performance problem?
-4. Why may a scan of `Product` still be acceptable?
+1. What is the difference between **rows read**, **rows returned**, and **logical reads**?
+2. Why can scanning 10 million orders return only 5,477 relevant orders?
+3. Why is `SalesOrderItem` the main bottleneck, despite having a join predicate?
+4. Why might `Hash Match` be a reasonable join strategy before adding indexes?
+5. Why is a scan of `Product` not necessarily a problem?
+6. Which SQL clauses correspond to `Compute Scalar`, `Hash Match (Aggregate)`, and `Sort`?
+7. Why should you not blindly create every Missing Index recommendation?
 
 <details>
 <summary>Show answers</summary>
 
-1. Without a useful access path the engine must inspect many unrelated rows/pages to evaluate the filter.
-2. It lets the engine find items for each relevant order instead of scanning the entire item table.
-3. No, it may be the cheapest join algorithm for the available inputs.
-4. Because a small scan may cost less than using an index plus additional lookups.
+1. Rows read are examined by an access operator; rows returned pass its filter; logical reads count 8 KB page accesses through the buffer pool.
+2. The date filter is selective, but without a suitable index the engine may still inspect the whole heap to find the matches.
+3. The join key is not indexed for the needed access pattern, so the engine may process a 40-million-row input for roughly 21,908 matching items.
+4. It can efficiently match large unsorted inputs when no suitable repeated seek path exists.
+5. Its table is much smaller; the overall cost of the scan can be low.
+6. Arithmetic expression; `GROUP BY` and aggregates; `ORDER BY`.
+7. Suggestions are query-specific and may overlap indexes or add unnecessary write and storage costs.
 
 </details>
 
 ---
 
-# 8. Create useful indexes
+# 8. Create indexes and observe the changing plan
 
 ## 8.1 Create clustered primary keys
 
@@ -368,11 +475,14 @@ PRIMARY KEY CLUSTERED (SalesOrderItemId);
 GO
 ```
 
-Refresh the **Indexes** folder in SSMS and confirm `PK_SalesOrder` and `PK_SalesOrderItem` exist.
+In SSMS Object Explorer, refresh the **Indexes** nodes under both tables and check that `PK_SalesOrder` and `PK_SalesOrderItem` exist.
 
-These indexes organize the data by their ID columns. However, the baseline query filters orders by **OrderDate** and finds items by **SalesOrderId**. Primary keys alone do not fully address those two access patterns.
+A clustered primary key enforces uniqueness and stores the actual table rows in its leaf level. However, the main query filters by `OrderDate` and joins order items by `SalesOrderId`. The clustered keys alone are not designed for both access patterns.
 
-## 8.2 Nonclustered index for the order-date filter
+> [!TIP]
+> Optionally rerun the main query **after the clustered primary keys but before creating the nonclustered indexes**. Observe whether the plan improves and whether the original large scans remain. This helps separate the effect of clustering from that of adding the two targeted nonclustered indexes. Record the plan, but do not use it as the final 'after' comparison.
+
+## 8.2 Create an index for the `SalesOrder` date filter
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_OrderDate
@@ -380,9 +490,13 @@ ON dbo.SalesOrder (OrderDate);
 GO
 ```
 
-The key `OrderDate` supports the date-range predicate. Because `SalesOrderId` is the clustered key, SQL Server already carries it as the row locator in this nonclustered index; an explicit `INCLUDE (SalesOrderId)` is unnecessary.
+The index key is `OrderDate` because the query's filter is a date range. `SalesOrderId` is the clustered key and is therefore already available as the nonclustered index's row locator. This makes the index sufficient to obtain the order IDs needed by the join without explicitly adding `SalesOrderId` to `INCLUDE`.
 
-## 8.3 Nonclustered index for the join: first without INCLUDE
+**Inspect:** expand the index in SSMS and check its key column. Remember the difference between the indexed **key** and an **implicit clustered-key locator**.
+
+## 8.3 Create the order-item index *without* included columns
+
+First create a narrow index on the join column:
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
@@ -390,7 +504,7 @@ ON dbo.SalesOrderItem (SalesOrderId);
 GO
 ```
 
-Use this isolated query to inspect the lookup:
+Run this isolated query with the Actual Execution Plan enabled:
 
 ```sql
 SELECT ProductId, Quantity, UnitPrice
@@ -399,12 +513,20 @@ WHERE SalesOrderId = 1;
 GO
 ```
 
-The optimizer may choose an **Index Seek** plus **Key Lookup**. The seek finds order-item rows using `SalesOrderId`, but the nonclustered index does not have `ProductId`, `Quantity`, and `UnitPrice`. SQL Server can fetch those values from the clustered index.
+The index helps SQL Server find rows matching `SalesOrderId`, but does **not** contain the requested `ProductId`, `Quantity`, and `UnitPrice` values. The optimizer may therefore choose an **Index Seek** followed by a **Key Lookup** in `PK_SalesOrderItem`.
+
+In the plan, inspect the following:
+
+- **Index Seek:** its Object should reference `IX_SalesOrderItem_SalesOrderId`; inspect its Seek Predicates.
+- **Key Lookup (Clustered):** its Object should reference `PK_SalesOrderItem`; inspect Output List and number of executions.
+- **Nested Loops:** it may connect the seek and lookup; repeated lookups can become expensive for many matching rows.
+
+A Key Lookup is not automatically slow for a few rows. It can become costly when repeated thousands of times. The optimizer may instead choose a scan when lookups are estimated to be too expensive.
 
 > [!NOTE]
-> An execution plan is cost-based. If SQL Server chooses a different plan on your instance, inspect row counts and costs rather than assuming the diagram is wrong.
+> A lookup is **not guaranteed** for this particular `SalesOrderId` on every dataset or version. If the optimizer selects a different access path, use the plan properties to explain the choice. Do not force an index unless you are explicitly studying the effect of a forced plan.
 
-## 8.4 Add the columns needed by the query
+## 8.4 Recreate the order-item index with `INCLUDE`
 
 ```sql
 DROP INDEX IX_SalesOrderItem_SalesOrderId ON dbo.SalesOrderItem;
@@ -421,64 +543,118 @@ INCLUDE
 GO
 ```
 
-Run the isolated query again. It should now be covered by the nonclustered index and normally no longer need a Key Lookup.
+Run the isolated query again. This index now contains everything required from `SalesOrderItem`, so a **Key Lookup is not needed** to obtain those three columns. Compare its plan with the previous one.
 
-- **Key column** `SalesOrderId`: supports the search/join.
-- **Included columns** `ProductId`, `Quantity`, `UnitPrice`: provide additional data at leaf level, without becoming part of the index search key.
+| Part of index | Columns | Role |
+|---|---|---|
+| Key | `SalesOrderId` | Locates matching order items through the B+ tree |
+| Included | `ProductId`, `Quantity`, `UnitPrice` | Supplies required columns at leaf level |
+| Implicit row locator | `SalesOrderItemId` | Clustered key needed to identify the complete row |
 
-A **covering index** supplies all columns required from a table for a particular query. Included columns can also support filters evaluated as residual predicates, `GROUP BY`, and aggregate expressions; they are not limited to the `SELECT` list.
+The main query needs these columns for joining `Product` (`ProductId`) and calculating revenue (`Quantity`, `UnitPrice`). This index is **covering** for the `SalesOrderItem` portion of the query.
+
+> [!IMPORTANT]
+> `INCLUDE` columns are stored at the leaf level; they do not extend the sorted search key. An included column can still support a residual filter or be used in `GROUP BY` or calculations, but it does not have the same seek or sort-order benefits as a leading key column.
 
 ---
 
-# 9. Run the baseline query again
+# 9. Re-run the baseline query and compare plans
 
-Re-run **exactly the SQL statement from Section 6.1**. The SQL text is unchanged; only the available access paths have changed.
+Execute **exactly the same SELECT from Section 6.2**, with both `STATISTICS IO` and `STATISTICS TIME` still on and Actual Execution Plan enabled. Do not modify the `WHERE`, joins, grouping, or ordering.
 
-Now compare the actual plans, logical reads, and elapsed time.
+## 9.1 Start with the access operators
 
-The optimizer may choose a pattern involving an `Index Seek` on the date index, a join such as `Nested Loops`, and seeks into the indexed order items. Exact operators can vary with statistics, cardinalities, and cost estimates.
+The original plan may have scanned large portions of `SalesOrder` and `SalesOrderItem`. After creating the targeted indexes, inspect whether the optimizer can use:
 
-A simplified view of nested loops is:
+- **Index Seek on `IX_SalesOrder_OrderDate`** to find the relevant date range.
+- **Index Seek on `IX_SalesOrderItem_SalesOrderId`** to find items for the selected order IDs.
+- **A join algorithm such as Nested Loops** to combine the relatively small outer input with repeated efficient inner seeks.
+
+**In SSMS:** click each relevant seek and inspect **Seek Predicates**. For the date index you should see a date-range condition; for the item index you should see a condition on `SalesOrderId` (subject to the optimizer's chosen plan).
+
+## 9.2 Why `Nested Loops` can become attractive
+
+A simplified mental model of a nested-loops join is:
 
 ```text
 for each matching order:
-    find matching order items using the SalesOrderId index
+    seek its matching order items using SalesOrderId
 ```
 
-> [!IMPORTANT]
-> An index can change the strategy of the **entire execution plan**, not just replace one access operator.
+Before indexing, repeated scans of `SalesOrderItem` would be unacceptably expensive. With an index on `SalesOrderId`, the inner input can be found through efficient index navigation. This can make Nested Loops cheaper than building or probing a hash join over an enormous item-table scan.
 
-## Reference comparison
+In the actual plan, compare the outer input's row count with the inner seek's **Number of Executions** or related runtime counters. A small number of logical reads per seek can still add up when the seek is repeated thousands of times. This is why the optimized query may still report tens of thousands of logical reads for `SalesOrderItem`.
 
-These are approximate results from the original lab on one SQL Server Express instance, not guaranteed targets:
+> [!NOTE]
+> The optimizer may still prefer `Hash Match`, `Merge Join`, a different access order, or a parallel plan. Indexes make new strategies **available**; they do not guarantee a particular one.
 
-| Metric | Before | After |
+## 9.3 Compare logical I/O, CPU, and elapsed time
+
+The original lab recorded the following approximate reference values on SQL Server Express:
+
+| Metric | Before indexes | After indexes |
 |---|---:|---:|
-| SalesOrder access | Table Scan | Index Seek |
+| `SalesOrder` access | Table Scan | Index Seek |
 | Relevant orders | ~5,477 | ~5,477 |
-| SalesOrderItem access | Table Scan | Index Seek |
-| Large item input | ~40 million rows | ~21,908 relevant rows |
+| `SalesOrderItem` access | Table Scan | Index Seek |
+| Relevant order items | ~21,908 | ~21,908 |
+| Large item input processed | ~40,000,000 rows | ~21,908 matching rows |
 | Main join | Hash Match | Nested Loops |
-| SalesOrderItem logical reads | ~198,000 | ~54,000 |
-| SalesOrder logical reads | ~57,000 | ~15 |
+| `SalesOrder` logical reads | ~57,000 | ~15 |
+| `SalesOrderItem` logical reads | ~198,000 | ~54,000 |
 | Elapsed time | ~17 s | ~0.5 s |
 
-The point is not that SQL Server suddenly processes 40 million rows faster. **It avoids processing most of them.**
+These are **reference measurements, not expected fixed answers**. The large reduction in work is the central observation. The number of matching records did not change, and the SQL statement did not change; **the physical access paths did**.
 
-## Check your understanding
+### Calculate your own improvement
 
-1. Why did clustered primary keys alone not solve the original query's main problem?
-2. Why is `OrderDate` the key of one index and `SalesOrderId` the key of the other?
-3. Which missing columns can cause a Key Lookup on the order-item index?
-4. Did the query itself change before and after adding the indexes?
+Using the numbers you recorded in Section 6.2:
+
+- **Speedup** = before elapsed time / after elapsed time.
+- **Logical-read reduction (%)** = 100 × (before reads − after reads) / before reads.
+
+Compare logical reads **per table**, not only total execution time. Note that a higher number of indexed seeks can produce many logical reads, even when the plan is much faster than the original large scans.
+
+## 9.4 Editions and parallel execution
+
+The original lab also compared Express with Developer/Enterprise on the same computer and data:
+
+| Reference measurement | Express | Developer / Enterprise |
+|---|---:|---:|
+| Execution before indexes | Serial in reference test | Parallel in reference test |
+| Elapsed before indexes | ~17 s | ~1.3 s |
+| Elapsed after indexes | ~0.5 s | ~0.17 s |
+| Approximate speedup due to indexes | ~33× | ~8× |
+
+The difference illustrates why **hardware, configured parallelism, memory, and edition capabilities** influence observed timing. A parallel plan can reduce elapsed time by using multiple workers, but it does not eliminate unnecessary logical I/O caused by a poor access path. In your own results, do not infer the edition or degree of parallelism from elapsed time alone; inspect plan properties.
+
+> [!IMPORTANT]
+> **The indexes did not make SQL Server faster at processing 40 million irrelevant order items. They allowed the engine to avoid processing most of them.**
+
+## 9.5 A structured plan-comparison exercise
+
+Open the **before** and **after** execution plans (if necessary, save the `.sqlplan` files in SSMS for comparison). Answer these questions using the actual plan rather than guessing:
+
+1. Which operator reads `SalesOrder` before indexing, and which operator reads it afterward?
+2. Which `SalesOrderItem` access path is used in each plan?
+3. Which join algorithm combines orders and items before and after indexing?
+4. Where do the rows that reach the join come from? Compare estimates and actuals.
+5. Did the scan of `Product` disappear? If not, does that automatically mean the plan is inefficient?
+6. Which expressions are calculated by `Compute Scalar`, and which operators handle aggregation and sorting?
+7. Did the logical reads for the two large tables drop? Which table shows the greatest relative improvement?
+8. Are the reference numbers from the lab identical to yours? Explain why a difference is expected.
 
 <details>
-<summary>Show answers</summary>
+<summary>Show discussion points</summary>
 
-1. The query filters by `OrderDate` and joins on `SalesOrderId`, not only by the primary-key values.
-2. They correspond to the filter and the join access pattern.
-3. `ProductId`, `Quantity`, and `UnitPrice` when they are not available in that index.
-4. No; indexes changed the available access paths.
+1. In the original reference plan the `SalesOrder` heap was scanned; after adding the date index the plan used an Index Seek.
+2. The original reference plan scanned the large order-item input; the new index supports seeks by `SalesOrderId`.
+3. The reference changed from a Hash Match join to Nested Loops. Either choice can be reasonable for different inputs and indexes.
+4. The join receives relevant orders and their matching items; indexes reduce the amount of unrelated data read. Inspect each student's actual row counts.
+5. Not necessarily. A smaller `Product` scan may still be cheap.
+6. The arithmetic expression, `GROUP BY`, and `ORDER BY` remain part of the query even when the access path changes. Exact physical operators may vary.
+7. The original reference showed `SalesOrder` logical reads decreasing from roughly 57,000 to 15, and `SalesOrderItem` from roughly 198,000 to 54,000.
+8. Hardware, caching, statistics, edition, parallelism, data distribution, and other workloads affect measurements and plans.
 
 </details>
 

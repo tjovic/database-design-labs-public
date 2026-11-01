@@ -56,7 +56,7 @@ a. **1** data page (`DBCC IND` returns 2 rows total: one IAM page and one data p
 b. `PageFID = 1`, `PagePID = 232`.
 c. Row 1 (`Croatia`): **29 bytes**. Row 2 (`Germany`): **29 bytes**. Row 3 (`Italy`): **25 bytes**.
 d. `IDState` — the clustering key. Row order on the page follows `IDState` ascending (1, 2, 3), not the alphabetical order of `Name`.
-e. `'Germany'` has `IDState = 2`. The row before it is `'Croatia'` (`IDState = 1`); the row after it is `'Italy'` (`IDState = 3`) — determined by `IDState`, not by the two country names' alphabetical relationship to `'Germany'`.
+e. `'Germany'` has `IDState = 2`. The row before it is `'Croatia'` (`IDState = 1`); the row after it is `'Italy'` (`IDState = 3`) — based on `IDState`, not on alphabetical order.
 
 </details>
 
@@ -97,7 +97,7 @@ f. `IDProduct` — the clustering key. Notice in (d) and (e) that the key value 
 
 </details>
 
-**Reflect:** Row counts per page were not identical across the six pages (they ranged from 62 to 107). Why might that be, given that `Name`, `ProductNumber`, and `Color` are all variable-length columns?
+**Bonus — why isn't every page equally full?** Row counts per page were not identical across the six pages (they ranged from 62 to 107). Why might that be, given that `Name`, `ProductNumber`, and `Color` are all variable-length columns?
 
 <details>
 <summary>Think about it</summary>
@@ -112,12 +112,14 @@ Rows with longer `Name`, `ProductNumber`, or `Color` values take up more bytes, 
 
 `Customer` has 19,972 rows — few enough that `DBCC IND` is still readable, but large enough to make the point of Lab 05's `SalesOrder` exercise: for a genuinely large table, listing every page by hand does not scale.
 
-**a) Use `DBCC IND` directly** for the first part of this exercise:
+### a) Using `DBCC IND` directly
 
 ```sql
 DBCC IND('AdventureWorksENG', 'dbo.Customer', -1);
 GO
 ```
+
+Answer:
 
 1. Approximately how many data pages (`PageType = 1`) does `Customer` use?
 2. What are the first five data-page `PagePID` values?
@@ -134,7 +136,9 @@ GO
 
 </details>
 
-**b) Now get the same page count without listing every page.** `Customer`'s 338 pages are still printable, but a table with millions of rows would produce an unusably long result (this is the exact problem Lab 05 raises for `SalesOrder`, which has tens of millions of rows). Use the documented `sys.dm_db_partition_stats` view instead:
+### b) Getting the same page count without listing every page
+
+`Customer`'s 338 pages are still printable, but a table with millions of rows would produce an unusably long result — the exact problem Lab 05 raises for `SalesOrder`, which has tens of millions of rows. Use the documented `sys.dm_db_partition_stats` view instead:
 
 ```sql
 SELECT
@@ -151,6 +155,8 @@ WHERE ps.object_id = OBJECT_ID('dbo.Customer')
   AND i.index_id IN (0, 1)
 GROUP BY i.name, i.index_id;
 ```
+
+Answer:
 
 1. Does `InRowDataPages` match the data-page count you found with `DBCC IND` in (a)?
 2. Compute `[RowCount] / InRowDataPages`. Does it match the row count you observed on one page in (a.3)?
@@ -182,6 +188,8 @@ SET STATISTICS IO OFF;
 ```
 
 For each table, look at the `logical reads` value on the **Messages** tab.
+
+Answer:
 
 1. For `State`, how does `logical reads` compare to the *total* number of pages `DBCC IND` listed in Exercise 1 (including the IAM page, not just the one data page)?
 2. For `Product`, how does `logical reads` compare to the total page count from Exercise 2 — 6 data pages, 1 root page, and 1 IAM page?

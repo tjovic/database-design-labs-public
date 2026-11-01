@@ -815,6 +815,7 @@ GO
 2. Did the physical-read count change?
 3. Why might both executions report zero physical reads?
 4. Can you conclude that the query accessed zero pages if `physical reads = 0`?
+5. Compare `logical reads` with the **159 data pages** you counted for `Product` in Guided investigation 2 (Section 14). Are the two numbers the same? If not, why not?
 
 > [!NOTE]
 > Pages may have been cached before you started this exercise. Do not expect the first query to show a nonzero physical-read count. **Do not clear the SQL Server buffer pool** just to force a difference on a shared classroom server.
@@ -826,6 +827,7 @@ GO
 2. They may differ: pages read from storage can remain cached for subsequent executions.
 3. Another query or an earlier operation may already have loaded the required pages into memory.
 4. No. Inspect **logical reads** to see page accesses in the buffer pool. Also consider `read-ahead reads` when studying storage activity.
+5. No — `logical reads` is **161**, not 159. A full scan also has to visit the clustered index's root page and its IAM page to find the data pages in the first place, so `logical reads` counts **every** page type touched (data, root/intermediate, and IAM), not just the leaf-level data pages you counted with `DBCC IND`.
 
 </details>
 

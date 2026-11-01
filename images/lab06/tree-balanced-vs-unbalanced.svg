@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-<title id="title">Balanced and unbalanced trees</title>
-<desc id="desc">Comparison of an unbalanced tree and a balanced tree. The unbalanced tree has leaves at different depths, while all leaves of the balanced tree are at the same depth.</desc>
+<title id="title">Leaf depths: unbalanced vs. B+ tree</title>
+<desc id="desc">Conceptual comparison: the left tree has leaves at different depths, while the right tree illustrates the equal leaf depth required by a B+ tree.</desc>
 
 <defs>
  <style>
@@ -16,12 +16,12 @@
 </defs>
 
 <rect width="1600" height="900" fill="#FFFFFF"/>
-<text class="title" x="64" y="64">Balanced and unbalanced trees</text>
-<text class="subtitle" x="64" y="96">A balanced tree has every leaf at the same distance from the root.</text>
+<text class="title" x="64" y="64">Leaf depths: unbalanced vs. B+ tree</text>
+<text class="subtitle" x="64" y="96">In a B+ tree, all leaf nodes are at the same depth.</text>
 
 <!-- panel headings -->
-<text x="420" y="174" text-anchor="middle" font-size="24" font-weight="700">Unbalanced tree</text>
-<text x="1180" y="174" text-anchor="middle" font-size="24" font-weight="700">Balanced tree</text>
+<text x="420" y="174" text-anchor="middle" font-size="24" font-weight="700">Unequal leaf depths</text>
+<text x="1180" y="174" text-anchor="middle" font-size="24" font-weight="700">B+ tree property</text>
 
 <!-- Left tree edges -->
 <g class="edge">
@@ -58,19 +58,20 @@
 </g>
 <!-- Right nodes -->
 <g>
- <circle cx="1180" cy="250" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1180" y="250">A</text>
- <circle cx="1010" cy="405" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1010" y="405">B</text>
- <circle cx="1350" cy="405" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1350" y="405">J</text>
- <circle cx="940" cy="565" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="940" y="565">E</text>
- <circle cx="1250" cy="565" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1250" y="565">C</text>
- <circle cx="1350" cy="565" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1350" y="565">H</text>
- <circle cx="1470" cy="565" r="37" fill="#FFC000" stroke="#D49B00" stroke-width="1.5"/><text class="nodeText" x="1470" y="565">G</text>
+ <circle cx="1180" cy="250" r="37" fill="#FFC84A" stroke="#D99A10" stroke-width="1.5"/><text class="nodeText" x="1180" y="250">A</text>
+ <circle cx="1010" cy="405" r="37" fill="#F3B27E" stroke="#C88749" stroke-width="1.5"/><text class="nodeText" x="1010" y="405">B</text>
+ <circle cx="1350" cy="405" r="37" fill="#F3B27E" stroke="#C88749" stroke-width="1.5"/><text class="nodeText" x="1350" y="405">J</text>
+ <circle cx="940" cy="565" r="37" fill="#A7DCC3" stroke="#5B9F80" stroke-width="1.5"/><text class="nodeText" x="940" y="565">E</text>
+ <circle cx="1250" cy="565" r="37" fill="#A7DCC3" stroke="#5B9F80" stroke-width="1.5"/><text class="nodeText" x="1250" y="565">C</text>
+ <circle cx="1350" cy="565" r="37" fill="#A7DCC3" stroke="#5B9F80" stroke-width="1.5"/><text class="nodeText" x="1350" y="565">H</text>
+ <circle cx="1470" cy="565" r="37" fill="#A7DCC3" stroke="#5B9F80" stroke-width="1.5"/><text class="nodeText" x="1470" y="565">G</text>
 </g>
 
 <!-- Bottom explanation -->
+<text x="1180" y="675" text-anchor="middle" font-size="17" fill="#3E7060">All leaves at level 2</text>
 <rect x="64" y="800" width="1472" height="58" rx="10" fill="#F8FAFC" stroke="#D8E1EC"/>
 <circle cx="92" cy="829" r="7" fill="#EA8A19"/>
-<text class="note" x="112" y="835">Left: leaves are at different depths.</text>
+<text class="note" x="112" y="835">Left: leaf depths vary.</text>
 <circle cx="600" cy="829" r="7" fill="#0F766E"/>
-<text class="note" x="620" y="835">Right: every leaf is at the same depth.</text>
+<text class="note" x="620" y="835">Right: all leaves are at depth 2.</text>
 </svg>

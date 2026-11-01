@@ -3,7 +3,7 @@
 <desc id="desc">A clustered index B+ tree. The search follows the right pointer from root page 200, then the middle pointer from intermediate page 202, and reaches data page 104 where the complete row for MemberID 61 is stored.</desc>
 <defs>
  <marker id="treeArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#64748B"/></marker>
- <marker id="searchArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#0F766E"/></marker>
+ <marker id="searchArrow" markerWidth="7" markerHeight="7" refX="8" refY="6" orient="auto"><path d="M0 1.5 L9 6 L0 10.5 Z" fill="#0F766E"/></marker>
  <marker id="leafArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#3B82F6"/></marker>
  <style>
  text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
@@ -17,7 +17,7 @@
  .small{font-size:12px;fill:#64748B}
  .note{font-size:15px;fill:#475569}
  .edge{fill:none;stroke:#AAB7C6;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#treeArrow)}
- .active{fill:none;stroke:#0F766E;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#searchArrow)}
+ .active{fill:none;stroke:#0F766E;stroke-width:3.1;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#searchArrow)}
  .leaf{fill:none;stroke:#3B82F6;stroke-width:2.8;stroke-linecap:round;marker-end:url(#leafArrow)}
  </style>
 </defs>
@@ -25,7 +25,7 @@
 
 <!-- Header -->
 <text class="title" x="42" y="52">Clustered index — B+ tree search</text>
-<text class="subtitle" x="42" y="82">Index on MemberID · Leaf pages contain complete data rows</text>
+<text class="subtitle" x="42" y="82">Index on MemberID · Leaf level = data pages containing complete rows</text>
 <rect x="1110" y="24" width="445" height="82" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.4"/>
 <text x="1132" y="48" font-size="12" font-weight="700" letter-spacing="1" fill="#0F766E">SEARCH EXAMPLE</text>
 <text x="1132" y="73" font-size="17" font-family="monospace" font-weight="700">SELECT * FROM Member</text>
@@ -107,21 +107,21 @@
 
 <!-- Data page 101 -->
 <g>
- <rect x="128" y="520" width="224" height="190" rx="9" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
- <path d="M137 520 H343 Q352 520 352 529 V554 H128 V529 Q128 520 137 520Z" fill="#F1F5F9"/>
+ <rect x="128" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
+ <path d="M137 520 H343 Q352 520 352 529 V554 H128 V529 Q128 520 137 520Z" fill="#E1F1E8"/>
  <text class="page" x="240" y="543" text-anchor="middle">DATA PAGE 101</text>
  <text class="cellhead" x="142" y="576">MemberID</text><text class="cellhead" x="210" y="576">FirstName</text><text class="cellhead" x="282" y="576">LastName</text>
  <line x1="128" y1="585" x2="352" y2="585" stroke="#D8E1EC"/>
  <text class="cell" x="142" y="615">11</text><text class="cell" x="210" y="615">Oliver</text><text class="cell" x="282" y="615">Brooks</text>
  <line x1="138" y1="628" x2="342" y2="628" stroke="#E2E8F0"/>
  <text class="cell" x="142" y="654">19</text><text class="cell" x="210" y="654">Emma</text><text class="cell" x="282" y="654">Reed</text>
- <text class="small" x="240" y="688" text-anchor="middle">sorted by MemberID</text>
+ <text class="small" x="240" y="688" text-anchor="middle">logical key order</text>
 </g>
 
 <!-- Data page 102 -->
 <g>
- <rect x="408" y="520" width="224" height="190" rx="9" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
- <path d="M417 520 H623 Q632 520 632 529 V554 H408 V529 Q408 520 417 520Z" fill="#F1F5F9"/>
+ <rect x="408" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
+ <path d="M417 520 H623 Q632 520 632 529 V554 H408 V529 Q408 520 417 520Z" fill="#E1F1E8"/>
  <text class="page" x="520" y="543" text-anchor="middle">DATA PAGE 102</text>
  <text class="cellhead" x="422" y="576">MemberID</text><text class="cellhead" x="490" y="576">FirstName</text><text class="cellhead" x="562" y="576">LastName</text>
  <line x1="408" y1="585" x2="632" y2="585" stroke="#D8E1EC"/>
@@ -132,8 +132,8 @@
 
 <!-- Data page 103 -->
 <g>
- <rect x="688" y="520" width="224" height="190" rx="9" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
- <path d="M697 520 H903 Q912 520 912 529 V554 H688 V529 Q688 520 697 520Z" fill="#F1F5F9"/>
+ <rect x="688" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
+ <path d="M697 520 H903 Q912 520 912 529 V554 H688 V529 Q688 520 697 520Z" fill="#E1F1E8"/>
  <text class="page" x="800" y="543" text-anchor="middle">DATA PAGE 103</text>
  <text class="cellhead" x="702" y="576">MemberID</text><text class="cellhead" x="770" y="576">FirstName</text><text class="cellhead" x="842" y="576">LastName</text>
  <line x1="688" y1="585" x2="912" y2="585" stroke="#D8E1EC"/>
@@ -144,8 +144,8 @@
 
 <!-- Data page 104 -->
 <g>
- <rect x="968" y="520" width="224" height="190" rx="9" fill="#FFFFFF" stroke="#0F766E" stroke-width="2.8"/>
- <path d="M977 520 H1183 Q1192 520 1192 529 V554 H968 V529 Q968 520 977 520Z" fill="#E6F4F1"/>
+ <rect x="968" y="520" width="224" height="190" rx="9" fill="#EAF8EF" stroke="#0F766E" stroke-width="2.8"/>
+ <path d="M977 520 H1183 Q1192 520 1192 529 V554 H968 V529 Q968 520 977 520Z" fill="#CFEBDD"/>
  <text x="1080" y="543" text-anchor="middle" font-size="13" font-weight="700" fill="#0F766E">DATA PAGE 104 · FOUND</text>
  <text class="cellhead" x="982" y="576">MemberID</text><text class="cellhead" x="1050" y="576">FirstName</text><text class="cellhead" x="1122" y="576">LastName</text>
  <line x1="968" y1="585" x2="1192" y2="585" stroke="#C7DDD8"/>
@@ -153,13 +153,13 @@
  <rect x="976" y="628" width="208" height="34" rx="5" fill="#FFF0D9" stroke="#EA580C" stroke-width="2"/>
  <text x="982" y="651" font-size="14" font-weight="800" fill="#C2410C">61</text><text x="1050" y="651" font-size="14" font-weight="800" fill="#C2410C">Sofia</text><text x="1122" y="651" font-size="14" font-weight="800" fill="#C2410C">Ford</text>
  <rect x="1028" y="670" width="104" height="25" rx="8" fill="#FFF7ED" stroke="#EA580C"/>
- <text x="1080" y="687" text-anchor="middle" font-size="12" font-weight="700" fill="#C2410C">KEY FOUND</text>
+ <text x="1080" y="687" text-anchor="middle" font-size="12" font-weight="700" fill="#C2410C">ROW FOUND</text>
 </g>
 
 <!-- Data page 105 -->
 <g>
- <rect x="1248" y="520" width="224" height="190" rx="9" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
- <path d="M1257 520 H1463 Q1472 520 1472 529 V554 H1248 V529 Q1248 520 1257 520Z" fill="#F1F5F9"/>
+ <rect x="1248" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
+ <path d="M1257 520 H1463 Q1472 520 1472 529 V554 H1248 V529 Q1248 520 1257 520Z" fill="#E1F1E8"/>
  <text class="page" x="1360" y="543" text-anchor="middle">DATA PAGE 105</text>
  <text class="cellhead" x="1262" y="576">MemberID</text><text class="cellhead" x="1330" y="576">FirstName</text><text class="cellhead" x="1402" y="576">LastName</text>
  <line x1="1248" y1="585" x2="1472" y2="585" stroke="#D8E1EC"/>
@@ -174,5 +174,5 @@
 <circle cx="75" cy="811" r="4.5" fill="#0F766E"/><text class="note" x="91" y="816">1. Root Page 200: 61 ≥ 43 → follow the right pointer.</text>
 <circle cx="575" cy="811" r="4.5" fill="#0F766E"/><text class="note" x="591" y="816">2. Page 202: 56 ≤ 61 &lt; 73 → follow the middle pointer.</text>
 <circle cx="1115" cy="811" r="4.5" fill="#EA580C"/><text class="note" x="1131" y="816">3. Page 104: row found.</text>
-<text x="66" y="846" font-size="14" fill="#64748B">Unlike a nonclustered index on a heap, no RID lookup is needed: the clustered-index leaf level stores the complete data rows.</text>
+<text x="66" y="846" font-size="13" fill="#64748B">No RID Lookup is needed: the clustered-index leaf page already contains the complete row. Leaf ordering is logical, not a physical disk guarantee.</text>
 </svg>

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2640" height="900" viewBox="0 0 2640 900" role="img" aria-labelledby="title desc">
-<title id="title">B+ tree growth after three insertions</title>
-<desc id="desc">Four stages show the initial B+ tree and the structural changes caused by inserting keys 58, 60, and 75. Each node has two fixed key slots.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1400" height="1990" viewBox="0 0 1400 1990" role="img" aria-labelledby="title desc">
+<title id="title">B+ tree insertion – four stages in two rows</title>
+<desc id="desc">Initial B+ tree, insert 58, insert 60, insert 75. Two-column layout for improved readability.</desc>
 <defs>
   <marker id="arrowTree" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#39434D"/></marker>
   <marker id="arrowLeaf" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#3976B8"/></marker>
@@ -21,6 +21,24 @@
     .slot-divider { stroke:#89939D; stroke-width:1.1; }
   </style>
 </defs>
+<style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #202832; }
+    .panel { fill:#FFFFFF; stroke:#D8DEE5; stroke-width:1.6; }
+    .stage-title { font-size:25px; font-weight:700; letter-spacing:.2px; }
+    .stage-sub { font-size:15px; fill:#64707D; }
+    .stage-num { font-size:17px; font-weight:700; fill:#FFFFFF; text-anchor:middle; dominant-baseline:middle; }
+    .level-label { font-size:11px; font-weight:700; letter-spacing:1.1px; fill:#7B8794; }
+    .key { font-size:18px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
+    .leaf-key { font-size:15px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
+    .tree-edge { fill:none; stroke:#39434D; stroke-width:1.8; stroke-linecap:round; marker-end:url(#arrowTree); }
+    .leaf-edge { fill:none; stroke:#3976B8; stroke-width:2.2; stroke-linecap:round; marker-end:url(#arrowLeaf); }
+    .note-head { font-size:20px; font-weight:700; letter-spacing:.25px; }
+    .note { font-size:18px; fill:#34404B; }
+    .node-outline { stroke-width:1.6; }
+    .slot-divider { stroke:#89939D; stroke-width:1.1; }
+  </style>
+<rect width="1400" height="1990" fill="#FFFFFF"/>
+<defs><g id="full-diagram">
 <rect width="100%" height="100%" fill="#FFFFFF"/>
 <rect class="panel" x="15" y="18" width="630" height="864" rx="15"/>
 <rect x="16" y="19" width="628" height="6" rx="3" fill="#4779A8"/>
@@ -87,7 +105,7 @@
 <text class="note" x="71" y="703">8 index pages in total</text>
 <circle cx="58" cy="741" r="4" fill="#4779A8"/>
 <text class="note" x="71" y="746">Root key: 43</text>
-<path d="M 647.0 448 L 662.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+
 <rect class="panel" x="665" y="18" width="630" height="864" rx="15"/>
 <rect x="666" y="19" width="628" height="6" rx="3" fill="#C45A52"/>
 <circle cx="704" cy="66" r="19" fill="#C45A52"/>
@@ -164,7 +182,7 @@
 <text class="note" x="721" y="703">Parent [56, 73] splits; separator 58 moves up</text>
 <circle cx="708" cy="741" r="4" fill="#C45A52"/>
 <text class="note" x="721" y="746">Root now contains [43, 58]</text>
-<path d="M 1297.0 448 L 1312.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+
 <rect class="panel" x="1315" y="18" width="630" height="864" rx="15"/>
 <rect x="1316" y="19" width="628" height="6" rx="3" fill="#4D8B59"/>
 <circle cx="1354" cy="66" r="19" fill="#4D8B59"/>
@@ -248,7 +266,7 @@
 <text class="note" x="1371" y="703">Separator 60 is added to the right parent</text>
 <circle cx="1358" cy="741" r="4" fill="#4D8B59"/>
 <text class="note" x="1371" y="746">Right parent now contains [60, 73]</text>
-<path d="M 1947.0 448 L 1962.0 448" stroke="#A2ABB5" stroke-width="2.4" fill="none" marker-end="url(#arrowTree)"/>
+
 <rect class="panel" x="1965" y="18" width="630" height="864" rx="15"/>
 <rect x="1966" y="19" width="628" height="6" rx="3" fill="#8057A6"/>
 <circle cx="2004" cy="66" r="19" fill="#8057A6"/>
@@ -354,4 +372,6 @@
 <text class="note" x="2021" y="746">Root [43, 58] splits</text>
 <circle cx="2008" cy="784" r="4" fill="#8057A6"/>
 <text class="note" x="2021" y="789">A new root [58] creates level 4</text>
+</g></defs>
+<svg x="20" y="70" width="660" height="900" viewBox="0 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="700" y="70" width="660" height="900" viewBox="650 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="20" y="1015" width="660" height="900" viewBox="1300 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="700" y="1015" width="660" height="900" viewBox="1950 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg>
 </svg>

@@ -1,80 +1,55 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-<title id="title">Tree terminology: root, internal nodes, leaves, levels, depth and order</title>
-<desc id="desc">A rooted tree with four levels. The root is A, internal nodes include H, F and E, and leaves are J, B, G, C and D. Side labels show levels zero through three.</desc>
-
-<defs>
- <style>
-  text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
-  .title{font-size:32px;font-weight:700}
-  .subtitle{font-size:17px;fill:#64748B}
-  .label{font-size:19px;font-weight:600}
-  .nodeText{font-size:25px;font-weight:700;text-anchor:middle;dominant-baseline:middle;fill:#102033}
-  .edge{stroke:#91A8C3;stroke-width:2.3;fill:none;stroke-linecap:round}
-  .note{font-size:16px;fill:#334155}
-  .level{font-size:17px;fill:#334155}
- </style>
-</defs>
-
+<title id="title">Tree terminology: root, internal nodes, leaves, levels and depth</title>
+<desc id="desc">A balanced tree with four levels from zero to three. All leaves are at level three and the maximum depth is three edges.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#24364B}.title{font-size:34px;font-weight:700}.subtitle{font-size:19px;fill:#66788d}.nodeText{font-size:24px;font-weight:700;text-anchor:middle;dominant-baseline:middle;fill:#17283d}.note{font-size:19px}.label{font-size:19px;font-weight:bold}</style>
 <rect width="1600" height="900" fill="#FFFFFF"/>
-<text class="title" x="64" y="64">Tree terminology</text>
-<text class="subtitle" x="64" y="96">Root, internal nodes, leaves, levels, depth and order</text>
-
-<!-- level guides -->
-<g stroke="#E2E8F0" stroke-width="1.2" stroke-dasharray="5 7">
- <line x1="330" y1="150" x2="1260" y2="150"/>
- <line x1="330" y1="310" x2="1260" y2="310"/>
- <line x1="330" y1="475" x2="1260" y2="475"/>
- <line x1="330" y1="650" x2="1260" y2="650"/>
-</g>
-<!-- level labels -->
-<g>
- <rect x="64" y="126" width="190" height="48" rx="5" fill="#FFFFFF" stroke="#5B83B5" stroke-width="1.6"/><text class="level" x="159" y="157" text-anchor="middle">Level 0</text>
- <rect x="64" y="286" width="190" height="48" rx="5" fill="#FFFFFF" stroke="#5B83B5" stroke-width="1.6"/><text class="level" x="159" y="317" text-anchor="middle">Level 1</text>
- <rect x="64" y="451" width="190" height="48" rx="5" fill="#FFFFFF" stroke="#5B83B5" stroke-width="1.6"/><text class="level" x="159" y="482" text-anchor="middle">Level 2</text>
- <rect x="64" y="626" width="190" height="48" rx="5" fill="#FFFFFF" stroke="#5B83B5" stroke-width="1.6"/><text class="level" x="159" y="657" text-anchor="middle">Level 3</text>
-</g>
-
-<!-- tree edges -->
-<g class="edge">
- <path d="M800 220 C710 255 610 275 520 310"/>
- <path d="M800 220 C900 255 1000 275 1090 310"/>
- <path d="M520 380 C485 415 450 445 420 475"/>
- <path d="M1090 380 C1020 415 950 445 900 475"/>
- <path d="M1090 380 C1090 420 1090 445 1090 475"/>
- <path d="M1090 380 C1160 415 1220 445 1260 475"/>
- <path d="M900 545 C870 580 840 610 810 650"/>
- <path d="M900 545 C940 580 980 610 1010 650"/>
-</g>
-
-<!-- nodes: root, internal, leaves -->
-<g>
- <circle cx="800" cy="185" r="42" fill="#FFC000" stroke="#D49B00" stroke-width="1.7"/><text class="nodeText" x="800" y="185">A</text>
- <circle cx="520" cy="345" r="42" fill="#F28C38" stroke="#D66B1F" stroke-width="1.7"/><text class="nodeText" x="520" y="345">H</text>
- <circle cx="1090" cy="345" r="42" fill="#F28C38" stroke="#D66B1F" stroke-width="1.7"/><text class="nodeText" x="1090" y="345">F</text>
- <circle cx="420" cy="510" r="42" fill="#70AD47" stroke="#568B36" stroke-width="1.7"/><text class="nodeText" x="420" y="510">G</text>
- <circle cx="900" cy="510" r="42" fill="#70AD47" stroke="#568B36" stroke-width="1.7"/><text class="nodeText" x="900" y="510">E</text>
- <circle cx="1090" cy="510" r="42" fill="#70AD47" stroke="#568B36" stroke-width="1.7"/><text class="nodeText" x="1090" y="510">C</text>
- <circle cx="1260" cy="510" r="42" fill="#70AD47" stroke="#568B36" stroke-width="1.7"/><text class="nodeText" x="1260" y="510">D</text>
- <circle cx="810" cy="685" r="42" fill="#A6A6A6" stroke="#7F7F7F" stroke-width="1.7"/><text class="nodeText" x="810" y="685">J</text>
- <circle cx="1010" cy="685" r="42" fill="#A6A6A6" stroke="#7F7F7F" stroke-width="1.7"/><text class="nodeText" x="1010" y="685">B</text>
-</g>
-
-<!-- explanatory callouts -->
-<g stroke="#8CA3BE" stroke-width="1.6" fill="none" stroke-dasharray="5 5">
- <path d="M1000 175 C940 175 900 180 848 185"/>
- <path d="M1320 330 C1250 330 1170 340 1135 345"/>
- <path d="M1320 600 C1240 610 1120 645 1050 675"/>
-</g>
-<text x="1015" y="165" font-size="18" font-weight="700">Root</text>
-<text x="1325" y="310" font-size="18" font-weight="700">Internal node</text>
-<text x="1325" y="337" font-size="16" fill="#64748B">a node that is not a leaf</text>
-<text x="1325" y="585" font-size="18" font-weight="700">Leaves</text>
-<text x="1325" y="612" font-size="16" fill="#64748B">nodes with no children</text>
-
-<!-- footer definitions -->
-<rect x="64" y="770" width="1472" height="88" rx="10" fill="#F8FAFC" stroke="#D8E1EC"/>
-<text x="88" y="801" font-size="15" font-weight="700">Level</text><text class="note" x="170" y="801">distance from the root to a node</text>
-<text x="600" y="801" font-size="15" font-weight="700">Depth</text><text class="note" x="680" y="801">maximum distance from the root to a leaf</text>
-<text x="88" y="835" font-size="15" font-weight="700">Order</text><text class="note" x="170" y="835">maximum number of children a node can have</text>
-<text x="920" y="835" font-size="13" fill="#64748B">Here, root is at Level 0; leaves are at Level 3.</text>
+<text class="title" x="62" y="65">Tree terminology</text>
+<text class="subtitle" x="62" y="101">Root, internal nodes, leaves, levels and depth</text>
+<line x1="283" y1="180" x2="1475" y2="180" stroke="#D9E4EF" stroke-width="1.5" stroke-dasharray="6 8"/>
+<rect x="60" y="156" width="177" height="48" rx="7" fill="#F7FAFD" stroke="#7A9DC7" stroke-width="1.7"/>
+<text x="148" y="187" font-size="19" text-anchor="middle">Level 0</text>
+<line x1="283" y1="340" x2="1475" y2="340" stroke="#D9E4EF" stroke-width="1.5" stroke-dasharray="6 8"/>
+<rect x="60" y="316" width="177" height="48" rx="7" fill="#F7FAFD" stroke="#7A9DC7" stroke-width="1.7"/>
+<text x="148" y="347" font-size="19" text-anchor="middle">Level 1</text>
+<line x1="283" y1="500" x2="1475" y2="500" stroke="#D9E4EF" stroke-width="1.5" stroke-dasharray="6 8"/>
+<rect x="60" y="476" width="177" height="48" rx="7" fill="#F7FAFD" stroke="#7A9DC7" stroke-width="1.7"/>
+<text x="148" y="507" font-size="19" text-anchor="middle">Level 2</text>
+<line x1="283" y1="665" x2="1475" y2="665" stroke="#D9E4EF" stroke-width="1.5" stroke-dasharray="6 8"/>
+<rect x="60" y="641" width="177" height="48" rx="7" fill="#F7FAFD" stroke="#7A9DC7" stroke-width="1.7"/>
+<text x="148" y="672" font-size="19" text-anchor="middle">Level 3</text>
+<line x1="800" y1="213" x2="500" y2="307" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="800" y1="213" x2="1100" y2="307" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="500" y1="373" x2="310" y2="467" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="500" y1="373" x2="660" y2="467" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="1100" y1="373" x2="940" y2="467" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="1100" y1="373" x2="1290" y2="467" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="310" y1="533" x2="220" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="310" y1="533" x2="400" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="660" y1="533" x2="570" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="660" y1="533" x2="750" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="940" y1="533" x2="850" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="940" y1="533" x2="1030" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="1290" y1="533" x2="1200" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<line x1="1290" y1="533" x2="1380" y2="632" stroke="#809BB9" stroke-width="2.8"/>
+<circle cx="800" cy="180" r="35" fill="#F8C146" stroke="#C89425" stroke-width="2"/><text class="nodeText" x="800" y="181">A</text>
+<circle cx="500" cy="340" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="500" y="341">B</text>
+<circle cx="1100" cy="340" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="1100" y="341">C</text>
+<circle cx="310" cy="500" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="310" y="501">D</text>
+<circle cx="660" cy="500" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="660" y="501">E</text>
+<circle cx="940" cy="500" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="940" y="501">F</text>
+<circle cx="1290" cy="500" r="35" fill="#EFA064" stroke="#CA7744" stroke-width="2"/><text class="nodeText" x="1290" y="501">G</text>
+<circle cx="220" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="220" y="666">H</text>
+<circle cx="400" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="400" y="666">I</text>
+<circle cx="570" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="570" y="666">J</text>
+<circle cx="750" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="750" y="666">K</text>
+<circle cx="850" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="850" y="666">L</text>
+<circle cx="1030" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="1030" y="666">M</text>
+<circle cx="1200" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="1200" y="666">N</text>
+<circle cx="1380" cy="665" r="35" fill="#A6CF9F" stroke="#5A9A65" stroke-width="2"/><text class="nodeText" x="1380" y="666">O</text>
+<rect x="60" y="760" width="1480" height="103" rx="12" fill="#F6F9FC" stroke="#D9E4EF"/>
+<circle cx="95" cy="795" r="11" fill="#F8C146"/><text x="117" y="801" class="note">Root</text>
+<circle cx="275" cy="795" r="11" fill="#EFA064"/><text x="297" y="801" class="note">Internal nodes</text>
+<circle cx="535" cy="795" r="11" fill="#A6CF9F"/><text x="557" y="801" class="note">Leaves (no children)</text>
+<text x="885" y="801" class="note"><tspan font-weight="700">Depth:</tspan> 3 edges (root to leaf)</text>
+<text x="95" y="836" font-size="17" fill="#587086">All leaves are at Level 3 in this balanced example. Levels count edges from the root, starting at 0.</text>
 </svg>

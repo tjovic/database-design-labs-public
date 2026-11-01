@@ -33,7 +33,7 @@
 
 <!-- Tree connections -->
 <g class="edge">
- <!-- Root: <43 | 43..61 | >=61 -->
+ <!-- Root child ranges: less than 43; from 43 to 60; 61 or greater -->
  <path d="M740 213 C675 240 430 245 350 300"/>
  <path d="M800 213 C800 250 800 260 800 300"/>
  <path d="M860 213 C960 240 1250 245 1370 300"/>
@@ -135,8 +135,9 @@
  <text class="page" x="1310" y="468" text-anchor="middle">DATA 105</text>
  <text class="head" x="1252" y="495">ID</text><text class="head" x="1283" y="495">FIRST</text><text class="head" x="1330" y="495">LAST</text>
  <line x1="1242" y1="502" x2="1378" y2="502" stroke="#D8E1EC"/>
- <rect x="1248" y="507" width="124" height="25" rx="4" class="new"/>
- <text class="val newtxt" x="1252" y="524">73</text><text class="val newtxt" x="1283" y="524">Olivia</text><text class="val newtxt" x="1330" y="524">Bennett</text>
+ <text class="val" x="1252" y="523">73</text><text class="val" x="1283" y="523">Olivia</text><text class="val" x="1330" y="523">Bennett</text>
+ <rect x="1248" y="531" width="124" height="25" rx="4" class="new"/>
+ <text class="val newtxt" x="1252" y="548">75</text><text class="val newtxt" x="1283" y="548">Liam</text><text class="val newtxt" x="1330" y="548">Cooper</text>
  <!-- page 108 -->
  <rect x="1420" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
  <path d="M1427 450H1549Q1556 450 1556 457V477H1420V457Q1420 450 1427 450Z" fill="#E6F4F1"/>
@@ -176,6 +177,6 @@
 <!-- Footer -->
 <rect x="42" y="750" width="1514" height="110" rx="12" fill="#F8FAFC" stroke="#D8E1EC"/>
 <text x="64" y="781" font-size="16" font-weight="700">Result</text>
-<text class="note" x="64" y="809">3 leaf page splits + 1 intermediate page split. The root does not split; it now contains separators 43 and 61.</text>
-<text x="64" y="837" font-size="13" fill="#64748B">Teaching model: maximum 2 separator keys per index page and 2 rows per data page. Page IDs are illustrative; SQL Server page capacity depends on row size and available space.</text>
+<text class="note" x="64" y="809">Three leaf splits and one intermediate split. The root gains 61 without splitting; its separators are 43 and 61.</text>
+<text x="64" y="837" font-size="13" fill="#64748B">Simplified model: at most 2 keys per internal page and 2 rows per leaf page. IDs and capacities are illustrative, not SQL Server page layouts.</text>
 </svg>

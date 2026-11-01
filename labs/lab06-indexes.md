@@ -261,6 +261,9 @@ This is the main practical part of the lab. We will execute **the same SQL query
 
 The `IndexLab` reference database contains approximately **10 million** rows in `SalesOrder`, **40 million** rows in `SalesOrderItem`, and **30,000** products. These figures are large enough to make inefficient access paths visible.
 
+> [!NOTE]
+> **Don't have `IndexLab` yet?** It is created in [Lab 05, Section 2 – Create the `IndexLab` database](lab05-physical-storage.md#2-create-the-indexlab-database) using the [IndexLab setup script](setup/index-lab-data-setup.md). This lab does not repeat that setup — it assumes the database already exists in its freshly generated state (heaps, no indexes beyond what the script creates).
+
 > [!IMPORTANT]
 > Complete the steps **in order**, using the database in its prepared initial state. Later sections create indexes that change the execution plan. If you already created these indexes in a previous attempt, restore the prepared lab state before repeating the *before indexes* measurement.
 
@@ -340,6 +343,30 @@ In the reference Express instance, the baseline execution took approximately **1
 
 > [!NOTE]
 > SQL Server Express has resource and parallelism limitations. The original lab's reference query used serial execution in Express. On instances using parallel execution, the sum of CPU time across workers can be larger than elapsed time. The observed plan depends on edition, configuration, statistics, and data distribution; neither serial execution nor a particular operator is guaranteed for every installation.
+
+Fill in your own values in the table above before expanding the reference results below.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+Measured on one SQL Server 2025 Express instance (`IndexLab` in its freshly generated state — heaps, no indexes beyond the setup script):
+
+| Metric | Before indexes |
+|---|---|
+| Elapsed time | **18.1 s** |
+| CPU time | **14.7 s** |
+| `SalesOrder` logical reads | **57,143** |
+| `SalesOrderItem` logical reads | **198,020** |
+| `Product` logical reads | **161** |
+| Access operator for `SalesOrder` | `Table Scan` (heap), with the `OrderDate` predicate applied during the scan — **5,477** rows returned out of 10,000,000 |
+| Access operator for `SalesOrderItem` | `Table Scan` (heap) — all **40,000,000** rows scanned, **21,908** rows survive the join |
+| Access operator for `Product` | `Clustered Index Scan` on `PK_Product` — all 30,000 rows scanned |
+| Main join operator(s) | Two `Hash Match (Inner Join)` operators — one for `SalesOrder`/`SalesOrderItem`, one for the result joined with `Product` |
+| Aggregation / sort | `Hash Match (Aggregate)` for `GROUP BY`, then `Sort` for `ORDER BY Revenue DESC` |
+
+Elapsed and CPU time will vary with your hardware; the row counts and logical reads should be close to these values, since they come from the same generated dataset and an unindexed heap scan.
+
+</details>
 
 ---
 

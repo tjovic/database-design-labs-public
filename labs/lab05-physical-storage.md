@@ -438,9 +438,11 @@ SQL Server uses different page types for different purposes. In this lab, focus 
 |---|---|
 | Data page | Rows in a heap or leaf-level rows of a clustered index |
 | Index page | Index entries and navigation information |
-| Allocation/metadata page | Information used to manage pages and extents |
+| Allocation/metadata page | Information used to manage pages and extents — for example, an **IAM (Index Allocation Map)** page, which tracks which extents belong to one table or index |
 
 ![SQL Server page types](../images/lab05/sql-server-page-types.svg)
+
+You will see an IAM page in the output of almost every query you run in Section 11 (`DBCC IND`) — every table or index has at least one.
 
 A **heap** is a table without a clustered index. We will study heaps and index structures in Lab 06.
 

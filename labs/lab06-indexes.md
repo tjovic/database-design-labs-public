@@ -374,6 +374,10 @@ Elapsed and CPU time will vary with your hardware; the row counts and logical re
 
 Keep the **Execution Plan** tab from the query you ran in Section 6.2 open — Sections 7.2 through 7.7 walk through that specific plan, operator by operator. If you closed it or ran anything else in between, re-run the Section 6.2 query with Actual Execution Plan enabled before continuing.
 
+![Execution plan before indexing: two Table Scans feeding two Hash Match joins, a Hash Match Aggregate, and a Sort](../images/lab06/execution-plan-before.svg)
+
+This is a simplified redrawing of the actual plan measured on one computer (Section 6.2's reference results) — same operators and row counts, laid out for readability. Your own plan's exact shape should match; icon style and layout will differ by SSMS version.
+
 Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
 ## 7.1 Learn the essential plan operators
@@ -572,6 +576,27 @@ A clustered primary key enforces uniqueness and stores the actual table rows in 
 > [!TIP]
 > Optionally rerun the main query **after the clustered primary keys but before creating the nonclustered indexes**. Observe whether the plan improves and whether the original large scans remain. This helps separate the effect of clustering from that of adding the two targeted nonclustered indexes. Record the plan, but do not use it as the final 'after' comparison.
 
+![Execution plan after clustered primary keys: both Table Scans become Clustered Index Scans, but SalesOrder and SalesOrderItem are still fully read](../images/lab06/execution-plan-after-clustered-pk.svg)
+
+If you rerun the query now, this is roughly what you should see: the access operator for both large tables changes from `Table Scan` to `Clustered Index Scan`, but the row counts do not improve — `SalesOrder` and `SalesOrderItem` are still read in full. A clustered key alone does not help a query that filters on `OrderDate` or joins on `SalesOrderId`, since neither is the clustering key here.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+Measured on one SQL Server 2025 Express instance, with only the two clustered primary keys in place:
+
+| Metric | Value |
+|---|---|
+| `SalesOrder` logical reads | 57,266 |
+| `SalesOrderItem` logical reads | 198,439 |
+| `Product` logical reads | 161 |
+| CPU time | 13.25 s |
+| Elapsed time | 14.1 s |
+
+Nearly identical to the heap baseline (57,143 / 198,020 / 161, ~14.7 s CPU / ~18.1 s elapsed) — a few extra logical reads come from the clustered index's new root and IAM pages, but both large tables are still read in full.
+
+</details>
+
 ## 8.2 Create an index for the `SalesOrder` date filter
 
 ```sql
@@ -583,6 +608,25 @@ GO
 The index key is `OrderDate` because the query's filter is a date range. `SalesOrderId` is the clustered key and is therefore already available as the nonclustered index's row locator. This makes the index sufficient to obtain the order IDs needed by the join without explicitly adding `SalesOrderId` to `INCLUDE`.
 
 **Inspect:** expand the index in SSMS and check its key column. Remember the difference between the indexed **key** and an **implicit clustered-key locator**.
+
+![Execution plan after the OrderDate index: SalesOrder switches to an Index Seek reading only 5,477 rows, while SalesOrderItem is still fully scanned](../images/lab06/execution-plan-after-orderdate.svg)
+
+Rerun the main query and compare: `SalesOrder` now shows an `Index Seek` on `IX_SalesOrder_OrderDate`, reading only the 5,477 matching rows instead of 10 million. `SalesOrderItem` is unaffected — it has no useful index yet, so it is still fully scanned. The join itself may still be a `Hash Match`, since one of its two inputs is still enormous.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | Before `IX_SalesOrder_OrderDate` | After `IX_SalesOrder_OrderDate` |
+|---|---:|---:|
+| `SalesOrder` logical reads | 57,266 | **15** |
+| `SalesOrderItem` logical reads | 198,439 | 198,439 (unchanged) |
+| `Product` logical reads | 161 | 161 (unchanged) |
+| CPU time | 13.25 s | 12.05 s |
+| Elapsed time | 14.1 s | 13.1 s |
+
+`SalesOrder`'s logical reads collapse from 57,266 to 15 — a seek through a handful of index pages instead of a full table read. The overall query is only modestly faster so far, because `SalesOrderItem` — the much larger table — is still scanned in full; that is the next bottleneck to address.
+
+</details>
 
 ## 8.3 Create the order-item index *without* included columns
 
@@ -615,6 +659,28 @@ A Key Lookup is not automatically slow for a few rows. It can become costly when
 
 > [!NOTE]
 > A lookup is **not guaranteed** for this particular `SalesOrderId` on every dataset or version. If the optimizer selects a different access path, use the plan properties to explain the choice. Do not force an index unless you are explicitly studying the effect of a forced plan.
+
+**Optional — see the same Key Lookup at full scale.** Rerun the **main query from Section 6.2** with this narrow index still in place (before creating the `INCLUDE` version in 8.4):
+
+![Execution plan with the narrow SalesOrderId index and no INCLUDE: both large tables use an Index Seek, but a Nested Loops + Clustered Index Seek lookup runs once per matching order item](../images/lab06/execution-plan-after-salesorderid.svg)
+
+Both `SalesOrder` and `SalesOrderItem` now use an `Index Seek`, but `SalesOrderItem`'s seek is immediately followed by a `Clustered Index Seek` lookup into `PK_SalesOrderItem` — run once per matching row. For the isolated single-order query above, that was one lookup; for the full query, it is **21,908** lookups, one per order item. This is the same `Key Lookup` pattern, just visible at the scale the main query actually operates at.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | After `IX_SalesOrder_OrderDate` only | After narrow `IX_SalesOrderItem_SalesOrderId` (no `INCLUDE`) |
+|---|---:|---:|
+| `SalesOrder` logical reads | 15 | 15 (unchanged) |
+| `SalesOrderItem` logical reads | 198,439 | **106,449** |
+| `SalesOrderItem` scan count | 1 | **5,477** (one seek per matching order) |
+| `Product` logical reads | 161 | 161 (unchanged) |
+| CPU time | 12.05 s | **0.28 s** |
+| Elapsed time | 13.1 s | **0.76 s** |
+
+This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats a 40-million-row `Hash Match` input by a wide margin, even with a `Key Lookup` on every one of the 21,908 matching rows. `SalesOrderItem`'s logical reads (106,449) are still far higher than they need to be, though: each lookup costs extra page accesses that a covering index can avoid entirely — the point of Section 8.4.
+
+</details>
 
 ## 8.4 Recreate the order-item index with `INCLUDE`
 
@@ -661,6 +727,25 @@ The original plan may have scanned large portions of `SalesOrder` and `SalesOrde
 - **A join algorithm such as Nested Loops** to combine the relatively small outer input with repeated efficient inner seeks.
 
 **In SSMS:** click each relevant seek and inspect **Seek Predicates**. For the date index you should see a date-range condition; for the item index you should see a condition on `SalesOrderId` (subject to the optimizer's chosen plan).
+
+![Execution plan after the covering INCLUDE index: both large tables use an Index Seek with no Key Lookup, joined by Nested Loops](../images/lab06/execution-plan-after-include.svg)
+
+Compare this with the [Section 7 "before" plan](#7-investigate-the-execution-plan-before-indexing): both `Table Scan` operators are gone, replaced by `Index Seek` operators that read only the matching rows, and the `Key Lookup` from Section 8.3 is gone too — `IX_SalesOrderItem_SalesOrderId`'s `INCLUDE` columns supply everything the query needs. The two `Hash Match (Inner Join)` operators have also become `Nested Loops`, now that the inner side of each join can be found with an efficient seek instead of a full scan.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | Before any indexes | After narrow index (8.3) | After `INCLUDE` (8.4, final) |
+|---|---:|---:|---:|
+| `SalesOrder` logical reads | 57,143 | 15 | 15 |
+| `SalesOrderItem` logical reads | 198,020 | 106,449 | **32,710** |
+| `Product` logical reads | 161 | 161 | 161 |
+| CPU time | 14.7 s | 0.28 s | **0.11 s** |
+| Elapsed time | 18.1 s | 0.76 s | **0.23 s** |
+
+Removing the `Key Lookup` cuts `SalesOrderItem`'s logical reads by roughly two-thirds again (106,449 → 32,710), and elapsed time drops from the full heap scan's 18.1 s to 0.23 s — about an **80× speedup** on this computer. The row counts (5,477 orders, 21,908 order items, 100 category groups) never changed; only the access paths did.
+
+</details>
 
 ## 9.2 Why `Nested Loops` can become attractive
 

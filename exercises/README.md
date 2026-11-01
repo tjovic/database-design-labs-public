@@ -64,6 +64,7 @@ The index collection is in [Index Exercises](indexes.md) and follows the learnin
 3. **Covering indexes** — design an index so a query needs no `Key Lookup`.
 4. **Selectivity** — judge when a low-cardinality column is still a good index candidate, including covering a `GROUP BY` column.
 5. **Evaluating suggestions** — decide whether a "Missing Index" recommendation is worth creating, given indexes that already exist.
+6. **The same pattern, a different table** — repeat Exercise 1's staged `INCLUDE` walkthrough on `Invoice` instead of `Product`, then connect the result back to Exercise 5's missing-index suggestion.
 
 Unlike Lab 06, which uses the large generated `IndexLab` database to make performance differences obvious, these exercises intentionally use `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Each exercise creates one real index on an existing table (see the database safety note below) rather than an isolated new object.
 

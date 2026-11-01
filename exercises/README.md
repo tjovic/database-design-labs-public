@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -43,6 +43,16 @@ The function collection is in [Function Exercises](functions.md) and follows the
 4. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic.
 
 The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
+
+### Physical storage
+
+The physical storage collection is in [Physical Storage Exercises](physical-storage.md) and follows the learning goals in [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md):
+
+1. **A small clustered table** — use `DBCC IND`/`DBCC PAGE` to see how a `PRIMARY KEY CLUSTERED` determines physical row order, on a table of only 3 rows.
+2. **Page boundaries on a medium table** — identify data vs. root pages, and confirm that a clustered key's value stays consecutive across a page boundary.
+3. **A larger table, two ways** — compare listing every page with `DBCC IND` against summarizing page counts with `sys.dm_db_partition_stats`, motivating why the latter scales to very large tables.
+
+Like the index exercises, these intentionally use `AdventureWorksENG` instead of the large generated `IndexLab` database, so results are small enough to read in full while still showing real, non-trivial numbers.
 
 ### Indexes
 
@@ -89,6 +99,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Stored Procedure Exercises](procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
 - [Function Exercises](functions.md)
+- [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
+- [Physical Storage Exercises](physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)
 - [Index Exercises](indexes.md)
 - [Repository overview](../README.md)

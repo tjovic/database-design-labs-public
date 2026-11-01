@@ -955,7 +955,21 @@ Avoid making every index wide “just in case”: wider indexes consume storage,
 
 Indexes use physical pages with finite capacity. If an insertion belongs in a page with enough free space, SQL Server can add the entry there. If the page cannot accommodate it, a **page split** may be required, moving entries between pages and updating parent pointers as necessary.
 
-The following illustrations continue the nonclustered `MemberID` index from Section 3.2 (the same initial tree: keys 11, 19, 27, 43, 56, 61, 73, 79). Three new members are inserted one at a time, in this order: **58**, then **60**, then **75**. The page capacities are intentionally simplified so that the splits are visible:
+The following illustrations continue the nonclustered `MemberID` index from Section 3.2 (the same initial tree: keys 11, 19, 27, 43, 56, 61, 73, 79). Three new members are inserted one at a time, in this order:
+
+```sql
+-- Illustrative statements: not executed against IndexLab
+INSERT INTO Member (MemberID, FirstName, LastName)
+VALUES (58, 'Daniel', 'Hayes');
+
+INSERT INTO Member (MemberID, FirstName, LastName)
+VALUES (60, 'Ryan', 'Mitchell');
+
+INSERT INTO Member (MemberID, FirstName, LastName)
+VALUES (75, 'Olivia', 'Bennett');
+```
+
+Each `INSERT` adds one new key to the index — `MemberID` 58, then 60, then 75 — in the order shown above. The page capacities below are intentionally simplified so that the resulting splits are visible:
 
 ![Step-by-step insertion into a simplified B+ tree](../images/lab06/bplus-tree-insert-steps.svg)
 

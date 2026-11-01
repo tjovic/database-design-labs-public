@@ -167,6 +167,39 @@ GROUP BY i.name, i.index_id;
 
 ---
 
+## Exercise 4 — From page count to logical reads [BEGINNER]
+
+Exercises 1–3 counted pages using `DBCC IND` and `sys.dm_db_partition_stats`. This exercise connects that page count to what `STATISTICS IO` reports for an actual query — the same link Lab 05, Section 16 makes conceptually.
+
+```sql
+SET STATISTICS IO ON;
+
+SELECT * FROM dbo.State;
+SELECT * FROM dbo.Product;
+SELECT * FROM dbo.Customer;
+
+SET STATISTICS IO OFF;
+```
+
+For each table, look at the `logical reads` value on the **Messages** tab.
+
+1. For `State`, how does `logical reads` compare to the *total* number of pages `DBCC IND` listed in Exercise 1 (including the IAM page, not just the one data page)?
+2. For `Product`, how does `logical reads` compare to the total page count from Exercise 2 — 6 data pages, 1 root page, and 1 IAM page?
+3. For `Customer`, how does `logical reads` compare to the total page count implied by Exercise 3 — 338 data pages, 1 root page, and 1 IAM page?
+4. Based on these three results, does `logical reads` count only the data (leaf) pages, or every page type SQL Server has to touch to satisfy the query?
+
+<details>
+<summary>Solution</summary>
+
+1. `State`: **2** logical reads = 1 data page + 1 IAM page.
+2. `Product`: **8** logical reads = 6 data pages + 1 root page + 1 IAM page.
+3. `Customer`: **340** logical reads = 338 data pages + 1 root page + 1 IAM page.
+4. Every page type. `logical reads` counts **every** page SQL Server accesses to answer the query — not just the leaf-level data pages. A full scan of a clustered table has to visit the IAM page to find the allocated extents, and in these three cases SQL Server also touched the root page on its way to the leaf level, even though the query itself did not need a seek. This is exactly why Lab 05 treats "how many pages does this table use" and "how many logical reads does this query cost" as closely related but not always identical questions — the second one depends on the access path the query actually takes, not just on the table's total page count.
+
+</details>
+
+---
+
 # Key takeaways
 
 - A table's `PRIMARY KEY CLUSTERED` determines the physical row order on its data pages — not insertion order, not alphabetical order of a non-key column.
@@ -174,6 +207,7 @@ GROUP BY i.name, i.index_id;
 - A clustered index's leaf-level key stays gapless across a page boundary — the last key on one page and the first key on the next are consecutive.
 - Variable-length columns (`varchar`, `nvarchar`) cause different rows to occupy different numbers of bytes, so different pages of the same table can hold different numbers of rows.
 - `DBCC IND` works for small and medium tables, but for a table with millions of rows, use a documented, summary-based view like `sys.dm_db_partition_stats` instead.
+- `STATISTICS IO`'s `logical reads` counts every page type a query touches — data, root/intermediate, and IAM pages — not just leaf-level data pages.
 
 ## References
 

@@ -1,9 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="2600" height="1520" viewBox="0 0 2600 1520">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1240" viewBox="0 0 2200 1240">
   <defs>
-    <filter id="shadow" x="-15%" y="-15%" width="130%" height="145%">
-      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#20364f" flood-opacity=".10"/>
-    </filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#71849a"/>
     </marker>
@@ -12,13 +9,13 @@
       .heading { fill:#172b45; font-size:34px; font-weight:750; letter-spacing:.2px; }
       .subheading { fill:#64748b; font-size:21px; font-weight:450; }
       .connector { stroke:#8192a7; stroke-width:3.5; fill:none; marker-end:url(#arrow); stroke-linecap:round; stroke-linejoin:round; }
-      .op { fill:#18314d; font-size:25px; font-weight:700; }
+      .op { fill:#18314d; font-size:27px; font-weight:700; }
       .detail { fill:#263d57; font-size:20px; font-weight:500; }
       .metric { fill:#64748b; font-size:19px; font-weight:600; }
       .note { fill:#405670; font-size:20px; font-weight:550; }
     </style>
   </defs>
-  <rect x="42" y="28" width="2516" height="112" rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <rect x="42" y="28" width="2116" height="112" rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
   <rect x="42" y="28" width="9" height="112" rx="4" fill="#4778a8"/>
   <text x="76" y="73" class="heading">EXECUTION PLAN · AFTER SalesOrderId INDEX (WITH INCLUDE)</text>
   <text x="76" y="111" class="subheading">Actual execution plan · data flows from right to left</text>
@@ -27,40 +24,40 @@
   <path d="M 959 692 H 894" class="connector"/>
   <path d="M 955 352 H 927 Q 910 352 910 369 V 675 Q 910 692 894 692" class="connector"/>
   <path d="M 1263 692 H 1203" class="connector"/>
-  <path d="M 2100 472 H 1835 Q 1818 472 1818 489 V 675 Q 1818 692 1801 692 H 1523" class="connector"/>
-  <path d="M 2100 1052 H 1870 Q 1853 1052 1853 1035 V 709 Q 1853 692 1836 692 H 1523" class="connector"/>
-  <rect x="60" y="610" width="215" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4" filter="url(#shadow)"/>
+  <path d="M 1710 472 C 1648 472 1648 645 1523 645" class="connector"/>
+  <path d="M 1710 1052 C 1648 1052 1648 739 1523 739" class="connector"/>
+  <rect x="60" y="610" width="215" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4"/>
   <text x="75" y="653" class="op">Sort</text>
   <text x="75" y="706" class="detail">Revenue DESC</text>
   <text x="75" y="753" class="metric">100 rows</text>
-  <rect x="337" y="610" width="250" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4" filter="url(#shadow)"/>
+  <rect x="337" y="610" width="250" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
   <text x="352" y="653" class="op">Hash Match</text>
   <text x="352" y="706" class="detail">Aggregate · CategoryId</text>
   <text x="352" y="753" class="metric">100 groups</text>
-  <rect x="650" y="610" width="244" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4" filter="url(#shadow)"/>
+  <rect x="650" y="610" width="244" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
   <text x="665" y="653" class="op">Hash Match</text>
   <text x="665" y="706" class="detail">Join Product</text>
   <text x="665" y="753" class="metric">21,908 rows</text>
-  <rect x="959" y="610" width="244" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4" filter="url(#shadow)"/>
+  <rect x="959" y="610" width="244" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4"/>
   <text x="974" y="653" class="op">Compute Scalar</text>
   <text x="974" y="706" class="detail">Quantity × UnitPrice</text>
   <text x="974" y="753" class="metric">21,908 rows</text>
-  <rect x="955" y="270" width="294" height="164" rx="13" fill="#edf0f4" stroke="#92a3b4" stroke-width="2.4" filter="url(#shadow)"/>
+  <rect x="955" y="270" width="294" height="164" rx="13" fill="#edf0f4" stroke="#92a3b4" stroke-width="2.4"/>
   <text x="970" y="313" class="op">Clustered Index Scan</text>
   <text x="970" y="366" class="detail">Product · PK_Product</text>
   <text x="970" y="413" class="metric">30,000 rows</text>
-  <rect x="1263" y="610" width="260" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4" filter="url(#shadow)"/>
+  <rect x="1263" y="610" width="260" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
   <text x="1278" y="653" class="op">Nested Loops</text>
   <text x="1278" y="706" class="detail">Join orders + items</text>
   <text x="1278" y="753" class="metric">21,908 rows</text>
-  <rect x="2100" y="390" width="390" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4" filter="url(#shadow)"/>
-  <text x="2115" y="433" class="op">Index Seek · SalesOrder</text>
-  <text x="2115" y="486" class="detail">IX_SalesOrder_OrderDate</text>
-  <text x="2115" y="533" class="metric">5,477 rows</text>
-  <rect x="2100" y="970" width="390" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4" filter="url(#shadow)"/>
-  <text x="2115" y="1013" class="op">Index Seek · SalesOrderItem</text>
-  <text x="2115" y="1066" class="detail">IX_SalesOrderItem_SalesOrderId</text>
-  <text x="2115" y="1113" class="metric">21,908 rows</text>
-  <rect x="56" y="1442" width="2450" height="58" rx="12" fill="#ffffff" stroke="#dbe4ee" stroke-width="1.5"/>
-  <text x="75" y="1481" class="note">WITH INCLUDE: required item columns are in the index; no additional clustered index access is needed.</text>
+  <rect x="1710" y="390" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4"/>
+  <text x="1725" y="433" class="op">Index Seek · SalesOrder</text>
+  <text x="1725" y="486" class="detail">IX_SalesOrder_OrderDate</text>
+  <text x="1725" y="533" class="metric">5,477 rows</text>
+  <rect x="1710" y="970" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4"/>
+  <text x="1725" y="1013" class="op">Index Seek · SalesOrderItem</text>
+  <text x="1725" y="1066" class="detail">IX_SalesOrderItem_SalesOrderId</text>
+  <text x="1725" y="1113" class="metric">21,908 rows</text>
+  <rect x="56" y="1160" width="2080" height="58" rx="12" fill="#ffffff" stroke="#dbe4ee" stroke-width="1.5"/>
+  <text x="75" y="1199" class="note">WITH INCLUDE: required item columns are in the index; no additional clustered index access is needed.</text>
 </svg>

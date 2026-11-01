@@ -506,10 +506,18 @@ Focus on these columns:
 
 For a **heap**, the ordinary in-row data pages typically have `PageType = 1` and `IndexID = 0`.
 
+You will see a few different `PageType` values in the output. The ones that matter here are:
+
+| `PageType` | What it is |
+|---|---|
+| `1` | An ordinary **data page** (for a heap) or **leaf page** (for a clustered index) — the pages that hold the actual rows. |
+| `2` | A **root or intermediate index page** — navigation pages above the leaf level, seen only once a table has enough rows to need more than one level. |
+| `10` | An **IAM (Index Allocation Map) page** — tracks which extents belong to this table or index, so SQL Server can find its data pages. Every table or index has at least one. |
+
 > [!NOTE]
 > Actual page IDs vary between databases. Do not copy the example IDs from this manual into your commands.
 
-Do not attempt to understand every field. Start by locating the data pages for `Category`.
+Do not attempt to understand every field. Start by locating the data pages (`PageType = 1`) for `Category`; you can ignore the IAM page for now.
 
 ---
 

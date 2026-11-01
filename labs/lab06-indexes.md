@@ -955,25 +955,44 @@ Avoid making every index wide “just in case”: wider indexes consume storage,
 
 Indexes use physical pages with finite capacity. If an insertion belongs in a page with enough free space, SQL Server can add the entry there. If the page cannot accommodate it, a **page split** may be required, moving entries between pages and updating parent pointers as necessary.
 
-The following illustrations simplify page capacity intentionally so that the operations are visible:
+The following illustrations continue the nonclustered `MemberID` index from Section 3.2 (the same initial tree: keys 11, 19, 27, 43, 56, 61, 73, 79). Three new members are inserted one at a time, in this order: **58**, then **60**, then **75**. The page capacities are intentionally simplified so that the splits are visible:
 
 ![Step-by-step insertion into a simplified B+ tree](../images/lab06/bplus-tree-insert-steps.svg)
 
+Inserting 58 and 60 each cause one leaf split; inserting 75 causes a leaf split **and** a root split, growing the tree from 3 levels to 4:
+
 ![Final B+ tree after the insertions](../images/lab06/bplus-tree-after-insert.svg)
 
-The next example shows insertion in the clustered-index case, where leaf pages hold the data rows themselves:
+The next example repeats the same three insertions (58, 60, 75) against the **clustered** version of the index from Section 4, where leaf pages hold the data rows themselves rather than key/RID pairs:
 
 ![Insertion into a clustered index](../images/lab06/clustered-index-insert.svg)
 
 > [!WARNING]
 > These diagrams model a very small maximum number of entries per node. Real SQL Server pages are 8 KB and can hold variable numbers of records, depending on row size and available space. The drawings are **conceptual**, not physical page byte layouts.
 
-Every additional index may also require work during `INSERT`, `UPDATE`, or `DELETE`. That creates a trade-off:
+> [!IMPORTANT]
+> **Indexes are not free.** Every nonclustered index must be kept in sync with the table: each `INSERT`, `UPDATE`, or `DELETE` that touches an indexed column also writes to every index built on it, not just to the table itself. This is the cost side of the trade-off the rest of this lab has been measuring the benefit of — and it is the reason the checklist in Section 13 asks whether an index is actually needed before creating it.
+
+That cost sits alongside the benefits measured earlier in this lab:
 
 - Faster and more targeted reads for some access patterns.
 - Additional storage for index pages.
 - Extra writes and maintenance when indexed data changes.
 - Possible page splits and fragmentation.
+
+<details>
+<summary>Show reference results from one computer</summary>
+
+A single-row `INSERT` into `dbo.SalesOrder`, measured with `STATISTICS IO` on one SQL Server 2025 Express instance:
+
+| Indexes on `SalesOrder` | Logical writes for one `INSERT` |
+|---|---:|
+| `PK_SalesOrder` (clustered) only | **3** |
+| `PK_SalesOrder` + `IX_SalesOrder_OrderDate` | **6** |
+
+Adding one nonclustered index **doubled** the logical writes for this insert — the clustered row itself still needs writing, plus a separate entry in the nonclustered index's own B+ tree. Every additional index on a frequently written table repeats this cost on every matching insert, update, or delete — and unlike a read, this work cannot be skipped just because the resulting index happens not to be useful for any query that runs.
+
+</details>
 
 Repeated page splits leave pages only partially full and scatter logically adjacent pages across the file, which is called **fragmentation**. You can inspect it with the same `sys.dm_db_index_physical_stats` call from Section 10 — its `avg_fragmentation_in_percent` column reports it directly. Two maintenance commands address it:
 

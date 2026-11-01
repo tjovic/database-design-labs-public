@@ -372,6 +372,8 @@ Elapsed and CPU time will vary with your hardware; the row counts and logical re
 
 # 7. Investigate the execution plan before indexing
 
+Keep the **Execution Plan** tab from the query you ran in Section 6.2 open — Sections 7.2 through 7.7 walk through that specific plan, operator by operator. If you closed it or ran anything else in between, re-run the Section 6.2 query with Actual Execution Plan enabled before continuing.
+
 Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
 ## 7.1 Learn the essential plan operators

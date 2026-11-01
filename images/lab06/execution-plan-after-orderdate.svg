@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="810" viewBox="0 0 1500 810">
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7z" fill="#68839d"/></marker></defs><rect width="1500" height="810" fill="#fff"/><style>text{font-family:Arial,Helvetica,sans-serif}.title{font-size:31px;font-weight:700;fill:#203951}.subtitle{font-size:16px;fill:#61738a}.head{font-size:16px;font-weight:700;fill:#243b51}.detail{font-size:13px;fill:#43576b}.number{font-size:15px;font-weight:700;fill:#304c64}.small{font-size:12px;fill:#51667a}</style>
+<text x="48" y="59" class="title">Execution plan after OrderDate index</text>
+<text x="48" y="88" class="subtitle">Actual plan from IndexLab · row flow right → left · simplified layout, original operator topology</text>
+<path d="M 1192 169.5 C 1056.0 169.5, 1056.0 273.0, 925 273.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 1192 351.0 C 1177.0 351.0, 1177.0 349.0, 1167 349.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 976 349.0 C 948.0 349.0, 948.0 273.0, 925 273.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 742 273.0 C 700.0 273.0, 700.0 373.0, 663 373.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 985 595.0 C 821.5 595.0, 821.5 373.0, 663 373.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 492 373.0 C 462.0 373.0, 462.0 373.0, 437 373.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<path d="M 266 373.0 C 238.5 373.0, 238.5 373.0, 216 373.0" stroke="#8096aa" stroke-width="2.4" fill="none" marker-end="url(#arrow)"/>
+<rect x="45" y="320" width="166" height="106" rx="12" fill="#e8eff7" stroke="#7692b1" stroke-width="2"/>
+<text x="59" y="345" class="head">Sort</text>
+<text x="59" y="366" class="detail"><tspan x="59" y="366.0">ORDER BY</tspan><tspan x="59" y="383.0">Revenue DESC</tspan></text>
+<text x="59" y="401.0" class="number">Output: 100 rows</text>
+<rect x="266" y="320" width="166" height="106" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="280" y="345" class="head">Hash Match</text>
+<text x="280" y="366" class="detail"><tspan x="280" y="366.0">Aggregate</tspan><tspan x="280" y="383.0">GROUP BY CategoryId</tspan></text>
+<text x="280" y="401.0" class="number">Output: 100 rows</text>
+<rect x="492" y="320" width="166" height="106" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="506" y="345" class="head">Hash Match</text>
+<text x="506" y="366" class="detail"><tspan x="506" y="366.0">Inner Join</tspan><tspan x="506" y="383.0">ProductId</tspan></text>
+<text x="506" y="401.0" class="number">Output: 21,908 rows</text>
+<rect x="742" y="215" width="178" height="116" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="756" y="240" class="head">Hash Match</text>
+<text x="756" y="261" class="detail"><tspan x="756" y="261.0">Inner Join</tspan><tspan x="756" y="278.0">SalesOrderId</tspan></text>
+<text x="756" y="296.0" class="number">Output: 21,908 rows</text>
+<rect x="1192" y="99" width="255" height="150" rx="12" fill="#e4f1e9" stroke="#67a686" stroke-width="2"/>
+<text x="1206" y="132" class="head">Index Seek</text>
+<text x="1206" y="171" class="detail">dbo.SalesOrder<tspan x="1206" y="189">IX_SalesOrder_OrderDate</tspan></text>
+<text x="1206" y="211" class="number">Output: 5,477 rows</text>
+<text x="1206" y="228" class="detail">Rows read: 5,477</text>
+<rect x="976" y="297" width="186" height="104" rx="12" fill="#e8eff7" stroke="#7692b1" stroke-width="2"/>
+<text x="990" y="322" class="head">Compute Scalar</text>
+<text x="990" y="343" class="detail"><tspan x="990" y="343.0">Quantity ×</tspan><tspan x="990" y="360.0">UnitPrice</tspan></text>
+<text x="990" y="378.0" class="number">Expression defined</text>
+<rect x="1192" y="278" width="255" height="149" rx="12" fill="#fbe5e3" stroke="#ce7870" stroke-width="2"/>
+<text x="1206" y="310" class="head">Clustered Index<tspan x="1206" y="328">Scan</tspan></text>
+<text x="1206" y="350" class="detail">dbo.SalesOrderItem<tspan x="1206" y="368">PK_SalesOrderItem</tspan></text>
+<text x="1206" y="388" class="number">Output: 40,000,000 rows</text>
+<text x="1206" y="407" class="detail">Rows read: 40,000,000</text>
+<rect x="985" y="533" width="254" height="124" rx="12" fill="#e4f1e9" stroke="#7baa90" stroke-width="2"/>
+<text x="999" y="558" class="head">Clustered Index Scan</text>
+<text x="999" y="579" class="detail">dbo.Product · PK_Product</text>
+<text x="999" y="605" class="number">Output: 30,000 rows</text>
+<text x="999" y="626" class="detail">Rows read: 30,000</text>
+<rect x="45" y="695" width="1400" height="83" rx="12" fill="#f3f6fa" stroke="#d9e2eb"/><text x="65" y="723" class="head">What changed after creating IX_SalesOrder_OrderDate?</text><text x="65" y="747" class="detail">SalesOrder now uses an Index Seek: 5,477 rows read instead of 10 million.</text><text x="65" y="766" class="small">SalesOrderItem still scans 40 million rows. Hash joins remain; the next index targets the order-item join.</text>
+</svg>

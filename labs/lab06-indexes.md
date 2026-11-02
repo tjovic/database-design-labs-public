@@ -579,7 +579,15 @@ Read the SQL statement before you execute it:
 
 This query is useful because it combines **filtering, joining, calculation, aggregation, and sorting**. Different plan operators can be linked directly to parts of the SQL statement.
 
-In the reference Express instance, the baseline execution took approximately **15–17 seconds**. Do not focus on the time alone. Record these values before changing any index:
+In the reference Express instance, the baseline execution took approximately **15–17 seconds**. Do not focus on the time alone — Section 7 explains how to read the plan behind this number.
+
+---
+
+# 7. Investigate the execution plan before indexing
+
+Keep the **Execution Plan** tab from the query you ran in Section 6.2 open — Sections 7.2 through 7.7 walk through that specific plan, operator by operator. If you closed it or ran anything else in between, re-run the Section 6.2 query with Actual Execution Plan enabled before continuing.
+
+Record these values now, before changing any index — you will compare them against the "after indexes" numbers in Section 9:
 
 | Metric | Before indexes | After indexes |
 |---|---|---|
@@ -593,6 +601,8 @@ In the reference Express instance, the baseline execution took approximately **1
 
 > [!NOTE]
 > SQL Server Express has resource and parallelism limitations. The original lab's reference query used serial execution in Express. On instances using parallel execution, the sum of CPU time across workers can be larger than elapsed time. The observed plan depends on edition, configuration, statistics, and data distribution; neither serial execution nor a particular operator is guaranteed for every installation.
+
+The "Access operator" and "Main join operator" rows ask you to name things Section 7.1 has not introduced yet — that is intentional. Write down what you see in the plan now (even informally), then come back and compare it with the vocabulary from 7.1 onward.
 
 Fill in your own values in the table above before expanding the reference results below.
 
@@ -618,15 +628,9 @@ Elapsed and CPU time will vary with your hardware; the row counts and logical re
 
 </details>
 
----
-
-# 7. Investigate the execution plan before indexing
-
-Keep the **Execution Plan** tab from the query you ran in Section 6.2 open — Sections 7.2 through 7.7 walk through that specific plan, operator by operator. If you closed it or ran anything else in between, re-run the Section 6.2 query with Actual Execution Plan enabled before continuing.
-
 ![Execution plan before indexing: two Table Scans feeding two Hash Match joins, a Hash Match Aggregate, and a Sort](../images/lab06/execution-plan-before.svg)
 
-This is a simplified redrawing of the actual plan measured on one computer (Section 6.2's reference results) — same operators and row counts, laid out for readability. Your own plan's exact shape should match; icon style and layout will differ by SSMS version.
+This is a simplified redrawing of the actual plan measured on one computer (the reference results above) — same operators and row counts, laid out for readability. Your own plan's exact shape should match; icon style and layout will differ by SSMS version.
 
 Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
@@ -1033,7 +1037,7 @@ These are **reference measurements, not expected fixed answers**. The large redu
 
 ### Calculate your own improvement
 
-Using the numbers you recorded in Section 6.2:
+Using the numbers you recorded in Section 7:
 
 - **Speedup** = before elapsed time / after elapsed time.
 - **Logical-read reduction (%)** = 100 × (before reads − after reads) / before reads.

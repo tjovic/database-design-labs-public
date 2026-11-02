@@ -615,44 +615,32 @@ Execution plans are often explained by reading **from right to left**, beginning
 
 ## 7.1 Learn the essential plan operators
 
-| Operator | Meaning | What to inspect |
-|---|---|---|
-| `Table Scan` | Reads data from a heap | Rows read, rows returned, predicate |
-| `Clustered Index Scan` | Scans all or part of a clustered index | Scan direction, ordered property, rows |
-| `Index Scan` | Scans a nonclustered index | Rows read vs. returned, ordering |
-| `Index Seek` | Uses index key ranges to locate entries | **Seek Predicates**, rows read |
-| `RID Lookup` | Retrieves a heap row via its row identifier | Repetitions, output columns |
-| `Key Lookup` | Retrieves additional columns from a clustered index | Number of executions, requested columns |
-| `Nested Loops` | Invokes or searches the inner input for outer rows | Outer row count, inner repetitions |
-| `Hash Match (Inner Join)` | Builds/probes hash structures to join inputs | Build/probe inputs, memory, spills |
-| `Hash Match (Aggregate)` | Groups rows and computes aggregates | Rows received and groups returned |
-| `Compute Scalar` | Defines a calculated expression | Defined Values / scalar expression |
-| `Sort` | Orders its input | Sort keys, input rows, memory/spills |
+An execution plan consists of **operators**, each representing an operation performed by SQL Server.
+
+Some operators retrieve data from tables or indexes. Others join rows, calculate values, group results, or sort data.
+
+The following table introduces the most important operators you will encounter in this lab.
+
+| Operator | What it does |
+|---|---|
+| `Table Scan` | Reads rows from a **heap** (a table without a clustered index). SQL Server examines the rows to find those matching the query conditions. If there is no suitable index, it may need to read the entire table. |
+| `Clustered Index Scan` | Reads data from the **leaf level of a clustered index**, where the actual table rows are stored. It may read many or all rows, even when the query needs only a small number of them. |
+| `Index Scan` | Reads entries from a **nonclustered index**. Because an index may contain fewer and narrower columns than the table, scanning it can require less work than scanning the complete table. |
+| `Index Seek` | Uses the **ordered index keys** to navigate directly to a specific value or range of values. This can avoid reading large parts of the index that are not relevant to the query. |
+| `RID Lookup` | Uses a **Row Identifier (RID)** obtained from a nonclustered index to retrieve additional columns from a heap row. It is needed when the index does not contain all the required data. |
+| `Key Lookup` | Retrieves additional columns from a **clustered index** after a nonclustered index has identified matching rows. It can become expensive when repeated for many rows. |
+| `Nested Loops` | Takes rows from one input (the **outer input**) and repeatedly accesses another input (the **inner input**). It is often efficient when relatively few outer rows can quickly find matching inner rows using an index. |
+| `Hash Match (Inner Join)` | Builds a **hash table** from one input and uses it to find matching rows from another input. It is often useful when joining large datasets without suitable indexes for repeated seeks. |
+| `Hash Match (Aggregate)` | Uses a hash table to **group rows by one or more values** and calculate aggregates such as `SUM`, `COUNT`, or `AVG`. It does not require the input rows to be sorted by the grouping columns. |
+| `Compute Scalar` | Defines a **calculated expression**, such as multiplication, addition, or data type conversion. For example, it may calculate `Quantity * UnitPrice` for each order item. |
+| `Sort` | Arranges rows according to one or more columns or expressions. It is commonly used for `ORDER BY`, but may also be needed by other operations that require sorted input. |
 
 > [!IMPORTANT]
-> **A seek is not automatically good, and a scan is not automatically bad.** The useful question is whether the plan processes *much more data than the query needs* and whether an alternative access path would reduce total cost. An `Index Seek` may still read many rows, and repeated lookups can be expensive.
-
-### A quick method for reading any plan
-
-For each relevant operator:
-
-1. Identify **the table or index** it accesses.
-2. Compare **Actual Number of Rows** with **Estimated Number of Rows** (where displayed).
-3. Find **Number of Rows Read** / **Actual Number of Rows Read**, if exposed, and compare it with rows produced.
-4. Inspect **Predicate** versus **Seek Predicates**.
-5. Check operator **executions**, particularly on the inner side of `Nested Loops`.
-6. Look for warnings such as spills, large estimation differences, or missing-index suggestions.
-7. Finally, relate the operator to `STATISTICS IO` and the cost of the full query.
-
-> [!NOTE]
-> Some properties vary by SQL Server version, operator, and whether the plan is estimated or actual. Do not assume every operator displays every property. Also, an operator's estimated percentage cost is **not an actual timing measurement**.
-
-> [!TIP]
-> A large gap between **Estimated** and **Actual Number of Rows** is not always caused by a missing index. It can also mean the optimizer's statistics are **out of date** for that table or index, so its row-count guesses no longer reflect the data. You can inspect a statistics object with:
-> ```sql
-> DBCC SHOW_STATISTICS ('dbo.SalesOrder', IX_SalesOrder_OrderDate);
-> ```
-> and refresh it with `UPDATE STATISTICS dbo.SalesOrder;` if needed. Creating a new index already generates fresh statistics for its key columns, so this matters more for columns and indexes that existed before large data changes.
+> **An Index Seek is not always better than a Scan.**
+>
+> A seek is useful when SQL Server needs a relatively small portion of the data. However, when a query requires many rows, scanning the table or index may be more efficient than performing many separate index lookups.
+>
+> The goal is not to eliminate every scan, but to **reduce unnecessary work**.
 
 ## 7.2 Investigate the `SalesOrder` scan
 

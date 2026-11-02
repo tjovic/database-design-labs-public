@@ -1085,32 +1085,100 @@ In the next sections, we will create nonclustered indexes specifically designed 
 
 ## 8.2 Create an index for the `SalesOrder` date filter
 
+In the previous step, we created clustered primary keys on `SalesOrder` and `SalesOrderItem`.
+
+However, the execution plan still showed large scans because the clustered indexes did not directly support the query's filtering and joining conditions.
+
+Let's address the first problem: **finding orders for a specific date**.
+
+### Why index OrderDate?
+
+Our main query filters orders using:
+
+```sql
+WHERE so.OrderDate >= '20250601'
+  AND so.OrderDate < '20250602'
+```
+
+Without a suitable index, SQL Server must examine a large number of rows to identify the orders within this date range.
+
+We can improve this by creating a nonclustered index on `OrderDate`.
+
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_OrderDate
 ON dbo.SalesOrder (OrderDate);
 GO
 ```
 
-The index key is `OrderDate` because the query's filter is a date range. `SalesOrderId` is the clustered key and is therefore already available as the nonclustered index's row locator. This makes the index sufficient to obtain the order IDs needed by the join without explicitly adding `SalesOrderId` to `INCLUDE`.
+The index organizes entries by `OrderDate`, allowing SQL Server to navigate directly to the relevant range instead of scanning the entire clustered index.
 
-**Inspect:** expand the index in SSMS and check its key column. Remember the difference between the indexed **key** and an **implicit clustered-key locator**.
+### Run the main query again
 
-![Execution plan after the OrderDate index: SalesOrder switches to an Index Seek reading only 5,477 rows, while SalesOrderItem is still fully scanned](../images/lab06/execution-plan-after-orderdate.svg)
+Execute **exactly the same query from Section 6.2**, with Actual Execution Plan enabled.
 
-Rerun the main query and compare: `SalesOrder` now shows an `Index Seek` on `IX_SalesOrder_OrderDate`, reading only the 5,477 matching rows instead of 10 million. `SalesOrderItem` is unaffected — it has no useful index yet, so it is still fully scanned. The join itself may still be a `Hash Match`, since one of its two inputs is still enormous.
+![Execution plan after creating the OrderDate index](../images/lab06/execution-plan-after-orderdate.svg)
+
+Compare the new execution plan with the previous one.
+
+In our reference execution plan:
+
+| Table | After clustered PK | After OrderDate index |
+|---|---|---|
+| `SalesOrder` | Clustered Index Scan | **Index Seek** |
+| `SalesOrderItem` | Clustered Index Scan | Clustered Index Scan |
+| Main join | Hash Match | Hash Match |
+
+The most important change is the access to `SalesOrder`.
+
+Before creating the index, SQL Server examined approximately **10 million rows** to find 5,477 orders.
+
+After creating the index, it can locate the relevant date range through an **Index Seek**, examining approximately **5,477 matching index entries**.
+
+### Inspect the Index Seek operator
+
+In SSMS:
+
+1. Select the `Index Seek` operator for `IX_SalesOrder_OrderDate`.
+2. Press **F4** to open its Properties.
+3. Find the **Seek Predicates** property.
+
+You should see a condition corresponding to the requested `OrderDate` range.
+
+Unlike the previous scan, SQL Server can use the index's ordered keys to locate the beginning of the range and read the matching entries.
+
+Compare **Actual Number of Rows Read** and **Actual Number of Rows**. In our reference plan, these values are approximately equal because the seek reads the relevant entries.
+
+> [!IMPORTANT]
+> **An Index Seek does not necessarily retrieve only one row.**
+>
+> It can efficiently locate a range of values and return many matching rows without scanning the entire index.
+
+### What problem remains?
+
+Although we have improved access to `SalesOrder`, the execution plan still contains a large `Clustered Index Scan` on `SalesOrderItem`.
+
+SQL Server still processes approximately **40 million order items** to find those belonging to the selected orders.
+
+The new `OrderDate` index helps SQL Server find orders, but it does not provide an efficient way to locate their items.
+
+This demonstrates an important principle:
+
+**An index can improve one part of an execution plan without solving every performance problem in the query.**
+
+In the next section, we will create an index on `SalesOrderItem(SalesOrderId)` to address the remaining large scan.
+
+### Check your understanding
+
+**Why did the new index eliminate the SalesOrder scan but not the SalesOrderItem scan?**
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answer</summary>
 
-| Metric | Before `IX_SalesOrder_OrderDate` | After `IX_SalesOrder_OrderDate` |
-|---|---:|---:|
-| `SalesOrder` logical reads | 57,266 | **15** |
-| `SalesOrderItem` logical reads | 198,439 | 198,439 (unchanged) |
-| `Product` logical reads | 161 | 161 (unchanged) |
-| CPU time | 13.25 s | 12.05 s |
-| Elapsed time | 14.1 s | 13.1 s |
+The new index is created on `SalesOrder(OrderDate)`, so it helps SQL Server find orders matching the requested date range.
 
-`SalesOrder`'s logical reads collapse from 57,266 to 15 — a seek through a handful of index pages instead of a full table read. The overall query is only modestly faster so far, because `SalesOrderItem` — the much larger table — is still scanned in full; that is the next bottleneck to address.
+However, `SalesOrderItem` is a separate table. Its rows are not organized by `SalesOrderId` in a suitable nonclustered index yet.
+
+SQL Server still needs to scan the large order-item table to find the matching items.
 
 </details>
 

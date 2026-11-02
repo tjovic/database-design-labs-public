@@ -816,16 +816,6 @@ The order-item table requires substantially more page accesses.
 
 This helps explain why it is the main bottleneck in our initial execution plan.
 
-### Why does SQL Server use a Hash Match?
-
-Since SQL Server must process a large order-item input, it needs an efficient way to match these rows with the 5,477 selected orders.
-
-In our reference execution plan, the optimizer chooses **Hash Match (Inner Join)**.
-
-This operator can efficiently join large inputs without repeatedly searching one table for each row from the other.
-
-We will examine how Hash Match works in the next section.
-
 ### Check your understanding
 
 **Why doesn't SQL Server simply find the order items for each of the 5,477 selected orders?**
@@ -847,17 +837,52 @@ Later in the lab, we will create an index on `SalesOrderItem(SalesOrderId)` and 
 
 ## 7.4 Why `Hash Match (Inner Join)` may be chosen
 
-A hash join is often suitable when the optimizer expects large inputs without a useful ordered or seekable access path. Conceptually, one input is used to build a hash structure on the join key, and the other input probes it for matches.
+In our initial execution plan, SQL Server uses **Hash Match (Inner Join)** to connect the selected orders with their order items.
 
-```text
-Filtered SalesOrder rows  ──┐
-                            ├── Hash Match (Inner Join) ── matching order items
-Large SalesOrderItem input ─┘
-```
+A Hash Join works in two main phases:
 
-This does **not** mean `Hash Match` is a bad operator. It may be the least expensive join algorithm under the circumstances. The real problem in this demonstration is the cost of reading and processing the huge order-item input.
+1. **Build phase:** SQL Server reads one input and builds a hash table in memory using the join key.
+2. **Probe phase:** SQL Server reads the other input and uses the hash table to find matching rows.
 
-**In SSMS:** select the Hash Match operator. Identify the join condition, the two incoming row flows, and any warnings. The smaller input is often a good choice for building the hash table, but do not assume a specific build side without inspecting the actual plan.
+In our example, SQL Server can build a hash table from the approximately **5,477 selected orders** and use it to match rows from the much larger `SalesOrderItem` input.
+
+This avoids comparing every order item with every selected order.
+
+### Why is Hash Match useful here?
+
+Without an index on `SalesOrderItem(SalesOrderId)`, SQL Server cannot efficiently locate the items belonging to each order.
+
+A Hash Join allows SQL Server to process the large input and find matching rows without repeatedly scanning the entire table for each order.
+
+However, **the Hash Join does not eliminate the expensive scan of 40 million order items**.
+
+> [!IMPORTANT]
+> **Hash Match is not a bad operator.** It is often an efficient choice for joining large datasets.
+>
+> In our example, the main performance problem is the amount of data that must be read, not the join algorithm itself.
+
+### Inspect the Hash Match operator
+
+In the Actual Execution Plan, find the `Hash Match (Inner Join)` connecting `SalesOrder` and `SalesOrderItem`.
+
+Open its Properties and examine the join condition and the number of rows flowing through the operator.
+
+In our reference plan, the join produces approximately **21,908 matching order items**.
+
+*Note: The build/probe description is simplified. The actual input roles depend on the execution plan.*
+
+### Check your understanding
+
+**Why can a Hash Join be a good choice even when the query is slow?**
+
+<details>
+<summary>Show answer</summary>
+
+A Hash Join can efficiently match large inputs without repeatedly scanning one table for each row from the other.
+
+The query is slow mainly because SQL Server must read 40 million order items, not because Hash Match is inherently inefficient.
+
+</details>
 
 ## 7.5 Why scanning `Product` may be fine
 

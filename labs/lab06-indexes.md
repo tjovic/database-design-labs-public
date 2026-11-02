@@ -1943,47 +1943,52 @@ The execution plan and performance measurements confirmed the improvement.
 
 ---
 
-# 10. Inspect the physical index structure
 
-Now connect the execution plan back to Lab 05. Every level of a disk-based rowstore B+ tree consists of **8 KB pages**. More pages and a deeper tree can mean more page access, although cache behavior and the chosen plan also matter.
+# 10. Index design principles
 
-You can inspect index metadata and physical characteristics. For example:
+## 10.1 Composite indexes and column order
+
+So far, we have created indexes on individual columns, such as `OrderDate` and `SalesOrderId`.
+
+However, many queries filter or sort data using **more than one column**.
+
+A **composite index** is an index that uses two or more columns as its key.
+
+The order of these columns is important because it determines how the index entries are organized and which search patterns the index can efficiently support.
+
+### How are composite index keys organized?
+
+Consider an index on:
 
 ```sql
-SELECT
-    i.name AS IndexName,
-    ips.index_type_desc AS IndexType,
-    ips.index_level AS IndexLevel,
-    ips.page_count AS PageCount,
-    ips.record_count AS RecordCount,
-    ips.avg_page_space_used_in_percent AS PageUsedPercent
-FROM sys.dm_db_index_physical_stats
-(
-    DB_ID(),
-    OBJECT_ID('dbo.SalesOrder'),
-    NULL, NULL, 'DETAILED'
-) AS ips
-JOIN sys.indexes AS i
-    ON i.object_id = ips.object_id
-   AND i.index_id = ips.index_id
-ORDER BY i.name, ips.index_level DESC;
-GO
+(CustomerId, OrderDate)
 ```
 
-`index_level = 0` represents the leaf level, and larger values represent higher levels. The highest level is the root for that index/allocation-unit context. For very large indexes, `'DETAILED'` can be expensive; use it in this training database, not automatically on busy production systems.
+The index entries are logically ordered:
 
-> [!NOTE]
-> `sys.dm_db_index_physical_stats` can return multiple rows for partitions or allocation units. Interpret its output in that context. For a quick summary, SQL Server also offers `sys.dm_db_index_physical_stats` with `'SAMPLED'` or `'LIMITED'`, but not every metric is available in every mode.
+1. First by `CustomerId`.
+2. Within each `CustomerId`, by `OrderDate`.
 
-Observe how the page counts differ between the clustered primary-key index and the narrower nonclustered `OrderDate` index.
+For example:
 
----
+| CustomerId | OrderDate |
+|---:|---|
+| 100 | 2025-01-05 |
+| 100 | 2025-02-12 |
+| 100 | 2025-04-20 |
+| 200 | 2025-01-10 |
+| 200 | 2025-03-15 |
+| 300 | 2025-02-01 |
 
-# 11. Index design principles
+Notice that all orders for the same customer are grouped together, and within each customer, the orders are sorted by date.
 
-## 11.1 Composite indexes and column order
+This makes it efficient to find orders for a particular customer, optionally restricted to a date range.
 
-Create an index that supports searches starting with `CustomerId` and optionally narrowing by date:
+However, the index is **not globally sorted by `OrderDate`**. Dates are sorted only within each `CustomerId` group.
+
+### Create the composite index
+
+Execute:
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_CustomerId_OrderDate
@@ -1991,37 +1996,108 @@ ON dbo.SalesOrder (CustomerId, OrderDate);
 GO
 ```
 
-Compare these queries (enable Actual Execution Plan):
+Now compare the following queries with Actual Execution Plan enabled.
+
+**Query A – Leading key only**
 
 ```sql
--- Leading key only
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE CustomerId = 500;
 GO
+```
 
--- Leading key followed by a range on the second key
+SQL Server can use the leading key `CustomerId` to locate the matching entries.
+
+**Query B – Leading key and second key**
+
+```sql
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE CustomerId = 500
   AND OrderDate >= '20250101';
 GO
+```
 
--- Second key without the first
+SQL Server can use the equality condition on `CustomerId` and the range condition on `OrderDate` to efficiently locate matching entries.
+
+**Query C – Second key only**
+
+```sql
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
 WHERE OrderDate >= '20250101';
 GO
 ```
 
-The first two patterns align with the leading key. The third does not provide `CustomerId`, so it generally cannot efficiently seek directly on `OrderDate` using this index alone. A scan may still use it for coverage.
+This query does not filter by the leading key, `CustomerId`.
+
+Therefore, SQL Server generally cannot use this composite index to directly seek to one continuous date range across all customers.
+
+It may scan the index or choose another available index, such as `IX_SalesOrder_OrderDate`, which we created earlier.
+
+### Compare the execution plans
+
+For each query, inspect the access operator and its **Seek Predicates**.
+
+| Query | Predicate | Expected use of the composite index |
+|---|---|---|
+| A | `CustomerId = 500` | Seek using the leading key |
+| B | `CustomerId = 500 AND OrderDate >= ...` | Seek using both key columns |
+| C | `OrderDate >= ...` | No efficient date-only seek using this composite index |
 
 > [!IMPORTANT]
-> **Key column order matters.** Reordering predicates in the `WHERE` clause does not change an index's key order.
+> **The order of columns in a composite index matters.**
+>
+> An index on `(CustomerId, OrderDate)` is not equivalent to an index on `(OrderDate, CustomerId)`.
+>
+> Reordering conditions in the `WHERE` clause does not change the index's key order.
 
-## 11.2 Selectivity
+### Check your understanding
 
-Inspect the values of `Status`:
+**Would an index on `(OrderDate, CustomerId)` be equally efficient for finding all orders belonging to `CustomerId = 500`?**
+
+<details>
+<summary>Show answer</summary>
+
+Not necessarily.
+
+With `OrderDate` as the leading key, the index is organized primarily by date. Orders for customer 500 may be spread across many different date ranges.
+
+An index on `(CustomerId, OrderDate)` is generally better suited for queries that filter by `CustomerId` alone.
+
+However, `(OrderDate, CustomerId)` may be more useful for queries that primarily filter by date.
+
+The best column order depends on the queries the index needs to support.
+
+</details>
+
+## 10.2 Selectivity
+
+When designing an index, an important consideration is **selectivity**.
+
+Selectivity describes how effectively a search condition reduces the number of rows that need to be processed.
+
+For example, imagine a table containing one million orders:
+
+| Status | Number of orders |
+|---|---:|
+| Completed | 900,000 |
+| Processing | 90,000 |
+| Review | 10,000 |
+
+If we search for `Status = 'Completed'`, the query matches **90% of the table**.
+
+However, searching for `Status = 'Review'` matches only **1% of the table**.
+
+The second condition is much more selective because it returns a smaller proportion of the rows.
+
+> [!NOTE]
+> These numbers are illustrative. We will now examine the actual distribution of values in our `SalesOrder` table.
+
+### Examine the data distribution
+
+First, find out how frequently each status occurs:
 
 ```sql
 SELECT Status, COUNT(*) AS NumberOfOrders
@@ -2029,147 +2105,346 @@ FROM dbo.SalesOrder
 GROUP BY Status
 ORDER BY NumberOfOrders DESC;
 GO
+```
 
+Examine the results.
+
+Which status occurs most frequently? Which is the rarest?
+
+The distribution matters because SQL Server estimates how many rows a query will return and uses that information when choosing an execution plan.
+
+### Create an index on Status
+
+Now create a nonclustered index:
+
+```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_Status
 ON dbo.SalesOrder (Status);
 GO
 ```
 
-Compare the plans:
+The index organizes its entries by `Status`, allowing SQL Server to locate rows with a particular status.
+
+However, **having an index does not guarantee that SQL Server will use it for every status value**.
+
+### Compare two queries
+
+Enable Actual Execution Plan and execute:
+
+**Query A – Common status**
 
 ```sql
 SELECT SalesOrderId, Status
 FROM dbo.SalesOrder
 WHERE Status = 'Completed';
 GO
+```
 
+**Query B – Rare status**
+
+```sql
 SELECT SalesOrderId, Status
 FROM dbo.SalesOrder
 WHERE Status = 'Review';
 GO
 ```
 
-**Selectivity** describes how narrowly a predicate reduces the rows to be processed. A rare status may be a good index candidate even if the `Status` column has only a few distinct values. The optimizer considers the distribution of values and cost of alternative plans.
+Both queries filter on the same indexed column, but they may return very different numbers of rows.
 
-## 11.3 Included columns and index width
+Compare their execution plans and `STATISTICS IO` results.
 
-Our index on `SalesOrderItem(SalesOrderId) INCLUDE (ProductId, Quantity, UnitPrice)` is a covering index for the order-item portion of the main query. An included column supplies data but does not extend the ordered search key.
+Pay attention to:
 
-Avoid making every index wide “just in case”: wider indexes consume storage, take more maintenance work, and may require more page reads.
+- **Access operator:** Does SQL Server use an `Index Seek` or an `Index Scan`?
+- **Actual Number of Rows:** How many rows does each query return?
+- **Logical reads:** How much page-access work does each query perform?
+
+> [!IMPORTANT]
+> **An index is often most beneficial when a query needs only a small portion of the table.**
+>
+> When a query returns a large proportion of the rows, a scan may be more efficient, especially if additional columns must be retrieved from the table.
+
+### Selectivity vs. number of distinct values
+
+A column with only a few different values is sometimes described as having **low cardinality**.
+
+For example, `Status` might contain only `Completed`, `Processing`, and `Review`.
+
+However, this does not automatically make an index on `Status` useless.
+
+If `Review` occurs in only 1% of the rows, searching for that value can still be highly selective.
+
+The important distinction is:
+
+- **Cardinality:** how many distinct values a column contains (in this context).
+- **Selectivity:** how narrowly a particular search condition filters the rows.
+
+### Check your understanding
+
+**Why might an index on `Status` be useful for `Status = 'Review'`, even though the column contains only a few distinct values?**
+
+<details>
+<summary>Show answer</summary>
+
+Because `Review` may occur in only a small percentage of the table.
+
+An index allows SQL Server to locate the matching entries without examining every row.
+
+The usefulness of an index depends not only on the number of distinct values but also on their distribution and the columns required by the query.
+
+</details>
+
+## 10.3 Included columns and index width
+
+In Section 8.4, we created a covering index on `SalesOrderItem`:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
+ON dbo.SalesOrderItem (SalesOrderId)
+INCLUDE (ProductId, Quantity, UnitPrice);
+```
+
+This allowed SQL Server to retrieve all the required columns directly from the nonclustered index, eliminating thousands of additional clustered index accesses.
+
+However, **adding more columns to an index is not always beneficial**.
+
+### Why does index width matter?
+
+As we learned in Lab 05, SQL Server stores index data in **8 KB pages**.
+
+When an index contains more columns, its leaf-level entries generally become wider.
+
+This has several consequences:
+
+- **Fewer entries per page:** wider entries reduce the number of index records that fit into an 8 KB page.
+- **More pages:** the index may require more pages to store the same number of entries.
+- **More I/O:** reading a larger portion of the index may require more page accesses.
+- **More maintenance:** inserting or updating indexed values can require additional work.
+
+For example, consider a simplified index with one million entries:
+
+| Average entry size | Entries per page (approx.) | Pages needed (approx.) |
+|---|---:|---:|
+| 20 bytes | 400 | 2,500 |
+| 40 bytes | 200 | 5,000 |
+| 80 bytes | 100 | 10,000 |
+
+These figures are illustrative and ignore page headers, record overhead, free space, and other internal structures.
+
+The important observation is that **doubling the size of index entries can approximately double the number of leaf pages required**.
+
+### Finding the right balance
+
+A narrow index uses less storage and may require fewer page reads, but it might not contain all the columns required by a query.
+
+A wider covering index can eliminate additional lookups, but it requires more storage and maintenance.
+
+The best choice depends on the workload.
+
+> [!IMPORTANT]
+> **A covering index is not necessarily the best index for every situation.**
+>
+> Add included columns when the benefit of avoiding additional data lookups justifies the extra storage and maintenance cost.
+
+### Check your understanding
+
+**Why might a wider covering index be faster for one query but less efficient for the database overall?**
+
+<details>
+<summary>Show answer</summary>
+
+A covering index can improve a query by providing all required columns without additional lookups.
+
+However, wider index entries require more storage pages and can increase the work needed for data modifications.
+
+The index may improve frequently executed queries while increasing storage and maintenance costs for the overall workload.
+
+</details>
 
 ---
 
-# 12. Inserts, page splits, and maintenance
+# 11. Inserts, page splits, and maintenance
 
-Indexes use physical pages with finite capacity. If an insertion belongs in a page with enough free space, SQL Server can add the entry there. If the page cannot accommodate it, a **page split** may be required, moving entries between pages and updating parent pointers as necessary.
+So far, we have focused on how indexes help SQL Server find data efficiently.
 
-The following illustrations continue the nonclustered `MemberID` index from Section 3.2 (the same initial tree: keys 11, 19, 27, 43, 56, 61, 73, 79). Three new members are inserted one at a time, in this order:
+However, database tables are not static. New rows are inserted, existing rows are updated, and rows are deleted.
 
-```sql
--- Illustrative statements: not executed against IndexLab
-INSERT INTO Member (MemberID, FirstName, LastName)
-VALUES (58, 'Daniel', 'Hayes');
+**Every index must remain consistent with the data it represents.**
 
-INSERT INTO Member (MemberID, FirstName, LastName)
-VALUES (60, 'Ryan', 'Mitchell');
+This means that indexes improve certain read operations, but they also introduce additional work when data changes.
 
-INSERT INTO Member (MemberID, FirstName, LastName)
-VALUES (75, 'Olivia', 'Bennett');
-```
+## 11.1 Inserting entries into a B+ tree
 
-Each `INSERT` adds one new key to the index — `MemberID` 58, then 60, then 75 — in the order shown above. The page capacities below are intentionally simplified so that the resulting splits are visible:
+As we learned earlier, SQL Server stores index entries in **8 KB pages**.
+
+The entries at the leaf level are logically ordered by their index keys.
+
+When a new row is inserted, SQL Server must place its index entry in the correct position according to the key.
+
+Two situations are possible:
+
+- **Enough free space:** the new entry can be inserted into the existing page.
+- **Not enough free space:** SQL Server may need to split the page to make room for the new entry.
+
+A page split can also require changes to separator keys and pointers in the upper levels of the B+ tree.
+
+### Example: Inserting new keys
+
+The following diagram illustrates the insertion of three new keys: `58`, `60`, and `75`.
 
 ![Step-by-step insertion into a simplified B+ tree](../images/lab06/bplus-tree-insert-steps.svg)
 
-Inserting 58 and 60 each cause one leaf split; inserting 75 causes a leaf split **and** a root split, growing the tree from 3 levels to 4:
+Follow the changes in the diagram:
+
+1. **Initial state:** the B+ tree contains existing keys, with some available space in its pages.
+2. **Insert 58:** the new key is placed in its correct position. A leaf page split requires an update to the parent structure.
+3. **Insert 60:** another insertion changes the leaf-level structure, but the overall tree height remains unchanged.
+4. **Insert 75:** additional splitting propagates upward, eventually creating a new root and increasing the height of the tree.
+
+> [!IMPORTANT]
+> **A page split does not always increase the height of a B+ tree.**
+>
+> The tree grows in height only when splitting propagates all the way to the root and a new root is required.
+
+### Final B+ tree
+
+The following diagram shows the resulting structure after all three insertions.
 
 ![Final B+ tree after the insertions](../images/lab06/bplus-tree-after-insert.svg)
 
-The next example repeats the same three insertions (58, 60, 75) against the **clustered** version of the index from Section 4, where leaf pages hold the data rows themselves rather than key/RID pairs:
+Notice that:
+
+- All leaf pages remain at the same depth.
+- The index entries remain logically ordered by key.
+- Separator keys and child pointers have been updated.
+- The tree now has an additional level.
+
+This illustrates how a B+ tree maintains its balanced structure even as new entries are inserted.
+
+## 11.2 Inserting rows into a clustered index
+
+In a **clustered index**, the leaf level contains the actual table rows.
+
+Therefore, inserting a new row may require SQL Server to reorganize the data rows stored in the leaf pages.
+
+The next diagram illustrates this process.
 
 ![Insertion into a clustered index](../images/lab06/clustered-index-insert.svg)
 
-> [!WARNING]
-> These diagrams model a very small maximum number of entries per node. Real SQL Server pages are 8 KB and can hold variable numbers of records, depending on row size and available space. The drawings are **conceptual**, not physical page byte layouts.
+The same basic B+ tree principles apply:
 
-> [!IMPORTANT]
-> **Indexes are not free.** Every nonclustered index must be kept in sync with the table: each `INSERT`, `UPDATE`, or `DELETE` that touches an indexed column also writes to every index built on it, not just to the table itself. This is the cost side of the trade-off the rest of this lab has been measuring the benefit of — and it is the reason the checklist in Section 13 asks whether an index is actually needed before creating it.
+- New rows must be placed according to the clustered key's logical order.
+- If the target leaf page has enough free space, the row can be inserted there.
+- If there is insufficient space, a page split may be necessary.
+- Changes to the leaf pages may require updates to the upper index levels.
 
-That cost sits alongside the benefits measured earlier in this lab:
+The key difference is that **clustered index leaf pages contain complete data rows**, not just nonclustered index entries.
 
-- Faster and more targeted reads for some access patterns.
-- Additional storage for index pages.
-- Extra writes and maintenance when indexed data changes.
-- Possible page splits and fragmentation.
+This means that splitting a clustered index leaf page involves redistributing actual table rows.
+
+## 11.3 Why do indexes require maintenance?
+
+Every additional index must be updated when relevant data changes.
+
+For example:
+
+- **INSERT:** SQL Server adds entries to the indexes associated with the new row.
+- **DELETE:** SQL Server must remove or logically delete the corresponding index entries.
+- **UPDATE:** SQL Server may need to modify index entries, especially when indexed key or included column values change.
+
+These operations require additional CPU, memory, logging, and page modifications.
+
+### Page splits and fragmentation
+
+Page splits can also contribute to **index fragmentation**.
+
+In simplified terms, fragmentation occurs when the physical organization of index pages becomes less efficient for certain access patterns.
+
+For example, logically neighboring leaf pages may no longer be stored close together in the physical file.
+
+This can increase the cost of reading large ranges of index pages, particularly when physical I/O is involved.
+
+However, fragmentation does not automatically mean that every query will become slower.
+
+> [!NOTE]
+> SQL Server provides index maintenance operations such as `ALTER INDEX ... REORGANIZE` and `ALTER INDEX ... REBUILD`.
+>
+> These operations can help address certain index maintenance issues, but they should not be performed automatically without considering actual performance, page counts, fragmentation, and workload requirements.
+
+## 11.4 The cost of additional indexes
+
+Indexes are useful because they can reduce the amount of data SQL Server must examine when executing queries.
+
+However, they also consume storage and increase the work required for data modifications.
+
+| Benefit | Cost |
+|---|---|
+| Faster access to selected rows | Additional storage space |
+| Efficient range searches | Extra work during INSERT, UPDATE, and DELETE |
+| Reduced need for large scans | Possible page splits and fragmentation |
+| Covering indexes can avoid lookups | Wider indexes require more pages |
+
+The goal is not to create as many indexes as possible.
+
+**The goal is to create indexes that provide the greatest benefit for the database workload.**
+
+### Check your understanding
+
+**Why can adding more indexes improve SELECT queries but make INSERT operations more expensive?**
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answer</summary>
 
-A single-row `INSERT` into `dbo.SalesOrder`, measured with `STATISTICS IO` on one SQL Server 2025 Express instance:
+Additional indexes provide more access paths that SQL Server can use to locate data efficiently.
 
-| Indexes on `SalesOrder` | Logical writes for one `INSERT` |
-|---|---:|
-| `PK_SalesOrder` (clustered) only | **3** |
-| `PK_SalesOrder` + `IX_SalesOrder_OrderDate` | **6** |
+However, when a new row is inserted, SQL Server must also maintain the corresponding entries in each affected index.
 
-Adding one nonclustered index **doubled** the logical writes for this insert — the clustered row itself still needs writing, plus a separate entry in the nonclustered index's own B+ tree. Every additional index on a frequently written table repeats this cost on every matching insert, update, or delete — and unlike a read, this work cannot be skipped just because the resulting index happens not to be useful for any query that runs.
+This requires additional page modifications, logging, and potentially page splits.
 
-</details>
-
-Repeated page splits leave pages only partially full and scatter logically adjacent pages across the file, which is called **fragmentation**. You can inspect it with the same `sys.dm_db_index_physical_stats` call from Section 10 — its `avg_fragmentation_in_percent` column reports it directly. Two maintenance commands address it:
-
-```sql
--- Reorders pages in place; an online, lower-impact operation
-ALTER INDEX IX_SalesOrder_OrderDate ON dbo.SalesOrder REORGANIZE;
-GO
-
--- Rebuilds the index from scratch; more thorough, but more resource-intensive
-ALTER INDEX IX_SalesOrder_OrderDate ON dbo.SalesOrder REBUILD;
-GO
-```
-
-`REORGANIZE` is generally used for lighter fragmentation, `REBUILD` for heavier fragmentation or to also update statistics with a full scan. Neither is “free”: both consume I/O and CPU, so they are normally scheduled as periodic maintenance rather than run reactively after every change.
-
-Do not index every column automatically. Choose indexes that support important, frequent queries.
-
-## Check your understanding
-
-1. Why does reordering predicates in a query's `WHERE` clause not change which column should be the leading key of a composite index?
-2. Why can a rare `Status` value be a good index candidate even when the column has few distinct values overall?
-3. What is the difference between a key column and an included column in a nonclustered index?
-4. What causes a page split, and what is its effect on index pages?
-5. What is the difference between `ALTER INDEX ... REORGANIZE` and `ALTER INDEX ... REBUILD`?
-6. Why isn't it a good idea to add an index for every column "just in case"?
-
-<details>
-<summary>Show answers</summary>
-
-1. An index's key order is fixed when the index is created; the optimizer can only use a composite index's leading column(s) to seek, regardless of how the `WHERE` clause predicates happen to be written.
-2. Selectivity depends on how many rows a specific value matches, not on how many distinct values the column has overall. A rare status value still filters out most rows, even if the column itself has only a handful of possible values.
-3. A key column defines the index's sort order and can be used for seeking and ordering. An included column is stored only at the leaf level to help cover a query; it does not participate in the sort order or support a seek on its own.
-4. A page split happens when a new or updated entry no longer fits on its current index page. SQL Server allocates a new page and redistributes entries, which can leave pages partially full and scatter logically adjacent pages, causing fragmentation.
-5. `REORGANIZE` reorders existing pages in place and is a lighter, online operation suited to mild fragmentation. `REBUILD` recreates the index from scratch, which is more thorough (and can refresh statistics with a full scan) but is more resource-intensive.
-6. Every additional index adds storage and must be maintained on every `INSERT`, `UPDATE`, or `DELETE` that touches its columns, so indexes should be chosen to support actual, frequent query patterns rather than added speculatively.
+Therefore, more indexes can improve read performance while increasing the cost of data modifications.
 
 </details>
 
 ---
 
-# 13. Practical checklist
+# 12. Practical checklist – Designing useful indexes
 
-When deciding whether to add an index, ask:
+Before creating an index, consider how the database will use it.
 
-1. Which columns appear in selective `WHERE` predicates or joins?
-2. Does the index have an appropriate **leading key**?
-3. Which columns need to be returned, grouped, or aggregated?
-4. Could included columns avoid a costly lookup?
-5. Is a scan actually cheaper because many rows are needed?
-6. Is there already a similar index?
-7. What is the storage and write-maintenance cost?
-8. What do the **actual execution plan** and **STATISTICS IO** show?
+An index should support **real query patterns**, not simply exist because a column appears in a table.
 
-> [!TIP]
-> Do not optimize by operator name alone. Optimize the actual workload, focusing on work avoided and the total cost of access paths.
+Use the following checklist when evaluating a new index.
+
+| Step | Question | Why it matters |
+|---|---|---|
+| 1. Identify the query | Which queries are slow or frequently executed? | Focus on queries where optimization provides a meaningful benefit. |
+| 2. Examine search conditions | Which columns appear in `WHERE` and `JOIN` conditions? | These columns are potential candidates for index keys. |
+| 3. Choose key columns | Does the index have the appropriate leading key and column order? | Key order determines which search patterns the index can efficiently support. |
+| 4. Consider required columns | Which additional columns are returned, calculated, or aggregated? | Included columns may eliminate expensive additional lookups. |
+| 5. Evaluate selectivity | How many rows does the query need compared with the total table size? | A selective predicate may benefit from an index seek, while a scan can be cheaper for large result sets. |
+| 6. Check existing indexes | Does another index already support the query? | Avoid creating unnecessary or overlapping indexes. |
+| 7. Consider maintenance costs | How frequently are rows inserted, updated, or deleted? | Additional indexes require storage and increase data modification costs. |
+| 8. Measure the result | Did logical reads, CPU time, or elapsed time improve? | Use actual execution plans and measurements to verify the benefit. |
+
+> [!IMPORTANT]
+> **A good index is designed for a query, not just for a column.**
+>
+> The goal is to reduce unnecessary work while keeping storage and maintenance costs reasonable.
+
+### A practical approach
+
+When investigating a slow query, follow this process:
+
+1. **Analyze** the SQL statement and its Actual Execution Plan.
+2. **Identify** expensive operations and unnecessary data access.
+3. **Design** an index that supports the query's filtering, joining, or ordering requirements.
+4. **Test** the query again using the same SQL statement.
+5. **Compare** logical reads, CPU time, and elapsed time.
+6. **Evaluate** whether the performance improvement justifies the additional index.
+
+Remember that an `Index Seek` is not automatically better than a `Scan`. The best execution strategy depends on the amount of data required and the available access paths.
+
+**Always measure the results instead of assuming that a new index will improve performance.**
 
 ---
 

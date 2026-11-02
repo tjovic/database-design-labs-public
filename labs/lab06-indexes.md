@@ -832,12 +832,43 @@ In our reference plan, the join produces approximately **21,908 matching order i
 
 ## 7.5 Why scanning `Product` may be fine
 
-The query also joins `Product`, which has approximately **30,000** rows. A scan of a relatively small table can be cheap, especially if a large proportion of its rows is needed or the table occupies comparatively few pages.
+Our query also joins the `Product` table, which contains approximately **30,000 rows**.
 
-**In SSMS:** compare the `Product` access operator with the order-item access operator. The fact that both say *Scan* does not mean they have the same cost or perform the same amount of work.
+In the reference execution plan, SQL Server uses a **Clustered Index Scan** to read the `Product` table.
+
+Although the table has a clustered index, SQL Server may still choose to scan it rather than perform individual index seeks.
+
+Why?
+
+Because scanning a relatively small table can be more efficient than performing many separate lookups, especially when a large proportion of its rows is needed.
+
+**Compare the scans in the execution plan:**
+
+- `SalesOrder`: approximately 10 million rows examined.
+- `SalesOrderItem`: approximately 40 million rows examined.
+- `Product`: approximately 30,000 rows examined.
+
+All three operators read rows, but the amount of work is very different.
 
 > [!TIP]
-> Do not try to eliminate every scan you see. Optimize the **expensive work**, not the operator labels.
+> **A Scan is not necessarily a performance problem.**
+>
+> Do not try to eliminate every scan in an execution plan. Focus on operations that read or process unnecessarily large amounts of data.
+
+### Think about it
+
+**Why might scanning 30,000 products be more efficient than performing thousands of individual index seeks?**
+
+<details>
+<summary>Show answer</summary>
+
+A scan can read the required pages sequentially, while many individual seeks may involve repeated index navigation and page accesses.
+
+When a large proportion of the table is needed, scanning it may require less total work.
+
+The optimizer compares the estimated costs of these alternatives.
+
+</details>
 
 ## 7.6 `Compute Scalar`, aggregation, and sorting
 

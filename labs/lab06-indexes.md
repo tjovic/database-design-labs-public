@@ -872,34 +872,63 @@ The optimizer compares the estimated costs of these alternatives.
 
 ## 7.6 `Compute Scalar`, aggregation, and sorting
 
-Look for the operators corresponding to the remaining SQL operations.
+After joining the tables, SQL Server still needs to **calculate revenue, group the results by product category, and sort the final output**.
 
-**`Compute Scalar`** may define the expression:
+Let's examine the operators responsible for these operations.
+
+### Compute Scalar
+
+The `Compute Scalar` operator defines calculated expressions.
+
+In our query, each order item's revenue is calculated using:
 
 ```sql
 CAST(soi.Quantity AS decimal(18,2)) * soi.UnitPrice
 ```
 
-The plan may show this as a calculated expression in the **Defined Values** property. SQL Server can sometimes defer evaluation of scalar expressions, so the presence of this operator does not by itself tell you when every value is physically computed.
+In the execution plan, select the `Compute Scalar` operator and inspect its **Defined Values** property.
 
-**`Hash Match (Aggregate)`** may implement the grouping:
+You should find an expression corresponding to this calculation.
+
+> [!NOTE]
+> SQL Server may defer the actual evaluation of scalar expressions until another operator needs their values. Therefore, `Compute Scalar` does not necessarily mean that every calculation is performed immediately at that point in the plan.
+
+### Hash Match (Aggregate)
+
+Our query groups the results by product category:
 
 ```sql
 GROUP BY p.CategoryId
 ```
 
-The aggregate produces totals by category. Compare the large incoming row flow with the much smaller number of output groups.
+The `Hash Match (Aggregate)` operator groups rows with the same `CategoryId` and calculates aggregate values such as `SUM`.
 
-**`Sort`** may implement:
+In our reference execution plan:
+
+- Approximately **21,908 order items** contribute to the aggregation.
+- The operator produces **100 groups**, one for each product category represented in the result.
+
+Notice that the number of output rows is much smaller than the number of input rows.
+
+**This is the purpose of aggregation:** many individual rows are combined into a smaller number of summary rows.
+
+### Sort
+
+Finally, the query sorts the aggregated results:
 
 ```sql
 ORDER BY Revenue DESC
 ```
 
-Inspect the **Order By** property and the row count being sorted. The result has relatively few category groups, so the final sort may be cheap compared with the earlier scans. In other queries, sorting many rows or spilling to tempdb can be expensive.
+The `Sort` operator arranges the category totals from highest to lowest revenue.
+
+In the execution plan, inspect the **Order By** property to see which expression determines the sorting order.
+
+Because the aggregation produces only approximately **100 rows**, this final sort is relatively small compared with the earlier scans of millions of rows.
 
 > [!NOTE]
-> The operator selected for grouping or ordering depends on available input order, cardinality, memory, and the optimizer. The specific plan is not a universal rule for every query with `GROUP BY` or `ORDER BY`.
+> SQL Server does not always use these exact operators for calculations, grouping, or sorting. The optimizer chooses a physical execution strategy based on the query, available indexes, estimated row counts, and other factors.
+
 
 ## 7.7 Missing Index recommendations
 

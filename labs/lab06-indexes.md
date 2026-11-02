@@ -1182,6 +1182,22 @@ SQL Server still needs to scan the large order-item table to find the matching i
 
 </details>
 
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | Before `IX_SalesOrder_OrderDate` | After `IX_SalesOrder_OrderDate` |
+|---|---:|---:|
+| `SalesOrder` logical reads | 57,266 | **15** |
+| `SalesOrderItem` logical reads | 198,439 | 198,439 (unchanged) |
+| `Product` logical reads | 161 | 161 (unchanged) |
+| CPU time | 13.25 s | 12.05 s |
+| Elapsed time | 14.1 s | 13.1 s |
+
+`SalesOrder`'s logical reads collapse from 57,266 to 15 — a seek through a handful of index pages instead of a full table read. The overall query is only modestly faster so far, because `SalesOrderItem` — the much larger table — is still scanned in full; that is the next bottleneck to address.
+
+</details>
+
+
 ## 8.3 Create the order-item index *without* included columns
 
 First create a narrow index on the join column:

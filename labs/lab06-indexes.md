@@ -1213,9 +1213,23 @@ SQL Server still needs to scan the large order-item table to find the matching i
 </details>
 
 
-## 8.3 Create the order-item index *without* included columns
+## 8.3 Create an index for the `SalesOrderItem` join
 
-First create a narrow index on the join column:
+In the previous step, we created an index on `SalesOrder(OrderDate)`, allowing SQL Server to efficiently find the 5,477 orders for the selected date.
+
+However, the execution plan still showed a large scan of approximately **40 million rows** in `SalesOrderItem`.
+
+Let's address this problem by creating an index on the column used to join order items with their orders.
+
+### Create the nonclustered index
+
+Our query joins the tables using:
+
+```sql
+soi.SalesOrderId = so.SalesOrderId
+```
+
+We can support this operation with a nonclustered index:
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
@@ -1223,7 +1237,74 @@ ON dbo.SalesOrderItem (SalesOrderId);
 GO
 ```
 
-Run this isolated query with the Actual Execution Plan enabled:
+The index organizes order-item entries by `SalesOrderId`.
+
+This allows SQL Server to efficiently locate the items belonging to a particular order without scanning the entire `SalesOrderItem` table.
+
+### Run the main query again
+
+Execute **the same main query from Section 6.2**, with Actual Execution Plan enabled.
+
+![Execution plan after creating the SalesOrderId index](../images/lab06/execution-plan-after-salesorderid.svg)
+
+Compare this execution plan with the previous one.
+
+In our reference execution plan:
+
+| Operation | Before this index | After this index |
+|---|---|---|
+| `SalesOrder` access | Index Seek | Index Seek |
+| `SalesOrderItem` access | Clustered Index Scan | **Index Seek** |
+| Main order-item join | Hash Match | **Nested Loops** |
+| Order items retrieved | 21,908 matching rows after the join | 21,908 matching index entries |
+| Additional clustered index accesses | Not needed for the scan | **21,908** |
+
+This is a major improvement.
+
+Instead of scanning all 40 million order items, SQL Server performs approximately **5,477 index seeks**, one for each selected order, retrieving a total of **21,908 matching order items**.
+
+However, the new plan also introduces additional work.
+
+### Why are additional clustered index accesses needed?
+
+The new nonclustered index contains `SalesOrderId` as its search key.
+
+However, our query also needs other columns from `SalesOrderItem`:
+
+- `ProductId` – to join with the `Product` table.
+- `Quantity` – to calculate the number of items sold and revenue.
+- `UnitPrice` – to calculate revenue.
+
+These columns are not stored in our narrow nonclustered index.
+
+Therefore, after finding the matching index entries, SQL Server must retrieve the missing columns from the clustered index.
+
+In our reference execution plan, this requires approximately **21,908 additional clustered index accesses**.
+
+> [!IMPORTANT]
+> **An index can efficiently locate matching rows without containing all the data required by the query.**
+>
+> When additional columns are needed, SQL Server may have to retrieve them from the underlying table.
+
+### Inspect the additional data retrieval
+
+In the Actual Execution Plan, locate the additional `Clustered Index Seek` on `PK_SalesOrderItem`.
+
+Inspect its Properties and identify:
+
+- **Object:** `PK_SalesOrderItem`.
+- **Number of Executions:** approximately 21,908.
+- **Output List:** the additional columns required by the query.
+
+Notice that this operator is executed repeatedly, once for each matching order item in our reference plan.
+
+This operation is conceptually similar to a **Key Lookup**, where SQL Server uses the clustered key obtained from a nonclustered index to retrieve missing columns.
+
+A small number of additional lookups may be inexpensive. However, thousands of repeated accesses can become a significant part of the query's total work.
+
+### A smaller example
+
+To observe this behavior more clearly, execute:
 
 ```sql
 SELECT ProductId, Quantity, UnitPrice
@@ -1232,24 +1313,29 @@ WHERE SalesOrderId = 1;
 GO
 ```
 
-The index helps SQL Server find rows matching `SalesOrderId`, but does **not** contain the requested `ProductId`, `Quantity`, and `UnitPrice` values. The optimizer may therefore choose an **Index Seek** followed by a **Key Lookup** in `PK_SalesOrderItem`.
+The nonclustered index helps SQL Server find the matching order items, but it does not contain the three selected columns.
 
-In the plan, inspect the following:
+Depending on the optimizer's choice, the execution plan may show an `Index Seek` followed by a `Key Lookup (Clustered)`.
 
-- **Index Seek:** its Object should reference `IX_SalesOrderItem_SalesOrderId`; inspect its Seek Predicates.
-- **Key Lookup (Clustered):** its Object should reference `PK_SalesOrderItem`; inspect Output List and number of executions.
-- **Nested Loops:** it may connect the seek and lookup; repeated lookups can become expensive for many matching rows.
-
-A Key Lookup is not automatically slow for a few rows. It can become costly when repeated thousands of times. The optimizer may instead choose a scan when lookups are estimated to be too expensive.
+Inspect the operators and compare the number of executions.
 
 > [!NOTE]
-> A lookup is **not guaranteed** for this particular `SalesOrderId` on every dataset or version. If the optimizer selects a different access path, use the plan properties to explain the choice. Do not force an index unless you are explicitly studying the effect of a forced plan.
+> A Key Lookup is not guaranteed for every query. SQL Server may choose a different access path depending on the estimated cost.
 
-**Optional — see the same Key Lookup at full scale.** Rerun the **main query from Section 6.2** with this narrow index still in place (before creating the `INCLUDE` version in 8.4):
+### Check your understanding
 
-![Execution plan with the narrow SalesOrderId index and no INCLUDE: both large tables use an Index Seek, but a Nested Loops + Clustered Index Seek lookup runs once per matching order item](../images/lab06/execution-plan-after-salesorderid.svg)
+**Why does SQL Server perform additional clustered index accesses even though it already found the matching order items using the nonclustered index?**
 
-Both `SalesOrder` and `SalesOrderItem` now use an `Index Seek`, but `SalesOrderItem`'s seek is immediately followed by a `Clustered Index Seek` lookup into `PK_SalesOrderItem` — run once per matching row. For the isolated single-order query above, that was one lookup; for the full query, it is **21,908** lookups, one per order item. This is the same `Key Lookup` pattern, just visible at the scale the main query actually operates at.
+<details>
+<summary>Show answer</summary>
+
+The nonclustered index contains the `SalesOrderId` key and the clustered-key row locator, but it does not contain all the columns required by the query.
+
+SQL Server uses the nonclustered index to find matching order items, then accesses the clustered index to retrieve the missing columns.
+
+In the next section, we will modify the index so that these additional accesses are no longer necessary.
+
+</details>
 
 <details>
 <summary>Show reference results from one computer</summary>

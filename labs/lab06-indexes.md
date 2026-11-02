@@ -1355,111 +1355,423 @@ This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats
 
 ## 8.4 Recreate the order-item index with `INCLUDE`
 
-```sql
-DROP INDEX IX_SalesOrderItem_SalesOrderId ON dbo.SalesOrderItem;
-GO
+In the previous step, we created a nonclustered index on `SalesOrderItem(SalesOrderId)`.
 
-CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
-ON dbo.SalesOrderItem (SalesOrderId)
-INCLUDE
-(
-    ProductId,
-    Quantity,
-    UnitPrice
-);
+This eliminated the expensive scan of 40 million order items. However, the execution plan still showed approximately **21,908 additional clustered index accesses** to retrieve columns missing from the nonclustered index.
+
+Can we avoid these additional accesses?
+
+Yes. We can extend the nonclustered index with **included columns**.
+
+### What are included columns?
+
+A nonclustered index can contain two types of explicitly defined columns:
+
+- **Key columns:** determine the logical ordering of index entries and can be used to efficiently locate specific values or ranges.
+- **Included columns:** store additional values at the leaf level without becoming part of the index's search key.
+
+For our query, we need the following columns from `SalesOrderItem`:
+
+| Column | Purpose | Index role |
+|---|---|---|
+| `SalesOrderId` | Find items belonging to selected orders | Key |
+| `ProductId` | Join order items with products | Included |
+| `Quantity` | Calculate items sold and revenue | Included |
+| `UnitPrice` | Calculate revenue | Included |
+
+By including the additional columns, SQL Server can retrieve all the required values directly from the nonclustered index.
+
+### Recreate the index
+
+First, remove the existing narrow index:
+
+```sql
+DROP INDEX IX_SalesOrderItem_SalesOrderId
+ON dbo.SalesOrderItem;
 GO
 ```
 
-Run the isolated query again. This index now contains everything required from `SalesOrderItem`, so a **Key Lookup is not needed** to obtain those three columns. Compare its plan with the previous one.
+Now create it again with the additional columns:
 
-| Part of index | Columns | Role |
+```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrderItem_SalesOrderId
+ON dbo.SalesOrderItem (SalesOrderId)
+INCLUDE (ProductId, Quantity, UnitPrice);
+GO
+```
+
+Notice that only `SalesOrderId` is the index key.
+
+The included columns are stored at the leaf level, but they do not change the logical ordering of the index.
+
+### Run the main query again
+
+Execute **exactly the same query from Section 6.2**, with Actual Execution Plan enabled.
+
+![Execution plan after adding INCLUDE columns](../images/lab06/execution-plan-after-include.svg)
+
+Compare this plan with the previous one, before adding `INCLUDE`.
+
+| Operation | Without `INCLUDE` | With `INCLUDE` |
 |---|---|---|
-| Key | `SalesOrderId` | Locates matching order items through the B+ tree |
-| Included | `ProductId`, `Quantity`, `UnitPrice` | Supplies required columns at leaf level |
-| Implicit row locator | `SalesOrderItemId` | Clustered key needed to identify the complete row |
+| `SalesOrder` access | Index Seek | Index Seek |
+| `SalesOrderItem` access | Index Seek | Index Seek |
+| Order-item index seeks | 5,477 | 5,477 |
+| Matching order items | 21,908 | 21,908 |
+| Additional clustered row fetches | **21,908** | **0** |
+| Main order-item join | Nested Loops | Nested Loops |
 
-The main query needs these columns for joining `Product` (`ProductId`) and calculating revenue (`Quantity`, `UnitPrice`). This index is **covering** for the `SalesOrderItem` portion of the query.
+The important difference is that **the additional clustered index accesses have disappeared**.
+
+The nonclustered index now contains all the columns required from `SalesOrderItem`, so SQL Server no longer needs to retrieve them from the clustered index.
+
+### What is a covering index?
+
+An index is called a **covering index** when it contains all the columns required by a particular query, allowing SQL Server to satisfy that part of the query without additional row lookups.
+
+Our index:
+
+```sql
+ON dbo.SalesOrderItem (SalesOrderId)
+INCLUDE (ProductId, Quantity, UnitPrice)
+```
+
+is covering for the `SalesOrderItem` portion of the main query.
 
 > [!IMPORTANT]
-> `INCLUDE` columns are stored at the leaf level; they do not extend the sorted search key. An included column can still support a residual filter or be used in `GROUP BY` or calculations, but it does not have the same seek or sort-order benefits as a leading key column.
+> **Covering is a property of an index relative to a query.**
+>
+> The same index may cover one query but not another query that requires additional columns.
 
----
+### What about the clustered key?
 
-# 9. Re-run the baseline query and compare plans
+There is one more detail worth understanding.
 
-Execute **exactly the same SELECT from Section 6.2**, with both `STATISTICS IO` and `STATISTICS TIME` still on and Actual Execution Plan enabled. Do not modify the `WHERE`, joins, grouping, or ordering.
+Our `SalesOrderItem` table has a clustered primary key on `SalesOrderItemId`.
 
-## 9.1 Start with the access operators
+In a nonclustered index on a clustered table, SQL Server also makes the clustered key available as a **row locator**.
 
-The original plan may have scanned large portions of `SalesOrder` and `SalesOrderItem`. After creating the targeted indexes, inspect whether the optimizer can use:
+Therefore, our nonclustered index effectively provides:
 
-- **Index Seek on `IX_SalesOrder_OrderDate`** to find the relevant date range.
-- **Index Seek on `IX_SalesOrderItem_SalesOrderId`** to find items for the selected order IDs.
-- **A join algorithm such as Nested Loops** to combine the relatively small outer input with repeated efficient inner seeks.
+| Column | Role |
+|---|---|
+| `SalesOrderId` | Explicit index key |
+| `ProductId` | Included column |
+| `Quantity` | Included column |
+| `UnitPrice` | Included column |
+| `SalesOrderItemId` | Implicit clustered-key row locator |
 
-**In SSMS:** click each relevant seek and inspect **Seek Predicates**. For the date index you should see a date-range condition; for the item index you should see a condition on `SalesOrderId` (subject to the optimizer's chosen plan).
+We did not need to explicitly include `SalesOrderItemId`.
 
-![Execution plan after the covering INCLUDE index: both large tables use an Index Seek with no Key Lookup, joined by Nested Loops](../images/lab06/execution-plan-after-include.svg)
+The same principle explains why our earlier index on `SalesOrder(OrderDate)` did not require `INCLUDE (SalesOrderId)`: `SalesOrderId` was already the clustered key of that table.
 
-Compare this with the [Section 7 "before" plan](#7-investigate-the-execution-plan-before-indexing): both `Table Scan` operators are gone, replaced by `Index Seek` operators that read only the matching rows, and the `Key Lookup` from Section 8.3 is gone too — `IX_SalesOrderItem_SalesOrderId`'s `INCLUDE` columns supply everything the query needs. The two `Hash Match (Inner Join)` operators have also become `Nested Loops`, now that the inner side of each join can be found with an efficient seek instead of a full scan.
+### The complete optimization process
+
+We have now completed all five stages of our indexing demonstration.
+
+The following table summarizes how SQL Server's access strategy changed as we introduced new indexes.
+
+| Stage | `SalesOrder` access | `SalesOrderItem` access | Additional clustered row fetches |
+|---|---|---|---|
+| 1. Before indexing | Table Scan | Table Scan | — |
+| 2. After clustered primary keys | Clustered Index Scan | Clustered Index Scan | — |
+| 3. After `OrderDate` index | **Index Seek** | Clustered Index Scan | — |
+| 4. After `SalesOrderId` index | Index Seek | **Index Seek** | **21,908** |
+| 5. After `INCLUDE` | Index Seek | Index Seek | **0** |
+
+Throughout all five stages:
+
+- **The SQL query remained unchanged.**
+- **The number of matching orders remained approximately 5,477.**
+- **The number of matching order items remained approximately 21,908.**
+
+What changed was **how SQL Server accessed and processed the data**.
+
+Each new index introduced an access path that allowed the optimizer to choose a different execution strategy.
+
+> [!IMPORTANT]
+> **Creating indexes does not change which rows a query should return. It changes how SQL Server can find and process those rows.**
+>
+> A useful index allows SQL Server to avoid unnecessary work, but it does not guarantee that every query will use it.
+
+### Are included columns always a good idea?
+
+Not necessarily.
+
+Included columns make an index wider, which can increase storage requirements and the work needed to maintain it during `INSERT`, `UPDATE`, and `DELETE` operations.
+
+They should be selected based on the columns required by important queries rather than added automatically.
+
+### Check your understanding
+
+**Why did adding `INCLUDE (ProductId, Quantity, UnitPrice)` eliminate the additional clustered index accesses?**
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answer</summary>
 
-| Metric | Before any indexes | After narrow index (8.3) | After `INCLUDE` (8.4, final) |
-|---|---:|---:|---:|
-| `SalesOrder` logical reads | 57,143 | 15 | 15 |
-| `SalesOrderItem` logical reads | 198,020 | 106,449 | **32,710** |
-| `Product` logical reads | 161 | 161 | 161 |
-| CPU time | 14.7 s | 0.28 s | **0.11 s** |
-| Elapsed time | 18.1 s | 0.76 s | **0.23 s** |
+The nonclustered index now contains all the columns required from `SalesOrderItem`.
 
-Removing the `Key Lookup` cuts `SalesOrderItem`'s logical reads by roughly two-thirds again (106,449 → 32,710), and elapsed time drops from the full heap scan's 18.1 s to 0.23 s — about an **80× speedup** on this computer. The row counts (5,477 orders, 21,908 order items, 100 category groups) never changed; only the access paths did.
+SQL Server can locate matching order items using `SalesOrderId` and retrieve `ProductId`, `Quantity`, and `UnitPrice` directly from the index's leaf level.
+
+There is no longer a need to access the clustered index to retrieve these values.
 
 </details>
 
-## 9.2 Why `Nested Loops` can become attractive
+---
 
-A simplified mental model of a nested-loops join is:
+We have now seen how different indexes change the execution plan. In the next section, we will compare **logical reads, CPU time, and elapsed time** to measure how much performance actually improved.
 
-```text
-for each matching order:
-    seek its matching order items using SalesOrderId
+---
+
+# 9. Performance comparison and analysis
+
+In Section 8, we gradually introduced indexes and observed how each change affected the execution plan.
+
+We started with expensive scans of millions of rows and ended with a more efficient execution strategy using targeted index seeks and a covering index.
+
+However, **a better-looking execution plan does not automatically mean a faster query**. We need to measure the actual performance to understand how much work SQL Server performs.
+
+In this section, we will compare three important metrics:
+
+- **Logical reads** – how many page accesses SQL Server performs through the buffer pool.
+- **CPU time** – how much processor time is spent executing the query.
+- **Elapsed time** – how much time passes from the beginning to the end of query execution.
+
+By comparing these measurements before and after indexing, we can evaluate the actual benefits of our indexes.
+
+> [!IMPORTANT]
+> **The goal of indexing is not simply to replace Scans with Seeks.**
+>
+> The goal is to reduce unnecessary work and improve query performance.
+
+## 9.1 Understanding performance metrics
+
+In Section 6.1, we enabled two SQL Server options:
+
+```sql
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
 ```
 
-Before indexing, repeated scans of `SalesOrderItem` would be unacceptably expensive. With an index on `SalesOrderId`, the inner input can be found through efficient index navigation. This can make Nested Loops cheaper than building or probing a hash join over an enormous item-table scan.
+These commands provide information about the work SQL Server performs when executing a query.
 
-In the actual plan, compare the outer input's row count with the inner seek's **Number of Executions** or related runtime counters. A small number of logical reads per seek can still add up when the seek is repeated thousands of times. This is why the optimized query may still report tens of thousands of logical reads for `SalesOrderItem`.
+Let's examine the most important measurements before comparing our results.
 
-> [!NOTE]
-> The optimizer may still prefer `Hash Match`, `Merge Join`, a different access order, or a parallel plan. Indexes make new strategies **available**; they do not guarantee a particular one.
+### Logical reads
 
-## 9.3 Compare logical I/O, CPU, and elapsed time
+A **logical read** occurs when SQL Server accesses a data or index page through the buffer pool.
 
-The original lab recorded the following approximate reference values on SQL Server Express:
+As we learned in Lab 05, SQL Server stores data in **8 KB pages**.
 
-| Metric | Before indexes | After indexes |
+For example, consider this simplified `STATISTICS IO` output:
+
+```text
+Table 'SalesOrder'.
+Scan count 1, logical reads 57000,
+physical reads 0, read-ahead reads 0.
+```
+
+This means SQL Server performed approximately **57,000 logical page reads** while accessing `SalesOrder`.
+
+Since each page is 8 KB, this represents approximately:
+
+\[
+57,000 \times 8\text{ KB} \approx 445\text{ MiB}
+\]
+
+However, this does not necessarily mean that SQL Server transferred 445 MiB from disk.
+
+The pages may already be cached in memory.
+
+> [!IMPORTANT]
+> **Logical reads are not the same as physical disk reads.**
+>
+> Logical reads measure page accesses through the buffer pool, including pages already cached in memory.
+>
+> A query can perform many logical reads even when physical disk reads are zero.
+
+### Physical reads and read-ahead reads
+
+The `STATISTICS IO` output may also include:
+
+| Metric | Meaning |
+|---|---|
+| `physical reads` | Pages read from storage because they were not already available in the buffer pool. |
+| `read-ahead reads` | Pages SQL Server reads into memory in advance because it expects to need them. |
+
+For this lab, we will focus primarily on **logical reads**, because they help us understand how much page-access work different execution plans perform.
+
+### CPU time and elapsed time
+
+`STATISTICS TIME` provides two important measurements.
+
+A simplified example:
+
+```text
+SQL Server Execution Times:
+   CPU time = 1200 ms,
+   elapsed time = 1500 ms.
+```
+
+| Metric | Meaning |
+|---|---|
+| CPU time | Total processor time consumed while executing the query. |
+| Elapsed time | Total wall-clock time taken to execute the query, including time spent waiting. |
+
+In this example, the query used approximately 1.2 seconds of CPU time and finished after 1.5 seconds.
+
+These values are not always similar.
+
+For example, a query may spend time waiting for I/O operations, locks, or other resources. In a parallel execution plan, CPU time can also exceed elapsed time because multiple workers execute simultaneously.
+
+### Why do we need all three measurements?
+
+Each metric tells us something different:
+
+- **Logical reads** help us understand the amount of page-access work.
+- **CPU time** helps us understand processor usage.
+- **Elapsed time** tells us how long the query actually took.
+
+A query can become faster without reducing all three measurements by the same percentage.
+
+For example, a different execution plan may reduce elapsed time through parallel execution while still processing a large amount of data.
+
+> [!TIP]
+> When comparing execution plans, do not look only at elapsed time.
+>
+> Compare logical reads, CPU time, and elapsed time together. Also remember that caching, concurrent activity, and execution settings can affect the results.
+
+### Check your understanding
+
+**A query reports 50,000 logical reads but zero physical reads. Does this mean SQL Server did not access any data pages?**
+
+<details>
+<summary>Show answer</summary>
+
+No.
+
+SQL Server accessed data or index pages approximately 50,000 times through the buffer pool.
+
+The zero physical reads indicate that no demand page reads from storage were reported. The required pages may already have been cached in memory.
+
+Logical reads measure page accesses, not necessarily physical disk operations.
+
+</details>
+
+## 9.2 Comparing performance before and after indexing
+
+We have now seen how indexes changed the execution plan. Let's measure how much these changes improved query performance.
+
+The following results were recorded during the original lab demonstration on **SQL Server Express**.
+
+The same SQL query was executed before and after creating the indexes.
+
+### Reference measurements
+
+| Metric | Before indexing | After indexing |
 |---|---:|---:|
-| `SalesOrder` access | Table Scan | Index Seek |
-| Relevant orders | ~5,477 | ~5,477 |
-| `SalesOrderItem` access | Table Scan | Index Seek |
-| Relevant order items | ~21,908 | ~21,908 |
-| Large item input processed | ~40,000,000 rows | ~21,908 matching rows |
-| Main join | Hash Match | Nested Loops |
 | `SalesOrder` logical reads | ~57,000 | ~15 |
 | `SalesOrderItem` logical reads | ~198,000 | ~54,000 |
+| Total logical reads (two large tables) | ~255,000 | ~54,015 |
 | Elapsed time | ~17 s | ~0.5 s |
 
-These are **reference measurements, not expected fixed answers**. The large reduction in work is the central observation. The number of matching records did not change, and the SQL statement did not change; **the physical access paths did**.
+These are approximate reference measurements. Your results may differ depending on hardware, caching, SQL Server configuration, and other factors.
 
-### Calculate your own improvement
+### How much did logical I/O decrease?
 
-Using the numbers you recorded in Section 7:
+Before indexing, SQL Server performed approximately **255,000 logical reads** across the two large tables.
 
-- **Speedup** = before elapsed time / after elapsed time.
-- **Logical-read reduction (%)** = 100 × (before reads − after reads) / before reads.
+After indexing, this decreased to approximately **54,015 logical reads**.
 
-Compare logical reads **per table**, not only total execution time. Note that a higher number of indexed seeks can produce many logical reads, even when the plan is much faster than the original large scans.
+We can calculate the reduction:
+
+\[
+\text{Reduction} = \frac{255,000 - 54,015}{255,000} \times 100
+\]
+
+\[
+\boxed{\text{Logical-read reduction} \approx 78.8\%}
+\]
+
+This means the optimized query performs approximately **79% fewer logical page accesses** across these two tables.
+
+Notice that the reduction is not identical for both tables:
+
+- `SalesOrder` logical reads decreased from approximately 57,000 to only 15.
+- `SalesOrderItem` logical reads decreased from approximately 198,000 to 54,000.
+
+Although the large scans have disappeared, repeated index seeks still require page accesses.
+
+**An Index Seek is efficient, but it is not free.**
+
+### How much faster is the query?
+
+The original execution took approximately **17 seconds**.
+
+After indexing, the same query completed in approximately **0.5 seconds**.
+
+We can calculate the speedup:
+
+\[
+\text{Speedup} = \frac{\text{Before elapsed time}}{\text{After elapsed time}}
+\]
+
+\[
+\text{Speedup} = \frac{17}{0.5} = 34
+\]
+
+The query completed approximately **34 times faster** in this reference test.
+
+This is a significant improvement, even though the SQL statement and the number of matching rows remained unchanged.
+
+### Why did elapsed time improve more than logical reads?
+
+Logical reads decreased by approximately 79%, while elapsed time improved by a factor of about 34.
+
+These measurements describe different aspects of query execution.
+
+The optimized plan avoids scanning millions of unrelated rows and uses more targeted access paths. This can reduce CPU processing, memory work, and other execution costs in addition to page accesses.
+
+However, elapsed time is also affected by caching, waiting, parallelism, and system load.
+
+Therefore, **the reduction in logical reads and the reduction in elapsed time do not have to be proportional**.
+
+### Record your own measurements
+
+Use the results you collected in Section 6.2 and after completing Section 8.4.
+
+| Metric | Before indexing | After indexing | Improvement |
+|---|---|---|---|
+| `SalesOrder` logical reads | | | |
+| `SalesOrderItem` logical reads | | | |
+| CPU time (ms) | | | |
+| Elapsed time (ms) | | | |
+
+Calculate the logical-read reduction for each table and the overall speedup.
+
+Compare your measurements with the reference values. They do not need to be identical.
+
+> [!IMPORTANT]
+> **The goal is not to reproduce the reference execution time.**
+>
+> The goal is to understand why the optimized execution plan performs less work and to verify the improvement using actual measurements.
+
+### Check your understanding
+
+**Why does the optimized query still perform approximately 54,000 logical reads on `SalesOrderItem`, even though it no longer scans all 40 million rows?**
+
+<details>
+<summary>Show answer</summary>
+
+The optimized plan uses repeated index seeks to find the order items belonging to the selected orders.
+
+Each seek requires accessing index pages, including navigation and leaf pages.
+
+Although these operations are much more targeted than scanning the entire table, their logical reads accumulate across thousands of seeks.
+
+Therefore, eliminating a large scan does not mean eliminating all page-access work.
+
+</details>
 
 ## 9.4 Editions and parallel execution
 

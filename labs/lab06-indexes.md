@@ -1741,26 +1741,6 @@ However, elapsed time is also affected by caching, waiting, parallelism, and sys
 
 Therefore, **the reduction in logical reads and the reduction in elapsed time do not have to be proportional**.
 
-### Record your own measurements
-
-Use the results you collected in Section 6.2 and after completing Section 8.4.
-
-| Metric | Before indexing | After indexing | Improvement |
-|---|---|---|---|
-| `SalesOrder` logical reads | | | |
-| `SalesOrderItem` logical reads | | | |
-| CPU time (ms) | | | |
-| Elapsed time (ms) | | | |
-
-Calculate the logical-read reduction for each table and the overall speedup.
-
-Compare your measurements with the reference values. They do not need to be identical.
-
-> [!IMPORTANT]
-> **The goal is not to reproduce the reference execution time.**
->
-> The goal is to understand why the optimized execution plan performs less work and to verify the improvement using actual measurements.
-
 ### Check your understanding
 
 **Why does the optimized query still perform approximately 54,000 logical reads on `SalesOrderItem`, even though it no longer scans all 40 million rows?**

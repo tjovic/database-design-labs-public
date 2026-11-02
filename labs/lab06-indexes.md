@@ -29,7 +29,11 @@ By the end of this lab, you should be able to:
 
 In Lab 05, we saw that SQL Server stores data in **8 KB pages**. The database engine reads pages, not individual rows directly from storage. If a query needs only a few rows from a very large table, reading many unrelated pages is wasted work.
 
-Imagine a library with thousands of books. If books are not arranged by author, finding a particular title could require inspecting many shelves. Instead, the librarian uses an **alphabetical card catalog**. Each card identifies a book and points to its shelf.
+Imagine a library with thousands of books. If books are not arranged by author, finding a particular book could require inspecting many shelves.
+
+**Before computerized library catalogs became common, libraries used alphabetical card catalogs.** Each card contained information about a book, including its location on the shelves.
+
+By searching the catalog, a librarian could quickly find where a book was stored without examining every shelf.
 
 ![Library catalog organized alphabetically by author](../images/lab06/library-catalog.svg)
 

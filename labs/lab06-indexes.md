@@ -1710,13 +1710,13 @@ After indexing, the same query completed in approximately **0.5 seconds**.
 
 We can calculate the speedup:
 
-$$
-\text{Speedup} = \frac{\text{Before elapsed time}}{\text{After elapsed time}}
-$$
+```math
+\mathrm{Speedup} = \frac{\mathrm{Before\ elapsed\ time}}{\mathrm{After\ elapsed\ time}}
+```
 
-$$
-\text{Speedup} = \frac{17}{0.5} = 34
-$$
+```math
+\mathrm{Speedup} = \frac{17}{0.5} = 34
+```
 
 The query completed approximately **34 times faster** in this reference test.
 

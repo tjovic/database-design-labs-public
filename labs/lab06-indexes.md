@@ -1575,9 +1575,7 @@ This means SQL Server performed approximately **57,000 logical page reads** whil
 
 Since each page is 8 KB, this represents approximately:
 
-\[
-57,000 \times 8\text{ KB} \approx 445\text{ MiB}
-\]
+**57,000 logical reads × 8 KB ≈ 445 MiB**
 
 However, this does not necessarily mean that SQL Server transferred 445 MiB from disk.
 
@@ -1685,13 +1683,13 @@ After indexing, this decreased to approximately **54,015 logical reads**.
 
 We can calculate the reduction:
 
-\[
-\text{Reduction} = \frac{255,000 - 54,015}{255,000} \times 100
-\]
+$$
+\text{Reduction} = \frac{255{,}000 - 54{,}015}{255{,}000} \times 100
+$$
 
-\[
+$$
 \boxed{\text{Logical-read reduction} \approx 78.8\%}
-\]
+$$
 
 This means the optimized query performs approximately **79% fewer logical page accesses** across these two tables.
 
@@ -1712,13 +1710,13 @@ After indexing, the same query completed in approximately **0.5 seconds**.
 
 We can calculate the speedup:
 
-\[
+$$
 \text{Speedup} = \frac{\text{Before elapsed time}}{\text{After elapsed time}}
-\]
+$$
 
-\[
+$$
 \text{Speedup} = \frac{17}{0.5} = 34
-\]
+$$
 
 The query completed approximately **34 times faster** in this reference test.
 

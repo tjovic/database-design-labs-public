@@ -1,13 +1,13 @@
 # Lab 06 – Indexes in SQL Server
 
-[!TIP]
-How to use this lab
-
-Your instructor will demonstrate the main concepts and the indexing process during the laboratory session.
-
-You are not expected to memorize every detail or complete every section during class. Use this manual to follow the demonstrations, explore the SQL examples independently, and review the explanations at your own pace.
-
-You can also return to the exercises and detailed explanations after the laboratory session.
+> [!TIP]
+> How to use this lab
+>
+> Your instructor will demonstrate the main concepts and the indexing process during the laboratory session.
+>
+> You are not expected to memorize every detail or complete every section during class. Use this manual to follow the demonstrations, explore the SQL examples independently, and review the explanations at your own pace.
+>
+> You can also return to the exercises and detailed explanations after the laboratory session.
 
 ---
 

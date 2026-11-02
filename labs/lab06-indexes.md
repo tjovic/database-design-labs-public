@@ -1083,6 +1083,21 @@ In the next sections, we will create nonclustered indexes specifically designed 
 
 </details>
 
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | Value |
+|---|---|
+| `SalesOrder` logical reads | 57,266 |
+| `SalesOrderItem` logical reads | 198,439 |
+| `Product` logical reads | 161 |
+| CPU time | 13.25 s |
+| Elapsed time | 14.1 s |
+
+Nearly identical to the heap baseline (57,143 / 198,020 / 161, ~14.7 s CPU / ~18.1 s elapsed) — a few extra logical reads come from the clustered index's new root and IAM pages, but both large tables are still read in full.
+
+</details>
+
 ## 8.2 Create an index for the `SalesOrder` date filter
 
 In the previous step, we created clustered primary keys on `SalesOrder` and `SalesOrderItem`.

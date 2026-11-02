@@ -705,30 +705,6 @@ These are logical page accesses through the buffer pool, not necessarily physica
 >
 > **The number of rows returned does not tell us how much work SQL Server performed to find them.**
 
-### Check your understanding
-
-**Why does the predicate use `< '20250602'` instead of `<= '20250601'`?**
-
-<details>
-<summary>Show answer</summary>
-
-The column may contain both a date and a time.
-
-Using `<= '20250601'` would include values up to midnight at the beginning of June 1, but exclude later times on the same day.
-
-The half-open interval:
-
-```sql
-OrderDate >= '20250601'
-AND OrderDate < '20250602'
-```
-
-includes the entire day, regardless of the time component.
-
-It is also suitable for efficient range searches using an index on `OrderDate`.
-
-</details>
-
 ## 7.3 Investigate the `SalesOrderItem` scan — the main bottleneck
 
 We have seen that SQL Server examines 10 million rows in `SalesOrder` to find approximately 5,477 orders for the selected date.
@@ -816,24 +792,6 @@ The order-item table requires substantially more page accesses.
 
 This helps explain why it is the main bottleneck in our initial execution plan.
 
-### Check your understanding
-
-**Why doesn't SQL Server simply find the order items for each of the 5,477 selected orders?**
-
-<details>
-<summary>Show answer</summary>
-
-Because there is no suitable index on `SalesOrderItem(SalesOrderId)`.
-
-SQL Server knows which order IDs it needs, but it cannot efficiently navigate directly to their corresponding order items.
-
-Without an index, repeatedly searching the large table for each order would be very expensive.
-
-Instead, the optimizer chooses to scan the order-item table and use a Hash Match join to identify the matching rows.
-
-Later in the lab, we will create an index on `SalesOrderItem(SalesOrderId)` and observe how this changes the execution plan.
-
-</details>
 
 ## 7.4 Why `Hash Match (Inner Join)` may be chosen
 
@@ -871,18 +829,6 @@ In our reference plan, the join produces approximately **21,908 matching order i
 
 *Note: The build/probe description is simplified. The actual input roles depend on the execution plan.*
 
-### Check your understanding
-
-**Why can a Hash Join be a good choice even when the query is slow?**
-
-<details>
-<summary>Show answer</summary>
-
-A Hash Join can efficiently match large inputs without repeatedly scanning one table for each row from the other.
-
-The query is slow mainly because SQL Server must read 40 million order items, not because Hash Match is inherently inefficient.
-
-</details>
 
 ## 7.5 Why scanning `Product` may be fine
 

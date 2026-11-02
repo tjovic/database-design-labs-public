@@ -587,31 +587,9 @@ In the reference Express instance, the baseline execution took approximately **1
 
 Keep the **Execution Plan** tab from the query you ran in Section 6.2 open — Sections 7.2 through 7.7 walk through that specific plan, operator by operator. If you closed it or ran anything else in between, re-run the Section 6.2 query with Actual Execution Plan enabled before continuing.
 
-Record these values now, before changing any index — you will compare them against the "after indexes" numbers in Section 9:
+Record your own values now, before changing any index — you will compare them against the "after indexes" numbers in Section 9. The table below shows reference values measured on one SQL Server 2025 Express instance (`IndexLab` in its freshly generated state — heaps, no indexes beyond the setup script), so you can check your own results against them:
 
-| Metric | Before indexes | After indexes |
-|---|---|---|
-| Elapsed time (ms) | Your value | To be measured |
-| CPU time (ms) | Your value | To be measured |
-| `SalesOrder` logical reads | Your value | To be measured |
-| `SalesOrderItem` logical reads | Your value | To be measured |
-| Access operator for `SalesOrder` | Your value | To be measured |
-| Access operator for `SalesOrderItem` | Your value | To be measured |
-| Main join operator | Your value | To be measured |
-
-> [!NOTE]
-> SQL Server Express has resource and parallelism limitations. The original lab's reference query used serial execution in Express. On instances using parallel execution, the sum of CPU time across workers can be larger than elapsed time. The observed plan depends on edition, configuration, statistics, and data distribution; neither serial execution nor a particular operator is guaranteed for every installation.
-
-The "Access operator" and "Main join operator" rows ask you to name things Section 7.1 has not introduced yet — that is intentional. Write down what you see in the plan now (even informally), then come back and compare it with the vocabulary from 7.1 onward.
-
-Fill in your own values in the table above before expanding the reference results below.
-
-<details>
-<summary>Show reference results from one computer</summary>
-
-Measured on one SQL Server 2025 Express instance (`IndexLab` in its freshly generated state — heaps, no indexes beyond the setup script):
-
-| Metric | Before indexes |
+| Metric | Before indexes (reference) |
 |---|---|
 | Elapsed time | **18.1 s** |
 | CPU time | **14.7 s** |
@@ -624,9 +602,10 @@ Measured on one SQL Server 2025 Express instance (`IndexLab` in its freshly gene
 | Main join operator(s) | Two `Hash Match (Inner Join)` operators — one for `SalesOrder`/`SalesOrderItem`, one for the result joined with `Product` |
 | Aggregation / sort | `Hash Match (Aggregate)` for `GROUP BY`, then `Sort` for `ORDER BY Revenue DESC` |
 
-Elapsed and CPU time will vary with your hardware; the row counts and logical reads should be close to these values, since they come from the same generated dataset and an unindexed heap scan.
+> [!NOTE]
+> SQL Server Express has resource and parallelism limitations. The original lab's reference query used serial execution in Express. On instances using parallel execution, the sum of CPU time across workers can be larger than elapsed time. The observed plan depends on edition, configuration, statistics, and data distribution; neither serial execution nor a particular operator is guaranteed for every installation. Elapsed and CPU time will vary most with your hardware; row counts and logical reads should be close to the reference values, since they come from the same generated dataset and an unindexed heap scan.
 
-</details>
+The "Access operator" and "Main join operator" rows name things Section 7.1 has not introduced yet — that is intentional. Look at your own plan now (even informally), then come back and compare it with the vocabulary from 7.1 onward.
 
 ![Execution plan before indexing: two Table Scans feeding two Hash Match joins, a Hash Match Aggregate, and a Sort](../images/lab06/execution-plan-before.svg)
 

@@ -1773,46 +1773,171 @@ Therefore, eliminating a large scan does not mean eliminating all page-access wo
 
 </details>
 
-## 9.4 Editions and parallel execution
+## 9.3 SQL Server editions and parallel execution
 
-The original lab also compared Express with Developer/Enterprise on the same computer and data:
+So far, we have focused on how indexes improve query performance by reducing unnecessary data access.
 
-| Reference measurement | Express | Developer / Enterprise |
+However, **the same query can perform differently depending on the SQL Server edition, configuration, and available hardware**.
+
+In the original lab demonstration, the same database and query were tested on SQL Server Express and Developer editions running on the same computer.
+
+### Reference measurements
+
+| Metric | SQL Server Express | Developer / Enterprise |
 |---|---:|---:|
-| Execution before indexes | Serial in reference test | Parallel in reference test |
-| Elapsed before indexes | ~17 s | ~1.3 s |
-| Elapsed after indexes | ~0.5 s | ~0.17 s |
-| Approximate speedup due to indexes | ~33× | ~8× |
+| Execution before indexing | Serial | Parallel |
+| Elapsed time before indexing | ~17 s | ~1.3 s |
+| Elapsed time after indexing | ~0.5 s | ~0.17 s |
+| Speedup from indexing | ~34× | ~8× |
 
-The difference illustrates why **hardware, configured parallelism, memory, and edition capabilities** influence observed timing. A parallel plan can reduce elapsed time by using multiple workers, but it does not eliminate unnecessary logical I/O caused by a poor access path. In your own results, do not infer the edition or degree of parallelism from elapsed time alone; inspect plan properties.
+These values are reference measurements from a particular test environment. They are not guaranteed results for every SQL Server installation.
+
+### What is parallel execution?
+
+SQL Server can sometimes divide the work of a query among multiple CPU workers.
+
+There are two common execution approaches:
+
+- **Serial execution:** the query uses a single worker for its execution.
+- **Parallel execution:** parts of the query are processed by multiple workers simultaneously.
+
+For example, when scanning a large table, a parallel plan may allow several workers to process different portions of the data.
+
+This can reduce the elapsed time needed to complete the query.
+
+However, **parallel execution does not necessarily reduce the total amount of work performed**. It may simply distribute the work across multiple CPU workers.
+
+### Why was the difference larger before indexing?
+
+Before indexing, the query had to process very large inputs, including approximately 40 million order items.
+
+In the reference Developer/Enterprise test, parallel execution helped distribute this work across multiple CPU workers.
+
+As a result, the query completed much faster than in the reference Express test, even before creating the indexes.
+
+After indexing, both editions benefited from more efficient access paths. The query needed to process far less unnecessary data, so the difference in elapsed time between the two environments became smaller.
+
+### CPU time vs. elapsed time
+
+Remember the distinction from Section 9.1:
+
+- **CPU time** measures the processor time consumed by the query.
+- **Elapsed time** measures how long the query takes to finish.
+
+In a parallel plan, several workers can consume CPU time simultaneously.
+
+For example, a query might consume 4 seconds of total CPU time but finish in 1.5 seconds of elapsed time.
+
+This is possible because multiple workers perform parts of the work concurrently.
 
 > [!IMPORTANT]
-> **The indexes did not make SQL Server faster at processing 40 million irrelevant order items. They allowed the engine to avoid processing most of them.**
+> **Parallel execution can make an inefficient query finish faster, but it does not automatically make the query more efficient.**
+>
+> Good indexing reduces unnecessary data access. Parallel execution can distribute the remaining work across multiple CPU workers.
 
-## 9.5 A structured plan-comparison exercise
+### Check your understanding
 
-Open the **before** and **after** execution plans (if necessary, save the `.sqlplan` files in SSMS for comparison). Answer these questions using the actual plan rather than guessing:
+**Why did the reference Developer/Enterprise instance execute the query much faster than Express before indexing, even though both processed the same data?**
 
-1. Which operator reads `SalesOrder` before indexing, and which operator reads it afterward?
-2. Which `SalesOrderItem` access path is used in each plan?
-3. Which join algorithm combines orders and items before and after indexing?
-4. Where do the rows that reach the join come from? Compare estimates and actuals.
-5. Did the scan of `Product` disappear? If not, does that automatically mean the plan is inefficient?
-6. Which expressions are calculated by `Compute Scalar`, and which operators handle aggregation and sorting?
-7. Did the logical reads for the two large tables drop? Which table shows the greatest relative improvement?
-8. Are the reference numbers from the lab identical to yours? Explain why a difference is expected.
+<details>
+<summary>Show answer</summary>
+
+The reference Developer/Enterprise instance used a parallel execution plan, allowing multiple CPU workers to process parts of the query simultaneously.
+
+The Express instance used a serial plan in this test.
+
+Parallelism reduced elapsed time, but the query still had to process large amounts of data.
+
+After indexing, both instances benefited from more efficient access paths, reducing unnecessary work.
+
+</details>
+
+## 9.4 Performance analysis exercise
+
+We have now completed the indexing demonstration and examined how the execution plan and query performance changed.
+
+In this exercise, you will use the **five execution plans** from Sections 7 and 8, together with your `STATISTICS IO` and `STATISTICS TIME` results.
+
+Your goal is to explain not only **which plan is faster, but why**.
+
+### Part 1 – Analyze the execution plans
+
+Review the five stages of our demonstration:
+
+1. Before indexing.
+2. After creating clustered primary keys.
+3. After creating the `OrderDate` index.
+4. After creating the `SalesOrderId` index.
+5. After adding the `INCLUDE` columns.
+
+Answer the following questions:
+
+1. Why did creating clustered primary keys not eliminate the large scans?
+2. Which index first allowed SQL Server to avoid scanning the entire `SalesOrder` table?
+3. Which index eliminated the large `SalesOrderItem` scan?
+4. Why did the narrow `SalesOrderId` index introduce additional clustered index accesses?
+5. What changed after adding `INCLUDE (ProductId, Quantity, UnitPrice)`?
+6. Why did the `Product` scan remain in the optimized plan?
+7. Why did the join strategy change from `Hash Match` to `Nested Loops`?
+8. Why is an `Index Seek` not always better than an `Index Scan` or `Table Scan`?
 
 <details>
 <summary>Show discussion points</summary>
 
-1. In the original reference plan the `SalesOrder` heap was scanned; after adding the date index the plan used an Index Seek.
-2. The original reference plan scanned the large order-item input; the new index supports seeks by `SalesOrderId`.
-3. The reference changed from a Hash Match join to Nested Loops. Either choice can be reasonable for different inputs and indexes.
-4. The join receives relevant orders and their matching items; indexes reduce the amount of unrelated data read. Inspect each student's actual row counts.
-5. Not necessarily. A smaller `Product` scan may still be cheap.
-6. The arithmetic expression, `GROUP BY`, and `ORDER BY` remain part of the query even when the access path changes. Exact physical operators may vary.
-7. The original reference showed `SalesOrder` logical reads decreasing from roughly 57,000 to 15, and `SalesOrderItem` from roughly 198,000 to 54,000.
-8. Hardware, caching, statistics, edition, parallelism, data distribution, and other workloads affect measurements and plans.
+1. The clustered keys did not directly support filtering by `OrderDate` or locating order items by `SalesOrderId`.
+2. `IX_SalesOrder_OrderDate` enabled efficient access to the requested date range.
+3. `IX_SalesOrderItem_SalesOrderId` enabled SQL Server to locate order items using the join key.
+4. The narrow index did not contain `ProductId`, `Quantity`, and `UnitPrice`, so SQL Server needed additional clustered index accesses.
+5. The index became covering for the order-item portion of the query, eliminating the additional clustered row fetches.
+6. Scanning the relatively small `Product` table could still be cheaper than performing many individual seeks.
+7. The new index made repeated seeks on the inner input efficient, making `Nested Loops` attractive.
+8. A seek may still process many rows or require repeated lookups. A scan can be more efficient when a large proportion of the data is needed.
+
+</details>
+
+### Part 2 – Analyze the performance measurements
+
+Use the results you recorded with `STATISTICS IO` and `STATISTICS TIME`.
+
+Answer the following questions:
+
+1. How much did the logical reads decrease for `SalesOrder`?
+2. How much did the logical reads decrease for `SalesOrderItem`?
+3. What was the overall percentage reduction in logical reads across these two tables?
+4. How many times faster was the query after indexing?
+5. Why did elapsed time improve by a different percentage than logical reads?
+6. Why can the same query have different execution times on SQL Server Express and Developer editions?
+
+<details>
+<summary>Show reference answers</summary>
+
+Using the approximate reference measurements from Section 9.2:
+
+1. `SalesOrder`: from 57,000 to 15 logical reads — approximately **99.97% reduction**.
+2. `SalesOrderItem`: from 198,000 to 54,000 logical reads — approximately **72.7% reduction**.
+3. Combined logical reads decreased from approximately 255,000 to 54,015 — approximately **78.8% reduction**.
+4. Elapsed time decreased from approximately 17 seconds to 0.5 seconds — approximately **34× speedup**.
+5. Logical reads measure page accesses, while elapsed time also depends on CPU processing, waiting, caching, and execution strategy.
+6. Different editions and configurations may use different execution plans, resource limits, and degrees of parallelism.
+
+Your own results may differ from these reference values.
+
+</details>
+
+### Final question
+
+**What is the most important lesson from this indexing demonstration?**
+
+<details>
+<summary>Show discussion</summary>
+
+The most important lesson is that **effective indexing is about supporting the way queries access data**.
+
+Creating indexes on arbitrary columns does not guarantee better performance.
+
+By choosing index keys that support filtering and joining, and including additional columns when necessary, we allowed SQL Server to avoid processing millions of unnecessary rows.
+
+The execution plan and performance measurements confirmed the improvement.
 
 </details>
 

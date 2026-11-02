@@ -67,6 +67,17 @@ This is the central idea of a database index: an additional structure helps loca
 
 **Think about it:** If a library already has an author catalog, why might it also need a title catalog?
 
+<details>
+<summary>Show answer</summary>
+
+People search for books in different ways. Sometimes they know the author, but sometimes they only know the title.
+
+An author catalog is organized by author names, so it is not efficient for searching by title alone. A separate title catalog allows books to be found quickly by title.
+
+Similarly, a database can have **multiple indexes on the same table**, each supporting different search patterns without duplicating the actual data rows.
+
+</details>
+
 ### From library catalogs to database indexes
 
 The library catalog helps us understand **why an index is useful**. However, there is another important question:

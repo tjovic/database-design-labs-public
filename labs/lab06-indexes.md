@@ -644,26 +644,90 @@ The following table introduces the most important operators you will encounter i
 
 ## 7.2 Investigate the `SalesOrder` scan
 
-The filter is:
+Let's start with the `SalesOrder` table.
+
+Our query contains the following filter:
 
 ```sql
 WHERE so.OrderDate >= '20250601'
   AND so.OrderDate <  '20250602'
 ```
 
-`SalesOrder` contains approximately **10,000,000** rows, while only about **5,477** orders match the selected day in the reference dataset. Without a useful index on `OrderDate`, SQL Server cannot efficiently navigate to this date range and may scan the heap.
+This condition selects orders from **June 1, 2025**.
 
-**In SSMS:** find the access operator for `dbo.SalesOrder`. Open Properties and identify its **Object**, **Actual Number of Rows**, **Estimated Number of Rows**, **Number of Rows Read**, and **Predicate**. If the predicate is applied while scanning, many rows may be inspected before a small fraction are returned.
+Notice that we use a range rather than comparing the date with a single value. This also works correctly when `OrderDate` contains a time component.
 
-This distinction matters:
+### Why does SQL Server scan the table?
 
-- **Rows read:** the amount of data examined by the access operator.
-- **Rows returned:** the data passed on to the next operator after filtering.
-- **Logical reads:** page reads reported by `STATISTICS IO`, not a count of returned rows.
+The `SalesOrder` table contains approximately **10 million rows**, but only about **5,477 rows** match the selected date in our reference dataset.
 
-A predicate can return only a few thousand rows yet require reading a very large table. This is exactly the situation an index on `OrderDate` may improve.
+Without a suitable index on `OrderDate`, SQL Server cannot directly locate the matching date range through an index seek.
 
-**Check:** Why does the predicate use `< '20250602'` rather than `<= '20250601'`? The half-open interval is convenient for date/time values with a time component and is usually a good pattern for complete-day filtering.
+In our initial execution plan, it therefore performs a **Table Scan**.
+
+This means SQL Server examines the heap's data pages to find rows satisfying the filter.
+
+### Inspect the Table Scan operator
+
+In the Actual Execution Plan:
+
+1. Find the `Table Scan` operator for `dbo.SalesOrder`.
+2. Click the operator and press **F4** to open Properties.
+3. Find the following values:
+
+| Property | Reference value | Meaning |
+|---|---:|---|
+| Actual Number of Rows Read | 10,000,000 | Rows examined by the operator |
+| Actual Number of Rows | 5,477 | Rows returned after filtering |
+| Predicate | `OrderDate` range | Condition used to filter rows |
+
+The exact property names may vary slightly depending on the SQL Server version.
+
+**What does this tell us?**
+
+SQL Server examines **10 million rows to return only 5,477**.
+That means approximately **99.95% of the examined rows do not match the filter**.
+This is the main inefficiency we want to address.
+
+### Rows are not pages
+
+Remember from Lab 05 that SQL Server stores data in **8 KB pages**.
+The values above describe rows, not the number of pages read.
+
+To measure page access, look at the `STATISTICS IO` output in the **Messages** tab.
+
+For example, the original reference measurement reported approximately 57,000 logical reads for `SalesOrder`.
+
+These are logical page accesses through the buffer pool, not necessarily physical disk reads.
+
+> [!IMPORTANT]
+> A query can return only a few rows while still reading a very large amount of data.
+>
+> **The number of rows returned does not tell us how much work SQL Server performed to find them.**
+
+### Check your understanding
+
+**Why does the predicate use `< '20250602'` instead of `<= '20250601'`?**
+
+<details>
+<summary>Show answer</summary>
+
+The column may contain both a date and a time.
+
+Using `<= '20250601'` would include values up to midnight at the beginning of June 1, but exclude later times on the same day.
+
+The half-open interval:
+
+```sql
+OrderDate >= '20250601'
+AND OrderDate < '20250602'
+```
+
+includes the entire day, regardless of the time component.
+
+It is also suitable for efficient range searches using an index on `OrderDate`.
+
+</details>
 
 ## 7.3 Investigate the `SalesOrderItem` scan — the main bottleneck
 

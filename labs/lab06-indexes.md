@@ -1,7 +1,13 @@
 # Lab 06 – Indexes in SQL Server
 
-> Database Design Laboratory  
-> Student Lab Manual
+[!TIP]
+How to use this lab
+
+Your instructor will demonstrate the main concepts and the indexing process during the laboratory session.
+
+You are not expected to memorize every detail or complete every section during class. Use this manual to follow the demonstrations, explore the SQL examples independently, and review the explanations at your own pace.
+
+You can also return to the exercises and detailed explanations after the laboratory session.
 
 ---
 
@@ -18,7 +24,6 @@ By the end of this lab, you should be able to:
 - compare query performance using `STATISTICS IO` and `STATISTICS TIME`;
 - design useful nonclustered, composite, and covering indexes;
 - explain selectivity, index maintenance, and the cost of additional indexes;
-- inspect the depth and page usage of an index.
 
 > [!NOTE]
 > **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database using the lab's preparation scripts before starting the SQL exercises below. This lab assumes the reference data and table names from those scripts.
@@ -107,7 +112,7 @@ A tree is a hierarchy of nodes connected by links. Database rowstore indexes use
 - **Root:** the entry point to the tree.
 - **Internal (intermediate) nodes:** contain separator keys and links to child pages.
 - **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
-- **Tree depth:** he number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. In database documentation, index depth may also be expressed as the number of levels, including the root and leaf levels.
+- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. In database documentation, index depth may also be expressed as the number of levels, including the root and leaf levels.
 
 An index may consist of a single page; it does not always need three levels. The examples below intentionally use three levels so that navigation is visible.
 
@@ -2550,7 +2555,7 @@ ORDER BY OrderDate;
 
 Before creating anything, consider:
 
-1. Does a similar index already exist (`IX_SalesOrder_Status` from Section 11.2)?
+1. Does a similar index already exist (`IX_SalesOrder_Status` from Section 10.2)?
 2. Would an index on `(Status, OrderDate)` overlap with it?
 3. Is it better to create a new index, replace the existing one, or do nothing?
 

@@ -54,10 +54,30 @@ This is the central idea of a database index: an additional structure helps loca
 | Search every shelf | Table/clustered index scan, depending on table structure |
 | Search catalog then find book | Index seek, optionally followed by a lookup |
 
-> [!IMPORTANT]
-> A useful index can reduce I/O, but it does **not** guarantee that the optimizer will use it. For a query returning most rows, a scan can still be cheaper.
+> [!NOTE]
+> **Is using an index always faster?**
+>
+> Not necessarily. Imagine that a librarian needs to find just one book. Using the catalog is much faster than checking every shelf.
+>
+> But what if the librarian needs to examine almost every book in the library? In that case, searching the catalog and following individual shelf references may involve more work than simply going through the shelves.
+>
+> SQL Server faces a similar decision. For a query that returns only a small number of rows, using an index may be very efficient. However, when a query needs a large portion of a table, scanning the data may be more efficient.
+>
+> SQL Server's **query optimizer** evaluates different execution strategies and chooses the one with the lowest estimated cost. We will investigate these decisions later when analyzing execution plans.
 
 **Think about it:** If a library already has an author catalog, why might it also need a title catalog?
+
+### From library catalogs to database indexes
+
+The library catalog helps us understand **why an index is useful**. However, there is another important question:
+
+**How can a database efficiently search an index containing millions of entries?**
+
+A simple alphabetical list would still require searching through many entries. We need a structure that allows the database engine to quickly narrow down the search to a small part of the index.
+
+SQL Server uses a tree-based structure for this purpose.
+
+In the next section, we will first learn the basic terminology of trees and then explore how a **B+ tree** organizes index entries for efficient searching.
 
 ---
 
@@ -72,7 +92,7 @@ A tree is a hierarchy of nodes connected by links. Database rowstore indexes use
 - **Root:** the entry point to the tree.
 - **Internal (intermediate) nodes:** contain separator keys and links to child pages.
 - **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
-- **Tree depth:** the number of levels to traverse from root to leaves (counting conventions vary).
+- **Tree depth:** he number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. In database documentation, index depth may also be expressed as the number of levels, including the root and leaf levels.
 
 An index may consist of a single page; it does not always need three levels. The examples below intentionally use three levels so that navigation is visible.
 
@@ -87,14 +107,71 @@ For a B+ tree, **all leaves are at the same depth**. Therefore, finding any key 
 
 ## 2.3 Keys, pointers, and leaf pages
 
-An internal page holds **separator keys** and child pointers. These keys divide the search space into ranges. For example, a separator `43` can direct keys smaller than 43 to the left and keys greater than or equal to 43 to the right.
+Now that we understand the basic structure of a tree, let's see how a B+ tree helps a database find information.
 
-At the leaf level, entries are logically ordered by key. The leaf pages also have links to adjacent leaf pages. That is useful when a query asks for a **range**, such as all keys between 40 and 70.
+A B+ tree organizes data using **keys** and **pointers**.
 
-The rectangular empty slots in our diagrams show **available capacity**, not literal SQL Server page formatting. Actual SQL Server pages use an 8 KB structure with variable-length records and a slot array. Free space is measured in bytes; a new entry may fit without changing the tree, or a full page may need to split.
+### Keys
+
+A **key** is a value used to organize and search the index.
+
+For example, imagine a table containing information about library members. Each member has a unique `MemberID`.
+
+If we create an index on `MemberID`, the index organizes its entries by these values.
+
+Unlike a simple list, a B+ tree does not require searching through all index entries one by one.
+
+### Pointers
+
+A **pointer** tells the database engine where to continue searching.
+
+In the upper levels of a B+ tree, pointers lead to pages at the next level.
+
+The database engine uses key values to decide which pointer to follow.
+
+This process repeats until the search reaches the leaf level.
+
+**The important idea is that the database does not need to visit every branch of the tree.** It follows only the branch that can contain the requested key.
+
+### Leaf pages
+
+The **leaf level** is the bottom level of the B+ tree.
+
+Leaf pages contain index entries arranged in logical key order.
+
+What these entries contain depends on the type of index:
+
+- In a **nonclustered index**, leaf entries contain index keys, row locators, and possibly additional columns.
+- In a **clustered index**, leaf pages contain the actual table rows.
+
+We will explore this difference in Sections 3 and 4.
+
+### Linked leaf pages
+
+Leaf pages are also linked to neighboring leaf pages.
+
+This is particularly useful for **range queries**, where the database needs multiple consecutive key values rather than just one.
+
+Instead of starting a completely new tree search for every matching key, SQL Server can locate the beginning of a range and continue reading the relevant leaf pages.
+
+### Free space in index pages
+
+In the following diagrams, some nodes contain empty slots.
+
+These empty slots are a simplified way to illustrate that an index page may have free space available for new entries.
+
+In SQL Server, index pages are 8 KB in size, and their actual capacity depends on the size of the stored records. Empty slots in our diagrams are not a literal representation of SQL Server's internal page format.
+
+If an index page does not have enough space for a new entry, SQL Server may need to perform a **page split**. We will explore this later in the lab.
 
 > [!TIP]
-> Think of a B+ tree as a *navigation structure*, not as an arithmetic formula students need to implement. We will focus on how SQL Server uses it.
+> Remember these three concepts:
+>
+> - **Keys** help determine where to search.
+> - **Pointers** lead to the next page.
+> - **Leaf pages** contain the information needed to locate or retrieve the data.
+>
+> In the next section, we will follow a real example and search for `MemberID = 61`.
 
 ---
 
@@ -102,26 +179,39 @@ The rectangular empty slots in our diagrams show **available capacity**, not lit
 
 ## 3.1 What is a heap?
 
-A **heap** is a SQL Server table without a clustered index. Its rows are stored in data pages but are not logically ordered by a clustered key.
+Before exploring how a nonclustered index works, we first need to understand how SQL Server stores table rows **without a clustered index**.
+
+A **heap** is a table that does not have a clustered index.
+
+As we learned in Lab 05, SQL Server stores table data in **8 KB pages**. A heap also uses these data pages, but its rows are not organized in a logical order defined by a clustered key.
+
+Consider a simple `Member` table containing member IDs, first names, and last names.
 
 ![Heap table data storage](../images/lab06/heap-table-storage.svg)
 
-The diagram illustrates several pages containing rows in no particular order by `MemberID`. A row's location can be described by a **RID (Row Identifier)**: *File ID, Page ID, Slot ID*.
+Notice that the rows are **not arranged by `MemberID`**. For example, a row with a larger ID may appear on an earlier page than a row with a smaller ID.
 
-> [!NOTE]
-> A heap is not the same thing as a randomly ordered query result. Without `ORDER BY`, SQL does not guarantee output order for *any* table, including one with a clustered index.
+This is perfectly valid. A heap does not require rows to be stored in any particular key order.
 
-## 3.2 A nonclustered index on a heap
+### How does SQL Server locate a row in a heap?
 
-Suppose we create a nonclustered index on `MemberID`. The index has sorted keys and stores a **RID locator** for each corresponding heap row. The heap data pages remain separate from the index.
+Each heap row has a physical location identified by a **RID (Row Identifier)**.
 
-![B+ tree navigation and row lookups in a nonclustered index on a heap](../images/lab06/bplus-tree-search.svg)
+A RID consists of three components:
 
-The black pointers lead from parent pages to child pages, the leaf entries carry key/row-location information, and the horizontal links connect neighboring leaf pages. The colored arrows to data pages are conceptual references to the underlying rows.
+| Component | Meaning |
+|---|---|
+| File ID | Identifies the database file |
+| Page ID | Identifies the page within that file |
+| Slot ID | Identifies the row slot within the page |
 
-### Finding `MemberID = 61`
+Together, these values allow SQL Server to locate a particular row.
 
-Consider this illustrative query (the `Member` table is used only for the diagram, not as part of `IndexLab`):
+However, knowing that a row has a physical location is not the same as knowing **which location contains a particular `MemberID`**.
+
+### What happens when we search without an index?
+
+Suppose we want to find one member:
 
 ```sql
 SELECT *
@@ -129,26 +219,204 @@ FROM dbo.Member
 WHERE MemberID = 61;
 ```
 
-Follow the path in the image:
+If no suitable index exists, SQL Server may need to perform a **Table Scan**.
 
-1. **Root:** compare 61 with 43. Since `61 >= 43`, take the right pointer.
-2. **Intermediate level:** compare 61 with 56 and 73. Since `56 <= 61 < 73`, take the middle pointer.
-3. **Leaf level:** locate the entry for key 61.
-4. **Heap row:** use its RID to retrieve the complete row if the query needs columns not present in the index.
+This means reading the heap's data pages and examining rows to find those that satisfy the condition.
 
-If the optimizer chooses this access path, the additional heap access appears in the plan as **RID Lookup**. If the index already contains everything needed, the extra lookup is unnecessary.
+For a small table, this may be inexpensive. But for a table containing millions of rows, scanning many pages can require substantial I/O work.
 
-For a range query, the engine can locate the first key and continue through the linked leaf pages:
+> [!NOTE]
+> A heap does not guarantee that rows will be returned in any particular order. Neither does a clustered index. If a query requires a specific result order, use `ORDER BY`.
+
+### Can we search a heap efficiently?
+
+Yes. We can create a **nonclustered index** on `MemberID` without changing the heap into a clustered table.
+
+The index provides an ordered search structure, while the actual data rows remain in the heap.
+
+**This is what we will explore in the next section.**
+
+## 3.2 A nonclustered index on a heap
+
+In the previous section, we saw that a heap stores rows without organizing them by a clustered key.
+
+If we want to find a particular member using `MemberID`, SQL Server may have to scan many data pages.
+
+**Can we make searching faster without reorganizing the actual table?**
+
+Yes. We can create a **nonclustered index** on `MemberID`.
+
+A nonclustered index is a separate structure that organizes index entries by their key values. In a heap table, each index entry also contains a **RID (Row Identifier)** that identifies the corresponding data row.
+
+This gives us two separate structures:
+
+- **Nonclustered index:** stores ordered keys and information needed to locate rows.
+- **Heap:** stores the actual data rows, which are not organized by the index key.
+
+### Understanding the diagram
+
+![B+ tree navigation and row lookups in a nonclustered index on a heap](../images/lab06/bplus-tree-search.svg)
+
+The diagram illustrates a nonclustered index on `MemberID`.
+
+Let's identify its main components.
+
+**1. Root level**
+
+The root is the starting point of the search.
+
+It contains separator keys and pointers that direct the search to the appropriate branch of the tree.
+
+The root does not need to contain every `MemberID`. Its purpose is to help SQL Server decide where to search next.
+
+**2. Intermediate level**
+
+Intermediate pages further divide the possible key values into smaller ranges.
+
+Each page contains separator keys and pointers to child pages.
+
+By following the appropriate pointer, SQL Server can eliminate entire branches of the tree without examining their entries.
+
+**3. Leaf level**
+
+The leaf level contains the actual nonclustered index entries, organized in key order.
+
+In our example, each entry contains:
+
+- The indexed key (`MemberID`).
+- A RID that identifies the corresponding row in the heap.
+
+Notice that the leaf pages are connected by horizontal pointers. These connections allow SQL Server to continue reading consecutive index entries.
+
+**4. Heap data pages**
+
+At the bottom of the diagram, the data pages contain the actual member records.
+
+Unlike the index entries, the heap rows are not organized by `MemberID`.
+
+The orange arrows illustrate how the RID values in the index refer to rows stored in these pages.
+
+**5. Empty spaces**
+
+Some index pages contain empty slots.
+
+These are conceptual representations of available page capacity. They help us understand that new keys may be inserted into existing pages.
+
+Real SQL Server index pages have an 8 KB layout, and their capacity depends on the size of the stored records.
+
+### Finding MemberID = 61
+
+Suppose we execute the following query:
 
 ```sql
--- Illustrative query: not executed against IndexLab
+-- Illustrative example (Member is not part of IndexLab)
+SELECT *
+FROM dbo.Member
+WHERE MemberID = 61;
+```
+
+SQL Server can use the nonclustered index to locate the requested member.
+
+**Step 1 – Start at the root**
+
+The search starts at the root page, which contains the separator key `43`.
+
+We are searching for `61`.
+
+Because `61 >= 43`, we follow the right pointer.
+
+There is no need to examine the left subtree because it contains smaller key values.
+
+**Step 2 – Follow the intermediate pointer**
+
+The next index page contains the separator keys `56` and `73`.
+
+Our value falls into this range:
+
+`56 <= 61 < 73`
+
+Therefore, we follow the middle pointer.
+
+Again, we eliminate the other branches without reading their leaf pages.
+
+**Step 3 – Find the entry at the leaf level**
+
+We reach a leaf page containing the keys `56` and `61`.
+
+The entry for `61` contains a RID that identifies the location of the corresponding member row.
+
+At this point, SQL Server has found the matching **index entry**, but it may not yet have all the columns requested by the query.
+
+**Step 4 – Retrieve the actual row**
+
+Our query uses `SELECT *`, so SQL Server needs the complete member row.
+
+If the nonclustered index does not contain all the required columns, SQL Server follows the RID to the corresponding heap data page.
+
+This additional operation is called a **RID Lookup**.
+
+The important distinction is:
+
+- **Index Seek:** locates the matching index entry.
+- **RID Lookup:** retrieves missing columns from the actual heap row.
+
+> [!IMPORTANT]
+> A RID Lookup is not always required.
+>
+> If the nonclustered index already contains all columns needed by the query, SQL Server can return the result directly from the index.
+>
+> Such an index is called a **covering index**. We will explore covering indexes and `INCLUDE` columns later in the lab.
+
+### Searching for a range of values
+
+Indexes are useful not only when searching for a single value.
+
+Consider this query:
+
+```sql
+-- Illustrative example (Member is not part of IndexLab)
 SELECT *
 FROM dbo.Member
 WHERE MemberID BETWEEN 40 AND 70;
 ```
 
-> [!IMPORTANT]
-> **Nonclustered index ≠ heap-only index.** A nonclustered index can also be created on a table that has a clustered index. In that case its row locator is generally the **clustered key**, not a heap RID. We will use this fact in the performance demo.
+SQL Server can use the index to locate the beginning of the range.
+
+Because leaf pages are logically ordered and linked to their neighbors, the engine can continue reading subsequent index entries until it reaches the end of the requested range.
+
+This avoids starting a completely new tree search for every individual key.
+
+However, because this query uses `SELECT *`, SQL Server may also need additional heap lookups for the matching rows.
+
+If the range contains a large portion of the table, the optimizer may decide that a Table Scan is more efficient.
+
+> [!NOTE]
+> A nonclustered index is not limited to heap tables.
+>
+> When a table has a clustered index, a nonclustered index generally uses the **clustered key** as its row locator instead of a heap RID.
+>
+> If additional columns must be retrieved from the clustered index, SQL Server may use a **Key Lookup** instead of a RID Lookup.
+
+### Check your understanding
+
+1. Why are the index entries ordered while the heap rows are not?
+2. Why does the root contain only separator keys rather than every `MemberID`?
+3. What happens when we search for `MemberID = 61`?
+4. What is the difference between Index Seek and RID Lookup?
+5. Why are the leaf pages linked?
+6. When can SQL Server avoid a RID Lookup?
+
+<details>
+<summary>Show answers</summary>
+
+1. A nonclustered index organizes entries by its key, independently of the heap's row organization.
+2. Separator keys guide the search into the correct subtree without storing every key at the root.
+3. SQL Server navigates through the appropriate index pages, finds key 61, and retrieves the heap row if additional columns are required.
+4. Index Seek locates index entries; RID Lookup retrieves missing data from a heap row.
+5. Linked leaf pages support efficient traversal of consecutive key ranges.
+6. When the index contains all columns required by the query.
+
+</details>
 
 ## 3.3 Why is an index so efficient?
 

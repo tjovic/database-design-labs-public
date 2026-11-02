@@ -1691,6 +1691,7 @@ We can calculate the reduction:
 \boxed{\mathrm{Logical\text{-}read\ reduction} \approx 78.8\%}
 ```
 
+
 This means the optimized query performs approximately **79% fewer logical page accesses** across these two tables.
 
 Notice that the reduction is not identical for both tables:
@@ -1717,6 +1718,7 @@ We can calculate the speedup:
 ```math
 \mathrm{Speedup} = \frac{17}{0.5} = 34
 ```
+
 
 The query completed approximately **34 times faster** in this reference test.
 

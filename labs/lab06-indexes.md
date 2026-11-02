@@ -731,17 +731,119 @@ It is also suitable for efficient range searches using an index on `OrderDate`.
 
 ## 7.3 Investigate the `SalesOrderItem` scan — the main bottleneck
 
-The largest join is:
+We have seen that SQL Server examines 10 million rows in `SalesOrder` to find approximately 5,477 orders for the selected date.
+
+However, finding the orders is only the first part of the query.
+
+We also need to find **all order items belonging to those orders**.
+
+### How are orders and order items connected?
+
+The query uses the following join condition:
 
 ```sql
 soi.SalesOrderId = so.SalesOrderId
 ```
 
-`SalesOrderItem` contains approximately **40,000,000** rows, but the orders from the selected day refer to only about **21,908** order items in the reference data. Without a suitable access path on `SalesOrderItem(SalesOrderId)`, the optimizer may process a huge input to find those matching items.
+Each order can contain multiple order items. The `SalesOrderId` column in `SalesOrderItem` identifies the order to which each item belongs.
 
-**In SSMS:** locate the access operator for `dbo.SalesOrderItem`. Compare its rows read with the number of rows that eventually participate in the join. Look at the `STATISTICS IO` line for this table. It is the large input, not the fact that the query uses a join, that makes this expensive.
+In our reference dataset:
 
-Notice that the `SalesOrder` date filter does not automatically tell SQL Server where the matching rows are stored in `SalesOrderItem`. A **join key index** can provide that missing path.
+| Description | Number of rows |
+|---|---:|
+| Total orders in `SalesOrder` | 10,000,000 |
+| Orders matching the selected date | 5,477 |
+| Total rows in `SalesOrderItem` | 40,000,000 |
+| Order items belonging to the selected orders | 21,908 |
+
+The query needs only 21,908 order items, but the `SalesOrderItem` table contains **40 million rows**.
+
+### Why does SQL Server scan SalesOrderItem?
+
+At this stage, there is no suitable index on `SalesOrderItem(SalesOrderId)`.
+
+Although SQL Server knows the `SalesOrderId` values of the selected orders, it has no efficient index-based way to locate the corresponding order items.
+
+In our initial execution plan, SQL Server therefore performs a **Table Scan** on `SalesOrderItem`.
+
+The scan reads the order-item data and supplies rows to the join operator.
+
+The join then identifies which items belong to the selected orders.
+
+> [!IMPORTANT]
+> **A JOIN condition does not automatically provide an efficient way to locate matching rows.**
+>
+> Without a suitable index, SQL Server may need to process a very large input even when only a small number of rows are relevant.
+
+### Inspect the Table Scan operator
+
+In the Actual Execution Plan:
+
+1. Find the `Table Scan` operator for `dbo.SalesOrderItem`.
+2. Select the operator and press **F4** to open Properties.
+3. Examine the following values:
+
+| Property | Reference value | Meaning |
+|---|---:|---|
+| Actual Number of Rows | 40,000,000 | Rows produced by the scan |
+| Actual Number of Rows Read | 40,000,000 | Rows examined by the scan |
+| Predicate | None | The scan does not filter rows by the selected order IDs |
+
+Notice the difference compared with the `SalesOrder` scan.
+
+For `SalesOrder`, the date condition filters 10 million examined rows down to 5,477.
+
+For `SalesOrderItem`, the scan produces **all 40 million rows**. The filtering to matching orders happens later, during the join.
+
+### What about logical reads?
+
+Look at the `STATISTICS IO` output in the Messages tab.
+
+In the original reference measurement, `SalesOrderItem` required approximately **198,000 logical reads**.
+
+Remember that a logical read represents an 8 KB page access through the buffer pool.
+
+This is a large amount of work, even when most pages are already cached in memory.
+
+Compare the two large tables:
+
+| Table | Logical reads (approximately) |
+|---|---:|
+| `SalesOrder` | 57,000 |
+| `SalesOrderItem` | 198,000 |
+
+The order-item table requires substantially more page accesses.
+
+This helps explain why it is the main bottleneck in our initial execution plan.
+
+### Why does SQL Server use a Hash Match?
+
+Since SQL Server must process a large order-item input, it needs an efficient way to match these rows with the 5,477 selected orders.
+
+In our reference execution plan, the optimizer chooses **Hash Match (Inner Join)**.
+
+This operator can efficiently join large inputs without repeatedly searching one table for each row from the other.
+
+We will examine how Hash Match works in the next section.
+
+### Check your understanding
+
+**Why doesn't SQL Server simply find the order items for each of the 5,477 selected orders?**
+
+<details>
+<summary>Show answer</summary>
+
+Because there is no suitable index on `SalesOrderItem(SalesOrderId)`.
+
+SQL Server knows which order IDs it needs, but it cannot efficiently navigate directly to their corresponding order items.
+
+Without an index, repeatedly searching the large table for each order would be very expensive.
+
+Instead, the optimizer chooses to scan the order-item table and use a Hash Match join to identify the matching rows.
+
+Later in the lab, we will create an index on `SalesOrderItem(SalesOrderId)` and observe how this changes the execution plan.
+
+</details>
 
 ## 7.4 Why `Hash Match (Inner Join)` may be chosen
 

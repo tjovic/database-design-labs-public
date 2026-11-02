@@ -975,6 +975,10 @@ This recommendation is based on the optimizer's view of a **particular query**, 
 
 ## 8.1 Create clustered primary keys
 
+Until now, `SalesOrder` and `SalesOrderItem` have been stored as **heaps**, without clustered indexes.
+
+We will now create a clustered primary key on each table.
+
 ```sql
 ALTER TABLE dbo.SalesOrder
 ADD CONSTRAINT PK_SalesOrder
@@ -987,31 +991,95 @@ PRIMARY KEY CLUSTERED (SalesOrderItemId);
 GO
 ```
 
-In SSMS Object Explorer, refresh the **Indexes** nodes under both tables and check that `PK_SalesOrder` and `PK_SalesOrderItem` exist.
+### What changes when we create a clustered index?
 
-A clustered primary key enforces uniqueness and stores the actual table rows in its leaf level. However, the main query filters by `OrderDate` and joins order items by `SalesOrderId`. The clustered keys alone are not designed for both access patterns.
+Creating a clustered index changes how the table's rows are organized.
 
-> [!TIP]
-> Optionally rerun the main query **after the clustered primary keys but before creating the nonclustered indexes**. Observe whether the plan improves and whether the original large scans remain. This helps separate the effect of clustering from that of adding the two targeted nonclustered indexes. Record the plan, but do not use it as the final 'after' comparison.
+- The table is no longer a heap.
+- The actual data rows become the **leaf level of the clustered index**.
+- The rows are logically organized by the clustered key.
+- SQL Server creates the necessary root and intermediate index pages for navigating the tree.
 
-![Execution plan after clustered primary keys: both Table Scans become Clustered Index Scans, but SalesOrder and SalesOrderItem are still fully read](../images/lab06/execution-plan-after-clustered-pk.svg)
+Remember that the clustered index defines a **logical key order**, not necessarily the physical order of pages on disk.
 
-If you rerun the query now, this is roughly what you should see: the access operator for both large tables changes from `Table Scan` to `Clustered Index Scan`, but the row counts do not improve — `SalesOrder` and `SalesOrderItem` are still read in full. A clustered key alone does not help a query that filters on `OrderDate` or joins on `SalesOrderId`, since neither is the clustering key here.
+> [!NOTE]
+> Creating a clustered index on a large heap can be an expensive operation because SQL Server must build the new index structure and organize the existing rows.
+
+### Inspect the new indexes
+
+In SSMS Object Explorer, expand the **Indexes** nodes under `SalesOrder` and `SalesOrderItem`.
+
+Verify that the following indexes exist:
+
+- `PK_SalesOrder` – clustered index on `SalesOrderId`.
+- `PK_SalesOrderItem` – clustered index on `SalesOrderItemId`.
+
+### Run the main query again
+
+Execute **exactly the same query from Section 6.2**, with Actual Execution Plan enabled.
+
+Compare the new plan with the original one.
+
+![Execution plan after creating clustered primary keys](../images/lab06/execution-plan-after-clustered-pk.svg)
+
+In our reference execution plan, the access operators change:
+
+| Table | Before | After clustered PK |
+|---|---|---|
+| `SalesOrder` | Table Scan | Clustered Index Scan |
+| `SalesOrderItem` | Table Scan | Clustered Index Scan |
+| `Product` | Clustered Index Scan | Clustered Index Scan |
+
+However, the important observation is that **the large scans remain**.
+
+SQL Server still examines approximately:
+
+- **10 million** rows from `SalesOrder`.
+- **40 million** rows from `SalesOrderItem`.
+
+The optimizer also continues to use `Hash Match` to join the large inputs.
+
+### Why didn't the clustered indexes solve the problem?
+
+The clustered indexes organize rows by:
+
+- `SalesOrder.SalesOrderId`
+- `SalesOrderItem.SalesOrderItemId`
+
+However, our query uses different columns for filtering and joining:
+
+```sql
+WHERE so.OrderDate >= '20250601'
+  AND so.OrderDate < '20250602'
+```
+
+```sql
+soi.SalesOrderId = so.SalesOrderId
+```
+
+The clustered index on `SalesOrderId` does not provide an efficient way to locate orders by `OrderDate`.
+
+Similarly, the clustered index on `SalesOrderItemId` does not provide an efficient way to locate order items by their `SalesOrderId`.
+
+The indexes are useful for searches using their clustered keys, but they do not directly support the access patterns required by our query.
+
+> [!IMPORTANT]
+> **Creating an index does not automatically make every query faster.**
+>
+> An index is most useful when its key columns support the query's filtering, joining, or ordering requirements.
+
+### Check your understanding
+
+**Why does SQL Server still scan both large tables even after creating clustered primary keys?**
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answer</summary>
 
-Measured on one SQL Server 2025 Express instance, with only the two clustered primary keys in place:
+Because the clustered indexes are organized by `SalesOrderId` and `SalesOrderItemId`, while our query filters orders by `OrderDate` and finds order items using `SalesOrderId`.
 
-| Metric | Value |
-|---|---|
-| `SalesOrder` logical reads | 57,266 |
-| `SalesOrderItem` logical reads | 198,439 |
-| `Product` logical reads | 161 |
-| CPU time | 13.25 s |
-| Elapsed time | 14.1 s |
+These access patterns are not efficiently supported by the new clustered indexes.
 
-Nearly identical to the heap baseline (57,143 / 198,020 / 161, ~14.7 s CPU / ~18.1 s elapsed) — a few extra logical reads come from the clustered index's new root and IAM pages, but both large tables are still read in full.
+In the next sections, we will create nonclustered indexes specifically designed for these operations.
 
 </details>
 

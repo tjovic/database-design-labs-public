@@ -1683,13 +1683,13 @@ After indexing, this decreased to approximately **54,015 logical reads**.
 
 We can calculate the reduction:
 
-$$
-\text{Reduction} = \frac{255{,}000 - 54{,}015}{255{,}000} \times 100
-$$
+```math
+\mathrm{Reduction} = \frac{255{,}000 - 54{,}015}{255{,}000} \times 100
+```
 
-$$
-\boxed{\text{Logical-read reduction} \approx 78.8\%}
-$$
+```math
+\boxed{\mathrm{Logical\text{-}read\ reduction} \approx 78.8\%}
+```
 
 This means the optimized query performs approximately **79% fewer logical page accesses** across these two tables.
 

@@ -1213,32 +1213,41 @@ The number of logical reads depends on the available indexes and the execution p
 
 # 9. Page types
 
-SQL Server uses different page types for different purposes. In this lab, focus on:
+SQL Server uses different types of **8 KB pages**, depending on what information they store.
 
-| Type | What it stores |
-|---|---|
-| Data page | Rows in a heap or leaf-level rows of a clustered index |
-| Index page | Index entries and navigation information |
-| Allocation/metadata page | Information used to manage pages and extents — for example, an **IAM (Index Allocation Map)** page, which tracks which extents belong to one table or index |
+Some pages contain actual table rows, others help navigate indexes, and some are used to manage storage allocation.
+
+The following page types are particularly important for this lab:
+
+| PageType | Name | Purpose |
+|---|---|---|
+| `1` | **Data page** | Stores table rows, including the leaf-level rows of a clustered index. |
+| `2` | **Index page** | Stores index entries used to navigate index structures. |
+| `10` | **IAM page** | Tracks extents allocated to a particular allocation unit. |
 
 ![SQL Server page types](../images/lab05/sql-server-page-types.svg)
 
-You will see an IAM page in the output of almost every query you run in Section 11 (`DBCC IND`) — every table or index has at least one.
+For example, a small table may fit into a single data page, while a larger table may require hundreds of data pages and additional index pages.
 
-A **heap** is a table without a clustered index. We will study heaps and index structures in Lab 06.
+SQL Server also uses other internal page types, such as **PFS, GAM, and SGAM**, to manage storage allocation. We will not examine these in detail.
 
-## Check your understanding
+> [!NOTE]
+> IAM pages contain allocation information, not ordinary table rows. They are not part of the index navigation hierarchy.
 
-1. Does every logical read correspond to a physical read?
-2. Why might the second execution of a query show fewer physical reads?
-3. Is a scan necessarily inefficient?
+In the following sections, we will use `DBCC IND` to identify these page types in our `IndexLab` database.
+
+**Check your understanding**
+
+1. What is the purpose of a data page?
+2. What is the difference between a data page and an index page?
+3. What does an IAM page track?
 
 <details>
 <summary>Show answers</summary>
 
-1. No. Cached pages can be accessed without physical storage reads.
-2. Needed pages may already be present in the buffer pool.
-3. No. Scanning a small table or a large proportion of a table can be efficient.
+1. A data page stores table rows, including the leaf-level rows of a clustered index.
+2. A data page stores actual table rows, while an index page contains entries used to navigate an index.
+3. An IAM page tracks extents allocated to a particular allocation unit.
 
 </details>
 

@@ -2091,9 +2091,7 @@ $$
 \text{Reduction} = \frac{161 - 2}{161} \times 100
 $$
 
-$$
-\text{Reduction} \approx 98.76\,\%
-$$
+**Reduction ≈ 98.76%**
 
 The targeted lookup performs approximately **80 times fewer logical reads**.
 

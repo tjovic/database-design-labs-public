@@ -1750,51 +1750,128 @@ Query time also depends on joins, predicates, CPU cost, memory, and the executio
 
 ---
 
-# 17. Large tables and the problem we need to solve
+# 17. From physical storage to query optimization
 
-Recall the two large tables:
+Throughout this lab, we have explored how SQL Server physically stores data and how the organization of database pages affects query performance.
 
-- `SalesOrder` – approximately 10 million rows,
-- `SalesOrderItem` – approximately 40 million rows.
+We started with a small table containing 100 rows and gradually examined larger tables with more complex storage structures.
 
-Imagine that you need orders from one specific day. Without a suitable access path, SQL Server might need to examine many pages to find a relatively small set of matching rows.
+We also discovered that **the number of pages SQL Server needs to access can be much more important than the number of rows returned by a query**.
 
-```mermaid
-flowchart LR
-    A[Large table] --> B[Many data pages]
-    B --> C[Scan many pages]
-    C --> D[Return only matching rows]
+Now let's consider what happens when tables contain millions of records.
+
+## 17.1 The challenge of large tables
+
+Our `IndexLab` database contains two particularly large tables:
+
+| Table | Approximate number of rows |
+|---|---:|
+| `SalesOrder` | 10,000,000 |
+| `SalesOrderItem` | 40,000,000 |
+
+These tables are significantly larger than the `Category`, `Product`, and `Customer` tables we examined earlier.
+
+Imagine that an application needs to retrieve a small number of orders belonging to a particular customer.
+
+```sql
+SELECT *
+FROM dbo.SalesOrder
+WHERE CustomerId = 50000;
 ```
 
-> **Can SQL Server find the relevant rows without scanning most of the table?**
+Although the query may return only a small number of rows, SQL Server still needs to **find those rows among millions of records**.
 
-This question leads directly to indexing.
+If there is no suitable index for the search condition, SQL Server may need to scan a large portion of the table.
+
+As we learned in Sections 7 and 8, scanning more pages generally means more logical reads and potentially more physical I/O.
+
+> [!IMPORTANT]
+> The number of rows returned by a query does not tell us how many pages SQL Server had to examine to find them.
+
+## 17.2 Different ways to access data
+
+In Sections 14 and 15, we observed how clustered indexes allow SQL Server to locate individual records efficiently.
+
+Our actual measurements were:
+
+| Table | Full retrieval | Single-row lookup |
+|---|---:|---:|
+| `Product` | 161 logical reads | 2 logical reads |
+| `Customer` | 736 logical reads | 3 logical reads |
+
+These results demonstrate the difference between reading an entire table and navigating an index to locate a specific record.
+
+However, our searches used the **clustered index key**.
+
+What happens when we search using another column?
+
+Consider the following simplified comparison:
+
+```mermaid
+flowchart TD
+    Q["Query with a search condition"]
+    Q --> D{"Suitable index available?"}
+
+    D -->|No| S["Scan many data pages"]
+    D -->|Yes| I["Navigate an index"]
+
+    S --> R["Find matching rows"]
+    I --> R
+```
+
+The diagram illustrates two possible access strategies.
+
+**Scanning data pages**
+
+SQL Server examines rows across the pages it needs to scan, checking which rows satisfy the search condition.
+
+This can be expensive for large tables when only a small number of rows are required.
+
+**Using an index**
+
+A suitable index can help SQL Server locate matching rows without scanning the entire table.
+
+However, indexes are not always the best choice. When a query needs a large proportion of a table, a scan may be more efficient.
+
+The SQL Server query optimizer decides which access method to use based on available indexes, statistics, and estimated costs.
+
+> [!NOTE]
+> Creating an index does not guarantee that SQL Server will use it. The optimizer chooses an execution plan based on the estimated cost of the available alternatives.
+
+## 17.3 What comes next – Lab 06: Indexes
+
+We now understand several important concepts:
+
+- Data is stored in 8 KB pages.
+- The size and number of records influence how many pages a table requires.
+- Logical reads measure accesses to pages in the buffer pool.
+- Clustered indexes organize table rows and provide navigation structures.
+- Query performance depends partly on how many pages SQL Server must access.
+
+But several important questions remain:
+
+- What happens when we search by a column that is not the clustered index key?
+- How can a nonclustered index improve query performance?
+- Why does SQL Server sometimes choose an index seek and sometimes a scan?
+- How can we measure whether an index actually improves a query?
+- Why can having too many indexes also be a problem?
+
+These are the questions we will investigate in **[Lab 06 – Indexes](lab06-indexes.md)**.
+
+In the next lab, we will use the same `IndexLab` database to create indexes, examine execution plans, and compare logical reads before and after indexing.
+
+The goal is not simply to create indexes, but to understand **when and why they improve query performance**.
+
+> [!TIP]
+> Keep your `IndexLab` database. We will continue using its large tables in Lab 06 to investigate query optimization under more realistic conditions.
 
 ---
 
-# 18. Bridge to Lab 06 – Indexes
+**Final takeaway**
 
-An index provides another way to locate rows. For a selective query, SQL Server may navigate index pages and access only the relevant data pages instead of scanning a large table.
+Physical storage and query optimization are closely connected.
 
-```mermaid
-flowchart LR
-    A[Without suitable index] --> B[Scan many data pages]
-    C[With suitable index] --> D[Navigate index pages]
-    D --> E[Access relevant rows/pages]
-```
-
-But indexes are not always the fastest option. A scan can be efficient for small tables or queries that need most rows.
-
-Lab 06 will explore:
-
-- B-tree index structures,
-- clustered and nonclustered indexes,
-- table scans, index scans, and index seeks,
-- execution plans and logical I/O,
-- when an index helps, and when it does not.
-
-> [!IMPORTANT]
-> **Lab 05 explains what SQL Server reads. Lab 06 explains how it can avoid reading unnecessary pages.**
+Understanding how SQL Server organizes and accesses database pages provides the foundation for understanding why some queries are efficient while others require significantly more work.
 
 ---
 

@@ -744,30 +744,179 @@ Later, in Sections 12 and 13, we will inspect a real SQL Server data page and co
 
 # 7. Why pages matter
 
-This is the central idea of the lab.
+We have learned that SQL Server stores data in 8 KB pages and that the number of rows fitting into a page depends on their physical size.
 
-Imagine two tables, both containing **1,000,000 rows**:
+But why does this matter for query performance?
 
-| | Table A | Table B |
+The key idea is that **SQL Server accesses data through pages, not as independent rows stored directly on disk**.
+
+When a query needs to examine many rows, the number of pages containing those rows can significantly affect the amount of work required.
+
+## 7.1 How row size affects page count
+
+Imagine two tables, both containing **1,000,000 rows**.
+
+Table A contains relatively narrow rows, while Table B contains wider rows.
+
+Because wider rows occupy more space, fewer of them can fit into each 8 KB page.
+
+| Property | Table A – Narrow rows | Table B – Wider rows |
 |---|---:|---:|
-| Rows per page | 100 | 50 |
-| Approximate pages | 10,000 | 20,000 |
-| Data pages to process for a full scan | ~10,000 | ~20,000 |
+| Number of rows | 1,000,000 | 1,000,000 |
+| Average rows per page | 100 | 50 |
+| Approximate data pages | 10,000 | 20,000 |
 
-The tables have the same row count, but a scan of Table B must process roughly twice as many data pages.
+We can estimate the number of pages required.
 
-```mermaid
-flowchart TD
-    A[Wider rows] --> B[Fewer rows fit per page]
-    B --> C[More pages needed]
-    C --> D[More pages processed by a scan]
-    D --> E[More logical I/O and possible physical I/O]
-```
+**Table A:**
+
+$$
+\frac{1{,}000{,}000}{100} = 10{,}000 \text{ pages}
+$$
+
+**Table B:**
+
+$$
+\frac{1{,}000{,}000}{50} = 20{,}000 \text{ pages}
+$$
+
+Although both tables contain the same number of rows, Table B requires approximately **twice as many data pages**.
+
+This illustrates an important relationship:
+
+**Wider rows → Fewer rows per page → More data pages**
+
+The actual number of pages also depends on page utilization, variable-length data, and other storage characteristics.
 
 > [!IMPORTANT]
-> The **number of rows returned** is not the same as the **number of rows or pages examined**. A query returning ten rows may still scan thousands of pages to find them.
+> Even a small increase in average record size can significantly increase the number of pages required by a large table.
 
-Not all page accesses have equal costs, and elapsed time also depends on CPU, memory, and the execution plan. But page count is an excellent starting point for understanding database performance.
+## 7.2 How page count affects I/O cost
+
+Now let's consider a separate example that focuses on the amount of page data accessed during a full table scan.
+
+Imagine two tables with very different storage requirements:
+
+- **Table A:** 100 data pages.
+- **Table B:** 100,000 data pages.
+
+Each SQL Server page occupies 8,192 bytes.
+
+| Property | Table A | Table B |
+|---|---:|---:|
+| Data pages | 100 | 100,000 |
+| Page size | 8 KB | 8 KB |
+| Total page data | 800 KiB | 781.25 MiB |
+
+We can calculate the total page data.
+
+**Table A:**
+
+$$
+100 \times 8192 = 819{,}200 \text{ bytes} = 800 \text{ KiB}
+$$
+
+**Table B:**
+
+$$
+100{,}000 \times 8192 = 819{,}200{,}000 \text{ bytes} = 781.25 \text{ MiB}
+$$
+
+The following illustration shows how page count affects the amount of data accessed during a full scan.
+
+![Relationship between page count and I/O cost](../images/lab05/page-count-to-io-cost.svg)
+
+Table B contains **1,000 times more data pages** than Table A.
+
+A full scan of Table B therefore involves approximately 1,000 times as much page data as a full scan of Table A.
+
+However, this does not necessarily mean that SQL Server transfers all these bytes from physical storage during every execution.
+
+Some or all of the required pages may already be cached in memory.
+
+> [!IMPORTANT]
+> **Page data accessed is not necessarily the same as data physically read from storage.**
+>
+> SQL Server may access pages already in memory, and a single storage I/O request may transfer multiple pages.
+
+We will examine this distinction in Section 8.
+
+## 7.3 Why more pages can mean more work
+
+When a query scans a table, SQL Server must access the pages containing the required records.
+
+More pages generally mean:
+
+- More page accesses in the buffer pool.
+- More work examining records and evaluating query conditions.
+- Potentially more physical storage reads when pages are not cached.
+- Greater memory requirements to cache the same proportion of the table.
+
+For example, even if all pages are already in memory, scanning 20,000 pages generally requires more page-processing work than scanning 10,000 pages under comparable conditions.
+
+This is why reducing unnecessary page accesses is an important part of query optimization.
+
+However, **twice as many pages does not automatically mean twice the execution time**. Performance also depends on CPU work, caching, I/O patterns, parallelism, and the execution plan.
+
+## 7.4 Rows returned vs. pages examined
+
+Consider the following query:
+
+```sql
+SELECT *
+FROM dbo.Customer
+WHERE CustomerName = 'Customer 50000';
+```
+
+The query may return only one row.
+
+But does that mean SQL Server needs to examine only one page?
+
+Not necessarily.
+
+If SQL Server cannot efficiently locate the requested row using an appropriate access path, it may need to scan many pages before finding it.
+
+Therefore, we must distinguish:
+
+- **Rows returned:** The number of rows produced by the query.
+- **Rows examined:** The number of rows SQL Server processes while evaluating the query.
+- **Pages accessed:** The number of page accesses required during execution.
+
+A query returning one row can still perform thousands of logical reads.
+
+> [!NOTE]
+> The number of logical reads is not necessarily the number of distinct pages. SQL Server may access the same page more than once during query execution.
+
+## 7.5 Key takeaways
+
+- SQL Server organizes data into 8 KB pages.
+- Wider rows generally mean fewer rows per page.
+- More pages are required to store the same number of rows when the average row size increases.
+- More pages can increase the amount of work required by a full scan.
+- Logical page accesses do not necessarily require physical storage I/O.
+- The number of rows returned does not tell us how many pages were examined.
+- Query performance depends on both the physical organization of data and the way SQL Server accesses it.
+
+**Check your understanding**
+
+1. Why can two tables with the same number of rows require different numbers of pages?
+2. If one million rows fit at 50 rows per page, how many data pages are required?
+3. How much page data is represented by 100,000 SQL Server pages?
+4. Does scanning twice as many pages always take twice as long?
+5. Can a query returning one row still access thousands of pages?
+6. Does accessing 1,000 pages always mean performing 1,000 physical disk I/O operations?
+
+<details>
+<summary>Show answers</summary>
+
+1. Because their rows may have different physical sizes, resulting in different numbers of rows per page. Page utilization can also affect the total.
+2. **20,000 pages**, assuming an average of 50 rows per page.
+3. **781.25 MiB**, assuming 8,192 bytes per page.
+4. **No.** Execution time also depends on caching, CPU work, I/O patterns, parallelism, and other factors.
+5. **Yes.** Without an efficient access path, SQL Server may need to scan many pages to find a matching row.
+6. **No.** Pages may already be cached in memory, and a single physical I/O request can transfer multiple pages.
+
+</details>
 
 ---
 

@@ -459,19 +459,120 @@ Before that, let's take a closer look at how SQL Server organizes its database f
 
 # 5. Files, extents, and pages
 
-A SQL Server **data file** is organized into **8 KB pages** (8192 bytes). Eight consecutive pages form a **64 KB extent**.
+SQL Server stores database data inside data files (`.mdf` and `.ndf`). These files are organized into fixed-size **8 KB pages**.
 
-| Unit | Size | Main role |
+A page is the fundamental unit SQL Server uses to store and access database data. Pages can contain table rows, index entries, or internal metadata.
+
+To manage storage allocation, SQL Server groups eight consecutive pages into an **extent**.
+
+| Unit | Size | Main purpose |
 |---|---:|---|
-| Page | 8 KB | Stores rows, index entries, or metadata |
-| Extent | 8 pages = 64 KB | Allocates groups of pages |
+| Page | 8 KB (8,192 bytes) | Stores rows, index entries, or metadata |
+| Extent | 8 pages = 64 KB | Groups pages for storage allocation |
+
+The following illustration shows how database files, extents, and pages relate to each other.
 
 ![Files, extents, and pages](../images/lab05/sql-server-files-extents-pages.svg)
 
-An **extent** is primarily an allocation concept. A **page** is the important unit for the I/O measurements used later in this lab.
+## 5.1 Understanding pages
+
+A SQL Server data file is divided into pages of **8,192 bytes**.
+
+Each page has an identifier within its database file, allowing SQL Server to locate it.
+
+A single page may contain many table rows. Larger tables require many pages, potentially distributed across different parts of the database file.
+
+Pages also store index structures and allocation metadata, not only user data.
+
+> [!IMPORTANT]
+> SQL Server uses pages as its fundamental unit of database storage and buffer-pool access. However, one page does not necessarily correspond to one physical disk I/O operation.
+
+## 5.2 Understanding extents
+
+An **extent** is a group of eight physically consecutive SQL Server pages within a database file.
+
+Therefore:
+
+$$
+8 \times 8192 = 65536 \text{ bytes} = 64 \text{ KB}
+$$
+
+SQL Server uses extents to manage the allocation of storage space.
+
+There are two types of extents:
+
+| Extent type | Description |
+|---|---|
+| **Uniform extent** | All eight pages are allocated to the same allocation unit. |
+| **Mixed extent** | Individual pages may be allocated to different allocation units. |
+
+Modern SQL Server versions normally use uniform extents for new allocations, although mixed extents are still supported.
+
+For this lab, the important concept is that **extents help SQL Server manage storage allocation**, while pages contain the actual database structures.
 
 > [!NOTE]
-> An extent and a 64 KB NTFS cluster may have the same size, but they belong to **different layers** and are not interchangeable.
+> An extent and a 64 KB NTFS cluster may have the same size, but they belong to different layers. An extent is a SQL Server allocation concept, while an NTFS cluster is a file-system allocation unit.
+
+## 5.3 Example – How many pages fit into a database file?
+
+Imagine a SQL Server data file with a size of **64 MB**.
+
+Because each page occupies 8 KB:
+
+$$
+64 \times 1024 = 65536 \text{ KB}
+$$
+
+$$
+65536 \div 8 = 8192 \text{ pages}
+$$
+
+Each extent contains eight pages:
+
+$$
+8192 \div 8 = 1024 \text{ extents}
+$$
+
+Therefore, a 64 MB data file contains space for:
+
+- **8,192 pages**
+- **1,024 extents**
+
+This does not mean that all pages contain user data. Some pages store internal metadata, while others may not yet be allocated to database objects.
+
+## 5.4 Why does this matter?
+
+Understanding pages and extents helps us distinguish two important concepts:
+
+- **Storage allocation:** How SQL Server manages space within database files.
+- **Data access:** How SQL Server reads and processes pages when executing queries.
+
+Extents are primarily relevant to storage allocation.
+
+Pages are particularly important when analyzing query performance because SQL Server reports **logical reads** as page accesses.
+
+For example, a query that accesses 1,000 pages performs substantially more page-access work than one that accesses only 10 pages, assuming comparable access patterns.
+
+In the following sections, we will examine what a data page contains and why the number of pages accessed can significantly affect query performance.
+
+## Check your understanding
+
+1. How many bytes does a SQL Server page contain?
+2. How many pages form an extent?
+3. What is the difference between a page and an extent?
+4. How many pages fit into a 64 MB data file?
+5. Does every page in a database file necessarily contain user data?
+
+<details>
+<summary>Show answers</summary>
+
+1. A SQL Server page contains **8,192 bytes (8 KB)**.
+2. An extent contains **eight consecutive pages**, totaling 64 KB.
+3. A page stores database data or metadata, while an extent groups eight pages for storage allocation.
+4. A 64 MB file contains space for **8,192 pages**.
+5. No. Some pages contain internal metadata, and others may not yet be allocated to database objects.
+
+</details>
 
 ---
 
@@ -910,7 +1011,7 @@ $$
 The occupied portion of the page is approximately:
 
 $$
-\frac{2888}{8192} \times 100 \approx 35.3\%
+\frac{2888}{8192} \times 100 \approx 35.3 \text{ % }
 $$
 
 This is **physical page occupancy**, including internal structures, not just user data. The page still has substantial room for additional records, subject to SQL Server's insertion and storage rules.

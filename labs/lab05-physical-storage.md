@@ -825,45 +825,188 @@ Do not assume that slot order always matches the order of rows returned by a que
 
 ---
 
-# 13. Guided investigation 1 – Category
+# 13. Practical example – How much space does a row occupy?
 
-`Category` is our smallest example.
+In the previous sections, we examined the physical pages belonging to the `Category` table and discovered that all **100 rows fit into a single 8 KB data page**.
+
+We also observed that individual records occupy different amounts of space.
+
+But why?
+
+In this section, we will connect the **logical structure of a table** with the **actual storage space used by its records**.
+
+## 13.1 Examine the table structure
+
+Our `Category` table contains two columns:
+
+| Column | Data type | Description |
+|---|---|---|
+| `CategoryId` | `int` | Fixed-length integer |
+| `CategoryName` | `varchar(50)` | Variable-length character data |
+
+The `int` data type always occupies **4 bytes**.
+
+The `varchar(50)` declaration allows up to 50 bytes of character data, but it does not mean that every value occupies 50 bytes.
+
+For example:
+
+- `Category 1` contains 10 characters.
+- `Category 10` contains 11 characters.
+- `Category 100` contains 12 characters.
+
+For these ASCII strings, each character occupies one byte.
+
+Therefore, the actual storage required for the text depends on its length.
+
+> [!IMPORTANT]
+> The declared maximum length of a `varchar` column is not the same as the actual storage used by each value.
+
+## 13.2 Measure the actual data length
+
+SQL Server provides the `DATALENGTH()` function, which returns the number of bytes used to represent a value.
+
+Execute:
+
+```sql
+SELECT
+    CategoryId,
+    CategoryName,
+    DATALENGTH(CategoryName) AS NameBytes
+FROM dbo.Category
+WHERE CategoryId IN (1, 9, 10, 99, 100)
+ORDER BY CategoryId;
+```
+
+On our reference database, the result is:
+
+| CategoryId | CategoryName | NameBytes |
+|---:|---|---:|
+| 1 | Category 1 | 10 |
+| 9 | Category 9 | 10 |
+| 10 | Category 10 | 11 |
+| 99 | Category 99 | 11 |
+| 100 | Category 100 | 12 |
+
+Notice that `DATALENGTH()` measures the actual bytes of the stored value, not the maximum declared size of the column.
+
+For comparison, `LEN()` returns the number of characters, excluding trailing spaces. For some character encodings, the number of characters and bytes may differ.
+
+## 13.3 Compare logical data with physical record size
+
+In Section 12, we used `DBCC PAGE` to inspect the actual records stored in the `Category` data page.
+
+The diagnostic output showed:
+
+```text
+Slot 0  Offset 0x60   Length 25
+Slot 9  Offset 0x141  Length 26
+Slot 99 Offset 0xa65  Length 27
+```
+
+Let's compare these physical record sizes with the logical data.
+
+| CategoryName | `int` | Text bytes | Physical record size |
+|---|---:|---:|---:|
+| Category 1 | 4 B | 10 B | 25 B |
+| Category 10 | 4 B | 11 B | 26 B |
+| Category 100 | 4 B | 12 B | 27 B |
+
+The physical record is larger than the sum of the column values.
+
+For example, `Category 1` contains:
+
+- `CategoryId`: 4 bytes
+- `CategoryName`: 10 bytes
+- Internal record overhead: 11 bytes
+
+Therefore:
+
+$$
+4 + 10 + 11 = 25 \text{ bytes}
+$$
+
+SQL Server needs additional bytes to describe the internal structure of each record.
+
+This overhead includes information such as record metadata, the null bitmap, and variable-length column information.
+
+For our `Category` records, the overhead is consistently **11 bytes**.
 
 > [!NOTE]
-> `Category`, `Product`, and `Customer` all have a `PRIMARY KEY CLUSTERED`, so their in-row data pages belong to a clustered index, not a heap. Expect `IndexID = 1`, not `IndexID = 0`. The `IndexID = 0` value applies only to the heap tables `SalesOrder` and `SalesOrderItem`, which have no clustered index yet.
+> Record overhead depends on the table structure and storage format. The 11-byte overhead shown here applies to our particular example and should not be treated as a universal constant.
 
-1. Run `DBCC IND('IndexLab', 'dbo.Category', -1);`.
-2. Identify its ordinary in-row data pages (`PageType = 1`, `IndexID = 1`).
-3. Choose one and inspect it using `DBCC PAGE`.
+## 13.4 How much space do all 100 records occupy?
 
-Answer:
+The `Category` table contains:
 
-1. How many data pages did you find?
-2. What are the `PageFID` and `PagePID` values for the selected page?
-3. How many rows are stored on that page?
-4. What is the approximate record size?
-5. Why might scanning this table be very cheap?
+- 9 records of 25 bytes (`Category 1` through `Category 9`)
+- 90 records of 26 bytes (`Category 10` through `Category 99`)
+- 1 record of 27 bytes (`Category 100`)
 
-> [!NOTE]
-> **A scan is not automatically bad.** Reading a few pages may cost less than navigating a more complicated access path.
+We can calculate the total record storage:
 
-Answer the five questions above before expanding the reference results below.
+$$
+(9 \times 25) + (90 \times 26) + (1 \times 27)
+$$
+
+$$
+= 225 + 2340 + 27 = 2592 \text{ bytes}
+$$
+
+This matches the result we obtained from `DBCC PAGE` in Section 12.
+
+The 100 records occupy only **2,592 bytes**, leaving substantial space available on the 8 KB page.
+
+However, remember that the page also contains a header and slot array, so the total occupied page space is larger than the sum of record sizes.
+
+## 13.5 Why does this matter?
+
+Consider a table containing one million rows.
+
+If each row requires only one additional byte, the table needs approximately one million additional bytes for its records.
+
+That may not sound significant, but larger rows mean that **fewer rows fit into each 8 KB page**.
+
+For queries that scan the entire table, this can lead to:
+
+- More data pages to access.
+- More logical reads.
+- Potentially more physical I/O.
+- Greater memory usage for cached pages.
+
+This connects directly to the concepts discussed in Sections 7 and 8.
+
+It also explains why choosing appropriate data types and avoiding unnecessarily large records can improve database efficiency.
+
+> [!TIP]
+> The effect becomes especially important in large tables. Even small differences in average row size can influence the number of pages required to store millions of records.
+
+## 13.6 Key takeaways
+
+- Fixed-length data types such as `int` occupy a predictable amount of storage.
+- Variable-length types such as `varchar` use space according to the actual stored value.
+- `DATALENGTH()` measures the number of bytes used by a value.
+- A physical record contains both column values and internal metadata.
+- Larger records generally reduce the number of rows that fit into a data page.
+- Row size influences page count, logical reads, and potentially query performance.
+
+**Check your understanding**
+
+1. Does `varchar(50)` always occupy 50 bytes?
+2. What is the difference between `LEN()` and `DATALENGTH()`?
+3. Why does `Category 1` occupy 25 bytes when its column values require only 14 bytes?
+4. How many bytes do all 100 `Category` records occupy?
+5. Why can increasing the average row size affect query performance?
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answers</summary>
 
-Measured on one SQL Server 2025 Express instance:
-
-1. **1** in-row data page (`DBCC IND` returned only 2 rows total: 1 IAM page and 1 data page).
-2. `PageFID = 1`, `PagePID = 113736`.
-3. **100** rows — the entire table fits on this one page.
-4. **25 bytes** per record.
-5. The row-per-page formula predicts `floor(8096 / (25 + 2)) ≈ 299`, well above the table's 100 rows — so the whole table fits on a single page. Scanning `Category` means reading that one page regardless of which rows a query needs, which is why a scan here is cheap.
-
-Your own `PageFID`/`PagePID` values will differ — page allocation is instance-specific.
+1. **No.** `varchar(50)` specifies a maximum of 50 bytes for the stored character data. The actual storage depends on the value.
+2. **`LEN()`** returns the number of characters, excluding trailing spaces. **`DATALENGTH()`** returns the number of bytes used to represent the value.
+3. Because SQL Server stores additional internal record metadata. In this example, the record has 11 bytes of overhead.
+4. **2,592 bytes**, calculated as `(9 × 25) + (90 × 26) + (1 × 27)`.
+5. Larger rows generally mean fewer rows per page, potentially increasing the number of pages, logical reads, and physical I/O required by queries.
 
 </details>
-
 ---
 
 # 14. Guided investigation 2 – Product

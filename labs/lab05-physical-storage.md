@@ -490,93 +490,323 @@ This enables the trace flag for the **current session**. Run it again if you ope
 
 # 11. DBCC IND – Which pages belong to a table?
 
-Start with a small table:
+When we execute SQL queries, we work with logical objects such as tables and rows. However, SQL Server physically stores these rows in **8 KB pages** inside database files.
+
+A table may occupy one page or thousands of pages, depending on its size and structure.
+
+The undocumented diagnostic command `DBCC IND` allows us to examine **which pages are allocated to a table or its indexes**.
+
+Let's start with our smallest table, `Category`.
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Category', -1);
 GO
 ```
 
-Focus on these columns:
+The command accepts three parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `'IndexLab'` | Database to inspect |
+| `'dbo.Category'` | Table to inspect |
+| `-1` | Include all indexes belonging to the table |
+
+The result contains several columns describing the pages associated with the table.
+
+## 11.1 Understanding the output
+
+For this lab, focus on the following columns:
 
 | Column | Meaning |
 |---|---|
-| `PageFID` | Database file ID |
-| `PagePID` | Page ID within that file |
-| `PageType` | Internal type of page |
-| `IndexID` | Heap or index identifier |
+| `PageFID` | Identifies the database file containing the page. |
+| `PagePID` | Identifies the page within that file. |
+| `PageType` | Identifies the type and purpose of the page. |
+| `IndexID` | Identifies the heap or index to which the page belongs. |
 
-For a **heap**, the ordinary in-row data pages typically have `PageType = 1` and `IndexID = 0`.
+### PageFID and PagePID
 
-You will see a few different `PageType` values in the output. The ones that matter here are:
+SQL Server identifies a database page using two values:
 
-| `PageType` | What it is |
-|---|---|
-| `1` | An ordinary **data page** (for a heap) or **leaf page** (for a clustered index) — the pages that hold the actual rows. |
-| `2` | A **root or intermediate index page** — navigation pages above the leaf level, seen only once a table has enough rows to need more than one level. |
-| `10` | An **IAM (Index Allocation Map) page** — tracks which extents belong to this table or index, so SQL Server can find its data pages. Every table or index has at least one. |
+- **PageFID (File ID)** identifies the data file.
+- **PagePID (Page ID)** identifies the page within that file.
 
-> [!NOTE]
-> Actual page IDs vary between databases. Do not copy the example IDs from this manual into your commands.
+Together, these values uniquely identify a page within the database.
 
-Do not attempt to understand every field. Start by locating the data pages (`PageType = 1`) for `Category`; you can ignore the IAM page for now.
-
----
-
-# 12. DBCC PAGE – Look inside one page
-
-From `DBCC IND`, select a row representing a data page (`PageType = 1`). Copy its **PageFID** and **PagePID** values.
-
-The syntax is:
+For example:
 
 ```text
-DBCC PAGE('IndexLab', file_id, page_id, 3) WITH TABLERESULTS;
+PageFID = 1
+PagePID = 113736
 ```
 
-For example, **only if those IDs actually appear in your output**:
+This means page 113736 in database file 1.
 
-```sql
-DBCC PAGE('IndexLab', 1, 123, 3)
-WITH TABLERESULTS;
-GO
+Remember that a database can contain multiple data files, so a page number alone is not sufficient to identify a page.
+
+> [!NOTE]
+> Page IDs depend on how SQL Server allocates storage. Your values may differ from those shown in this manual.
+
+### PageType – What kind of page is this?
+
+As discussed in Section 9, SQL Server uses different page types for different purposes.
+
+The most important values for this lab are:
+
+| PageType | Meaning |
+|---|---|
+| `1` | **Data page** – contains table rows, including leaf-level rows of a clustered index. |
+| `2` | **Index page** – contains navigation entries in the non-leaf levels of an index. |
+| `10` | **IAM page** – tracks allocated extents associated with an allocation unit. |
+
+For example, a small table may require only one data page and one IAM page.
+
+Larger tables may contain hundreds or thousands of data pages. If they have a sufficiently large clustered index, they will also have index pages used to navigate its structure.
+
+> [!IMPORTANT]
+> An IAM page does not contain ordinary table rows. It contains allocation information that helps SQL Server track where pages belonging to an allocation unit are located.
+
+### IndexID – Which index does the page belong to?
+
+The `IndexID` column tells us which table storage structure or index is associated with the page.
+
+| IndexID | Meaning |
+|---|---|
+| `0` | Heap – a table without a clustered index |
+| `1` | Clustered index |
+| `2` or higher | Nonclustered index |
+
+Our `Category`, `Product`, and `Customer` tables have a **clustered primary key**.
+
+Therefore, their ordinary data pages belong to the clustered index and have `IndexID = 1`.
+
+This may seem unusual at first: why do the actual table rows belong to an index?
+
+In SQL Server, a clustered index organizes the table's rows at its leaf level. In other words, **the leaf level of a clustered index contains the actual table data**.
+
+We will explore clustered and nonclustered indexes in more detail in Lab 06.
+
+## 11.2 Interpreting the Category results
+
+On our reference SQL Server instance, `DBCC IND` returned two pages for `Category`:
+
+| PageFID | PagePID | PageType | IndexID |
+|---|---:|---:|---:|
+| 1 | 119 | 10 | 1 |
+| 1 | 113736 | 1 | 1 |
+
+Let's interpret these results.
+
+**Page 119 – IAM page**
+
+- `PageType = 10` identifies an Index Allocation Map (IAM) page.
+- SQL Server uses this page to track allocated extents for the table's allocation unit.
+- It does not contain ordinary table rows.
+
+**Page 113736 – Data page**
+
+- `PageType = 1` identifies a data page.
+- `IndexID = 1` indicates that it belongs to the clustered index.
+- This page contains the actual rows of the `Category` table.
+
+Because `Category` is very small, all **100 rows fit into a single data page**.
+
+This illustrates an important concept: **a table containing 100 rows does not necessarily require 100 pages**. Multiple rows are stored together inside the same 8 KB page.
+
+For larger tables such as `Product` and `Customer`, you will find many more data pages.
+
+## 11.3 From page location to page contents
+
+We now know that the `Category` table has a data page identified by:
+
+```text
+File ID: 1
+Page ID: 113736
 ```
 
-Look for:
+But what does this page actually contain?
 
-- `PAGE HEADER` and page metadata,
-- `Slot` entries and their relationship to rows,
-- `Record Size` values.
+How many records are stored inside it? How much space do they occupy? How much free space remains?
 
-```mermaid
-flowchart LR
-    A[Logical table] --> B[DBCC IND: list pages]
-    B --> C[Choose a data page]
-    C --> D[DBCC PAGE: inspect contents]
-```
+To answer these questions, we need another diagnostic command: **`DBCC PAGE`**.
 
-Compare the diagnostic output with the ordinary logical view:
-
-```sql
-SELECT TOP (10) *
-FROM dbo.Category;
-```
-
-The SQL query shows rows and columns. `DBCC PAGE` reveals part of the storage format behind them.
+In Section 12, we will use it to examine the internal structure of a data page, including its header, records, and slot array.
 
 ## Check your understanding
 
-1. What does `DBCC IND` tell you?
-2. Which two identifiers are needed for `DBCC PAGE`?
-3. Why should you use a page ID obtained from your own database?
+1. What information does `DBCC IND` provide?
+2. Why do we need both `PageFID` and `PagePID` to identify a page?
+3. What is the difference between `PageType = 1` and `PageType = 10`?
+4. Why do the data pages of `Category` have `IndexID = 1`?
+5. Can a table containing 100 rows fit into a single data page?
 
 <details>
 <summary>Show answers</summary>
 
-1. It shows pages associated with a table or index, including their file IDs, page IDs, and types.
-2. File ID (`PageFID`) and page ID (`PagePID`).
-3. SQL Server chooses page locations during allocation, so IDs can differ between database instances and rebuilds.
+1. It lists pages associated with a table or its indexes, including their locations, types, and index identifiers.
+2. Because page numbers are unique only within a database file. Together, the file ID and page ID identify a page within the database.
+3. `PageType = 1` contains data rows, while `PageType = 10` contains IAM allocation information.
+4. Because `Category` has a clustered index, and its actual table rows are stored at the leaf level of that index.
+5. Yes. A single 8 KB page can contain many rows, depending on their sizes.
 
 </details>
+
+---
+
+# 12. DBCC PAGE – Look inside a data page
+
+In Section 11, we used `DBCC IND` to locate the pages associated with the `Category` table. Our reference database contains one data page for its 100 rows:
+
+- **File ID (`PageFID`):** `1`
+- **Page ID (`PagePID`):** `113736`
+
+We can now inspect the physical layout of that page using the undocumented diagnostic command `DBCC PAGE`.
+
+## 12.1 Inspecting the page
+
+```sql
+USE IndexLab;
+GO
+
+DBCC TRACEON(3604);
+GO
+
+DBCC PAGE('IndexLab', 1, 113736, 3)
+WITH TABLERESULTS;
+GO
+```
+
+| Argument | Purpose |
+|---|---|
+| `'IndexLab'` | Database name |
+| `1` | File ID (`PageFID`) |
+| `113736` | Page ID (`PagePID`) |
+| `3` | Detailed output including interpreted records |
+| `WITH TABLERESULTS` | Return diagnostic output in a tabular format |
+
+`DBCC TRACEON(3604)` directs diagnostic output to the client for the current session.
+
+> [!WARNING]
+> `DBCC IND` and `DBCC PAGE` are undocumented diagnostic commands. Use them only for learning and controlled diagnostics, not as a supported application interface.
+
+> [!NOTE]
+> Your page IDs may differ. Use the `PageFID` and `PagePID` returned by `DBCC IND` for a page with `PageType = 1`.
+
+## 12.2 Reading the page header
+
+Every SQL Server data page has a **96-byte header** (see Section 6). The `DBCC PAGE` output contains the following values for our `Category` data page:
+
+| Field | Reference value | Meaning |
+|---|---:|---|
+| `m_slotCnt` | 100 | Number of record slots on the page |
+| `m_freeCnt` | 5,304 | Available free bytes on the page |
+| `m_freeData` | 2,688 | Offset of the end of the used record-data area |
+
+**`m_slotCnt` and the slot array.** The page contains 100 record slots, corresponding to the 100 `Category` rows in this example. Each slot-array entry occupies 2 bytes and holds the offset of a record. Therefore, the slot array occupies:
+
+$$
+100 \times 2 = 200 \text{ bytes}
+$$
+
+**`m_freeCnt` and available space.** The page has 5,304 free bytes. Its occupied space, including the page header and slot array, is:
+
+$$
+8192 - 5304 = 2888 \text{ bytes}
+$$
+
+**`m_freeData` is an offset, not a byte count.** On this particular compactly populated page, the records begin immediately after the 96-byte header and end at offset 2,688. Their combined size is therefore:
+
+$$
+2688 - 96 = 2592 \text{ bytes}
+$$
+
+> [!IMPORTANT]
+> This last calculation works for **our specific page**, where the record-data area is compactly populated. On pages with deleted, moved, or otherwise fragmented records, `m_freeData - 96` does **not necessarily equal the total size of active records**. `m_freeData` identifies a position within the page; it is not a general-purpose record-size total.
+
+## 12.3 Visualizing the 8 KB page
+
+The following diagram shows the measured space distribution of our `Category` data page. The widths are proportional to the number of bytes occupied by each component.
+
+![Proportional layout of the Category data page](images/sql-server-category-page-layout.svg)
+
+| Component | Size | Share of page |
+|---|---:|---:|
+| Page header | 96 B | 1.2% |
+| Stored records | 2,592 B | 31.6% |
+| Free space | 5,304 B | 64.7% |
+| Slot array | 200 B | 2.4% |
+| **Total** | **8,192 B** | **100%** |
+
+The byte counts add up exactly:
+
+$$
+96 + 2592 + 5304 + 200 = 8192 \text{ bytes}
+$$
+
+The occupied portion of the page is approximately:
+
+$$
+\frac{2888}{8192} \times 100 \approx 35.3\%
+$$
+
+This is **physical page occupancy**, including internal structures, not just user data. The page still has substantial room for additional records, subject to SQL Server's insertion and storage rules.
+
+## 12.4 Inspecting individual records
+
+`DBCC PAGE` also reports individual record locations and sizes. Our reference output includes:
+
+```text
+Slot 0  Offset 0x60   Length 25
+Slot 9  Offset 0x141  Length 26
+Slot 99 Offset 0xa65  Length 27
+```
+
+| Element | Meaning |
+|---|---|
+| `Slot` | Entry in the page's slot array |
+| `Offset` | Byte offset of the record within the page |
+| `Length` | Physical size of the record in bytes |
+
+For example, `0x60` is hexadecimal for 96, so the record referenced by slot 0 starts immediately after the page header. Its length is 25 bytes.
+
+The different record lengths are not an error. The `Category` table contains a variable-length `varchar(50)` column, so records can occupy different amounts of space. We will investigate the actual row sizes in Section 13.
+
+> [!NOTE]
+> A slot number is not a permanent row identifier. The physical position of a record and its slot assignment can change as SQL Server modifies pages.
+
+## 12.5 Logical rows versus physical records
+
+Compare the page diagnostics with an ordinary query:
+
+```sql
+SELECT TOP (10)
+    CategoryId,
+    CategoryName
+FROM dbo.Category
+ORDER BY CategoryId;
+```
+
+The `SELECT` statement shows the **logical view**: columns and values. `DBCC PAGE` shows the **physical representation**: page metadata, record offsets, record sizes, and slot-array information.
+
+Do not assume that slot order always matches the order of rows returned by a query. The `ORDER BY` clause defines the result order in the example above.
+
+## 12.6 Key takeaways
+
+- `DBCC PAGE` reveals the internal layout of an individual database page.
+- A data page is 8,192 bytes, including a 96-byte header.
+- The slot array uses 2 bytes per slot to locate records.
+- `m_freeCnt` measures free bytes; `m_freeData` is an offset.
+- Record sizes can differ within the same table.
+- The page's physical layout helps explain how multiple rows fit into one 8 KB page.
+
+**Check your understanding**
+
+1. What does `DBCC PAGE` show that a normal `SELECT` does not?
+2. What does `m_slotCnt = 100` mean?
+3. How much space does a slot array with 100 entries occupy?
+4. Why is `m_freeData` different from `m_freeCnt`?
+5. Why must we be careful when using `m_freeData - 96` to calculate record sizes?
+
 
 ---
 

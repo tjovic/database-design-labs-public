@@ -36,19 +36,52 @@ This lab involves relatively little coding. Its goal is to build a **mental mode
 
 # 1. From logical data to physical storage
 
-Until now, we have mainly worked at the **logical level**: tables, views, triggers, procedures, and functions.
+Until now, we have mainly worked with SQL Server at the **logical level**: tables, views, triggers, stored procedures, and functions.
+
+For example, consider the following query:
 
 ```sql
 SELECT *
 FROM dbo.Customer;
 ```
 
-This query looks as though SQL Server simply retrieves rows from a table. In reality, those rows are stored inside **pages** in database files.
+From a logical perspective, we simply request all rows from the `Customer` table.
+
+But how does SQL Server actually retrieve these rows?
+
+The data is not stored as a simple collection of independent rows. SQL Server organizes table data into **8 KB pages**, which are stored inside database files.
+
+We can distinguish two perspectives:
+
+| Perspective | What it describes |
+|---|---|
+| **Logical** | Tables, columns, rows, relationships, and SQL queries |
+| **Physical** | Database files, pages, records, and how data is organized and accessed |
+
+The following illustration shows the relationship between logical data and physical storage.
 
 ![Logical data and physical storage](../images/lab05/logical-vs-physical-storage.svg)
 
+A single page can contain many rows, while a large table may require thousands or even millions of pages.
+
 > [!IMPORTANT]
 > A **row** is a logical unit of table data. An **8 KB page** is the fundamental unit SQL Server uses to organize that data in database files and the buffer pool.
+
+### Why does physical storage matter?
+
+Consider two queries that return the same number of rows.
+
+One query may locate the required rows by accessing only a few pages, while another may need to examine thousands of pages.
+
+Even though both queries return the same amount of data, the work required to find that data can be very different.
+
+This leads to an important question:
+
+**How many pages must SQL Server access to execute a query?**
+
+Throughout this lab, we will explore how data is physically stored, how SQL Server accesses pages, and why these concepts matter for query performance.
+
+In Lab 06, we will use this knowledge to understand how indexes can reduce unnecessary page accesses.
 
 ---
 

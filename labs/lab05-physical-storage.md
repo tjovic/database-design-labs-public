@@ -1278,7 +1278,7 @@ The reduction in logical reads is:
 $$
 \text{Reduction} = \frac{161 - 2}{161} \times 100
 $$
-
+>
 $$
 \boxed{\text{Reduction} \approx 98.76\%}
 $$

@@ -2523,24 +2523,8 @@ This illustrates why hierarchical indexes are so effective for targeted lookups.
 
 ---
 
-# 16. From page count to I/O cost
 
-Suppose Query A processes **100 pages**, while Query B processes **100,000 pages**.
-
-- Query A processes roughly `100 × 8 KB = 800 KB` of page content.
-- Query B processes roughly `100,000 × 8 KB = 781.25 MB` of page content.
-
-This represents the **amount of page data involved in the comparison**, not a prediction of the exact bytes read from the storage device. Cached pages and repeated logical reads can change the observed I/O.
-
-![Page count and I/O cost](../images/lab05/page-count-to-io-cost.svg)
-
-**Important:** logical reads count page accesses, not necessarily unique pages. A storage device may service multiple pages in one I/O request, and an already cached page may need no physical storage access at all.
-
-Query time also depends on joins, predicates, CPU cost, memory, and the execution plan. Nevertheless, reducing unnecessary page access is a major goal of query optimization.
-
----
-
-# 17. From physical storage to query optimization
+# 16. From physical storage to query optimization
 
 Throughout this lab, we have explored how SQL Server physically stores data and how the organization of database pages affects query performance.
 
@@ -2550,7 +2534,7 @@ We also discovered that **the number of pages SQL Server needs to access can be 
 
 Now let's consider what happens when tables contain millions of records.
 
-## 17.1 The challenge of large tables
+## 16.1 The challenge of large tables
 
 Our `IndexLab` database contains two particularly large tables:
 
@@ -2578,7 +2562,7 @@ As we learned in Sections 7 and 8, scanning more pages generally means more logi
 > [!IMPORTANT]
 > The number of rows returned by a query does not tell us how many pages SQL Server had to examine to find them.
 
-## 17.2 Different ways to access data
+## 16.2 Different ways to access data
 
 In Sections 14 and 15, we observed how clustered indexes allow SQL Server to locate individual records efficiently.
 
@@ -2628,7 +2612,7 @@ The SQL Server query optimizer decides which access method to use based on avail
 > [!NOTE]
 > Creating an index does not guarantee that SQL Server will use it. The optimizer chooses an execution plan based on the estimated cost of the available alternatives.
 
-## 17.3 What comes next – Lab 06: Indexes
+## 16.3 What comes next – Lab 06: Indexes
 
 We now understand several important concepts:
 

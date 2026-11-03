@@ -727,7 +727,7 @@ $$
 
 The following diagram shows the measured space distribution of our `Category` data page. The widths are proportional to the number of bytes occupied by each component.
 
-![Proportional layout of the Category data page]((../images/lab05/sql-server-category-page-layout.svg)
+![Proportional layout of the Category data page](../images/lab05/sql-server-category-page-layout.svg)
 
 | Component | Size | Share of page |
 |---|---:|---:|

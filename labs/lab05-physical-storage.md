@@ -922,45 +922,292 @@ A query returning one row can still perform thousands of logical reads.
 
 # 8. Buffer pool, logical reads, and physical reads
 
-SQL Server processes database pages in memory, using a cache called the **buffer pool**.
+In Section 7, we learned that the number of database pages can significantly affect the amount of work required to execute a query.
+
+But does accessing 1,000 pages mean that SQL Server must perform 1,000 physical disk reads?
+
+**Not necessarily.**
+
+SQL Server uses an area of RAM called the **buffer pool** to cache database pages and reduce the need for repeated storage access.
+
+Understanding how SQL Server accesses these pages is essential for interpreting query performance.
+
+## 8.1 The buffer pool
+
+SQL Server stores table and index data in **8 KB pages**.
+
+When a query needs a page, SQL Server checks whether that page is already available in the buffer pool.
+
+- **If the page is in memory**, SQL Server can access it without reading it from storage.
+- **If the page is not in memory**, SQL Server must load it from storage into the buffer pool before accessing it.
+
+Once a page has been loaded, it may remain in memory and be reused by subsequent queries.
 
 ```mermaid
 flowchart TD
-    A[Query requires a page] --> B{Already in buffer pool?}
-    B -->|Yes| C[Access cached page: logical read]
-    B -->|No| D[Read page from storage]
-    D --> E[Place page in buffer pool]
+    A["Query needs a data page"] --> B{"Page in buffer pool?"}
+    B -->|Yes| C["Access page in memory"]
+    B -->|No| D["Read page from storage"]
+    D --> E["Load page into buffer pool"]
     E --> C
 ```
 
-### Logical read
+For example, imagine that the first query accesses 500 pages that are not currently cached.
 
-A **logical read** is an access to an 8 KB page in the buffer pool. **The same page can be accessed more than once**, so logical-read counts are not necessarily counts of distinct pages.
+SQL Server may need to load those pages from storage.
 
-### Physical read
+If another query accesses the same pages shortly afterward, they may already be available in the buffer pool, avoiding additional storage reads.
 
-A **physical read** is needed when SQL Server must obtain a page from storage rather than finding it in its buffer pool. Read-ahead can also bring in pages proactively.
+> [!NOTE]
+> The buffer pool caches database pages, not complete query results. Even when all required pages are already in memory, SQL Server still needs to access and process them.
 
-A second execution of the same query may be faster because the needed pages have already been cached. But a first execution **does not necessarily** produce physical reads: another query may have cached those pages earlier.
+### What if a page is modified?
 
-We can inspect some of this activity with:
+SQL Server also uses the buffer pool when modifying data.
+
+When a query changes a row, SQL Server modifies the corresponding page in memory. Such a page is called a **dirty page** until its changes are written to the database file.
+
+SQL Server uses transaction logging and background writing mechanisms to ensure that changes can be recovered and eventually persisted.
+
+For this lab, the important point is that **the buffer pool is used for both reading and modifying database pages**.
+
+## 8.2 Logical, physical, and read-ahead reads
+
+SQL Server distinguishes between several types of page reads.
+
+| Type | Description |
+|---|---|
+| **Logical read** | Access to a database page in the buffer pool. |
+| **Physical read** | A page read from storage on demand because it was not already available in memory. |
+| **Read-ahead read** | A page read from storage in advance because SQL Server expects to need it soon. |
+
+### How read-ahead works
+
+When SQL Server scans a large table, it may predict which pages will be needed next.
+
+Instead of waiting until each page is requested, SQL Server can **load upcoming pages into the buffer pool in advance**.
+
+This allows SQL Server to overlap storage activity with query processing, reducing the time spent waiting for pages.
+
+For example, imagine a query scanning a table containing thousands of pages.
+
+While SQL Server processes the current pages, the read-ahead mechanism may already be loading additional pages that the query will need shortly.
+
+> [!IMPORTANT]
+> Read-ahead reads also involve physical storage access. However, `SET STATISTICS IO` reports them separately from on-demand `physical reads`.
+
+### Example – Cached and uncached pages
+
+Imagine a query that performs 1,000 logical reads.
+
+**Scenario A – All required pages are cached**
+
+| Metric | Value |
+|---|---:|
+| Logical reads | 1,000 |
+| Physical reads | 0 |
+| Read-ahead reads | 0 |
+
+All required pages are already available in memory.
+
+**Scenario B – Some pages must be loaded**
+
+| Metric | Value |
+|---|---:|
+| Logical reads | 1,000 |
+| Physical reads | 100 |
+| Read-ahead reads | 300 |
+
+SQL Server performs 1,000 logical page accesses, while some required pages are loaded from storage either on demand or through read-ahead.
+
+These are illustrative values. Physical and read-ahead reads are separate counters, and their sum does not necessarily equal the number of distinct pages accessed by the query.
+
+Also, logical reads do not necessarily represent the number of **unique pages**. The same page may be accessed multiple times during query execution.
+
+## 8.3 Measuring I/O with STATISTICS IO
+
+SQL Server provides the `SET STATISTICS IO` command to display information about page reads performed by a query.
+
+Let's examine the `Product` table in our `IndexLab` database.
+
+Execute:
 
 ```sql
-SET STATISTICS IO ON;
+USE IndexLab;
 GO
+
+SET STATISTICS IO ON;
 
 SELECT *
 FROM dbo.Product;
-GO
 
 SET STATISTICS IO OFF;
-GO
 ```
 
-In SSMS, inspect the **Messages** tab. Find the `logical reads`, `physical reads`, and `read-ahead reads` values.
+After executing the query, open the **Messages** tab in SQL Server Management Studio (SSMS).
 
-> [!TIP]
-> `read-ahead reads` describe pages read in advance of immediate demand. They are reported separately from `physical reads` by `SET STATISTICS IO`, and both are relevant when discussing storage activity.
+On our reference database, the relevant output was:
+
+```text
+Table 'Product'. Scan count 1,
+logical reads 161,
+physical reads 0,
+read-ahead reads 0.
+```
+
+*Only the relevant metrics are shown. Your results may differ.*
+
+Let's interpret the values:
+
+| Metric | Value | Interpretation |
+|---|---:|---|
+| `scan count` | 1 | One scan was started for the table. |
+| `logical reads` | 161 | SQL Server performed 161 page accesses in the buffer pool. |
+| `physical reads` | 0 | No on-demand storage reads were reported. |
+| `read-ahead reads` | 0 | No read-ahead storage reads were reported. |
+
+The query returned **30,000 product rows**.
+
+Although SQL Server performed 161 logical reads, it did not need to load additional pages from storage during this execution.
+
+The required pages were already available in memory.
+
+> [!NOTE]
+> Physical and read-ahead read counts may differ between executions because the buffer pool contents change over time.
+>
+> Logical reads are often useful when comparing query access methods, but they can also change if SQL Server selects a different execution plan.
+
+## 8.4 Why logical reads matter
+
+It may seem that logical reads are unimportant because they access memory rather than storage.
+
+However, accessing and processing pages in memory still requires system resources.
+
+Even when physical reads are zero, SQL Server must perform work to access pages, examine records, and evaluate query conditions.
+
+Consider two hypothetical queries returning the same result:
+
+| Metric | Query A | Query B |
+|---|---:|---:|
+| Logical reads | 10,000 | 100 |
+| Physical reads | 0 | 0 |
+
+Both queries access only cached pages.
+
+However, Query A performs **100 times as many logical page reads**.
+
+This may require more CPU processing, memory access, and buffer management work.
+
+Therefore, **reducing unnecessary logical reads can improve query performance even when physical reads are zero**.
+
+### Connection to physical storage
+
+Recall from Section 7:
+
+**Wider rows → Fewer rows per page → More pages required**
+
+For a full table scan, more pages generally mean more logical page accesses.
+
+However, the number of pages accessed also depends on **how SQL Server locates the required data**.
+
+A query that scans an entire table may access hundreds or thousands of pages, while a query using a suitable index may need only a few.
+
+We will investigate this in Sections 14 and 15 and explore index optimization in greater detail in Lab 06.
+
+## 8.5 Compare two queries
+
+Let's compare the I/O statistics of two queries against the same table.
+
+Execute:
+
+```sql
+SET STATISTICS IO ON;
+
+-- Query A: Retrieve all products
+SELECT *
+FROM dbo.Product;
+
+-- Query B: Retrieve one product
+SELECT *
+FROM dbo.Product
+WHERE ProductId = 500;
+
+SET STATISTICS IO OFF;
+```
+
+On our reference database, we obtained:
+
+| Metric | Query A: All products | Query B: One product |
+|---|---:|---:|
+| Rows returned | 30,000 | 1 |
+| Scan count | 1 | 0 |
+| Logical reads | 161 | 2 |
+| Physical reads | 0 | 0 |
+| Read-ahead reads | 0 | 0 |
+
+Notice the difference:
+
+- Query A performs **161 logical reads**.
+- Query B performs only **2 logical reads**.
+
+Both queries report zero physical reads, but the number of logical page accesses is very different.
+
+Why?
+
+The second query can use the clustered index on `ProductId` to locate the requested row efficiently, rather than scanning the entire table.
+
+We will examine the physical structure of this index in Section 14.
+
+> [!IMPORTANT]
+> These queries return different amounts of data: 30,000 rows versus one row.
+>
+> This comparison demonstrates different data-access patterns, not the isolated performance benefit of adding an index. We will perform controlled index comparisons in Lab 06.
+
+### Does a WHERE condition always reduce logical reads?
+
+No.
+
+Adding a `WHERE` condition does not automatically mean that SQL Server can access fewer pages.
+
+If there is no suitable index, SQL Server may still need to scan the entire table to find matching rows.
+
+The number of logical reads depends on the available indexes and the execution plan selected by SQL Server.
+
+## 8.6 Key takeaways
+
+- SQL Server uses the buffer pool to cache database pages in memory.
+- Logical reads represent accesses to pages in the buffer pool.
+- Physical reads load pages from storage on demand.
+- Read-ahead reads load pages in advance to reduce waiting for storage.
+- A query can perform many logical reads even when physical reads are zero.
+- Reducing unnecessary logical reads can improve query performance.
+- The number of pages accessed depends on both physical storage and the query execution plan.
+
+**Check your understanding**
+
+1. What is the purpose of the buffer pool?
+2. Why can a query perform 1,000 logical reads but zero physical reads?
+3. What is the difference between an on-demand physical read and a read-ahead read?
+4. Does a logical read always correspond to a different database page?
+5. Why can reducing logical reads improve performance even when all pages are cached?
+6. Does adding a `WHERE` condition always reduce logical reads?
+
+<details>
+<summary>Show answers</summary>
+
+1. **The buffer pool caches database pages in RAM**, reducing the need to repeatedly read them from storage.
+
+2. Because all required pages may already be cached in the buffer pool. SQL Server can access them without performing additional storage reads.
+
+3. **An on-demand physical read** loads a page when it is needed and not cached. **A read-ahead read** loads a page in advance because SQL Server expects to need it soon.
+
+4. **No.** The same page may be accessed multiple times, and each access can contribute to the logical-read count.
+
+5. Because accessing and processing pages in memory still consumes CPU and memory resources. Reducing unnecessary page accesses can reduce this work.
+
+6. **No.** Without a suitable index, SQL Server may still need to scan many or all data pages to evaluate the condition.
+
+</details>
 
 ---
 

@@ -260,7 +260,11 @@ Notice that `SalesOrderItem` contains four times as many rows as `SalesOrder` an
 
 # 4. From the storage device to SQL Server
 
-SQL Server works with pages, but the storage layers beneath it use different units. Let us inspect them before examining SQL Server pages.
+SQL Server stores data in database files, but these files ultimately reside on storage devices managed by the operating system.
+
+Different layers of the storage system use different units. Understanding these units will help us see how SQL Server's 8 KB pages relate to the underlying storage.
+
+Let's first examine the storage configuration of your computer.
 
 Open **Command Prompt** or **PowerShell** and run:
 
@@ -268,7 +272,9 @@ Open **Command Prompt** or **PowerShell** and run:
 fsutil fsinfo ntfsinfo C:
 ```
 
-If the database files are stored on another NTFS volume, use its drive letter. Find these entries (their exact names and values may differ):
+If your database files are stored on another NTFS volume, use that volume's drive letter instead.
+
+Look for entries similar to these (the exact names and values may differ):
 
 ```text
 Bytes Per Sector          : 512
@@ -276,29 +282,75 @@ Bytes Per Physical Sector : 4096
 Bytes Per Cluster         : 4096
 ```
 
+These values describe different storage units. Let's examine what each one means.
+
 ## 4.1 Sectors: 512 B and 4 KB
 
-Older hard disk drives traditionally used **512-byte sectors**. The value persists for compatibility even on many modern storage devices.
+A **sector** is a unit of storage addressing exposed by a storage device to the operating system.
 
-- **Logical sector (512 B in this example):** the unit in which the device exposes addresses to the operating system.
-- **Reported physical sector (4096 B in this example):** the device's reported physical sector granularity.
+Older hard disk drives traditionally used 512-byte sectors. Modern storage devices commonly use 4 KB physical sectors, although they may still expose 512-byte logical sectors for compatibility.
 
-A **512e** device presents 512-byte logical sectors while reporting 4096-byte physical sectors. Eight logical sectors therefore correspond to one reported 4 KB physical sector.
+Two important concepts are:
+
+- **Logical sector:** The smallest addressable unit exposed by the storage device to the operating system.
+- **Physical sector:** The physical sector granularity reported by the device.
+
+Modern storage devices commonly use the following configurations:
+
+| Configuration | Logical sector | Physical sector |
+|---|---:|---:|
+| 512n | 512 B | 512 B |
+| 512e | 512 B | 4096 B |
+| 4Kn | 4096 B | 4096 B |
+
+### Understanding 512e
+
+A **512e (512-byte emulation)** device uses 4 KB physical sectors but presents 512-byte logical sectors to the operating system.
+
+Therefore:
+
+$$
+4096 \div 512 = 8
+$$
+
+Eight logical sectors correspond to one reported 4 KB physical sector.
+
+This distinction matters because a write that updates only part of a physical sector may require the device to perform a **read-modify-write operation**.
+
+The device may need to read the entire physical sector, modify the relevant portion, and write it back.
 
 > [!NOTE]
-> **What about SSDs?** SSDs do not have rotating platters or magnetic tracks. They still expose logical sectors, but internally organize NAND flash memory differently. A reported 4 KB physical sector is **not necessarily** the internal NAND page size.
+> **What about SSDs?**
+>
+> SSDs do not have rotating platters or magnetic tracks. They still expose logical sectors to the operating system, but internally organize NAND flash memory using different structures.
+>
+> A reported 4 KB physical sector is not necessarily the same as an internal NAND flash page.
 
-The following illustration provides a conceptual overview of how logical table data relates to SQL Server data pages and physical disk storage. The individual storage layers are examined in more detail in the following sections.
+The following illustration provides a conceptual overview of how logical table data relates to SQL Server data pages and physical storage.
 
 ![Logical row to physical disk](../images/lab05/logical-row-to-physical-disk.svg)
 
-From a logical table row to SQL Server data pages and physical disk storage. The arrows illustrate conceptual relationships, not a direct one-to-one mapping between rows and disk sectors.
+The arrows illustrate conceptual relationships, not a direct one-to-one mapping between table rows, SQL Server pages, and physical disk sectors.
 
 ## 4.2 NTFS clusters
 
-A **cluster** (allocation unit) is the amount of space the NTFS file system allocates as a unit to a file. This is **not** the same concept as a disk sector.
+A **cluster**, also called an *allocation unit*, is the basic unit of disk space that the NTFS file system normally allocates to a file.
 
-If the cluster size is **4096 bytes**, then a small file may require:
+A cluster consists of one or more logical sectors.
+
+For example, if a volume uses 512-byte logical sectors and 4096-byte clusters:
+
+$$
+4096 \div 512 = 8
+$$
+
+One NTFS cluster contains eight logical sectors.
+
+### How cluster size affects file allocation
+
+Suppose the NTFS cluster size is **4096 bytes (4 KB)**.
+
+Consider three files:
 
 | File size | Clusters allocated | Allocated space |
 |---:|---:|---:|
@@ -306,23 +358,102 @@ If the cluster size is **4096 bytes**, then a small file may require:
 | 5000 B | 2 | 8192 B |
 | 10000 B | 3 | 12288 B |
 
-This is a simplified example of ordinary allocated file data; special NTFS features, including resident data, can behave differently.
+A file containing 1000 bytes normally requires one 4096-byte cluster, leaving part of the allocated space unused.
 
-For large SQL Server data files, **64 KB NTFS allocation units are commonly recommended** in Microsoft storage guidance. This is a file-system configuration recommendation, not a change to SQL Server's page size.
+Similarly, a 5000-byte file requires two clusters because it cannot fit into one.
+
+This unused space within the final allocated cluster is sometimes called **slack space**.
+
+> [!NOTE]
+> This is a simplified example of ordinary file allocation. NTFS has additional features, such as resident data, that can store very small files differently.
+
+### Why are 64 KB clusters often recommended for SQL Server?
+
+For many SQL Server database storage configurations, **64 KB NTFS allocation units** are commonly recommended.
+
+Larger allocation units can reduce file-system allocation overhead when working with large database files.
+
+However, this does not mean that SQL Server starts using 64 KB data pages.
+
+SQL Server still organizes its database data into **8 KB pages**, regardless of the NTFS cluster size.
+
+The two units belong to different layers:
+
+- NTFS clusters determine how the file system allocates space to files.
+- SQL Server pages determine how the database engine organizes data inside those files.
+
+> [!IMPORTANT]
+> A 64 KB NTFS cluster does not automatically make SQL queries faster.
+>
+> The appropriate allocation unit size depends on the workload, storage configuration, and applicable SQL Server recommendations. Cluster size is normally selected when the volume is formatted.
 
 ## 4.3 Different layers, different units
 
+We have now encountered several storage units: sectors, clusters, and SQL Server pages.
+
+The following illustration shows how these layers relate to each other.
+
 ![Storage layers](../images/lab05/storage-layers.svg)
 
-| Layer | Example unit |
-|---|---|
-| Device interface | 512 B logical sector |
-| Device-reported physical sector | 4 KB |
-| NTFS | 4 KB or 64 KB cluster |
-| SQL Server | 8 KB page; 64 KB extent |
+Each layer has its own responsibilities.
+
+| Layer | Unit | Example size | Purpose |
+|---|---|---|---|
+| Storage device | Logical sector | 512 B | Addressable unit exposed to the operating system |
+| Storage device | Reported physical sector | 4 KB | Reported physical sector granularity |
+| NTFS file system | Cluster | 4 KB | File-space allocation unit |
+| SQL Server | Page | 8 KB | Basic unit of database storage |
+| SQL Server | Extent | 64 KB | Group of eight consecutive database pages |
+
+### Comparing the sizes
+
+Consider a system with:
+
+- 512-byte logical sectors
+- 4096-byte physical sectors
+- 4096-byte NTFS clusters
+- 8192-byte SQL Server pages
+
+In terms of size:
+
+**One NTFS cluster:**
+
+$$
+4096 \div 512 = 8 \text{ logical sectors}
+$$
+
+**One SQL Server page:**
+
+$$
+8192 \div 4096 = 2 \text{ NTFS clusters}
+$$
+
+**One SQL Server extent:**
+
+$$
+8 \times 8192 = 65536 \text{ bytes} = 64 \text{ KB}
+$$
+
+These calculations compare the sizes of different storage units.
+
+They do not imply that each SQL Server page is always stored in exactly two specific NTFS clusters or that accessing one page requires a fixed number of hardware operations.
 
 > [!IMPORTANT]
-> **One SQL Server page does not imply one physical disk I/O operation.** The buffer pool, read-ahead, operating-system cache, storage controller, and device can change how I/O requests are carried out. These sizes describe different layers, not a fixed count of hardware operations.
+> **One SQL Server page does not necessarily mean one physical disk I/O operation.**
+>
+> SQL Server can read multiple consecutive pages in a single I/O request. The operating system and storage hardware may also process I/O requests differently from the logical page accesses performed by SQL Server.
+>
+> Furthermore, if a page is already available in the buffer pool, SQL Server can access it without reading it from storage again.
+
+### From storage units to I/O performance
+
+Understanding these storage units helps explain how SQL Server interacts with the underlying storage system.
+
+However, the number of database pages accessed by a query and the number of physical storage operations are **not the same measurement**.
+
+In Section 8, we will examine how SQL Server uses the **buffer pool**, distinguish **logical reads** from **physical reads**, and explain how **read-ahead** can load pages before they are needed.
+
+Before that, let's take a closer look at how SQL Server organizes its database files into **pages and extents**.
 
 ---
 

@@ -2457,13 +2457,9 @@ Let's compare the results:
 
 The reduction in logical reads is:
 
-$$
-\text{Reduction} = \frac{736 - 3}{736} \times 100
-$$
+\mathrm{Reduction} = \frac{736 - 3}{736} \times 100
 
-$$
-\text{Reduction} \approx 99.59 \text{ % }
-$$
+\boxed{\mathrm{Reduction} \approx 99.59\,\%}
 
 The targeted lookup performs approximately **245 times fewer logical reads**.
 

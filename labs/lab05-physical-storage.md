@@ -2320,7 +2320,7 @@ The distribution can depend on index construction, subsequent insertions, and pa
 Consider the following query:
 
 ```sql
-SELECT CustomerId, CustomerName
+SELECT CustomerId, LastName
 FROM dbo.Customer
 WHERE CustomerId = 50000;
 ```

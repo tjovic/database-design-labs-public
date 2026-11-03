@@ -1010,45 +1010,339 @@ It also explains why choosing appropriate data types and avoiding unnecessarily 
 
 ---
 
-# 14. Guided investigation 2 – Product
+# 14. Guided investigation – Product: From pages to query performance
+
+In the previous sections, we examined the `Category` table and discovered that all 100 rows fit into a single 8 KB data page.
+
+But what happens when a table contains thousands of rows?
+
+In this investigation, we will examine the `Product` table, which contains **30,000 rows**, and discover how SQL Server organizes its pages and efficiently locates individual records.
+
+We will also connect physical storage with the concepts of **logical reads and query performance** introduced in Section 8.
+
+## 14.1 Examine the table's physical storage
+
+First, verify the number of rows:
+
+```sql
+SELECT COUNT(*) AS TotalRows
+FROM dbo.Product;
+```
+
+Our reference database contains:
+
+```text
+TotalRows
+---------
+30000
+```
+
+Now examine the pages associated with the table:
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Product', -1);
 GO
 ```
 
-Inspect two or three ordinary data pages using `DBCC PAGE`.
+The command returns many rows. Focus on the `PageType`, `IndexID`, and `IndexLevel` columns.
 
-Answer:
+On our reference database, we obtained:
 
-1. Approximately how many data pages are allocated to `Product`?
-2. Record the first three data page IDs from your results.
-3. How many rows are on one selected page?
-4. Compare the sizes of several records. Are they identical?
-5. Which variable-length columns might explain differences?
+| PageType | Number of pages | Purpose |
+|---|---:|---|
+| `1` | 159 | Data pages containing the actual product rows |
+| `2` | 1 | Index page used to navigate the clustered index |
+| `10` | 1 | IAM page tracking allocated storage |
+| **Total** | **161** | |
 
-### Estimate rows per page
+Unlike `Category`, the `Product` table requires many data pages.
 
-If the selected page contains rows averaging `R` bytes **including row-format overhead**, estimate:
+However, notice something interesting: **SQL Server also uses an index page**.
 
-`Rows per page ≈ floor(8096 / (R + 2))`
+Why is this necessary?
 
-The extra `2` accounts for one slot-array entry per row. Compare your estimate with the inspected page and explain why it may differ. Do not expect an exact match on partially filled pages.
+## 14.2 Understanding the clustered index structure
 
-Answer the five questions above and compute your own estimate before expanding the reference results below.
+The `Product` table has a clustered primary key on `ProductId`.
+
+As discussed in Section 11, a clustered index stores the actual table rows at its **leaf level**.
+
+When a clustered index becomes large enough, SQL Server introduces additional levels containing navigation information.
+
+Our `Product` clustered index has two levels:
+
+| IndexLevel | PageType | Pages | Purpose |
+|---|---|---:|---|
+| `1` | `2` | 1 | Root page containing navigation entries |
+| `0` | `1` | 159 | Leaf pages containing actual product rows |
+
+The root page helps SQL Server locate the appropriate leaf page without examining every data page.
+
+```mermaid
+flowchart TD
+    R["Root index page<br/>Page 121840<br/>IndexLevel = 1"]
+    R --> L1["Leaf page<br/>121832"]
+    R --> L2["Leaf page<br/>121848"]
+    R --> L3["Leaf page<br/>121849"]
+    R --> L4["..."]
+    R --> L5["159 leaf pages in total"]
+```
+
+The diagram is simplified. The root page contains navigation entries pointing to all 159 leaf pages.
+
+> [!NOTE]
+> The IAM page (page 120) tracks allocated storage but is not part of the clustered index's navigation hierarchy.
+
+We will explore the internal structure of clustered and nonclustered indexes in more detail in Lab 06.
+
+## 14.3 Inspecting the root page
+
+From `DBCC IND`, we identified the root page:
+
+| Property | Value |
+|---|---:|
+| PageFID | 1 |
+| PagePID | 121840 |
+| PageType | 2 |
+| IndexID | 1 |
+| IndexLevel | 1 |
+
+Let's inspect it:
+
+```sql
+DBCC PAGE('IndexLab', 1, 121840, 3)
+WITH TABLERESULTS;
+GO
+```
+
+The page header reports:
+
+```text
+m_slotCnt = 159
+```
+
+This means the root page contains **159 record slots**.
+
+In our example, these correspond to navigation entries pointing to the 159 leaf pages.
+
+The diagnostic output includes:
+
+| ProductId (key) | ChildPageId | Row size |
+|---|---:|---:|
+| NULL | 121832 | 11 B |
+| 201 | 121848 | 11 B |
+| 398 | 121849 | 11 B |
+| 595 | 121850 | 11 B |
+| 792 | 121851 | 11 B |
+| 989 | 121852 | 11 B |
+| 1182 | 121853 | 11 B |
+| 1374 | 121854 | 11 B |
+
+Each navigation entry contains a child-page reference and information used to determine which child page to follow.
+
+The first entry has a `NULL` key in this diagnostic output. It represents the leftmost branch of the index, not a product with a NULL `ProductId`.
+
+Notice that the navigation entries are small. In our example, each occupies **11 bytes**.
+
+This allows a single root page to contain references to many leaf pages.
+
+## 14.4 How SQL Server finds a specific product
+
+Consider the following query:
+
+```sql
+SELECT ProductId, ProductName
+FROM dbo.Product
+WHERE ProductId = 500;
+```
+
+SQL Server can use the clustered index to locate the row efficiently.
+
+Let's follow the navigation using the actual root-page entries.
+
+The relevant key boundaries are:
+
+| ProductId (key) | ChildPageId |
+|---|---:|
+| 398 | 121849 |
+| 595 | 121850 |
+
+Because:
+
+$$
+398 \leq 500 < 595
+$$
+
+SQL Server can follow the pointer associated with key `398`, leading to **leaf page 121849**.
+
+```mermaid
+flowchart TD
+    Q["Find ProductId = 500"]
+    R["Root page 121840"]
+    C{"Which key range?"}
+    L["Leaf page 121849"]
+    P["Locate ProductId = 500"]
+
+    Q --> R
+    R --> C
+    C -->|"398 ≤ 500 < 595"| L
+    L --> P
+```
+
+Instead of examining all 159 leaf pages, SQL Server can navigate directly to the relevant page.
+
+This is the basic idea behind a **B-tree index**, which we will study in Lab 06.
+
+### Verify the execution plan
+
+In SSMS, enable **Include Actual Execution Plan** (`Ctrl + M`) and execute the query again.
+
+On our reference database, SQL Server selected:
+
+**Clustered Index Seek – PK_Product**
+
+This confirms that SQL Server used the clustered index to locate the requested row.
+
+> [!NOTE]
+> The execution plan shows the access method, but it does not display the actual physical page IDs. We identified those separately using `DBCC PAGE`.
+
+## 14.5 Measuring the I/O cost
+
+We can now measure how many page accesses SQL Server performs when retrieving all products compared with retrieving a single product.
+
+Execute:
+
+```sql
+SET STATISTICS IO ON;
+
+-- Query A: Retrieve all products
+SELECT *
+FROM dbo.Product;
+
+-- Query B: Retrieve one product
+SELECT *
+FROM dbo.Product
+WHERE ProductId = 500;
+
+SET STATISTICS IO OFF;
+```
+
+Open the **Messages** tab in SSMS.
+
+Our reference database produced the following results:
+
+| Metric | Query A: All products | Query B: One product |
+|---|---:|---:|
+| Rows returned | 30,000 | 1 |
+| Scan count | 1 | 0 |
+| Logical reads | 161 | 2 |
+| Physical reads | 0 | 0 |
+| Read-ahead reads | 0 | 0 |
+
+*Only the relevant I/O metrics are shown.*
+
+### Query A – Reading all products
+
+SQL Server retrieves all 30,000 rows.
+
+The query performs **161 logical reads**.
+
+Although the table contains 159 data pages, logical reads count page accesses rather than distinct physical pages. Additional page accesses may occur during execution.
+
+### Query B – Finding one product
+
+SQL Server uses a `Clustered Index Seek`.
+
+The query performs only **2 logical reads**.
+
+This is consistent with the two-level clustered index structure:
+
+1. Access the root page to determine which leaf page contains the requested key.
+2. Access the leaf page to locate the row.
+
+Both queries report zero physical reads because the required pages were already available in the buffer pool.
+
+This confirms an important concept from Section 8: **a query can perform many logical reads even when no physical reads are required**.
+
+## 14.6 Comparing logical reads
+
+Let's compare the results:
+
+| Query | Logical reads |
+|---|---:|
+| Retrieve all products | 161 |
+| Retrieve one product | 2 |
+
+The reduction in logical reads is:
+
+$$
+\text{Reduction} = \frac{161 - 2}{161} \times 100
+$$
+
+$$
+\boxed{\text{Reduction} \approx 98.76\%}
+$$
+
+The targeted lookup performs approximately **80 times fewer logical reads**.
+
+However, these queries do not return the same amount of data. The first retrieves 30,000 rows, while the second retrieves only one.
+
+Therefore, this comparison demonstrates the difference between **reading an entire table and performing a targeted index lookup**. It does not isolate the performance benefit of adding an index.
+
+We will make more controlled comparisons in Lab 06.
+
+## 14.7 Why does this matter?
+
+The `Category` and `Product` examples illustrate how physical storage changes as a table grows.
+
+| Property | Category | Product |
+|---|---:|---:|
+| Rows | 100 | 30,000 |
+| Data pages | 1 | 159 |
+| Root index pages | 0 | 1 |
+| Clustered index levels | 1 | 2 |
+
+For a very small table, SQL Server can store all rows in one page.
+
+For a larger table, the clustered index may require additional levels to navigate efficiently between pages.
+
+As tables grow, the number of pages and the way SQL Server accesses them become increasingly important for query performance.
+
+This is why understanding physical storage is essential before studying indexes.
+
+## 14.8 Key takeaways
+
+- Larger tables generally require more data pages.
+- A clustered index stores actual table rows at its leaf level.
+- Additional index levels contain navigation information.
+- `DBCC IND` identifies index and data pages, while `DBCC PAGE` reveals their internal contents.
+- A `Clustered Index Seek` can locate a specific row without scanning every data page.
+- Logical reads measure page accesses, even when all required pages are cached.
+- Index structure and query access methods strongly influence I/O costs.
+
+**Check your understanding**
+
+1. Why does `Product` require more data pages than `Category`?
+2. What is the difference between the root and leaf levels of a clustered index?
+3. Why does the root page contain navigation entries instead of complete product rows?
+4. How can SQL Server locate `ProductId = 500` without scanning all 159 data pages?
+5. Why did the index seek require only two logical reads?
+6. Why does the 98.76% reduction not represent a controlled comparison of indexed and non-indexed queries?
 
 <details>
-<summary>Show reference results from one computer</summary>
+<summary>Show answers</summary>
 
-Measured on one SQL Server 2025 Express instance:
+1. **Product contains more rows.** Its 30,000 records require 159 data pages, while all 100 Category records fit into one page.
 
-1. **159** in-row data pages (plus one root page and one IAM page — 161 total allocated to the clustered index).
-2. The first three leaf data page IDs were `121832`, `121848`, `121849` (the page in between, `121840`, is the root — not a leaf — so it does not count).
-3. **200** rows on the sampled leaf page.
-4. No. Record sizes were **38–39 bytes** — not identical.
-5. `ProductName` (`varchar(100)`) is the only variable-length column; its stored length changes slightly as the generated names go from `Product 1` to `Product 30000`, which accounts for the 1-byte difference. `CategoryId` (`int`) and `ListPrice` (`decimal(10,2)`) are fixed-length and do not contribute to the difference.
+2. **The root level** contains navigation entries pointing to lower-level pages. **The leaf level** of a clustered index contains the actual table rows.
 
-The row-per-page formula predicts `floor(8096 / (38.5 + 2)) ≈ 202`, close to the observed 200. Your own page IDs will differ — page allocation is instance-specific.
+3. Navigation entries are much smaller than complete rows. This allows one root page to reference many leaf pages and makes searches more efficient.
+
+4. SQL Server uses the root page to identify the key range containing `ProductId = 500`, then follows the corresponding child-page pointer.
+
+5. The clustered index has two levels. In our measured execution, the seek required one logical read at the root level and one at the leaf level.
+
+6. The queries return different amounts of data: 30,000 rows versus one row. The comparison demonstrates different access patterns, not the isolated effect of adding an index.
 
 </details>
 

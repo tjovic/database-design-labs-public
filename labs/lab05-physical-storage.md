@@ -1007,6 +1007,7 @@ It also explains why choosing appropriate data types and avoiding unnecessarily 
 5. Larger rows generally mean fewer rows per page, potentially increasing the number of pages, logical reads, and physical I/O required by queries.
 
 </details>
+
 ---
 
 # 14. Guided investigation 2 – Product

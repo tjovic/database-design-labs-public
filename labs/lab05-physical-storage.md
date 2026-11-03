@@ -2459,7 +2459,9 @@ The reduction in logical reads is:
 
 ```math
 \mathrm{Reduction} = \frac{736 - 3}{736} \times 100
->
+```
+
+```math
 \boxed{\mathrm{Reduction} \approx 99.59\,\%}
 ```
 

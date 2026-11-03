@@ -801,11 +801,26 @@ Do not assume that slot order always matches the order of rows returned by a que
 
 **Check your understanding**
 
-1. What does `DBCC PAGE` show that a normal `SELECT` does not?
-2. What does `m_slotCnt = 100` mean?
-3. How much space does a slot array with 100 entries occupy?
-4. Why is `m_freeData` different from `m_freeCnt`?
-5. Why must we be careful when using `m_freeData - 96` to calculate record sizes?
+1. What is the purpose of `DBCC PAGE`?
+2. What does `m_slotCnt = 100` tell us?
+3. How many bytes does a slot array with 100 entries occupy?
+4. What is the difference between `m_freeCnt` and `m_freeData`?
+5. Why can two rows from the same table occupy different amounts of storage?
+
+<details>
+<summary>Show answers</summary>
+
+1. **DBCC PAGE** allows us to inspect the internal structure of a database page, including its header, stored records, and slot array.
+
+2. **`m_slotCnt = 100`** means that the page contains 100 record slots. In our example, these correspond to the 100 rows of the `Category` table.
+
+3. Each slot array entry occupies 2 bytes. Therefore, 100 entries require **200 bytes**.
+
+4. **`m_freeCnt`** indicates the amount of free space on the page, measured in bytes. **`m_freeData`** identifies the offset where the used record-data area ends. It is a position within the page, not a measure of free space.
+
+5. Rows may contain variable-length columns such as `varchar`. For example, `Category 1` requires fewer bytes than `Category 100`, so their physical records have different sizes.
+
+</details>
 
 
 ---

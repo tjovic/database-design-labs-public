@@ -578,45 +578,165 @@ In the following sections, we will examine what a data page contains and why the
 
 # 6. Inside a data page
 
-A regular SQL Server data page contains a **96-byte page header**, row data, free space, and a **slot array**.
+We have learned that SQL Server organizes database data into **8 KB pages (8,192 bytes)**.
+
+But what is actually stored inside a data page?
+
+A regular SQL Server data page contains four main components:
+
+- **Page header** – metadata describing the page.
+- **Records** – the actual stored rows, including internal record overhead.
+- **Free space** – space available for additional records.
+- **Slot array** – information used to locate individual records within the page.
+
+The following illustration shows the internal structure of a SQL Server data page.
 
 ![SQL Server data page structure](../images/lab05/sql-server-data-page.svg)
 
-- The **page header** contains metadata about the page.
-- The **rows** contain record data, including row-format overhead.
-- The **slot array** stores a 2-byte offset for each record, allowing SQL Server to locate rows within the page.
+## 6.1 Page header
 
-## 6.1 A simple row-count estimate
+Every regular SQL Server data page begins with a **96-byte header**.
 
-Start with the available bytes after the page header:
+The header contains information such as:
 
-`8192 - 96 = 8096 bytes`
+- The page identifier (file ID and page ID).
+- The page type.
+- The number of record slots.
+- Information about available space.
 
-Suppose each stored row, **including its row-format overhead**, occupies approximately **100 bytes**. The slot array needs another **2 bytes per row**.
+SQL Server uses this metadata to manage the page and locate its contents.
 
-`8096 / (100 + 2) ≈ 79 rows per page`
+Therefore, the full 8,192 bytes are not available exclusively for storing rows.
 
-For one million rows:
+After the header, the remaining space is:
 
-`1,000,000 / 79 ≈ 12,659 pages` (rounded up).
+$$
+8192 - 96 = 8096 \text{ bytes}
+$$
 
-This is **only an estimate**. Real page utilization also depends on row formats, variable-length columns, allocation, and partially filled pages.
+However, some of this space is also required for the slot array.
+
+## 6.2 Records and row overhead
+
+A data page stores multiple records, provided they fit into the available space.
+
+Each record contains the column values and additional internal information required by SQL Server.
+
+For example, a table might contain:
+
+```sql
+CategoryId INT,
+CategoryName VARCHAR(50)
+```
+
+The `int` value requires 4 bytes, while the `varchar` value uses space according to the actual stored text.
+
+However, the physical record is larger than the sum of these values because SQL Server also stores internal record metadata.
+
+This can include information about the record format, null bitmap, and variable-length columns.
 
 > [!NOTE]
-> Wider rows usually mean fewer rows per page. Some large values may also be stored outside the main in-row record.
+> The physical size of a record depends on its column definitions and stored values. Two rows in the same table may occupy different amounts of space.
+
+We will examine real record sizes in Section 13 using the `Category` table.
+
+## 6.3 The slot array
+
+At the end of a regular data page, SQL Server maintains a **slot array**.
+
+Each slot array entry occupies **2 bytes** and stores the offset of a record within the page.
+
+For example, if a page contains 100 records:
+
+$$
+100 \times 2 = 200 \text{ bytes}
+$$
+
+The slot array occupies 200 bytes.
+
+Why does SQL Server need a slot array?
+
+Records are not necessarily stored in the same physical order in which they are logically accessed. The slot array allows SQL Server to locate individual records using their offsets.
+
+If records are moved within the page, SQL Server can update their slot offsets.
+
+> [!IMPORTANT]
+> A slot number is not the same as a table's primary key. It identifies a record position within a particular page and should not be treated as a permanent logical row identifier.
+
+## 6.4 A simple row-count estimate
+
+Let's estimate how many rows can fit into one 8 KB page.
+
+Start with the available space after the page header:
+
+$$
+8192 - 96 = 8096 \text{ bytes}
+$$
+
+Suppose each stored record, **including its internal overhead**, occupies approximately 100 bytes.
+
+Each record also requires a 2-byte slot array entry.
+
+Therefore, the approximate space required per record is:
+
+$$
+100 + 2 = 102 \text{ bytes}
+$$
+
+The estimated number of records per page is:
+
+$$
+\left\lfloor \frac{8096}{102} \right\rfloor = 79
+$$
+
+This means approximately **79 records fit into one page**.
+
+Now imagine a table containing one million records.
+
+The estimated number of data pages is:
+
+$$
+\left\lceil \frac{1{,}000{,}000}{79} \right\rceil = 12{,}659
+$$
+
+Therefore, the table would require approximately **12,659 data pages**.
+
+This is only an estimate. Actual page utilization depends on factors such as record sizes, variable-length data, page splits, and partially filled pages.
+
+> [!NOTE]
+> This estimate assumes ordinary in-row records of approximately equal size and relatively full pages. Some large values may be stored outside the main data page.
+
+## 6.5 Why does this matter?
+
+The number of records that fit into a page directly influences the number of pages required to store a table.
+
+For the same number of records:
+
+- **Smaller records** generally mean more records per page and fewer data pages.
+- **Larger records** generally mean fewer records per page and more data pages.
+
+More pages can mean more work for queries that scan the table.
+
+In Section 7, we will examine this relationship and explain how page count affects query performance.
+
+Later, in Sections 12 and 13, we will inspect a real SQL Server data page and compare these estimates with actual storage measurements.
 
 ## Check your understanding
 
-1. How many SQL Server pages form an extent?
-2. Why is the full 8192-byte page not available exclusively for row data?
-3. Why might two rows in the same table have different physical sizes?
+1. How many bytes does a SQL Server data page contain?
+2. Why are all 8,192 bytes not available exclusively for record data?
+3. What is the purpose of the slot array?
+4. How many bytes does a slot array with 100 entries occupy?
+5. Why might two records from the same table have different physical sizes?
 
 <details>
 <summary>Show answers</summary>
 
-1. Eight pages, totaling 64 KB.
-2. Pages have a 96-byte header, slot-array entries, and record-format overhead.
-3. Variable-length values and storage features can change row size.
+1. **8,192 bytes (8 KB).**
+2. Because the page also contains a 96-byte header and a slot array. Individual records also contain internal overhead.
+3. The slot array stores offsets that allow SQL Server to locate records within the page.
+4. **200 bytes**, because each entry occupies 2 bytes.
+5. Because variable-length column values and other record-format characteristics can affect the physical size of each record.
 
 </details>
 
@@ -1545,7 +1665,7 @@ $$
 $$
 
 $$
-\text{Reduction} \approx 98.76\%
+\text{Reduction} \approx 98.76 \text{ % }
 $$
 
 The targeted lookup performs approximately **80 times fewer logical reads**.
@@ -1917,7 +2037,7 @@ $$
 $$
 
 $$
-\text{Reduction} \approx 99.59\%
+\text{Reduction} \approx 99.59 \text{ % }
 $$
 
 The targeted lookup performs approximately **245 times fewer logical reads**.

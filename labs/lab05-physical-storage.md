@@ -1348,52 +1348,386 @@ This is why understanding physical storage is essential before studying indexes.
 
 ---
 
-# 15. Guided investigation 3 – Customer
+# 15. Guided investigation – Customer: A three-level clustered index
+
+In Section 14, we examined the `Product` table with 30,000 rows and discovered that its clustered index has two levels: a root page and 159 leaf pages.
+
+But what happens when a table becomes even larger?
+
+In this investigation, we will examine the `Customer` table, which contains **100,000 rows**, and discover how SQL Server organizes a larger clustered index.
+
+We will also measure how many logical reads are required to retrieve all customers compared with locating a single customer.
+
+## 15.1 Examine the table's physical storage
+
+First, verify the number of rows:
+
+```sql
+SELECT COUNT(*) AS TotalRows
+FROM dbo.Customer;
+```
+
+Our reference database contains:
+
+```text
+TotalRows
+---------
+100000
+```
+
+Now examine the pages associated with the table:
 
 ```sql
 DBCC IND('IndexLab', 'dbo.Customer', -1);
 GO
 ```
 
-Using `DBCC IND` and `DBCC PAGE`, answer:
+Focus on the `PageType`, `IndexID`, and `IndexLevel` columns.
 
-1. Approximately how many data pages does `Customer` use?
-2. What are the first five data page IDs shown in your result?
-3. How many rows occupy one selected page?
-4. What sizes do the first few records have?
-5. Why might records in the same table occupy different amounts of space?
+On our reference database, we obtained:
 
-Compare your observations with `Category` and `Product`.
+| PageType | IndexLevel | Number of pages | Purpose |
+|---|---:|---:|---|
+| `1` | `0` | 732 | Leaf pages containing customer rows |
+| `2` | `1` | 2 | Intermediate index pages |
+| `2` | `2` | 1 | Root index page |
+| `10` | – | 1 | IAM page tracking allocated storage |
+| **Total** | | **736** | |
 
-Answer the five questions above before expanding the reference results below.
+Unlike `Product`, the `Customer` clustered index has **three levels**.
 
-<details>
-<summary>Show reference results from one computer</summary>
+The additional level allows SQL Server to navigate between a larger number of leaf pages.
 
-Measured on one SQL Server 2025 Express instance:
+## 15.2 Understanding the three-level structure
 
-1. **732** in-row data pages (plus a root page at index level 1 and an IAM page).
-2. The first five leaf data page IDs were `130192`, `130208`, `130209`, `130210`, `130211` (note the gap between the first and second — the root page sits in between in page-ID order, though not in the leaf chain).
-3. **138** rows on the first leaf page (`130192`); the table-wide average is `100,000 / 732 ≈ 137`, so this page was close to typical.
-4. Record sizes on that page ranged from **52 to 62 bytes**.
-5. `FirstName`, `LastName`, and `City` are all variable-length (`varchar`) columns, and the generated values have different lengths — e.g., `FirstName1` through `FirstName5000` vary in digit count, and city names like `Zagreb` and `Rijeka` differ in length.
+The `Customer` table has a clustered primary key on `CustomerId`.
 
-`Category` (1 page), `Product` (159 pages), and `Customer` (732 pages) confirm that the same row count would not necessarily need the same number of pages — row width and total row count both matter. Your own page IDs will differ — page allocation is instance-specific.
+Its clustered index contains:
 
-</details>
+- **Root level (2):** One page containing navigation entries.
+- **Intermediate level (1):** Two pages containing references to leaf pages.
+- **Leaf level (0):** 732 pages containing the actual customer rows.
 
-## Check your understanding
+```mermaid
+flowchart TD
+    R["Root page 130848<br/>Level 2 · 1 page"]
+    I1["Intermediate page 130200<br/>Level 1 · 269 entries"]
+    I2["Intermediate page 130849<br/>Level 1 · 463 entries"]
+    L1["269 leaf pages<br/>Level 0"]
+    L2["463 leaf pages<br/>Level 0"]
 
-1. Why can two tables with the same number of rows occupy different numbers of pages?
-2. Why can two records from the same table have different lengths?
-3. Why is a row-count estimate only approximate?
+    R --> I1
+    R --> I2
+    I1 --> L1
+    I2 --> L2
+```
+
+The root page directs SQL Server to the appropriate intermediate page. The intermediate page then directs the search to a specific leaf page.
+
+The IAM page (page 121) tracks allocated storage but does not participate in the index navigation hierarchy.
+
+> [!NOTE]
+> The number of index levels depends on factors such as the number of data pages, index key size, record size, and page utilization. A larger row count does not automatically imply an additional index level.
+
+## 15.3 Inspecting the root page
+
+From `DBCC IND`, we identified the root page:
+
+| Property | Value |
+|---|---:|
+| PageFID | 1 |
+| PagePID | 130848 |
+| PageType | 2 |
+| IndexID | 1 |
+| IndexLevel | 2 |
+
+Inspect the page:
+
+```sql
+DBCC PAGE('IndexLab', 1, 130848, 3)
+WITH TABLERESULTS;
+GO
+```
+
+The page header reports:
+
+```text
+m_slotCnt = 2
+```
+
+The root page contains only **two navigation entries**:
+
+| CustomerId (key) | ChildPageId | Row size |
+|---|---:|---:|
+| NULL | 130200 | 11 B |
+| 36803 | 130849 | 11 B |
+
+These entries divide the search into two branches:
+
+- `CustomerId < 36803` → Intermediate page `130200`
+- `CustomerId >= 36803` → Intermediate page `130849`
+
+The `NULL` value represents the leftmost branch of the index, not a customer with a NULL identifier.
+
+Notice that the root page contains only two small navigation records, yet it provides access to all 732 leaf pages through the intermediate level.
+
+## 15.4 Inspecting the intermediate pages
+
+Let's inspect both intermediate pages:
+
+```sql
+DBCC PAGE('IndexLab', 1, 130200, 3)
+WITH TABLERESULTS;
+GO
+
+DBCC PAGE('IndexLab', 1, 130849, 3)
+WITH TABLERESULTS;
+GO
+```
+
+The page headers report:
+
+| Intermediate page | IndexLevel | m_slotCnt |
+|---|---:|---:|
+| 130200 | 1 | 269 |
+| 130849 | 1 | 463 |
+| **Total** | | **732** |
+
+Each navigation entry points to a child page at the leaf level.
+
+Therefore:
+
+$$
+269 + 463 = 732
+$$
+
+This matches the number of leaf pages returned by `DBCC IND`.
+
+The two intermediate pages do not contain the same number of navigation entries. SQL Server does not necessarily distribute child pages evenly between intermediate pages.
+
+The distribution can depend on index construction, subsequent insertions, and page splits.
+
+## 15.5 How SQL Server finds a specific customer
+
+Consider the following query:
+
+```sql
+SELECT CustomerId, CustomerName
+FROM dbo.Customer
+WHERE CustomerId = 50000;
+```
+
+We can follow the search through all three levels using the actual page contents.
+
+**Step 1 – Root page**
+
+The root page contains the following boundary:
+
+```text
+CustomerId = 36803 → ChildPageId = 130849
+```
+
+Because:
+
+$$
+50000 \geq 36803
+$$
+
+SQL Server follows the pointer to intermediate page `130849`.
+
+**Step 2 – Intermediate page**
+
+On page `130849`, we found these navigation entries:
+
+| CustomerId (key) | ChildPageId |
+|---|---:|
+| 49934 | 130572 |
+| 50072 | 130573 |
+
+Because:
+
+$$
+49934 \leq 50000 < 50072
+$$
+
+SQL Server follows the pointer to leaf page `130572`.
+
+**Step 3 – Leaf page**
+
+The leaf page contains the actual customer records.
+
+SQL Server locates the row with `CustomerId = 50000`.
+
+The complete navigation path is:
+
+```mermaid
+flowchart TD
+    Q["Find CustomerId = 50000"]
+    R["Root page 130848<br/>Level 2"]
+    I["Intermediate page 130849<br/>Level 1"]
+    L["Leaf page 130572<br/>Level 0"]
+    C["Locate CustomerId = 50000"]
+
+    Q --> R
+    R -->|"50000 ≥ 36803"| I
+    I -->|"49934 ≤ 50000 < 50072"| L
+    L --> C
+```
+
+Instead of scanning all 732 leaf pages, SQL Server can navigate directly to the appropriate page.
+
+This is the fundamental advantage of a hierarchical index structure.
+
+## 15.6 Measuring the I/O cost
+
+Let's compare retrieving all customers with retrieving a single customer.
+
+Execute:
+
+```sql
+SET STATISTICS IO ON;
+
+-- Query A: Retrieve all customers
+SELECT *
+FROM dbo.Customer;
+
+-- Query B: Retrieve one customer
+SELECT *
+FROM dbo.Customer
+WHERE CustomerId = 50000;
+
+SET STATISTICS IO OFF;
+```
+
+Our reference database produced:
+
+| Metric | Query A: All customers | Query B: One customer |
+|---|---:|---:|
+| Rows returned | 100,000 | 1 |
+| Scan count | 1 | 0 |
+| Logical reads | 736 | 3 |
+| Physical reads | 0 | 0 |
+| Read-ahead reads | 0 | 0 |
+
+*Only the relevant I/O metrics are shown.*
+
+### Query A – Reading all customers
+
+SQL Server retrieves all 100,000 rows.
+
+The query performs **736 logical reads**.
+
+Although the clustered index contains 732 leaf pages, the logical-read count includes page accesses performed during execution, not just the number of distinct leaf pages.
+
+### Query B – Finding one customer
+
+SQL Server uses the clustered index to locate a specific customer.
+
+The query performs only **3 logical reads**.
+
+This is consistent with the three-level index structure:
+
+1. Access the root page.
+2. Access the intermediate page.
+3. Access the leaf page containing the requested row.
+
+Both queries report zero physical reads because the required pages were already cached in the buffer pool.
+
+> [!IMPORTANT]
+> The three logical reads observed in this example correspond to the three index levels. However, logical-read counts are not universally equal to index depth. More complex queries may access additional pages.
+
+## 15.7 Comparing logical reads
+
+Let's compare the results:
+
+| Query | Logical reads |
+|---|---:|
+| Retrieve all customers | 736 |
+| Retrieve one customer | 3 |
+
+The reduction in logical reads is:
+
+$$
+\text{Reduction} = \frac{736 - 3}{736} \times 100
+$$
+
+$$
+\boxed{\text{Reduction} \approx 99.59\%}
+$$
+
+The targeted lookup performs approximately **245 times fewer logical reads**.
+
+However, these queries return different amounts of data: 100,000 rows versus one row.
+
+Therefore, the comparison demonstrates the difference between a full-table retrieval and a targeted index lookup. It does not isolate the performance benefit of adding an index.
+
+We will perform more controlled index experiments in Lab 06.
+
+## 15.8 Comparing Category, Product, and Customer
+
+We have now examined three tables of different sizes.
+
+| Property | Category | Product | Customer |
+|---|---:|---:|---:|
+| Rows | 100 | 30,000 | 100,000 |
+| Leaf/data pages | 1 | 159 | 732 |
+| Intermediate pages | 0 | 0 | 2 |
+| Root index pages | 0 | 1 | 1 |
+| Clustered index levels | 1 | 2 | 3 |
+| IAM pages | 1 | 1 | 1 |
+
+Notice how the clustered index structure changes as the number of data pages increases.
+
+- `Category` fits into a single leaf page.
+- `Product` uses a root page and 159 leaf pages.
+- `Customer` introduces an intermediate level between the root and 732 leaf pages.
+
+The important lesson is that **SQL Server can locate a specific row by navigating through a small number of index levels**, even when the table contains many thousands of records.
+
+For our measured queries:
+
+| Table | Full retrieval logical reads | Single-row seek logical reads |
+|---|---:|---:|
+| Product | 161 | 2 |
+| Customer | 736 | 3 |
+
+Although `Customer` contains more than three times as many rows as `Product`, locating a single row required only one additional logical read in our examples.
+
+This illustrates why hierarchical indexes are so effective for targeted lookups.
+
+## 15.9 Key takeaways
+
+- A clustered index may contain multiple levels.
+- The root and intermediate levels store navigation entries.
+- The leaf level contains the actual table rows.
+- Each additional index level introduces another navigation step.
+- A targeted index seek can locate a row without scanning all leaf pages.
+- Logical reads depend on the access method and execution plan.
+- Understanding physical page organization helps explain why indexes improve query performance.
+
+**Check your understanding**
+
+1. Why does the `Customer` clustered index have three levels?
+2. What is the purpose of an intermediate index page?
+3. How many leaf pages are referenced by intermediate pages `130200` and `130849`?
+4. Which pages does SQL Server navigate through when searching for `CustomerId = 50000`?
+5. Why did the targeted lookup require only three logical reads?
+6. Why is comparing 736 and 3 logical reads not a controlled experiment measuring the benefit of adding an index?
 
 <details>
 <summary>Show answers</summary>
 
-1. Row width, overhead, free space, and allocation patterns differ.
-2. Variable-length columns can store values of different lengths.
-3. Pages contain headers, slot arrays, row overhead, and sometimes free space; not all pages are equally full.
+1. **Because its index structure requires an additional navigation level.** The 732 leaf pages are organized beneath two intermediate pages and one root page. Index depth depends on storage structure and page utilization, not only row count.
+
+2. **An intermediate page** contains navigation entries that direct SQL Server from the root level toward the appropriate leaf page.
+
+3. Page `130200` references **269 leaf pages**, while page `130849` references **463 leaf pages**, for a total of 732.
+
+4. SQL Server navigates through **root page 130848 → intermediate page 130849 → leaf page 130572**.
+
+5. The index has three levels. In this execution, SQL Server accessed one page at each level.
+
+6. The queries return different amounts of data: 100,000 rows versus one row. The comparison demonstrates different access patterns rather than isolating the effect of adding an index.
 
 </details>
 

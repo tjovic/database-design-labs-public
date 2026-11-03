@@ -1255,26 +1255,48 @@ In the following sections, we will use `DBCC IND` to identify these page types i
 
 # 10. Inspecting physical pages
 
-Now we will inspect the actual pages behind the `Category`, `Product`, and `Customer` tables.
+So far, we have learned how SQL Server organizes data into pages and how different page types serve different purposes.
 
-The purpose is **not to memorize diagnostic syntax**. We want to answer two questions:
+But can we actually examine these pages?
 
-- Which pages are allocated to a table?
-- What is inside one of those pages?
+SQL Server provides diagnostic commands that allow us to inspect its internal storage structures.
+
+In this lab, we will use two commands:
+
+| Command | Purpose |
+|---|---|
+| `DBCC IND` | Lists the pages associated with a table and its indexes. |
+| `DBCC PAGE` | Displays the internal contents of a specific database page. |
+
+**DBCC** stands for *Database Console Commands*. SQL Server provides DBCC commands for diagnostics, maintenance, and consistency checks.
 
 > [!WARNING]
-> `DBCC IND` and `DBCC PAGE` are **undocumented diagnostic commands**. Use them only in this teaching database. Their output and behavior are not a stable interface for application code or production monitoring.
+> `DBCC IND` and `DBCC PAGE` are undocumented diagnostic commands. They are useful for learning and troubleshooting but should not be relied upon as stable, supported interfaces in production applications.
 
-To print the diagnostic output to the SSMS session, run:
+## Preparing the session
+
+Before inspecting pages, enable diagnostic output for the current session:
 
 ```sql
 USE IndexLab;
 GO
+
 DBCC TRACEON(3604);
 GO
 ```
 
-This enables the trace flag for the **current session**. Run it again if you open a new query window.
+Trace flag `3604` directs diagnostic output to the client session rather than the SQL Server error log.
+
+Because we have not specified the `-1` global option, this setting applies only to the current session.
+
+> [!NOTE]
+> The page identifiers and diagnostic output shown in the following sections may differ on your computer. SQL Server determines how pages are allocated, so always use the page identifiers returned by your own database.
+
+We are now ready to examine the physical pages belonging to our tables.
+
+In **Section 11**, we will use `DBCC IND` to locate pages.
+
+In **Section 12**, we will use `DBCC PAGE` to inspect their contents.
 
 ---
 

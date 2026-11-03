@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="205" viewBox="0 0 1100 205" role="img" aria-label="SQL Server 8192-byte data page: 96-byte header, 2592-byte records, 5304-byte free space, 200-byte slot array">
+<rect width="1100" height="205" fill="#ffffff"/>
+<text x="30" y="30" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#172554">Category data page (8,192 bytes)</text>
+<g transform="translate(30,62)">
+<rect x="0" y="0" width="12" height="65" fill="#64748b"/>
+<rect x="12" y="0" width="324" height="65" fill="#2563eb"/>
+<rect x="336" y="0" width="663" height="65" fill="#dcfce7"/>
+<rect x="999" y="0" width="25" height="65" fill="#d97706"/>
+<rect x="0" y="0" width="1024" height="65" fill="none" stroke="#334155" stroke-width="1"/>
+<text x="174" y="29" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#fff" font-weight="bold">100 records</text>
+<text x="174" y="51" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" fill="#fff">2,592 B (31.6%)</text>
+<text x="668" y="29" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#166534" font-weight="bold">Free space</text>
+<text x="668" y="51" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" fill="#166534">5,304 B (64.7%)</text>
+<path d="M6 0 V-12 H95" stroke="#64748b" stroke-width="1.5" fill="none"/>
+<text x="100" y="-10" font-family="Arial,sans-serif" font-size="13" fill="#334155">Header: 96 B (1.2%)</text>
+<path d="M1011 65 V88 H770" stroke="#d97706" stroke-width="1.5" fill="none"/>
+<text x="765" y="93" text-anchor="end" font-family="Arial,sans-serif" font-size="14" fill="#92400e">Slot array: 200 B (2.4%)</text>
+</g>
+<text x="30" y="188" font-family="Arial,sans-serif" font-size="14" fill="#475569">Widths are proportional to the measured byte counts; narrow regions are labeled with callouts.</text>
+</svg>

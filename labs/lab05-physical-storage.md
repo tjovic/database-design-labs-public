@@ -1652,7 +1652,7 @@ $$
 $$
 
 $$
-\boxed{\text{Reduction} \approx 99.59\%}
+\text{Reduction} \approx 99.59\%
 $$
 
 The targeted lookup performs approximately **245 times fewer logical reads**.

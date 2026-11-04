@@ -90,12 +90,10 @@ Both problems need the same fundamental thing: a way to send **more than a scala
 
 The simplest idea: build the SQL string in your application code.
 
-```csharp
-// C# pseudo-code — DO NOT DO THIS
-string sql = "DELETE FROM Customer WHERE IDCustomer = " + id1
-           + " OR IDCustomer = " + id2
-           + " OR IDCustomer = " + id3;
-cmd.ExecuteNonQuery(sql);
+```python
+# Python pseudo-code — DO NOT DO THIS
+sql = f"DELETE FROM Customer WHERE IDCustomer = {id1} OR IDCustomer = {id2} OR IDCustomer = {id3}"
+cursor.execute(sql)
 ```
 
 Easy. Direct. Every programmer knows how to concatenate strings.
@@ -163,10 +161,9 @@ With a stored procedure and parameters, the server name and parameter values tra
 
 Using **parameterised queries** in the client solves injection and plan-cache problems:
 
-```csharp
-// C# with parameterised query — safe, but incomplete
-cmd.Parameters.Add("@id", id);
-cmd.ExecuteNonQuery("DELETE FROM Customer WHERE IDCustomer = @id");
+```python
+# Python with parameterised query — safe, but incomplete
+cursor.execute("DELETE FROM Customer WHERE IDCustomer = ?", (id,))
 ```
 
 But parameterised queries do **not** solve "many rows in one call". If you have 30 IDs to delete, you still send 30 separate `EXEC` calls. The network makes thirty round-trips instead of one.

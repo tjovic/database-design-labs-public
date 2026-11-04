@@ -1,0 +1,7 @@
+# Python virtual environments and caches (used by demos/*)
+.venv/
+__pycache__/
+*.pyc
+
+# Local environment configuration — copy .env.example to .env instead
+.env

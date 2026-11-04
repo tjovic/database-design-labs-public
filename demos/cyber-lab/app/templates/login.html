@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+    <div class="col-lg-6">
+
+        <div class="card shadow">
+
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">SQL Injection Demo</h4>
+            </div>
+
+            <div class="card-body">
+
+                <form method="post">
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Username
+                        </label>
+
+                        <input
+                            type="text"
+                            class="form-control"
+                            name="username"
+                            placeholder="Enter username"
+                            required>
+
+                    </div>
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+                            Password
+                        </label>
+
+                        <input
+                            type="password"
+                            class="form-control"
+                            name="password"
+                            placeholder="Enter password"
+                            required>
+
+                    </div>
+
+                    <div class="d-grid gap-2">
+
+                        <button
+                            type="submit"
+                            class="btn btn-danger"
+                            formaction="/login/vulnerable"
+                            formmethod="post">
+
+                            🔴 Login (Vulnerable)
+
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-success"
+                            formaction="/login/secure"
+                            formmethod="post">
+
+                            🟢 Login (Secure)
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+                <hr>
+
+                <p class="mb-2 text-muted small">
+                    Payload examples (click to fill the fields):
+                </p>
+
+                <div class="d-flex flex-wrap gap-2">
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary payload-btn"
+                        data-username="' OR 1=1 --"
+                        data-password="x">
+                        ' OR 1=1 --
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary payload-btn"
+                        data-username="admin' --"
+                        data-password="x">
+                        admin' --
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary payload-btn"
+                        data-username="' OR Username='admin' --"
+                        data-password="x">
+                        ' OR Username='admin' --
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger payload-btn"
+                        data-username="' UNION SELECT Id, CardNumber, CVV, Owner, ExpiryDate FROM CreditCards --"
+                        data-password="x">
+                        UNION → CreditCards (exfiltration)
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary payload-btn"
+                        data-username="admin"
+                        data-password="12345">
+                        admin / 12345 (valid)
+                    </button>
+
+                </div>
+
+                <script>
+                    document.querySelectorAll('.payload-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            document.querySelector('input[name=username]').value = btn.dataset.username;
+                            document.querySelector('input[name=password]').value = btn.dataset.password;
+                        });
+                    });
+                </script>
+
+            </div>
+
+        </div>
+
+        {% if result %}
+
+        <div class="card mt-4">
+
+            <div class="card-header">
+                Result
+            </div>
+
+            <div class="card-body">
+
+                {% if result.success %}
+
+                <div class="alert alert-success mb-0">
+
+                    <h5>✔ Login successful</h5>
+
+                    <hr>
+
+                    The query returned <strong>{{ result.rows|length }}</strong> row(s):
+
+                    <table class="table table-sm table-striped mt-2 mb-0">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>Username</th>
+                                <th>FullName</th>
+                                <th>Department</th>
+                                {% if mode == "Vulnerable" %}
+                                <th class="text-danger">Password (leaked!)</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in result.rows %}
+                            <tr>
+                                <td>{{ row.id }}</td>
+                                <td>{{ row.username }}</td>
+                                <td>{{ row.full_name }}</td>
+                                <td>{{ row.department }}</td>
+                                {% if mode == "Vulnerable" %}
+                                <td class="text-danger"><code>{{ row.password }}</code></td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+
+                </div>
+
+                {% else %}
+
+                <div class="alert alert-danger mb-0">
+
+                    <h5>✖ Login failed</h5>
+
+                    <hr>
+
+                    {{ result.message }}
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+        {% if mode %}
+
+        <div class="card mt-3">
+
+            <div class="card-header">
+                Mode
+            </div>
+
+            <div class="card-body">
+
+                {% if mode == "Secure" %}
+
+                <span class="badge bg-success fs-6">
+                    {{ mode }}
+                </span>
+
+                {% else %}
+
+                <span class="badge bg-danger fs-6">
+                    {{ mode }}
+                </span>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+        {% if query %}
+
+        <div class="card mt-3">
+
+            <div class="card-header">
+                SQL being executed
+            </div>
+
+            <div class="card-body">
+
+<pre class="mb-0">{{ query }}</pre>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+        {% if parameters %}
+
+        <div class="card mt-3">
+
+            <div class="card-header">
+                Parameters
+            </div>
+
+            <div class="card-body">
+
+                <table class="table table-bordered table-sm mb-0">
+
+                    <tr>
+                        <th style="width:150px;">Username</th>
+                        <td>{{ parameters.username }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Password</th>
+                        <td>{{ parameters.password }}</td>
+                    </tr>
+
+                </table>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+        <div class="card mt-3 border-info">
+
+            <div class="card-header bg-info text-white">
+                Explanation
+            </div>
+
+            <div class="card-body">
+
+                <p class="mb-2">
+                    <strong>🟢 Secure</strong> uses a parameterized SQL query.
+                    User input is sent as a parameter and never becomes part of the SQL statement.
+                </p>
+
+                <p class="mb-0">
+                    <strong>🔴 Vulnerable</strong> demonstrates, for educational purposes, an approach where user input is embedded into the SQL text. This is why parameterized queries are the recommended approach.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -192,6 +192,9 @@ But parameterised queries do **not** solve "many rows in one call". If you have 
 > [!TIP]
 > The remaining methods in this lab all live **inside the procedure**, not in the client. That is how they solve the "many rows in one call" problem.
 
+> [!TIP]
+> Want to see this attack land against a real, running application? [`demos/cyber-lab/`](../demos/cyber-lab/) is a small FastAPI login form with a vulnerable and a secure endpoint side by side, plus the exact payloads from this section as one-click buttons. Entirely optional — not required for this lab.
+
 ---
 
 # Section 3 – Method 2: Delimited String Parameters
@@ -952,6 +955,9 @@ Key points:
 | **Cons** | Less strictly typed than TVPs — all parsing happens at runtime. No pre-compiled plan for the shape. Requires SQL Server 2016+. |
 
 JSON is the natural choice when the caller is a web service (React frontend, FastAPI backend, mobile app, etc.) and JSON is already the wire format. If both client and server are .NET or T-SQL, TVP is usually faster and safer.
+
+> [!TIP]
+> Want to see this pattern end to end — a real HTTP `POST` landing on `OPENJSON` and an atomic insert? [`demos/obp-rest-demo/`](../demos/obp-rest-demo/) is a small FastAPI invoicing API that does exactly this. Entirely optional — not required for this lab.
 
 ---
 

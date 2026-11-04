@@ -55,19 +55,15 @@ Every real-world system encounters two shapes of the same problem.
 
 An invoice has a header and many line items. You want one procedure call that inserts both the header and all lines together.
 
-```text
-One call
-
-    ↓
-
-Invoice header (1 row)
-    +
-Line items (20 rows)
-
-    ↓
-
-All in one transaction,
-or roll back everything.
+```mermaid
+flowchart TD
+    A["One EXEC call"] --> B["Invoice Header<br/>(1 row)"]
+    A --> C["Line Items<br/>(20 rows)"]
+    B --> D["BEGIN TRANSACTION"]
+    C --> D
+    D --> E["COMMIT or<br/>ROLLBACK together"]
+    style A fill:#e1f5ff
+    style E fill:#c8e6c9
 ```
 
 Without such a mechanism, you'd need twenty-one `EXEC` calls — one for the header, twenty for the lines — or worse, you'd loop in application code.
@@ -76,18 +72,12 @@ Without such a mechanism, you'd need twenty-one `EXEC` calls — one for the hea
 
 A user selects 30 rows in a grid and clicks "Delete". You want one procedure call that deletes all 30 by their IDs.
 
-```text
-One call
-
-    ↓
-
-30 customer IDs
-(or product IDs, invoice IDs, …)
-
-    ↓
-
-Delete all matching rows
-in a single statement.
+```mermaid
+flowchart LR
+    A["30 Customer IDs<br/>from grid selection"] --> B["One EXEC call"]
+    B --> C["DELETE all matching rows<br/>in one statement"]
+    style A fill:#fff3e0
+    style C fill:#ffccbc
 ```
 
 Both problems need the same fundamental thing: a way to send **more than a scalar value** to a procedure in a single call.
@@ -115,6 +105,19 @@ Easy. Direct. Every programmer knows how to concatenate strings.
 This is the single worst pattern in database programming. Not for prototypes. Not for internal tools. Not for anything.
 
 ## Three Concrete Problems
+
+```mermaid
+graph TD
+    A["String concatenation<br/>in client code"] --> B["Problem 1:<br/>SQL Injection"]
+    A --> C["Problem 2:<br/>No plan reuse"]
+    A --> D["Problem 3:<br/>Network traffic"]
+    B --> E["Attacker input<br/>becomes SQL code"]
+    C --> F["Every unique string<br/>= new compiled plan"]
+    D --> G["Entire SQL travels<br/>every round-trip"]
+    style B fill:#ffccbc
+    style C fill:#ffccbc
+    style D fill:#ffccbc
+```
 
 ### 1. SQL Injection
 
@@ -533,6 +536,18 @@ This is Problem 2 (batch key operation) solved.
 
 This is the showcase example. An invoice header and many line items, all in one call.
 
+```mermaid
+flowchart LR
+    A["Application<br/>Invoice + Lines"] --> B["DECLARE TVPs<br/>Fill with data"]
+    B --> C["EXEC dbo.usp_InvoiceInsert<br/>@Header, @Lines"]
+    C --> D["BEGIN TRANSACTION"]
+    D --> E["INSERT Header<br/>SCOPE_IDENTITY"]
+    E --> F["INSERT Lines<br/>linked to header"]
+    F --> G["COMMIT<br/>all or nothing"]
+    style A fill:#e1f5ff
+    style G fill:#c8e6c9
+```
+
 First, define two types:
 
 ```sql
@@ -652,6 +667,16 @@ This bridges the gap between the JSON world (outside the database) and the SQL w
 ## Reading JSON: OPENJSON WITH
 
 The function `OPENJSON(@json, path)` takes JSON and shreds it into rows. The `WITH (...)` clause declares what columns you want and where to find them.
+
+```mermaid
+flowchart TD
+    A["JSON Array<br/>from REST API"] --> B["OPENJSON<br/>parse it"]
+    B --> C["WITH clause<br/>define columns"]
+    C --> D["Typed rows<br/>FirstName, LastName, Email"]
+    D --> E["Use like any<br/>normal SELECT result"]
+    style A fill:#fff3e0
+    style E fill:#c8e6c9
+```
 
 ```sql
 DECLARE @Customers nvarchar(max) = N'
@@ -800,6 +825,16 @@ This shreds the nested array into individual rows, one per line item.
 
 JSON works both ways. Use `FOR JSON PATH` with dotted column aliases to build nested JSON from a `SELECT`:
 
+```mermaid
+flowchart LR
+    A["SELECT<br/>from SQL tables"] --> B["FOR JSON PATH<br/>with dotted aliases"]
+    B --> C["[Invoice.IDCustomer]<br/>[Invoice.FirstName]"]
+    C --> D["Build JSON<br/>with nesting"]
+    D --> E["Send to<br/>REST API client"]
+    style A fill:#e1f5ff
+    style E fill:#fff3e0
+```
+
 ```sql
 SELECT
     c.IDCustomer       AS [Invoice.IDCustomer],
@@ -872,6 +907,22 @@ Here is the complete picture — all five methods, one table:
 **Default choice**: Table-Valued Parameters. Type-safe, best plan quality, fastest execution, standard in all modern client libraries.
 
 **Web API situation**: JSON. The client already sends it as JSON. Accept it as JSON. No translation layer.
+
+## Methods at a Glance
+
+```mermaid
+graph TD
+    A["Batch of<br/>Customer IDs"] -->|"Delimited"| B["'1,2,3,4'<br/>STRING_SPLIT"]
+    C["Invoice<br/>Header + Lines"] -->|"Structured"| D["TVP<br/>CREATE TYPE"]
+    E["Invoice<br/>Header + Lines"] -->|"From Web"| F["JSON<br/>OPENJSON"]
+    G["Structured<br/>Legacy System"] -->|"Interop"| H["XML<br/>.nodes()"]
+    I["String Concat<br/>from Client"] -->|"NEVER!"| J["❌<br/>SQL Injection"]
+    style B fill:#fffde7
+    style D fill:#c8e6c9
+    style F fill:#b3e5fc
+    style H fill:#f0f4c3
+    style J fill:#ffccbc
+```
 
 ## Decision Flowchart
 

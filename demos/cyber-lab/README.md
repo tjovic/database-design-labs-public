@@ -3,11 +3,15 @@
 An educational FastAPI application that uses a single login form to show
 the difference between a **vulnerable** (concatenated SQL) and a **secure**
 (parameterized SQL) approach, and demonstrates classic SQL injection
-attacks against a live SQL Server database.
+attacks against a live SQL Server database. Pairs with
+[Lab 8, Section 2 — Client-Side Query Building](../../labs/lab08-complex-parameters.md).
 
 > This application is intended for local learning only. The vulnerable
 > endpoint really does execute user input as SQL — **do not expose it to
 > a public network**.
+
+This page covers setup. For a guided, click-by-click classroom script
+(with diagrams for each payload), see [lab.md](lab.md).
 
 ---
 
@@ -226,7 +230,8 @@ cyber-lab/
 │   ├── init.sql               # CREATE DATABASE + CREATE TABLE
 │   └── seed.sql               # INSERT test data
 ├── requirements.txt
-└── README.md
+├── README.md                  # this file — setup
+└── lab.md                     # guided classroom walkthrough
 ```
 
 ---

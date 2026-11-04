@@ -519,6 +519,113 @@ DROP PROCEDURE dbo.usp_InsertCustomerFromXml;
 >
 > The `SELECT ... WHERE IDCustomer = @NewCustomerID` at the end is the same "insert, then show what you just inserted" pattern from the TVP invoice example in Section 5 — it works identically here because it has nothing to do with XML; it's just `SCOPE_IDENTITY()` plus a follow-up query.
 
+## Find-or-Create: Resolving a Chain of Foreign Keys
+
+The customer example above always inserts. But some data arrives already partially in the database — a customer's state and city might already exist, or might not. Inserting unconditionally would create duplicates.
+
+Consider this XML, with every field as an attribute on one element:
+
+```xml
+<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />
+```
+
+`Customer` references a `City`, which references a `State` — a chain of two foreign keys. Before inserting anything, the procedure must check, at **each level**, whether that row already exists:
+
+```mermaid
+flowchart TD
+    A["Read State name from XML"] --> B{"State exists?"}
+    B -->|Yes| C["Use its IDState"]
+    B -->|No| D["INSERT State,<br/>capture new IDState"]
+    C --> E{"City exists<br/>in that State?"}
+    D --> E
+    E -->|Yes| F["Use its IDCity"]
+    E -->|No| G["INSERT City,<br/>capture new IDCity"]
+    F --> H{"Customer exists<br/>by name?"}
+    G --> H
+    H -->|Yes| I["Use existing row"]
+    H -->|No| J["INSERT Customer,<br/>linked to IDCity"]
+```
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
+    @Customer xml
+AS
+BEGIN
+    DECLARE @FirstName nvarchar(50) = @Customer.value('(/Customer/@FirstName)[1]', 'nvarchar(50)');
+    DECLARE @LastName  nvarchar(50) = @Customer.value('(/Customer/@LastName)[1]',  'nvarchar(50)');
+    DECLARE @CityName  nvarchar(50) = @Customer.value('(/Customer/@City)[1]',      'nvarchar(50)');
+    DECLARE @StateName nvarchar(50) = @Customer.value('(/Customer/@State)[1]',     'nvarchar(50)');
+
+    DECLARE @StateID    int;
+    DECLARE @CityID     int;
+    DECLARE @CustomerID int;
+
+    -- Find or create the state
+    SELECT @StateID = IDState FROM State WHERE Name = @StateName;
+    IF @StateID IS NULL
+    BEGIN
+        INSERT INTO State (Name) VALUES (@StateName);
+        SET @StateID = SCOPE_IDENTITY();
+    END
+
+    -- Find or create the city, scoped to that state
+    SELECT @CityID = IDCity FROM City WHERE Name = @CityName AND StateID = @StateID;
+    IF @CityID IS NULL
+    BEGIN
+        INSERT INTO City (Name, StateID) VALUES (@CityName, @StateID);
+        SET @CityID = SCOPE_IDENTITY();
+    END
+
+    -- Find or create the customer
+    SELECT @CustomerID = IDCustomer FROM Customer WHERE FirstName = @FirstName AND LastName = @LastName;
+    IF @CustomerID IS NULL
+    BEGIN
+        INSERT INTO Customer (FirstName, LastName, CityID) VALUES (@FirstName, @LastName, @CityID);
+        SET @CustomerID = SCOPE_IDENTITY();
+    END
+
+    SELECT c.IDCustomer, c.FirstName, c.LastName, ci.Name AS CityName, s.Name AS StateName
+    FROM Customer c
+    JOIN City ci ON ci.IDCity = c.CityID
+    JOIN State s ON s.IDState = ci.StateID
+    WHERE c.IDCustomer = @CustomerID;
+END
+GO
+```
+
+Call it twice with the **same** input:
+
+```sql
+-- Run 1: Spain, Madrid, and Luka Modric do not exist yet — all three get inserted
+EXEC dbo.usp_InsertCustomerWithLocation
+    @Customer = N'<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />';
+
+-- Run 2: the exact same call again — nothing new is inserted
+EXEC dbo.usp_InsertCustomerWithLocation
+    @Customer = N'<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />';
+
+-- Confirm there is still only one of each
+SELECT COUNT(*) FROM State    WHERE Name = 'Spain';
+SELECT COUNT(*) FROM City     WHERE Name = 'Madrid';
+SELECT COUNT(*) FROM Customer WHERE FirstName = 'Luka' AND LastName = 'Modric';
+```
+
+Both runs return the same `IDCustomer`. Both counts stay at exactly `1`, no matter how many times the procedure is called with the same input.
+
+```sql
+-- Cleanup
+DELETE FROM Customer WHERE FirstName = 'Luka' AND LastName = 'Modric';
+DELETE FROM City WHERE Name = 'Madrid';
+DELETE FROM State WHERE Name = 'Spain';
+DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
+```
+
+> [!NOTE]
+> The city lookup checks `Name = @CityName AND StateID = @StateID`, not `Name` alone. Two different states can each have a city with the same name — checking the name in isolation could match the wrong one, or skip creating a city that's genuinely new in this state.
+
+> [!IMPORTANT]
+> This "check, then insert only if missing" pattern is not specific to XML — the same `IF ... IS NULL BEGIN INSERT ... END` logic works identically whether the input arrived as XML attributes, a TVP row, or JSON properties. What XML (or JSON, or a TVP) buys you here is simply a single parameter that carries all four related values together, instead of four separate scalar parameters.
+
 ## Building XML: FOR XML PATH
 
 XML works both ways. If a client sends XML in, sometimes we send XML back.
@@ -1513,6 +1620,69 @@ DROP PROCEDURE dbo.usp_InsertCustomersFromJson;
 
 ---
 
+## Exercise 6 — TVP: Insert Multiple Products [INTERMEDIATE]
+
+Create a **table type** `dbo.ProductInput` with columns `Name nvarchar(50)`, `ProductNumber nvarchar(25)`, and `PriceWithoutVAT money` (all `NOT NULL`).
+
+Write a procedure `dbo.usp_InsertProducts` that:
+
+1. Accepts one `dbo.ProductInput READONLY` parameter.
+2. Inserts every row from it into the `Product` table.
+
+Call it with at least two test products. Verify they were inserted with a query. Clean up by deleting those rows, then drop the procedure and the type (in the right order).
+
+### Hints
+
+- `Product.MinimumQuantityInStock` is `NOT NULL` with no default — supply a value (e.g. `0`) in the `INSERT`, even though the TVP itself doesn't carry that column.
+- Use a distinctive name prefix (e.g. `ZZ_Test`) for your test products so cleanup is a single `WHERE Name LIKE ...`.
+- Drop the procedure first, then the type.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE TYPE dbo.ProductInput AS TABLE
+(
+    Name            nvarchar(50) NOT NULL,
+    ProductNumber   nvarchar(25) NOT NULL,
+    PriceWithoutVAT money        NOT NULL
+);
+GO
+
+CREATE OR ALTER PROCEDURE dbo.usp_InsertProducts
+    @Products dbo.ProductInput READONLY
+AS
+BEGIN
+    INSERT INTO Product (Name, ProductNumber, MinimumQuantityInStock, PriceWithoutVAT)
+    SELECT Name, ProductNumber, 0, PriceWithoutVAT
+    FROM @Products;
+END
+GO
+
+-- Test
+DECLARE @NewProducts dbo.ProductInput;
+
+INSERT INTO @NewProducts (Name, ProductNumber, PriceWithoutVAT) VALUES
+    (N'ZZ_TestWidget1', N'ZZTEST-101', 19.99),
+    (N'ZZ_TestWidget2', N'ZZTEST-102', 29.99);
+
+EXEC dbo.usp_InsertProducts @Products = @NewProducts;
+
+-- Verify
+SELECT IDProduct, Name, ProductNumber, PriceWithoutVAT
+FROM Product
+WHERE Name LIKE N'ZZ_TestWidget%';
+
+-- Cleanup (procedure first, then type)
+DELETE FROM Product WHERE Name LIKE N'ZZ_TestWidget%';
+DROP PROCEDURE dbo.usp_InsertProducts;
+DROP TYPE dbo.ProductInput;
+```
+
+</details>
+
+---
+
 # Cleanup
 
 Remove the procedures and types created in the lab body. (Each exercise's solution already cleans up after itself.)
@@ -1521,6 +1691,7 @@ Remove the procedures and types created in the lab body. (Each exercise's soluti
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerFromXml;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerWithLocation;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDs;
 DROP PROCEDURE IF EXISTS dbo.usp_InvoiceInsert;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatchFromJson;

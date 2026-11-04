@@ -2,14 +2,14 @@
 
 **Database:** `AdventureWorksENG`
 
-In Labs 4 and 5, we learned that stored procedures and functions package database operations behind a name. Every procedure and function we wrote accepted scalar parameters — one `int`, one `nvarchar`, one `money` at a time.
+In Labs 3 and 4, we learned that stored procedures and functions package database operations behind a name. Every procedure and function we wrote accepted scalar parameters — one `int`, one `nvarchar`, one `money` at a time.
 
 But what happens when you need to pass **many** values in a single call? How do you insert an invoice header together with twenty line items? How do you delete multiple rows by ID? How do you accept the output of a web API that sends JSON?
 
 This lab introduces five methods for passing collections of data into procedures. Some are anti-patterns to avoid. Others are the native SQL Server way. One is essential for web integration. By the end, you'll know which to reach for in different situations.
 
 > [!IMPORTANT]
-> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some more natural for the wire protocol you're using. This lab covers the three historical workarounds (delimited strings, XML) and why they fell short. Lab 9 covers the two native answers (Table-Valued Parameters and JSON).
+> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some more natural for the wire protocol you're using. This lab covers three historical workarounds (client-side query building, delimited strings, XML) and the two native answers designed for this exact job (Table-Valued Parameters and JSON).
 
 ---
 
@@ -32,7 +32,7 @@ After completing this lab, you should be able to:
 >
 > - **Stored procedures (Lab 3)** — how to create them, what `EXEC` does, what parameters are.
 > - **Functions (Lab 4)** — scalar and table-valued functions.
-> - **T-SQL programming (Lab 0, Sections 4 and 10)** — variables, `IF/BEGIN/END`, `WHILE` loops, `CAST`/`CONVERT`, basic `TRY/CATCH`.
+> - **T-SQL programming (Lab 0)** — variables (Section 2), `IF/BEGIN/END` (Section 4), `WHILE` loops (Section 7), inline type conversion (Section 6), and basic `TRY/CATCH` (Section 10).
 >
 > String functions (`LEN`, `SUBSTRING`, `CHARINDEX`) and XML/JSON literals are introduced inline as needed.
 
@@ -339,15 +339,9 @@ Breaking it down:
 
 ## Full Pattern: Insert a Batch of Cities
 
+Create the procedure first:
+
 ```sql
-DECLARE @NorwayID int;
-
-INSERT INTO State (Name)
-VALUES ('Norway');
-SET @NorwayID = SCOPE_IDENTITY();
-
-GO
-
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCityBatch
     @StateID int,
     @Cities  xml
@@ -360,6 +354,17 @@ BEGIN
     FROM @Cities.nodes('/Cities/City') AS tbl(node);
 END
 GO
+```
+
+Then, in one unbroken batch, create a state to attach the cities to, call the procedure, verify, and clean up:
+
+```sql
+DECLARE @NorwayID int;
+
+INSERT INTO State (Name)
+VALUES ('Norway');
+
+SET @NorwayID = SCOPE_IDENTITY();
 
 -- Call it
 EXEC dbo.usp_InsertCityBatch
@@ -379,9 +384,15 @@ WHERE s.Name = 'Norway';
 
 -- Cleanup
 DELETE FROM City  WHERE StateID = @NorwayID;
-DELETE FROM State WHERE IDState  = @NorwayID;
+DELETE FROM State WHERE IDState = @NorwayID;
+```
+
+```sql
 DROP PROCEDURE dbo.usp_InsertCityBatch;
 ```
+
+> [!NOTE]
+> `@NorwayID` must stay in scope from the moment it is declared until it is last used. `GO` ends a batch and clears all local variables, so everything that reads `@NorwayID` — the `EXEC`, the cleanup `DELETE`s — must run in the same batch as the `DECLARE`. The procedure itself can be created separately beforehand, since it doesn't depend on the variable.
 
 **Three inserts. One procedure call. One round-trip.**
 
@@ -465,7 +476,7 @@ XML is fine when the data has structure and the wire format is already XML. It f
 
 ---
 
-# Section 4 – Table-Valued Parameters
+# Section 5 – Table-Valued Parameters
 
 ## The Idea
 
@@ -529,6 +540,14 @@ Three rows in a variable. One `EXEC` call. Inside the procedure, `@IDs` behaves 
 
 This is Problem 2 (batch key operation) solved.
 
+Clean up this introductory example before moving on (the next example defines its own types):
+
+```sql
+DROP PROCEDURE dbo.usp_GetProductsByIDs;
+DROP TYPE dbo.ProductIDList;
+GO
+```
+
 ## Full Example: The 1:N Insert with Two TVPs
 
 This is the showcase example. An invoice header and many line items, all in one call.
@@ -589,11 +608,13 @@ BEGIN
     SET @NewInvoiceID = SCOPE_IDENTITY();
 
     -- Insert all line items, linked to the new invoice
-    INSERT INTO InvoiceItem (InvoiceID, ProductID, Quantity, TotalPrice)
+    INSERT INTO InvoiceItem (InvoiceID, ProductID, Quantity, InitialPrice, Discount, TotalPrice)
     SELECT
         @NewInvoiceID,
         l.ProductID,
         l.Quantity,
+        l.UnitPrice,
+        0,
         l.Quantity * l.UnitPrice
     FROM @Lines l;
 
@@ -604,11 +625,12 @@ END
 GO
 ```
 
-The three key pieces:
+The key pieces:
 
 - **`BEGIN TRANSACTION` / `COMMIT`** — either both the header and lines land together, or none of them do. This ensures the invoice is never half-created.
 - **`SCOPE_IDENTITY()`** — captures the auto-generated invoice ID so we can link the line items.
 - **Two TVPs** — one for the header shape, one for the lines shape. Each can be read multiple times by different parts of the procedure.
+- **`InitialPrice` and `Discount`** — `InvoiceItem` requires both (`NOT NULL`). The TVP only carries a single `UnitPrice`, so the procedure uses it as `InitialPrice` and records no discount (`0`) for this simplified example.
 
 Call it:
 
@@ -628,9 +650,14 @@ EXEC dbo.usp_InvoiceInsert @Header = @Hdr, @Lines = @Lns;
 
 One `EXEC`. One header. Three line items. One transaction. **Problem 1 solved — natively, type-safely, atomically.**
 
-Cleanup (note the order):
+Clean up the demo invoice, then the procedure and types (note the drop order — procedure before types):
 
 ```sql
+DECLARE @LastInvoiceID int = (SELECT MAX(IDInvoice) FROM Invoice);
+
+DELETE FROM InvoiceItem WHERE InvoiceID = @LastInvoiceID;
+DELETE FROM Invoice     WHERE IDInvoice = @LastInvoiceID;
+
 DROP PROCEDURE dbo.usp_InvoiceInsert;
 DROP TYPE dbo.InvoiceLineInput;
 DROP TYPE dbo.InvoiceHeaderInput;
@@ -651,7 +678,7 @@ TVPs are the default choice when both the client and server speak SQL Server (T-
 
 ---
 
-# Section 5 – JSON Parameters
+# Section 6 – JSON Parameters
 
 ## The Idea
 
@@ -879,7 +906,7 @@ JSON is the natural choice when the caller is a web service (React frontend, Fas
 
 ---
 
-# Section 6 – Five Methods: One Table, One Choice
+# Section 7 – Five Methods: One Table, One Choice
 
 ## The Comparison
 
@@ -888,7 +915,7 @@ Here is the complete picture — all five methods, one table:
 | Method | Type-Safe | Plan Reuse | Injection Risk | Handles Structure | Network Efficiency | When to Use |
 |--------|-----------|-----------|--------------|----------|----------|-----------|
 | **Client-side query** | No | Poor | **HIGH** | No | Poor | **Never** |
-| **Delimited string** | No | Good | None | No | Good | Flat list of IDs; SQL Server < 2016 |
+| **Delimited string** | No | Good | None | No | Good | Flat list of IDs where simplicity beats type safety |
 | **XML** | Partial | Good | None | Yes | Fair | Nested data; interop with XML systems |
 | **TVP** | **Yes** | **Best** | None | Yes | Excellent | **Default for T-SQL–to–T-SQL and .NET** |
 | **JSON** | Weak | Good | None | Yes | Fair | **Web-facing APIs; SQL Server 2016+** |
@@ -927,16 +954,13 @@ graph TD
 flowchart TD
     A["Need to pass a collection?"]
     A -->|No| Z["Use scalar parameters"]
-    A -->|Yes| B["Is the data flat?<br/>Just a list of IDs?"]
-    B -->|Yes, and SQL Server < 2016| C["Use delimited string<br/>+ STRING_SPLIT"]
-    B -->|Yes, modern SQL Server| D{"Client is<br/>web service?"}
-    B -->|No, hierarchical| E{"Client is<br/>web service?"}
-    D -->|Yes| F["Use JSON<br/>OPENJSON, FOR JSON PATH"]
-    D -->|No| G["Use TVP<br/>CREATE TYPE, READONLY"]
-    E -->|Yes| F
-    E -->|No| H{"Need interop<br/>with XML<br/>systems?"}
-    H -->|Yes| I["Use XML<br/>.nodes(), .value()"]
-    H -->|No| G
+    A -->|Yes| B{"Is the caller<br/>a web/REST client?"}
+    B -->|Yes| F["Use JSON<br/>OPENJSON, FOR JSON PATH"]
+    B -->|No, T-SQL or .NET| C{"Need interop<br/>with an existing<br/>XML system?"}
+    C -->|Yes| I["Use XML<br/>.nodes(), .value()"]
+    C -->|No| D{"Just a flat<br/>list of IDs?"}
+    D -->|Yes, simplicity<br/>matters most| E["Delimited string<br/>+ STRING_SPLIT"]
+    D -->|No, or want<br/>type safety| G["Use TVP<br/>CREATE TYPE, READONLY"]
 ```
 
 ---
@@ -964,7 +988,7 @@ flowchart TD
 
 4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. If you wanted to read the node's text content instead (the value between opening and closing tags), you'd use `.` (dot).
 
-5. **Nested elements in FOR XML PATH** — Use dotted aliases in the `SELECT` list. `[OSOBA.ostalo.email]` produces `<OSOBA><ostalo><email>...</email></ostalo></OSOBA>`. Each dot creates one level of nesting.
+5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 8.)
 
 6. **Why `READONLY` is mandatory** — It allows SQL Server to pass the TVP data efficiently without copying it to a temporary structure. The procedure can only read it, not modify it. If you need to modify, copy the TVP into a local table variable (which is **not** `READONLY`) and modify the copy.
 
@@ -994,13 +1018,14 @@ The procedure must:
 2. Delete all products whose name appears in the list.
 3. Use `STRING_SPLIT` to split the list.
 
-Test it with at least three product names. Verify the rows are gone. Restore them before finishing.
+Insert three throwaway test products first (do not delete real `AdventureWorksENG` products — see the [database safety note](../exercises/README.md#database-safety-note)). Test the procedure against your own test products. Verify they are gone.
 
 ### Hints
 
 - Use `STRING_SPLIT(@NameList, ',')` to get a table.
 - Use `IN (SELECT value FROM STRING_SPLIT(...))` to match the names.
 - Remember: `value` is `nvarchar`, and the `Product.Name` column is also `nvarchar`, so no `CAST` is needed.
+- `Product.ProductNumber` and `Product.MinimumQuantityInStock` are `NOT NULL` — supply a value for each when inserting test rows.
 
 <details>
 <summary>Show solution</summary>
@@ -1019,17 +1044,17 @@ BEGIN
 END
 GO
 
--- Test: delete three products
-EXEC dbo.usp_DeleteProductsByNameList @NameList = N'Adjustable Race,Bearing Ball,Ball Bearing';
+-- Insert three throwaway test products — never delete real seed data
+INSERT INTO Product (Name, ProductNumber, MinimumQuantityInStock, PriceWithoutVAT) VALUES
+    (N'ZZ_TestProduct1', N'ZZTEST-001', 0, 9.99),
+    (N'ZZ_TestProduct2', N'ZZTEST-002', 0, 9.99),
+    (N'ZZ_TestProduct3', N'ZZTEST-003', 0, 9.99);
+
+-- Test: delete all three test products in a single call
+EXEC dbo.usp_DeleteProductsByNameList @NameList = N'ZZ_TestProduct1,ZZ_TestProduct2,ZZ_TestProduct3';
 
 -- Verify they are gone
-SELECT COUNT(*) FROM Product;
-
--- Restore them (because we shouldn't delete from a real database)
-INSERT INTO Product (Name, Color, PriceWithoutVAT) VALUES
-    (N'Adjustable Race', NULL, 0),
-    (N'Bearing Ball', NULL, 0),
-    (N'Ball Bearing', NULL, 0);
+SELECT * FROM Product WHERE Name LIKE N'ZZ_TestProduct%';
 
 DROP PROCEDURE dbo.usp_DeleteProductsByNameList;
 ```
@@ -1119,7 +1144,7 @@ Write a query (not a procedure) that:
 </Customers>
 ```
 
-Use `FOR XML PATH` with dotted aliases to create the nested structure.
+Use `FOR XML PATH` with slash-separated aliases to create the nested structure.
 
 ### Hints
 
@@ -1271,18 +1296,19 @@ DROP PROCEDURE dbo.usp_InsertCustomersFromJson;
 
 # Cleanup
 
-Remove the procedures and types created during this lab.
+Remove the procedures and types created in the lab body. (Each exercise's solution already cleans up after itself.)
 
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteProductsByNameList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_ShowCitiesFromXml;
-DROP PROCEDURE IF EXISTS dbo.usp_ListProductsByIDList;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomersFromJson;
+DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDs;
+DROP PROCEDURE IF EXISTS dbo.usp_InvoiceInsert;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatchFromJson;
+GO
+
 DROP TYPE IF EXISTS dbo.ProductIDList;
+DROP TYPE IF EXISTS dbo.InvoiceLineInput;
+DROP TYPE IF EXISTS dbo.InvoiceHeaderInput;
 GO
 ```
 
@@ -1307,12 +1333,12 @@ GO
 | Method | Use When | Why |
 |--------|----------|-----|
 | **Client-side query** | **Never.** | SQL injection, plan cache, network — three ways to lose. |
-| **Delimited string** | Flat list of IDs; SQL Server < 2016 | Simple, small on wire. No structure needed. |
+| **Delimited string** | Flat list of IDs, simplicity over type safety | Simple, small on wire. No structure needed. |
 | **XML** | Hierarchical data; interop with XML systems | Standard, self-documenting. Verbose on wire. |
 | **TVP** | **Default for .NET and T-SQL–to–T-SQL** | Type-safe, fastest, best plans, multi-column. |
 | **JSON** | **Web APIs, REST endpoints, mobile clients** | Client already sends JSON. Zero translation. |
 
-**By the end of this lab, you have all five methods and know which to reach for.** The decision flowchart in Section 6 guides you. When in doubt: **TVP for database-to-database, JSON for web-facing APIs.**
+**By the end of this lab, you have all five methods and know which to reach for.** The decision flowchart in Section 7 guides you. When in doubt: **TVP for database-to-database, JSON for web-facing APIs.**
 
 ---
 

@@ -10,6 +10,18 @@ Demonstration of how a modern application communicates with a SQL Server databas
 The project shows the same `OPENJSON` pattern taught in Lab 8, Section 6 —
 but driven by a real HTTP request instead of a JSON literal typed into SSMS.
 
+```mermaid
+flowchart LR
+    A["Browser / Swagger UI"] -->|"HTTP request"| B["FastAPI<br/>api/routes.py"]
+    B -->|"EXEC ... @Json"| C["Stored Procedure<br/>SQL Server"]
+    C --> D[("Customer, Product,<br/>Invoice, InvoiceItem")]
+    style A fill:#e1f5ff
+    style D fill:#c8e6c9
+```
+
+Keep this picture on screen (or on the whiteboard) for the whole demo —
+every step below is one arrow in it.
+
 ---
 
 # Goals
@@ -106,11 +118,22 @@ Show:
 
 Emphasize:
 
-Relational model
+```mermaid
+flowchart LR
+    subgraph SQL["SQL Server — 4 flat tables"]
+        direction LR
+        Customer
+        Invoice
+        InvoiceItem
+        Product
+    end
+    SQL -->|"sp_GetInvoice"| JSON["One JSON object<br/>{ invoiceId, customer, items[] }"]
+    style JSON fill:#c8e6c9
+```
 
-↓
-
-Hierarchical JSON
+Four separate tables, joined by foreign keys, become **one nested
+document**. The client never sees the joins — it sees the shape it
+asked for.
 
 ---
 
@@ -159,29 +182,25 @@ Send:
 }
 ```
 
-Explain:
+Explain — trace this exact path for the JSON you just sent:
 
-Swagger
+```mermaid
+flowchart TD
+    A["Swagger"] --> B["FastAPI<br/>POST /invoices"]
+    B --> C["EXEC sp_AddInvoice<br/>@Json"]
+    C --> D["JSON_VALUE<br/>reads customerId, date"]
+    C --> E["OPENJSON(@Json, '$.items')<br/>shreds the items array"]
+    D --> F["INSERT Invoice<br/>(1 row)"]
+    E --> G["INSERT InvoiceItem<br/>(N rows)"]
+    F --> H["COMMIT"]
+    G --> H
+    style A fill:#e1f5ff
+    style H fill:#c8e6c9
+```
 
-↓
-
-FastAPI
-
-↓
-
-Stored Procedure
-
-↓
-
-OPENJSON
-
-↓
-
-INSERT
-
-↓
-
-COMMIT
+One header value is read with `JSON_VALUE`; the nested array is shredded
+with `OPENJSON`. Both land in the same transaction — either the whole
+invoice is saved, or none of it is.
 
 ---
 
@@ -203,11 +222,14 @@ Show the new items.
 
 Explain:
 
-One JSON document
+```mermaid
+flowchart LR
+    A["One JSON document<br/>1 header + 2 items"] --> B["1 row in Invoice"]
+    A --> C["2 rows in InvoiceItem"]
+```
 
-↓
-
-multiple INSERT statements
+One document in, one header row plus one row per array element out —
+count the `items` in the request body against the rows in `InvoiceItem`.
 
 ---
 
@@ -243,9 +265,16 @@ Ask the students:
 
 Explain:
 
+```mermaid
+flowchart LR
+    A["DELETE FROM Invoice<br/>WHERE InvoiceID = ..."] -->|"ON DELETE CASCADE<br/>on the FK"| B["InvoiceItem rows<br/>for that invoice<br/>also deleted"]
+    style A fill:#ffccbc
+    style B fill:#ffccbc
 ```
-ON DELETE CASCADE
-```
+
+Nobody issued a second `DELETE`. The foreign key itself is declared
+`ON DELETE CASCADE` in [sql/01_CreateDatabase.sql](../sql/01_CreateDatabase.sql) — SQL Server removes the
+children automatically when the parent row goes.
 
 ---
 
@@ -269,12 +298,27 @@ Recall **Lab 8, Section 4** — the XML type, `.nodes()`, `.value()`, `FOR XML P
 
 Explain:
 
-JSON and XML solve the same problem.
+JSON and XML solve the same problem. The difference is in the format,
+not the idea:
 
-The difference is in the format, not the idea: a client sends a structured
-document, SQL Server shreds it into rows with `OPENJSON` (seen here) or
-`.nodes()`/`.value()` (seen in Section 4), and both round-trip back out
-with `FOR JSON PATH` or `FOR XML PATH`.
+```mermaid
+flowchart LR
+    subgraph JSON["Today — JSON"]
+        direction LR
+        J1["Client sends JSON"] --> J2["OPENJSON"] --> J3["Rows"]
+        J3 --> J4["FOR JSON PATH"] --> J5["JSON back out"]
+    end
+    subgraph XML["10+ years ago — XML"]
+        direction LR
+        X1["Client sends XML"] --> X2[".nodes() / .value()"] --> X3["Rows"]
+        X3 --> X4["FOR XML PATH"] --> X5["XML back out"]
+    end
+```
+
+Same shape, same shred-into-rows-then-build-back-out idea, on both sides
+— only the envelope and the function names change. `OPENJSON`/`FOR JSON
+PATH` here mirror `.nodes()`/`.value()`/`FOR XML PATH` from Lab 8,
+Section 4.
 
 Emphasize that XML will still be encountered in existing business systems and integrations.
 

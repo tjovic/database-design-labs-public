@@ -1,10 +1,14 @@
-# LAB 09 – REST API and SQL Server
+# OBP REST Demo — Classroom Walkthrough
+
+Pairs with [Lab 8 – Complex Parameters](../../../labs/lab08-complex-parameters.md),
+**Section 6 (JSON Parameters)**.
 
 ## Topic
 
 Demonstration of how a modern application communicates with a SQL Server database.
 
-The project serves as motivation for the material on XML and storage of complex data.
+The project shows the same `OPENJSON` pattern taught in Lab 8, Section 6 —
+but driven by a real HTTP request instead of a JSON literal typed into SSMS.
 
 ---
 
@@ -259,21 +263,18 @@ This is the way the same problem is most commonly solved today.
 
 Ask the students:
 
-> How would we send the same invoice to SQL Server ten or more years ago?
+> How would we have sent the same invoice to SQL Server ten or more years ago?
 
-Show XML.
+Recall **Lab 8, Section 4** — the XML type, `.nodes()`, `.value()`, `FOR XML PATH`.
 
 Explain:
 
 JSON and XML solve the same problem.
 
-The difference is in the format.
-
-In the rest of the lab, show:
-
-* the XML type
-* nodes()
-* value()
+The difference is in the format, not the idea: a client sends a structured
+document, SQL Server shreds it into rows with `OPENJSON` (seen here) or
+`.nodes()`/`.value()` (seen in Section 4), and both round-trip back out
+with `FOR JSON PATH` or `FOR XML PATH`.
 
 Emphasize that XML will still be encountered in existing business systems and integrations.
 

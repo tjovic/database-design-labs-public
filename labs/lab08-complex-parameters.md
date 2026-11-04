@@ -49,56 +49,189 @@ GO
 
 ---
 
-# Section 1 – The Problem: Two Shapes
+# Section 1 – The Problem: Passing Multiple Values
 
-Every real-world system encounters two shapes of the same problem.
+In previous labs, we learned how to create stored procedures and pass values through parameters.
 
-## Problem 1 — The 1:N Insert
+Consider this simple procedure:
 
-An invoice has a header and many line items. You want one procedure call that inserts both the header and all lines together.
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetProduct
+    @ProductID int
+AS
+BEGIN
+    SELECT IDProduct, Name, PriceWithoutVAT
+    FROM Product
+    WHERE IDProduct = @ProductID;
+END;
+GO
+```
+
+We can call it by passing a single product ID:
+
+```sql
+EXEC dbo.usp_GetProduct @ProductID = 1;
+```
+
+This works because `@ProductID` is a **scalar parameter** — it contains one value.
+
+But what if we want to pass several product IDs in a single procedure call?
+
+For example, we might want to retrieve products **1, 2, and 3**.
+
+We cannot simply pass a list to an `int` parameter:
+
+```sql
+-- This does not work
+EXEC dbo.usp_GetProduct @ProductID = (1, 2, 3);
+```
+
+An `int` parameter expects one integer, not a collection of integers.
+
+We need a way to pass **multiple values through a single parameter**.
+
+This is the main problem we will solve in this lab.
+
+## 1.1 Problem 1 – Working with Multiple IDs
+
+Imagine an application that displays a list of products.
+
+A user selects three products and clicks a button to display their details.
+
+The application knows which products were selected:
+
+```text
+Selected product IDs: 1, 2, 3
+```
+
+One possible solution is to call the procedure three times:
+
+```sql
+EXEC dbo.usp_GetProduct @ProductID = 1;
+EXEC dbo.usp_GetProduct @ProductID = 2;
+EXEC dbo.usp_GetProduct @ProductID = 3;
+```
+
+This works, but the application must make three separate procedure calls.
+
+What if the user selects 100 products?
+
+A better approach would be to pass all selected IDs in **one procedure call** and let SQL Server process them together.
+
+```text
+Application
+    |
+    | Selected IDs: 1, 2, 3
+    |
+    v
+Stored Procedure
+    |
+    | Process all selected IDs
+    |
+    v
+Product Table
+    |
+    v
+Return matching products
+```
+
+This type of operation is called a **batch operation**.
+
+The same concept applies when we want to update, delete, or retrieve multiple rows using a list of IDs.
+
+> [!NOTE]
+> A batch operation processes multiple items together. In SQL Server, we can often use a single set-based SQL statement instead of executing the same operation separately for each item.
+
+## 1.2 Problem 2 – Inserting Related Data
+
+Now consider a more complex example: creating an invoice.
+
+An invoice consists of:
+
+- **One invoice header** — customer, date, invoice number.
+- **Multiple invoice items** — products, quantities, and prices.
+
+For example:
+
+**Invoice**
+
+| IDInvoice | CustomerID | InvoiceDate |
+|---|---|---|
+| 101 | 5 | 2026-11-04 |
+
+**InvoiceItem**
+
+| InvoiceID | ProductID | Quantity | UnitPrice |
+|---|---|---|---|
+| 101 | 1 | 2 | 199.00 |
+| 101 | 2 | 1 | 49.90 |
+| 101 | 3 | 5 | 9.99 |
+
+The application needs to send all this information to the database.
+
+We could create separate procedures for inserting the invoice header and each invoice item.
+
+However, this introduces several challenges:
+
+1. The application must make multiple procedure calls.
+2. The invoice ID must be passed to every invoice item.
+3. If one insert fails, we must ensure that the invoice is not left incomplete.
+
+Ideally, we want to send the entire invoice in **one procedure call**.
 
 ```mermaid
 flowchart TD
-    A["One EXEC call"] --> B["Invoice Header<br/>(1 row)"]
-    A --> C["Line Items<br/>(20 rows)"]
-    B --> D["BEGIN TRANSACTION"]
-    C --> D
-    D --> E["COMMIT or<br/>ROLLBACK together"]
-    style A fill:#e1f5ff
-    style E fill:#c8e6c9
+    A["Application"] --> B["One procedure call"]
+    B --> C["Invoice header + all items"]
+    C --> D["BEGIN TRANSACTION"]
+    D --> E["Insert invoice header"]
+    E --> F["Insert all invoice items"]
+    F --> G{"All operations successful?"}
+    G -->|Yes| H["COMMIT"]
+    G -->|No| I["ROLLBACK"]
 ```
 
-Without such a mechanism, you'd need twenty-one `EXEC` calls — one for the header, twenty for the lines — or worse, you'd loop in application code.
+The procedure receives the invoice data, inserts the header and all items, and manages the transaction.
 
-## Problem 2 — The Batch Key Operation
+If an error occurs, the transaction can be rolled back so that the invoice is not partially inserted.
 
-A user selects 30 rows in a grid and clicks "Delete". You want one procedure call that deletes all 30 by their IDs.
+> [!IMPORTANT]
+> **One procedure call does not necessarily mean one SQL statement.**
+>
+> A procedure may execute several SQL statements inside a transaction. The transaction ensures that related changes are committed or rolled back together.
 
-```mermaid
-flowchart LR
-    A["30 Customer IDs<br/>from grid selection"] --> B["One EXEC call"]
-    B --> C["DELETE all matching rows<br/>in one statement"]
-    style A fill:#fff3e0
-    style C fill:#ffccbc
-```
+## 1.3 The Solution – Complex Parameters
 
-Both problems need the same fundamental thing: a way to send **more than a scalar value** to a procedure in a single call.
+Both examples have something in common.
 
-## One List, Five Envelopes
+We need to pass more than one value to a stored procedure:
 
-Here is a concrete running example to hold onto for the rest of the lab. Suppose the marketing team wants to feature **products 1, 2, and 3** on the homepage this week, and you need to pass that short list of IDs into a procedure.
+- A **list of IDs**, such as `1, 2, 3`.
+- A **collection of related records**, such as an invoice with multiple items.
 
-The list itself never changes — `1`, `2`, `3`. Only the **envelope** around it changes:
+These are examples of **complex parameters**.
 
-| Method | The same three IDs, packaged for the call |
-|--------|--------------------------------------------|
-| Client-side query *(never do this)* | baked directly into the SQL text: `...WHERE IDProduct = 1 OR IDProduct = 2 OR IDProduct = 3` |
-| Delimited string | `'1,2,3'` |
-| XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` |
-| TVP | a table value: 3 rows, one column `ID` |
-| JSON | `[1, 2, 3]` |
+Unlike scalar parameters, complex parameters can represent collections or structured data.
 
-Every section below teaches you how to build, send, and unpack one row of this table. Section 7 closes the loop with the same example, side by side, once you've seen all five.
+SQL Server provides several ways to handle this.
+
+In this lab, we will explore five approaches:
+
+| Method | Example | Main idea |
+|---|---|---|
+| Client-side query building | `WHERE IDProduct IN (1, 2, 3)` | Construct SQL in application code |
+| Delimited string | `'1,2,3'` | Pass a string and split it into values |
+| XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` | Pass structured XML data |
+| Table-Valued Parameter (TVP) | A table containing three ID rows | Pass a collection of typed rows |
+| JSON | `[1, 2, 3]` | Pass structured JSON data |
+
+All five approaches can represent the same list of product IDs, but they differ in how the data is prepared, transmitted, and processed.
+
+Some approaches are safer, more efficient, or better suited to particular applications than others.
+
+We will begin with a problematic approach — building SQL statements directly in application code — and then explore better alternatives.
+
+By the end of this lab, you should understand **how to pass collections of data to stored procedures and how to choose an appropriate method for a given situation**.
 
 ---
 

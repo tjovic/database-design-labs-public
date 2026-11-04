@@ -1229,8 +1229,8 @@ XML remains useful when integrating with systems that already exchange XML docum
 
 However, it is not the only way to pass structured data to SQL Server.
 
-[!TIP]
-Additional practice: Exercise 7 demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
+> [!TIP]
+> Additional practice: Exercise 7 demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
 
 In the next section, we will explore **Table-Valued Parameters (TVPs)**, which allow us to pass collections of typed rows directly to stored procedures without converting them into XML or delimited strings.
 
@@ -2613,7 +2613,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 
 1. **1:N insert** — An invoice header and twenty line items need to go into the database together, all or nothing. Without collection parameters, you'd need one call for the header and twenty more for the lines. With one collection parameter, it's one call, one round-trip, one transaction.
 
-2. **Three reasons never to concatenate** — (1) **SQL injection**: attacker input becomes SQL, letting the attacker execute their own statements. (2) **No plan-cache reuse**: every unique query text compiles a new plan; 30 different ID combinations = 30 different plans filling the cache. (3) **Network chatter**: the whole SQL string travels every time instead of just the procedure name and parameters.
+2. **Three reasons never to concatenate** — (1) **SQL injection**: attacker input becomes SQL, letting the attacker execute their own statements. (2) **No plan-cache reuse**: Different SQL text may lead to separate execution plans, increasing compilation overhead and plan-cache usage; 30 different ID combinations = 30 different plans filling the cache. (3) **Network chatter**: the whole SQL string travels every time instead of just the procedure name and parameters.
 
 3. **STRING_SPLIT returns** — A one-column table with a column always named `value`, of type `nvarchar` (matching the input string's type). One row per split piece. If the input was `'1,2,5'` and separator was `,`, you get three rows: `1`, `2`, `5`.
 
@@ -2627,7 +2627,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 
 8. **Dotted aliases in FOR JSON PATH** — Column aliases like `[Invoice.IDCustomer]` or `[Invoice.Lines.ProductID]` create nested objects. Each dot is one level of nesting. `[A.B.C]` produces `{ "A": { "B": { "C": ... } } }`.
 
-9. **TVP vs JSON** — **TVP** when both client and server are SQL Server or .NET; it's type-safe and fastest. **JSON** when the client is a web service (React, mobile, etc.) and JSON is already the wire format; it eliminates translation overhead.
+9. **TVP** is a good choice for passing typed relational data when the database client supports it. **JSON** is useful when data already arrives in JSON format, particularly through web APIs. The best choice depends on the application architecture and workload.
 
 </details>
 
@@ -2755,7 +2755,7 @@ DROP PROCEDURE dbo.usp_InsertStatesBatch;
 
 ---
 
-## Exercise 3 — XML Round-Trip: Customers to XML and Back [ADVANCED]
+## Exercise 3 – Generating Nested XML with FOR XML PATH [ADVANCED]
 
 Write a query (not a procedure) that:
 
@@ -3262,16 +3262,6 @@ DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
 >
 > For this exercise, assume that the procedure is executed sequentially in an isolated training database.
 
-### What You Should Learn
-
-After completing this exercise, you should understand how to:
-
-- Extract several values from one XML parameter.
-- Resolve foreign key relationships before inserting records.
-- Reuse existing records instead of inserting duplicates.
-- Retrieve generated IDs using `SCOPE_IDENTITY()`.
-- Combine multiple database operations inside a transaction.
-- Return the resulting record to the caller.
 
 # Cleanup
 

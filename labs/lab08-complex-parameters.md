@@ -21,7 +21,9 @@ After completing this lab, you should be able to:
 - understand why client-side query building is dangerous and how it fails in three concrete ways;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
 - pass hierarchical data as XML, shred it with `.nodes()` and `.value()`, and build it back with `FOR XML PATH`;
-- recognize the trade-offs of each method and know when each is appropriate.
+- define a table type with `CREATE TYPE ... AS TABLE` and pass tables as parameters using Table-Valued Parameters (TVPs);
+- accept JSON data with `OPENJSON(@json) WITH (...)`, shred it into typed columns, and build JSON output with `FOR JSON PATH` and dotted aliases;
+- compare all five methods (client-side query, delimited string, XML, TVP, JSON) and know which to reach for in different situations.
 
 ---
 
@@ -463,22 +465,431 @@ XML is fine when the data has structure and the wire format is already XML. It f
 
 ---
 
-# Section 5 – Preview: The Two Native Answers
+# Section 4 – Table-Valued Parameters
 
-You've now seen three ways to pass collections to procedures:
+## The Idea
 
-1. **Client-side query building** — **Never.** SQL injection, plan cache, network. Three ways to lose.
-2. **Delimited string** — flat list only.
-3. **XML** — handles nesting.
+A procedure parameter must have a type. `int`, `nvarchar`, `money` — SQL Server already knows these. But "a table with these three columns" is not a built-in type until you define it.
 
-There are two more methods. They are designed for the job, not workarounds:
+**`CREATE TYPE ... AS TABLE`** teaches SQL Server a new type shape. Then you use that type as a parameter — and the procedure can read the entire table, not just one scalar.
 
-1. **Table-Valued Parameters** — SQL Server's native answer. You define a table shape once, then pass tables as parameters. Faster, type-safe, multi-column.
-2. **JSON** — the web's answer. `OPENJSON` shreds it on the way in, `FOR JSON PATH` builds it on the way out. Zero impedance mismatch with web clients.
+This is SQL Server's **native answer** to "pass me many rows".
 
-They are covered in **Lab 9 – Table-Valued Parameters and JSON**.
+## Step 1 – Define the Type
 
-For now, know that these two are the ones you should reach for in new code. Everything else is a historical answer or an anti-pattern.
+```sql
+CREATE TYPE dbo.ProductIDList AS TABLE
+(
+    ID int PRIMARY KEY
+);
+GO
+```
+
+`CREATE TYPE ... AS TABLE` — one new keyword. Inside the parentheses, the same column definitions you'd use in `CREATE TABLE`. Give it a primary key when you can — SQL Server uses it for optimization.
+
+Once created, `dbo.ProductIDList` is a first-class type. You can use it anywhere a type is allowed.
+
+## Step 2 – Use It in a Procedure
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetProductsByIDs
+    @IDs dbo.ProductIDList READONLY
+AS
+BEGIN
+    SELECT
+        p.IDProduct,
+        p.Name,
+        p.PriceWithoutVAT
+    FROM Product p
+    INNER JOIN @IDs i ON i.ID = p.IDProduct;
+END
+GO
+```
+
+The key word: **`READONLY`**. Inside the procedure, you cannot `INSERT`, `UPDATE`, or `DELETE` on `@IDs`. You can only read from it.
+
+This is a **fundamental rule** of TVPs, not a bug you can work around. Why? Read-only means SQL Server doesn't have to copy the input into a temporary structure — it passes the data efficiently and the procedure works directly with it.
+
+> [!NOTE]
+> If you truly need to modify the input list, copy it into a local table variable of the same type — that copy is not `READONLY` and you can modify it freely.
+
+## Step 3 – Call It From T-SQL
+
+To call a TVP-accepting procedure from T-SQL, declare a variable of the type, fill it, and pass it:
+
+```sql
+DECLARE @MyIDs dbo.ProductIDList;
+
+INSERT INTO @MyIDs (ID) VALUES (1), (2), (3);
+
+EXEC dbo.usp_GetProductsByIDs @IDs = @MyIDs;
+```
+
+Three rows in a variable. One `EXEC` call. Inside the procedure, `@IDs` behaves like any other table you can `JOIN` against.
+
+This is Problem 2 (batch key operation) solved.
+
+## Full Example: The 1:N Insert with Two TVPs
+
+This is the showcase example. An invoice header and many line items, all in one call.
+
+First, define two types:
+
+```sql
+CREATE TYPE dbo.InvoiceHeaderInput AS TABLE
+(
+    CustomerID   int  NOT NULL,
+    InvoiceDate  date NOT NULL
+);
+GO
+
+CREATE TYPE dbo.InvoiceLineInput AS TABLE
+(
+    ProductID  int   NOT NULL,
+    Quantity   int   NOT NULL,
+    UnitPrice  money NOT NULL
+);
+GO
+```
+
+Now the procedure:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsert
+    @Header dbo.InvoiceHeaderInput READONLY,
+    @Lines  dbo.InvoiceLineInput   READONLY
+AS
+BEGIN
+    SET XACT_ABORT ON;
+    BEGIN TRANSACTION;
+
+    DECLARE @NewInvoiceID int;
+
+    -- Insert the header
+    INSERT INTO Invoice (CustomerID, InvoiceDate, InvoiceNumber)
+    SELECT
+        h.CustomerID,
+        h.InvoiceDate,
+        CONVERT(nvarchar(20), NEWID())
+    FROM @Header h;
+
+    -- Capture the new invoice ID
+    SET @NewInvoiceID = SCOPE_IDENTITY();
+
+    -- Insert all line items, linked to the new invoice
+    INSERT INTO InvoiceItem (InvoiceID, ProductID, Quantity, TotalPrice)
+    SELECT
+        @NewInvoiceID,
+        l.ProductID,
+        l.Quantity,
+        l.Quantity * l.UnitPrice
+    FROM @Lines l;
+
+    COMMIT TRANSACTION;
+
+    SELECT @NewInvoiceID AS NewInvoiceID;
+END
+GO
+```
+
+The three key pieces:
+
+- **`BEGIN TRANSACTION` / `COMMIT`** — either both the header and lines land together, or none of them do. This ensures the invoice is never half-created.
+- **`SCOPE_IDENTITY()`** — captures the auto-generated invoice ID so we can link the line items.
+- **Two TVPs** — one for the header shape, one for the lines shape. Each can be read multiple times by different parts of the procedure.
+
+Call it:
+
+```sql
+DECLARE @Hdr dbo.InvoiceHeaderInput;
+DECLARE @Lns dbo.InvoiceLineInput;
+
+INSERT INTO @Hdr (CustomerID, InvoiceDate) VALUES (1, '2026-07-23');
+
+INSERT INTO @Lns (ProductID, Quantity, UnitPrice) VALUES
+    (1, 2, 199.00),
+    (2, 1,  49.90),
+    (3, 5,   9.99);
+
+EXEC dbo.usp_InvoiceInsert @Header = @Hdr, @Lines = @Lns;
+```
+
+One `EXEC`. One header. Three line items. One transaction. **Problem 1 solved — natively, type-safely, atomically.**
+
+Cleanup (note the order):
+
+```sql
+DROP PROCEDURE dbo.usp_InvoiceInsert;
+DROP TYPE dbo.InvoiceLineInput;
+DROP TYPE dbo.InvoiceHeaderInput;
+GO
+```
+
+> [!IMPORTANT]
+> **Drop the procedure before the type.** SQL Server refuses to drop a type that any procedure still references. This "children before parents" rule is important.
+
+## The Trade-Offs
+
+| Aspect | Details |
+|--------|---------|
+| **Pros** | Type-safe. Multi-column. Native SQL Server answer. Best query plan quality. Standard client-library support (.NET, Python, Java all have TVP support). |
+| **Cons** | You must `CREATE TYPE` first. `ALTER TYPE` does not exist — to change the shape, you must drop and recreate. Any procedure using the type blocks the drop. |
+
+TVPs are the default choice when both the client and server speak SQL Server (T-SQL to T-SQL, .NET to SQL, Python with pyodbc, etc.). Keep TVP types small and focused — one type per concept, not one per procedure.
+
+---
+
+# Section 5 – JSON Parameters
+
+## The Idea
+
+Not all callers speak SQL Server. Web frontends send JSON. Mobile apps send JSON. REST APIs trade in JSON.
+
+SQL Server (since 2016) can accept an `nvarchar(max)` containing JSON, parse it into rows, and let you query it like a table. No `CREATE TYPE`. Just an `nvarchar(max)` and a couple of functions.
+
+This bridges the gap between the JSON world (outside the database) and the SQL world (inside the database).
+
+## Reading JSON: OPENJSON WITH
+
+The function `OPENJSON(@json, path)` takes JSON and shreds it into rows. The `WITH (...)` clause declares what columns you want and where to find them.
+
+```sql
+DECLARE @Customers nvarchar(max) = N'
+[
+    { "FirstName": "Ida",   "LastName": "Ibsen",    "Email": "ida@example.com" },
+    { "FirstName": "Jonas", "LastName": "Jensen",   "Email": "jonas@example.com" },
+    { "FirstName": "Kari",  "LastName": "Kristian", "Email": "kari@example.com" }
+]';
+
+SELECT *
+FROM OPENJSON(@Customers)
+WITH
+(
+    FirstName nvarchar(50)  '$.FirstName',
+    LastName  nvarchar(50)  '$.LastName',
+    Email     nvarchar(100) '$.Email'
+);
+```
+
+Breaking it down:
+
+- `OPENJSON(@Customers)` — parse the JSON. Without a `WITH` clause it returns a generic key/value view.
+- `WITH (...)` — declare the columns we want. Name, SQL type, JSON path.
+- `'$.FirstName'` — the path expression. `$` is "the root of this row". `$.FirstName` is the `FirstName` property of the current object.
+- Result: three clean columns, three rows. Identical to a normal SQL query result.
+
+| FirstName | LastName  | Email |
+|-----------|-----------|-------|
+| Ida | Ibsen | ida@example.com |
+| Jonas | Jensen | jonas@example.com |
+| Kari | Kristian | kari@example.com |
+
+## Full Example: Insert a Batch via JSON
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerBatchFromJson
+    @JsonCustomers nvarchar(max)
+AS
+BEGIN
+    INSERT INTO Customer (FirstName, LastName, Email)
+    SELECT FirstName, LastName, Email
+    FROM OPENJSON(@JsonCustomers)
+    WITH
+    (
+        FirstName nvarchar(50)  '$.FirstName',
+        LastName  nvarchar(50)  '$.LastName',
+        Email     nvarchar(100) '$.Email'
+    );
+END
+GO
+
+-- Call it
+EXEC dbo.usp_InsertCustomerBatchFromJson @JsonCustomers = N'
+[
+    { "FirstName": "Alice",   "LastName": "Anderson", "Email": "alice@example.com" },
+    { "FirstName": "Bob",     "LastName": "Brown",    "Email": "bob@example.com" }
+]';
+
+-- Verify
+SELECT FirstName, LastName, Email
+FROM Customer
+WHERE Email IN ('alice@example.com', 'bob@example.com');
+
+-- Cleanup
+DELETE FROM Customer WHERE Email IN ('alice@example.com', 'bob@example.com');
+DROP PROCEDURE dbo.usp_InsertCustomerBatchFromJson;
+```
+
+**Two customers. One `INSERT`. One JSON parameter.**
+
+## Deeply Nested JSON
+
+Real-world JSON is rarely flat. It nests:
+
+```json
+{
+    "Invoice":
+    {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-07-23",
+        "Lines":
+        [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 }
+        ]
+    }
+}
+```
+
+To read this:
+
+```sql
+DECLARE @Json nvarchar(max) = N'{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-07-23",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 }
+        ]
+    }
+}';
+
+SELECT *
+FROM OPENJSON(@Json, '$.Invoice')
+WITH
+(
+    CustomerID  int          '$.CustomerID',
+    InvoiceDate date         '$.InvoiceDate'
+);
+```
+
+Key points:
+
+- The second argument to `OPENJSON` — `'$.Invoice'` — sets the **starting point** in the JSON. Start here, not at the document root.
+- The paths in the `WITH` columns are **relative** to that starting point. `'$.CustomerID'` means "from the current Invoice object, read the CustomerID property".
+
+For the nested array of lines, use a second `OPENJSON` in a `CROSS APPLY`:
+
+```sql
+SELECT
+    inv.CustomerID,
+    inv.InvoiceDate,
+    lines.ProductID,
+    lines.Quantity,
+    lines.UnitPrice
+FROM OPENJSON(@Json, '$.Invoice') AS inv
+WITH
+(
+    CustomerID  int          '$.CustomerID',
+    InvoiceDate date         '$.InvoiceDate',
+    LinesJson   nvarchar(max) '$.Lines' AS JSON
+)
+CROSS APPLY OPENJSON(inv.LinesJson)
+WITH
+(
+    ProductID  int           '$.ProductID',
+    Quantity   int           '$.Quantity',
+    UnitPrice  decimal(10,2) '$.UnitPrice'
+) AS lines;
+```
+
+This shreds the nested array into individual rows, one per line item.
+
+## Building JSON: FOR JSON PATH
+
+JSON works both ways. Use `FOR JSON PATH` with dotted column aliases to build nested JSON from a `SELECT`:
+
+```sql
+SELECT
+    c.IDCustomer       AS [Invoice.IDCustomer],
+    c.FirstName        AS [Invoice.FirstName],
+    c.LastName         AS [Invoice.LastName],
+    c.Email            AS [Invoice.Email]
+FROM Customer c
+WHERE c.IDCustomer < 5
+FOR JSON PATH, ROOT('Customers');
+```
+
+Expected output:
+
+```json
+{
+    "Customers": [
+        {
+            "Invoice": {
+                "IDCustomer": 1,
+                "FirstName": "Gustavo",
+                "LastName": "Achong",
+                "Email": "gustavo0@adventure-works.com"
+            }
+        },
+        ...
+    ]
+}
+```
+
+Key points:
+
+- Each dot in the column alias creates one level of object nesting.
+- `[Invoice.IDCustomer]` produces `{ "Invoice": { "IDCustomer": ... } }`.
+- `FOR JSON PATH` wraps each row in its own object.
+- `ROOT('Customers')` wraps the whole array in a root container.
+
+## The Trade-Offs
+
+| Aspect | Details |
+|--------|---------|
+| **Pros** | The web already speaks JSON. Zero impedance mismatch on the client — send JSON as-is, no translation needed. Lighter syntax than XML. Requires no `CREATE TYPE`. |
+| **Cons** | Less strictly typed than TVPs — all parsing happens at runtime. No pre-compiled plan for the shape. Requires SQL Server 2016+. |
+
+JSON is the natural choice when the caller is a web service (React frontend, FastAPI backend, mobile app, etc.) and JSON is already the wire format. If both client and server are .NET or T-SQL, TVP is usually faster and safer.
+
+---
+
+# Section 6 – Five Methods: One Table, One Choice
+
+## The Comparison
+
+Here is the complete picture — all five methods, one table:
+
+| Method | Type-Safe | Plan Reuse | Injection Risk | Handles Structure | Network Efficiency | When to Use |
+|--------|-----------|-----------|--------------|----------|----------|-----------|
+| **Client-side query** | No | Poor | **HIGH** | No | Poor | **Never** |
+| **Delimited string** | No | Good | None | No | Good | Flat list of IDs; SQL Server < 2016 |
+| **XML** | Partial | Good | None | Yes | Fair | Nested data; interop with XML systems |
+| **TVP** | **Yes** | **Best** | None | Yes | Excellent | **Default for T-SQL–to–T-SQL and .NET** |
+| **JSON** | Weak | Good | None | Yes | Fair | **Web-facing APIs; SQL Server 2016+** |
+
+## Reading the Table
+
+**Never**: Client-side query building. Period. SQL injection risk is unacceptable.
+
+**For a flat list**: Delimited string works. Simple, small on the wire. No structure needed.
+
+**For hierarchical data in SQL Server 2008+, without web integration**: XML. Standard, self-documenting, handles arbitrary nesting.
+
+**Default choice**: Table-Valued Parameters. Type-safe, best plan quality, fastest execution, standard in all modern client libraries.
+
+**Web API situation**: JSON. The client already sends it as JSON. Accept it as JSON. No translation layer.
+
+## Decision Flowchart
+
+```mermaid
+flowchart TD
+    A["Need to pass a collection?"]
+    A -->|No| Z["Use scalar parameters"]
+    A -->|Yes| B["Is the data flat?<br/>Just a list of IDs?"]
+    B -->|Yes, and SQL Server < 2016| C["Use delimited string<br/>+ STRING_SPLIT"]
+    B -->|Yes, modern SQL Server| D{"Client is<br/>web service?"}
+    B -->|No, hierarchical| E{"Client is<br/>web service?"}
+    D -->|Yes| F["Use JSON<br/>OPENJSON, FOR JSON PATH"]
+    D -->|No| G["Use TVP<br/>CREATE TYPE, READONLY"]
+    E -->|Yes| F
+    E -->|No| H{"Need interop<br/>with XML<br/>systems?"}
+    H -->|Yes| I["Use XML<br/>.nodes(), .value()"]
+    H -->|No| G
+```
 
 ---
 
@@ -489,6 +900,10 @@ For now, know that these two are the ones you should reach for in new code. Ever
 3. What does `STRING_SPLIT` return, and what type is the `value` column?
 4. When you use XML, what does `@Name` mean in `.value('@Name', 'nvarchar(50)')`?
 5. When you use `FOR XML PATH`, how do you create nested elements in the output?
+6. Why is `READONLY` mandatory on TVP parameters, and what do you do if you need to modify the input?
+7. In `OPENJSON(@Json, '$.Invoice')`, what does `'$.Invoice'` do?
+8. How would you use `FOR JSON PATH` to build nested JSON with dotted aliases?
+9. Compare TVP and JSON: when would you pick each one?
 
 <details>
 <summary>Show answers</summary>
@@ -502,6 +917,14 @@ For now, know that these two are the ones you should reach for in new code. Ever
 4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. If you wanted to read the node's text content instead (the value between opening and closing tags), you'd use `.` (dot).
 
 5. **Nested elements in FOR XML PATH** — Use dotted aliases in the `SELECT` list. `[OSOBA.ostalo.email]` produces `<OSOBA><ostalo><email>...</email></ostalo></OSOBA>`. Each dot creates one level of nesting.
+
+6. **Why `READONLY` is mandatory** — It allows SQL Server to pass the TVP data efficiently without copying it to a temporary structure. The procedure can only read it, not modify it. If you need to modify, copy the TVP into a local table variable (which is **not** `READONLY`) and modify the copy.
+
+7. **`'$.Invoice'` in OPENJSON** — It sets the **starting point** for shredding. Instead of starting at the document root (`$`), start at the `Invoice` property. All column paths in the `WITH` clause are then relative to each row starting from that point.
+
+8. **Dotted aliases in FOR JSON PATH** — Column aliases like `[Invoice.IDCustomer]` or `[Invoice.Lines.ProductID]` create nested objects. Each dot is one level of nesting. `[A.B.C]` produces `{ "A": { "B": { "C": ... } } }`.
+
+9. **TVP vs JSON** — **TVP** when both client and server are SQL Server or .NET; it's type-safe and fastest. **JSON** when the client is a web service (React, mobile, etc.) and JSON is already the wire format; it eliminates translation overhead.
 
 </details>
 
@@ -681,9 +1104,126 @@ Run it and inspect the XML. Notice:
 
 ---
 
+## Exercise 4 — TVP Fundamentals [INTERMEDIATE]
+
+Create a **table type** `dbo.ProductIDList` with a single `int` column called `ID` (primary key).
+
+Write a procedure `dbo.usp_ListProductsByIDList` that:
+
+1. Accepts one `dbo.ProductIDList READONLY` parameter.
+2. Returns `IDProduct`, `Name`, and `PriceWithoutVAT` for all products in the list.
+3. Joins the TVP against the `Product` table.
+
+Call it with three product IDs. Verify the results. Then drop the procedure and the type (in the right order).
+
+### Hints
+
+- `CREATE TYPE ... AS TABLE` defines the type; `CREATE OR ALTER PROCEDURE` uses it as a parameter type.
+- Remember `READONLY` is mandatory.
+- After `DECLARE @List dbo.ProductIDList;`, you can `INSERT INTO @List (ID) VALUES (...), (...);`
+- Drop the procedure first, then the type.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE TYPE dbo.ProductIDList AS TABLE
+(
+    ID int PRIMARY KEY
+);
+GO
+
+CREATE OR ALTER PROCEDURE dbo.usp_ListProductsByIDList
+    @IDs dbo.ProductIDList READONLY
+AS
+BEGIN
+    SELECT
+        p.IDProduct,
+        p.Name,
+        p.PriceWithoutVAT
+    FROM Product p
+    INNER JOIN @IDs ids ON ids.ID = p.IDProduct
+    ORDER BY p.IDProduct;
+END
+GO
+
+-- Test
+DECLARE @ProductList dbo.ProductIDList;
+INSERT INTO @ProductList (ID) VALUES (1), (2), (5);
+
+EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
+
+-- Cleanup (procedure first, then type)
+DROP PROCEDURE dbo.usp_ListProductsByIDList;
+DROP TYPE dbo.ProductIDList;
+```
+
+</details>
+
+---
+
+## Exercise 5 — JSON: Insert Customers from JSON [INTERMEDIATE]
+
+Write a procedure `dbo.usp_InsertCustomersFromJson` that:
+
+1. Accepts an `nvarchar(max)` parameter containing JSON.
+2. The JSON is an array of objects with `FirstName`, `LastName`, and `Email` fields.
+3. Uses `OPENJSON ... WITH (...)` to shred the JSON into rows.
+4. Inserts all rows into the `Customer` table.
+
+Call it with at least two customers in JSON format. Verify they were inserted. Clean up by deleting those rows.
+
+### Hints
+
+- JSON array: `[ { "FirstName": "...", ... }, { "FirstName": "...", ... } ]`
+- `OPENJSON(@Json)` without a second argument shreds the root array.
+- `WITH (FirstName nvarchar(50) '$.FirstName', ...)`  — column name, type, and path.
+- Paths like `'$.FirstName'` mean "from the current row, read the FirstName property".
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomersFromJson
+    @JsonCustomers nvarchar(max)
+AS
+BEGIN
+    INSERT INTO Customer (FirstName, LastName, Email)
+    SELECT FirstName, LastName, Email
+    FROM OPENJSON(@JsonCustomers)
+    WITH
+    (
+        FirstName nvarchar(50)  '$.FirstName',
+        LastName  nvarchar(50)  '$.LastName',
+        Email     nvarchar(100) '$.Email'
+    );
+END
+GO
+
+-- Test
+EXEC dbo.usp_InsertCustomersFromJson @JsonCustomers = N'
+[
+    { "FirstName": "Xavier", "LastName": "Xavier", "Email": "xavier@example.com" },
+    { "FirstName": "Yolanda", "LastName": "Yates", "Email": "yolanda@example.com" }
+]';
+
+-- Verify
+SELECT FirstName, LastName, Email
+FROM Customer
+WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
+
+-- Cleanup
+DELETE FROM Customer WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
+DROP PROCEDURE dbo.usp_InsertCustomersFromJson;
+```
+
+</details>
+
+---
+
 # Cleanup
 
-Remove the procedures created during this lab.
+Remove the procedures and types created during this lab.
 
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
@@ -692,6 +1232,9 @@ DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatch;
 DROP PROCEDURE IF EXISTS dbo.usp_ShowCitiesFromXml;
+DROP PROCEDURE IF EXISTS dbo.usp_ListProductsByIDList;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomersFromJson;
+DROP TYPE IF EXISTS dbo.ProductIDList;
 GO
 ```
 
@@ -699,7 +1242,7 @@ GO
 
 # What You Should Know After This Lab
 
-**Collection parameters are not scalars.** A scalar is one value. A collection is many. SQL Server provides different envelopes to pass collections.
+**Collection parameters are not scalars.** A scalar is one value. A collection is many. SQL Server provides multiple envelopes for different situations.
 
 **Never build SQL by concatenation in the client.** It enables SQL injection, fills the query plan cache with single-use plans, and sends data inefficiently.
 
@@ -707,16 +1250,21 @@ GO
 
 **XML handles nesting and structure.** Use `.nodes()` to shred, `.value()` to extract columns, `FOR XML PATH` to build it back. It is verbose on the wire but standard and self-documenting.
 
-**Two better methods are coming next lab.** Table-Valued Parameters (SQL Server's native answer, type-safe, fast) and JSON (the web's answer, matches what clients already send).
+**Table-Valued Parameters (TVPs)** are SQL Server's native answer. `CREATE TYPE ... AS TABLE` once, then pass variables of that type as `READONLY` parameters. Type-safe, fast, multi-column. Default choice for T-SQL-to-T-SQL and .NET.
 
-When choosing a method:
+**JSON matches the web.** `OPENJSON ... WITH (...)` shreds it on the way in. `FOR JSON PATH` with dotted aliases builds it on the way out. Essential when the client is a REST API, frontend, or mobile app.
 
-| Problem | Method | Why |
-|---------|--------|-----|
-| Delete 30 rows by ID | Delimited string | Simple, flat list of scalars. |
-| Insert an invoice with 20 lines | XML (for now) | Has structure; TVP is better but comes next lab. |
-| Web API sends JSON data | JSON (comes next lab) | The client already speaks it; matches the wire format. |
-| Building SQL client-side | **Never.** | SQL injection risk. Use parameterised queries or move logic into a procedure. |
+## The Complete Comparison
+
+| Method | Use When | Why |
+|--------|----------|-----|
+| **Client-side query** | **Never.** | SQL injection, plan cache, network — three ways to lose. |
+| **Delimited string** | Flat list of IDs; SQL Server < 2016 | Simple, small on wire. No structure needed. |
+| **XML** | Hierarchical data; interop with XML systems | Standard, self-documenting. Verbose on wire. |
+| **TVP** | **Default for .NET and T-SQL–to–T-SQL** | Type-safe, fastest, best plans, multi-column. |
+| **JSON** | **Web APIs, REST endpoints, mobile clients** | Client already sends JSON. Zero translation. |
+
+**By the end of this lab, you have all five methods and know which to reach for.** The decision flowchart in Section 6 guides you. When in doubt: **TVP for database-to-database, JSON for web-facing APIs.**
 
 ---
 
@@ -728,11 +1276,6 @@ More exercises on delimited strings, XML, and mixed scenarios are available in [
 
 # Where to Go Next
 
-In **Lab 9 – Table-Valued Parameters and JSON**, we finish the collection-parameters topic with the two native answers SQL Server designed for the job.
+You now have the complete collection-parameters toolkit — all five methods, their trade-offs, and when each one is the right choice.
 
-- **Table-Valued Parameters (TVPs)**: Define a table type once, then pass tables as parameters. Type-safe, fast, multi-column. The default choice for procedures calling procedures.
-- **JSON**: Accept `nvarchar(max)` containing JSON, shred it with `OPENJSON`, build it back with `FOR JSON PATH`. Essential for web APIs.
-
-You will also see a complete real-world example: a REST API (FastAPI) posting an invoice with nested line items as JSON, which a stored procedure accepts via `OPENJSON` and inserts atomically into the database.
-
-By the end of both labs, you will have a complete map of the five methods and when to reach for each.
+**Lab 9 – T-SQL Programming** continues with deeper error handling, including `THROW` and re-raising errors, and introduces `CONVERT` and `FORMAT` for working with dates and formatted text output. These patterns build on the `TRY/CATCH` foundations from Lab 0 and the transaction patterns you've seen here (the `BEGIN TRANSACTION` / `ROLLBACK TRANSACTION` in the TVP 1:N insert example).

@@ -21,8 +21,10 @@ After completing this lab, you should be able to:
 - understand why client-side query building is dangerous and how it fails in three concrete ways;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
 - pass hierarchical data as XML, shred it with `.nodes()` and `.value()`, and build it back with `FOR XML PATH`;
+- use XML to pass a single entity with many fields, not just a batch of simple items, and insert it with `.value()`'s singleton syntax;
 - define a table type with `CREATE TYPE ... AS TABLE` and pass tables as parameters using Table-Valued Parameters (TVPs);
 - accept JSON data with `OPENJSON(@json) WITH (...)`, shred it into typed columns, and build JSON output with `FOR JSON PATH` and dotted aliases;
+- insert a parent row and its children from a single nested JSON document, using `JSON_VALUE` and `OPENJSON` together inside one transaction;
 - compare all five methods (client-side query, delimited string, XML, TVP, JSON) and know which to reach for in different situations.
 
 ---
@@ -455,6 +457,67 @@ FROM @Cities.nodes('/Cities/City') AS tbl(node);
 ```
 
 Same idea. Different key.
+
+## Not Just Batches: One Entity, Many Fields
+
+Every XML example so far has been a **list** — several simple items, each with one or two attributes. XML is just as useful for the opposite case: **one entity with many different fields**, where naming each field is clearer than a long run of scalar parameters.
+
+```xml
+<Customer>
+    <FirstName>Nina</FirstName>
+    <LastName>Novak</LastName>
+    <Email>nina.novak@example.com</Email>
+</Customer>
+```
+
+There is no list here — no `.nodes()` needed. `.value()` can read straight from the root, as long as the XQuery expression is wrapped so SQL Server knows it matches **exactly one** node:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerFromXml
+    @Customer xml
+AS
+BEGIN
+    DECLARE @NewCustomerID int;
+
+    INSERT INTO Customer (FirstName, LastName, Email)
+    VALUES
+    (
+        @Customer.value('(/Customer/FirstName)[1]', 'nvarchar(50)'),
+        @Customer.value('(/Customer/LastName)[1]',  'nvarchar(50)'),
+        @Customer.value('(/Customer/Email)[1]',     'nvarchar(50)')
+    );
+
+    SET @NewCustomerID = SCOPE_IDENTITY();
+
+    -- Show the row we just created
+    SELECT *
+    FROM Customer
+    WHERE IDCustomer = @NewCustomerID;
+END
+GO
+```
+
+Call it:
+
+```sql
+EXEC dbo.usp_InsertCustomerFromXml @Customer = N'
+<Customer>
+    <FirstName>Nina</FirstName>
+    <LastName>Novak</LastName>
+    <Email>nina.novak@example.com</Email>
+</Customer>';
+```
+
+```sql
+-- Cleanup
+DELETE FROM Customer WHERE Email = 'nina.novak@example.com';
+DROP PROCEDURE dbo.usp_InsertCustomerFromXml;
+```
+
+> [!NOTE]
+> `(/Customer/FirstName)[1]` — the parentheses plus `[1]` tell SQL Server "this path matches one node, trust me." Without them, `.value()` raises an error: it refuses to guess whether a path could match more than one node. You only need this singleton syntax when reading directly from the root; `.value()` calls made from inside a `.nodes()` row (as in every earlier example) are already scoped to one node and don't need it.
+>
+> The `SELECT ... WHERE IDCustomer = @NewCustomerID` at the end is the same "insert, then show what you just inserted" pattern from the TVP invoice example in Section 5 — it works identically here because it has nothing to do with XML; it's just `SCOPE_IDENTITY()` plus a follow-up query.
 
 ## Building XML: FOR XML PATH
 
@@ -911,6 +974,78 @@ This shreds the nested array into individual rows, one per line item.
 
 > [!NOTE]
 > The table alias (`AS inv`, `AS lines`) comes **after** the `WITH (...)` clause, not right after `OPENJSON(...)`. Placing it before the `WITH` clause is a syntax error — SQL Server reports it as "Incorrect syntax near the keyword 'with'", which doesn't point at the alias as the actual problem.
+
+## Inserting a Parent and Its Children from JSON
+
+The invoice example only *reads* a nested document. The same two-level `OPENJSON` idea also drives an **insert** — one state, with several cities under it, created together from a single JSON document:
+
+```json
+{
+    "StateName": "Sweden",
+    "Cities": ["Stockholm", "Gothenburg", "Malmo"]
+}
+```
+
+`Cities` here is an array of plain strings, not objects — there is no `FirstName`-style property to name, so `OPENJSON` is used **without** a `WITH` clause. Without `WITH`, `OPENJSON` returns its default three columns (`key`, `value`, `type`); for an array of strings, `value` *is* the string itself:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertStateWithCities
+    @Json nvarchar(max)
+AS
+BEGIN
+    SET XACT_ABORT ON;
+    BEGIN TRANSACTION;
+
+    DECLARE @NewStateID int;
+    DECLARE @StateName nvarchar(50) = JSON_VALUE(@Json, '$.StateName');
+
+    -- Insert the parent row
+    INSERT INTO State (Name)
+    VALUES (@StateName);
+
+    SET @NewStateID = SCOPE_IDENTITY();
+
+    -- Insert all children, linked to the new state
+    INSERT INTO City (Name, StateID)
+    SELECT
+        value,
+        @NewStateID
+    FROM OPENJSON(@Json, '$.Cities');
+
+    COMMIT TRANSACTION;
+
+    SELECT @NewStateID AS NewStateID;
+END
+GO
+```
+
+Call it:
+
+```sql
+EXEC dbo.usp_InsertStateWithCities @Json = N'
+{
+    "StateName": "Sweden",
+    "Cities": ["Stockholm", "Gothenburg", "Malmo"]
+}';
+
+-- Verify
+SELECT s.Name AS StateName, c.Name AS CityName
+FROM State s
+JOIN City c ON c.StateID = s.IDState
+WHERE s.Name = 'Sweden';
+```
+
+```sql
+-- Cleanup
+DELETE FROM City WHERE StateID IN (SELECT IDState FROM State WHERE Name = 'Sweden');
+DELETE FROM State WHERE Name = 'Sweden';
+DROP PROCEDURE dbo.usp_InsertStateWithCities;
+```
+
+This mirrors exactly what Section 5 did for the invoice TVP, and what the XML city-batch example did in Section 4 — insert the parent, capture its new ID with `SCOPE_IDENTITY()`, insert the children against that ID, all inside one transaction. The only thing that changed across all three is the envelope the collection arrived in: a TVP, an XML fragment, or a JSON array.
+
+> [!NOTE]
+> `JSON_VALUE` reads one scalar from JSON — it is the JSON equivalent of `.value()` for XML. `OPENJSON` shreds an array or object into rows — the equivalent of `.nodes()`. The two functions are not alternatives to each other; most real procedures that accept JSON use both, exactly as this one does.
 
 ## Building JSON: FOR JSON PATH
 
@@ -1385,9 +1520,11 @@ Remove the procedures and types created in the lab body. (Each exercise's soluti
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerFromXml;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDs;
 DROP PROCEDURE IF EXISTS dbo.usp_InvoiceInsert;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatchFromJson;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertStateWithCities;
 GO
 
 DROP TYPE IF EXISTS dbo.ProductIDList;

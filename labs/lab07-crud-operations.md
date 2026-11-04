@@ -1561,4 +1561,6 @@ And remember:
 
 # Where to Go Next
 
-**Lab 8 – T-SQL Programming** goes further with error handling, including `THROW` and re-raising errors, together with `CONVERT` and `FORMAT` for working with dates and formatted output.
+**Lab 8 – Complex Parameters** tackles one of the core problems in database design: how to pass a collection of rows into a procedure in a single call. It covers the three historical approaches (client-side query building — never do it, delimited strings, and XML) and explains why they fall short. The two native solutions (Table-Valued Parameters and JSON) arrive in Lab 9.
+
+**Lab 9 – T-SQL Programming** goes further with error handling, including `THROW` and re-raising errors, together with `CONVERT` and `FORMAT` for working with dates and formatted output.

@@ -235,97 +235,238 @@ By the end of this lab, you should understand **how to pass collections of data 
 
 ---
 
-# Section 2 – Method 1: Client-Side Query Building (The Anti-Example)
+# Section 2 – Method 1: Client-Side Query Building
 
-## The Tempting Solution
+In Section 1, we saw a simple problem: an application needs to retrieve several products using their IDs.
 
-The simplest idea: build the SQL string in your application code.
+For example, the user selects products `1`, `2`, and `3`.
+
+One possible solution is to construct a SQL statement directly in the application.
+
+## 2.1 Building SQL in Application Code
+
+Consider the following Python example:
 
 ```python
-# Python pseudo-code — DO NOT DO THIS
-sql = f"DELETE FROM Customer WHERE IDCustomer = {id1} OR IDCustomer = {id2} OR IDCustomer = {id3}"
+# Example of building a SQL statement in application code
+product_ids = [1, 2, 3]
+
+sql = "SELECT * FROM Product WHERE IDProduct IN ("
+
+sql += ",".join(str(id) for id in product_ids)
+sql += ")"
+
 cursor.execute(sql)
 ```
 
-Easy. Direct. Every programmer knows how to concatenate strings.
+The application generates this SQL statement:
 
-**Never do it.**
-
-This is the single worst pattern in database programming. Not for prototypes. Not for internal tools. Not for anything.
-
-## Three Concrete Problems
-
-```mermaid
-graph TD
-    A["String concatenation<br/>in client code"] --> B["Problem 1:<br/>SQL Injection"]
-    A --> C["Problem 2:<br/>No plan reuse"]
-    A --> D["Problem 3:<br/>Network traffic"]
-    B --> E["Attacker input<br/>becomes SQL code"]
-    C --> F["Every unique string<br/>= new compiled plan"]
-    D --> G["Entire SQL travels<br/>every round-trip"]
-    style B fill:#ffccbc
-    style C fill:#ffccbc
-    style D fill:#ffccbc
+```sql
+SELECT *
+FROM Product
+WHERE IDProduct IN (1, 2, 3);
 ```
 
-### 1. SQL Injection
+The database receives a complete SQL statement and executes it.
 
-If any of those `id` values comes from user input, an attacker can put SQL syntax into your string.
+At first glance, this approach seems simple and convenient.
 
-Imagine a vulnerable search box whose client code builds this query:
+However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
 
-```text
-"SELECT * FROM Customer WHERE LastName = '" + userInput + "'"
-```
+Let's examine the main problems.
 
-The same code path, three different inputs:
+## 2.2 Problem 1 – SQL Injection
 
-| What the user types | SQL the server actually receives | What happens |
-|---|---|---|
-| `Smith` | `...WHERE LastName = 'Smith'` | Finds customers named Smith — works as intended |
-| `' OR 1=1 --` | `...WHERE LastName = '' OR 1=1 --'` | `1=1` is always true, so **every row matches**. The `--` comments out the trailing `'` so the query still parses. |
-| `'; DROP TABLE Customer; --` | `...WHERE LastName = ''; DROP TABLE Customer; --'` | The `;` starts a brand-new statement. SQL Server runs it. **The table is gone.** |
+SQL injection occurs when user-provided data becomes part of the SQL command itself.
 
-Nothing about the *code* changed between these three rows — only the text a user typed into a box. That is the entire attack: the database cannot tell "data" from "code" once they've been glued into the same string.
+Consider an application that allows users to search for customers by last name.
 
-With input like this, an attacker can:
-- Return every row from a table
-- Delete an entire table
-- Read credit card numbers from a different table via `UNION SELECT`
-- Modify data arbitrarily
-
-**SQL injection is not a "wrong password" problem. It is a "your whole database is readable and modifiable through one input box" problem.**
-
-### 2. No Query Plan Reuse
-
-SQL Server compiles a separate plan for each unique query text.
-
-If you send:
-- `DELETE FROM Customer WHERE IDCustomer = 1`
-- `DELETE FROM Customer WHERE IDCustomer = 2`
-- `DELETE FROM Customer WHERE IDCustomer = 3`
-
-SQL Server treats these as three different queries and compiles three separate plans. The plan cache fills with almost-identical plans that get used once and thrown away.
-
-### 3. Network Traffic
-
-The entire SQL string travels across the network every time.
-
-With a stored procedure and parameters, the server name and parameter values travel — small. With a concatenated string, everything travels every time.
-
-## The Safer Client-Side Alternative (Still Limited)
-
-Using **parameterised queries** in the client solves injection and plan-cache problems:
+The application builds a SQL statement like this:
 
 ```python
-# Python with parameterised query — safe, but incomplete
-cursor.execute("DELETE FROM Customer WHERE IDCustomer = ?", (id,))
+# UNSAFE — do not use this pattern
+last_name = input("Enter last name: ")
+
+sql = "SELECT * FROM Customer WHERE LastName = '" + last_name + "'"
+
+cursor.execute(sql)
 ```
 
-But parameterised queries do **not** solve "many rows in one call". If you have 30 IDs to delete, you still send 30 separate `EXEC` calls. The network makes thirty round-trips instead of one.
+### Example 1 – Normal input
 
-> [!TIP]
-> The remaining methods in this lab all live **inside the procedure**, not in the client. That is how they solve the "many rows in one call" problem.
+The user enters:
+
+```text
+Smith
+```
+
+The application generates:
+
+```sql
+SELECT *
+FROM Customer
+WHERE LastName = 'Smith';
+```
+
+Everything works as expected.
+
+### Example 2 – Malicious input
+
+Now imagine the user enters:
+
+```text
+' OR 1=1 --
+```
+
+The application generates:
+
+```sql
+SELECT *
+FROM Customer
+WHERE LastName = '' OR 1=1 --';
+```
+
+Let's examine what happened:
+
+1. The first `'` closes the original string.
+2. `OR 1=1` adds a condition that is always true.
+3. `--` comments out the remaining part of the SQL statement.
+
+Because `1=1` is always true, the query returns **all customers**, not just those with a particular last name.
+
+The user has changed the meaning of the SQL statement without changing the application code.
+
+### Example 3 – A more dangerous attack
+
+A malicious user might enter:
+
+```text
+'; DROP TABLE Customer; --
+```
+
+The generated SQL becomes:
+
+```sql
+SELECT *
+FROM Customer
+WHERE LastName = '';
+
+DROP TABLE Customer; --';
+```
+
+If the database account has sufficient permissions, SQL Server could execute the second statement and delete the entire `Customer` table.
+
+> [!WARNING]
+> **SQL injection is a security vulnerability, not a syntax error.**
+>
+> The database executes the SQL it receives. If an application mixes untrusted input with SQL code, an attacker may be able to change what the database does.
+>
+> The actual impact depends on the permissions granted to the database account.
+
+## 2.3 Problem 2 – Query Plan Reuse
+
+Before executing a query, SQL Server normally needs an **execution plan**.
+
+An execution plan describes how SQL Server will access the required data.
+
+Consider these statements:
+
+```sql
+SELECT * FROM Product WHERE IDProduct = 1;
+SELECT * FROM Product WHERE IDProduct = 2;
+SELECT * FROM Product WHERE IDProduct = 3;
+```
+
+Although the statements are logically similar, their SQL text is different.
+
+SQL Server may compile and cache separate execution plans for them.
+
+If an application generates thousands of different SQL statements, this can lead to unnecessary compilation work and increased plan-cache usage.
+
+A parameterized statement avoids embedding each value directly into the SQL text.
+
+For example:
+
+```sql
+SELECT *
+FROM Product
+WHERE IDProduct = @ProductID;
+```
+
+The SQL statement remains the same, while the parameter value changes.
+
+This makes execution-plan reuse more predictable.
+
+> [!NOTE]
+> SQL Server can sometimes reuse execution plans for queries containing literal values through automatic parameterization. Therefore, different SQL text does not always mean a completely new execution plan.
+
+## 2.4 Problem 3 – Network Overhead
+
+When an application communicates with a database server, requests and results travel over the network.
+
+Suppose an application needs to retrieve 100 products.
+
+One approach is to execute a separate query for each product:
+
+```python
+for product_id in product_ids:
+    cursor.execute(
+        "SELECT * FROM Product WHERE IDProduct = ?",
+        (product_id,)
+    )
+    # Process the result before executing the next query
+```
+
+This example uses **parameterized queries**, so it avoids the SQL injection problem.
+
+However, it still executes 100 separate queries.
+
+If each query requires a separate request to the database server, the application performs 100 network round-trips.
+
+A better solution for this scenario is to send all 100 IDs together and retrieve the matching products in one operation.
+
+```mermaid
+flowchart LR
+    A["Application"] -->|"100 separate requests"| B["SQL Server"]
+    C["Application"] -->|"One request with 100 IDs"| D["SQL Server"]
+```
+
+Reducing the number of round-trips can improve performance, especially when the application and database run on different servers.
+
+> [!IMPORTANT]
+> **Parameterized queries and collection parameters solve different problems.**
+>
+> - Parameterized queries keep data separate from SQL code, helping prevent SQL injection.
+> - Collection parameters allow multiple values or records to be passed together.
+>
+> Both techniques can be used together.
+
+## 2.5 The Better Approach
+
+We should avoid constructing SQL statements by concatenating untrusted input directly into the SQL text.
+
+Instead, applications should use **parameterized queries or stored procedures with properly defined parameters**.
+
+For a single product ID, a scalar parameter is sufficient:
+
+```sql
+EXEC dbo.usp_GetProduct @ProductID = 1;
+```
+
+But what if we want to pass 100 product IDs?
+
+We need a parameter capable of representing a collection.
+
+SQL Server provides several approaches:
+
+- **Delimited strings** — pass multiple values as text.
+- **XML** — pass structured data.
+- **Table-Valued Parameters (TVPs)** — pass typed rows.
+- **JSON** — pass structured JSON data.
+
+These approaches allow us to send collections to a stored procedure without inserting untrusted values directly into SQL code.
+
+In the following sections, we will explore each method, starting with the simplest: **delimited strings**.
 
 > [!TIP]
 > Want to see this attack land against a real, running application? [`demos/cyber-lab/`](../demos/cyber-lab/) is a small FastAPI login form with a vulnerable and a secure endpoint side by side, plus the exact payloads from this section as one-click buttons. Entirely optional — not required for this lab.

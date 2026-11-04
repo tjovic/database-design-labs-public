@@ -244,23 +244,34 @@ END
 GO
 ```
 
-Call it:
+Call it. Real customers in `AdventureWorksENG` have invoices pointing at them (`Invoice.CustomerID` is a required foreign key), so deleting a real `IDCustomer` would fail with a foreign key error. Insert two throwaway test customers instead, capture the IDs SQL Server assigned them, and delete those:
 
 ```sql
--- Before: 5 customers
-SELECT COUNT(*) FROM dbo.Customer;
+-- Insert two throwaway test customers — never delete real seed data
+DECLARE @InsertedIDs TABLE (ID int);
 
--- Delete customers with IDs 2 and 3 in a single call
-EXEC dbo.usp_DeleteCustomersByIDList @IDList = '2,3';
+INSERT INTO dbo.Customer (FirstName, LastName)
+OUTPUT INSERTED.IDCustomer INTO @InsertedIDs
+VALUES (N'ZZ_Test', N'Customer1'), (N'ZZ_Test', N'Customer2');
 
--- After: 3 customers
-SELECT COUNT(*) FROM dbo.Customer;
+-- In a real application this list comes from the UI (e.g. checked grid
+-- rows); here we build it from the rows we just inserted
+DECLARE @TestIDList nvarchar(max) = (SELECT STRING_AGG(CAST(ID AS nvarchar(10)), ',') FROM @InsertedIDs);
+
+-- Before: 2 test customers
+SELECT COUNT(*) FROM dbo.Customer WHERE FirstName = N'ZZ_Test';
+
+-- Delete both test customers in a single call
+EXEC dbo.usp_DeleteCustomersByIDList @IDList = @TestIDList;
+
+-- After: 0 test customers
+SELECT COUNT(*) FROM dbo.Customer WHERE FirstName = N'ZZ_Test';
 ```
 
-All deleted in one call, solving Problem 2 (batch key operation).
+Both deleted in one call, solving Problem 2 (batch key operation).
 
 > [!NOTE]
-> Don't actually run this if AdventureWorksENG is your only copy — it modifies real data. For actual testing, create your own test table or use the provided exercises.
+> `STRING_AGG` is the mirror image of `STRING_SPLIT` — it joins rows into one delimited string instead of splitting one apart. It isn't the point of this example; it's only here to build a realistic ID list without hardcoding IDs that differ on every machine.
 
 ## The Trade-Offs
 
@@ -641,7 +652,7 @@ BEGIN
     SELECT
         h.CustomerID,
         h.InvoiceDate,
-        CONVERT(nvarchar(20), NEWID())
+        LEFT(CONVERT(nvarchar(36), NEWID()), 20)
     FROM @Header h;
 
     -- Capture the new invoice ID
@@ -671,6 +682,7 @@ The key pieces:
 - **`SCOPE_IDENTITY()`** — captures the auto-generated invoice ID so we can link the line items.
 - **Two TVPs** — one for the header shape, one for the lines shape. Each can be read multiple times by different parts of the procedure.
 - **`InitialPrice` and `Discount`** — `InvoiceItem` requires both (`NOT NULL`). The TVP only carries a single `UnitPrice`, so the procedure uses it as `InitialPrice` and records no discount (`0`) for this simplified example.
+- **`LEFT(CONVERT(nvarchar(36), NEWID()), 20)`** — a placeholder invoice number. `NEWID()` always produces a 36-character string; converting it straight to a shorter `nvarchar` throws `Arithmetic overflow error converting expression to data type nvarchar` instead of truncating. Convert to the full length first, then `LEFT()` to cut it down — `LEFT()` truncates text safely, `CONVERT()` does not.
 
 Call it:
 
@@ -879,13 +891,13 @@ SELECT
     lines.ProductID,
     lines.Quantity,
     lines.UnitPrice
-FROM OPENJSON(@Json, '$.Invoice') AS inv
+FROM OPENJSON(@Json, '$.Invoice')
 WITH
 (
     CustomerID  int          '$.CustomerID',
     InvoiceDate date         '$.InvoiceDate',
     LinesJson   nvarchar(max) '$.Lines' AS JSON
-)
+) AS inv
 CROSS APPLY OPENJSON(inv.LinesJson)
 WITH
 (
@@ -896,6 +908,9 @@ WITH
 ```
 
 This shreds the nested array into individual rows, one per line item.
+
+> [!NOTE]
+> The table alias (`AS inv`, `AS lines`) comes **after** the `WITH (...)` clause, not right after `OPENJSON(...)`. Placing it before the `WITH` clause is a syntax error — SQL Server reports it as "Incorrect syntax near the keyword 'with'", which doesn't point at the alias as the actual problem.
 
 ## Building JSON: FOR JSON PATH
 

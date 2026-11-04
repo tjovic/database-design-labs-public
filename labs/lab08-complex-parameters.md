@@ -82,6 +82,22 @@ flowchart LR
 
 Both problems need the same fundamental thing: a way to send **more than a scalar value** to a procedure in a single call.
 
+## One List, Five Envelopes
+
+Here is a concrete running example to hold onto for the rest of the lab. Suppose the marketing team wants to feature **products 1, 2, and 3** on the homepage this week, and you need to pass that short list of IDs into a procedure.
+
+The list itself never changes — `1`, `2`, `3`. Only the **envelope** around it changes:
+
+| Method | The same three IDs, packaged for the call |
+|--------|--------------------------------------------|
+| Client-side query *(never do this)* | baked directly into the SQL text: `...WHERE IDProduct = 1 OR IDProduct = 2 OR IDProduct = 3` |
+| Delimited string | `'1,2,3'` |
+| XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` |
+| TVP | a table value: 3 rows, one column `ID` |
+| JSON | `[1, 2, 3]` |
+
+Every section below teaches you how to build, send, and unpack one row of this table. Section 7 closes the loop with the same example, side by side, once you've seen all five.
+
 ---
 
 # Section 2 – Method 1: Client-Side Query Building (The Anti-Example)
@@ -121,18 +137,23 @@ graph TD
 
 If any of those `id` values comes from user input, an attacker can put SQL syntax into your string.
 
-Consider this vulnerable code:
+Imagine a vulnerable search box whose client code builds this query:
 
-```sql
--- Vulnerable: client builds
-DECLARE @LastName nvarchar(50) = 'O''Brien';  -- user input
--- The client builds: "SELECT * FROM Customer WHERE LastName = '" + @LastName + "'"
--- But if @LastName is actually: ' OR 1=1 --
--- The server receives: SELECT * FROM Customer WHERE LastName = '' OR 1=1 --'
--- This matches every customer.
+```text
+"SELECT * FROM Customer WHERE LastName = '" + userInput + "'"
 ```
 
-With user input like `' OR 1=1 --`, an attacker can:
+The same code path, three different inputs:
+
+| What the user types | SQL the server actually receives | What happens |
+|---|---|---|
+| `Smith` | `...WHERE LastName = 'Smith'` | Finds customers named Smith — works as intended |
+| `' OR 1=1 --` | `...WHERE LastName = '' OR 1=1 --'` | `1=1` is always true, so **every row matches**. The `--` comments out the trailing `'` so the query still parses. |
+| `'; DROP TABLE Customer; --` | `...WHERE LastName = ''; DROP TABLE Customer; --'` | The `;` starts a brand-new statement. SQL Server runs it. **The table is gone.** |
+
+Nothing about the *code* changed between these three rows — only the text a user typed into a box. That is the entire attack: the database cannot tell "data" from "code" once they've been glued into the same string.
+
+With input like this, an attacker can:
 - Return every row from a table
 - Delete an entire table
 - Read credit card numbers from a different table via `UNION SELECT`
@@ -175,25 +196,7 @@ But parameterised queries do **not** solve "many rows in one call". If you have 
 
 # Section 3 – Method 2: Delimited String Parameters
 
-The first real answer: glue values together into a string and split them inside.
-
-## String Functions: A Quick Primer
-
-Before we can split, three system functions to know:
-
-```sql
-SELECT LEN('Ana');                              -- 3
-SELECT SUBSTRING('Miroslav', 1, 4);             -- 'Miro'
-SELECT CHARINDEX('a', 'Katarina');              -- 2 (first 'a')
-SELECT CHARINDEX('a', 'Katarina', 5);           -- 8 (find after position 5)
-SELECT CHARINDEX('f', 'Katarina');              -- 0 (not found)
-```
-
-- **`LEN`** — how many characters in the string.
-- **`SUBSTRING`** — pull out a piece by starting position and length.
-- **`CHARINDEX`** — find where one string first appears inside another; zero means "not found".
-
-Together, they let you walk through a delimited string character by character. But SQL Server provides a built-in tool that does it for you.
+The first real answer: glue values together into a string — `'1,2,3'` for our running example — and split them back apart inside the procedure.
 
 ## STRING_SPLIT — The Modern Splitter
 
@@ -216,7 +219,10 @@ value
 
 Pass it a string and a separator. Get back a table with one column — always named `value`. One row per piece.
 
-`STRING_SPLIT` is available in SQL Server 2016 and later. Older code you inherit may split manually using `CHARINDEX` and `SUBSTRING`.
+`STRING_SPLIT` is available in SQL Server 2016 and later.
+
+> [!NOTE]
+> **Before `STRING_SPLIT` existed**, you had to walk the string yourself with `LEN`, `SUBSTRING`, and `CHARINDEX` — find the next separator, cut out the piece before it, repeat. Older code you inherit may still do it that way. You'll build one of these manual splitters yourself in the [exercises](../exercises/complex-parameters.md), which is the fastest way to appreciate what one built-in function saves you.
 
 ## Full Pattern: Delete by ID List
 
@@ -308,6 +314,17 @@ You need four things:
 Slashes separate levels like a file path. `.` is "here". `@` is "attribute".
 
 ### Example: Shred Cities from XML
+
+Picture the document as a tree before looking at the code — this is exactly what `/Cities/City` walks:
+
+```mermaid
+graph TD
+    Cities --> City1["City<br/>Name = Oslo<br/>PostalCode = 0001"]
+    Cities --> City2["City<br/>Name = Bergen<br/>PostalCode = 5003"]
+    Cities --> City3["City<br/>Name = Trondheim<br/>PostalCode = 7010"]
+```
+
+`.nodes('/Cities/City')` walks down to the three `City` boxes and returns one row per box. `.value('@Name', ...)` then reads one label inside the box you're standing on.
 
 ```sql
 DECLARE @Cities xml = N'
@@ -480,11 +497,31 @@ XML is fine when the data has structure and the wire format is already XML. It f
 
 ## The Idea
 
-A procedure parameter must have a type. `int`, `nvarchar`, `money` — SQL Server already knows these. But "a table with these three columns" is not a built-in type until you define it.
+Back to our running example: pass products `1, 2, 3` into a procedure — but this time, as an actual **table**, not text.
 
-**`CREATE TYPE ... AS TABLE`** teaches SQL Server a new type shape. Then you use that type as a parameter — and the procedure can read the entire table, not just one scalar.
+Here's the wrinkle. Every parameter you've written so far has a type SQL Server already knows about:
 
-This is SQL Server's **native answer** to "pass me many rows".
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_Example
+    @IDList nvarchar(max),   -- SQL Server knows "nvarchar"
+    @Price  money            -- SQL Server knows "money"
+AS ...
+```
+
+But you **cannot** write this:
+
+```sql
+-- NOT VALID — SQL Server rejects an inline table shape
+CREATE OR ALTER PROCEDURE dbo.usp_Example
+    @IDs TABLE (ID int) READONLY
+AS ...
+```
+
+A parameter's type must already exist and have a name. `int`, `nvarchar`, `money` qualify. "A table with these columns" does not — not until you name it yourself.
+
+**`CREATE TYPE ... AS TABLE`** does exactly that: it teaches SQL Server a new type shape, once, under a name you choose. After that, the type behaves like any other — you can use it as a parameter, and the procedure reads the whole table through it, not just one scalar.
+
+This is SQL Server's **native answer** to "pass me many rows". No string to parse, no angle brackets, no `OPENJSON` — just a table, passed as a table.
 
 ## Step 1 – Define the Type
 
@@ -818,7 +855,19 @@ Key points:
 - The second argument to `OPENJSON` — `'$.Invoice'` — sets the **starting point** in the JSON. Start here, not at the document root.
 - The paths in the `WITH` columns are **relative** to that starting point. `'$.CustomerID'` means "from the current Invoice object, read the CustomerID property".
 
-For the nested array of lines, use a second `OPENJSON` in a `CROSS APPLY`:
+This one `OPENJSON` call only reaches the header — `CustomerID` and `InvoiceDate` are plain values, but `Lines` is itself an array. One `WITH` clause can read scalars; it can't also shred a nested array in the same breath. That takes a **second** `OPENJSON`, applied to just the `Lines` fragment:
+
+```mermaid
+flowchart LR
+    A["Whole JSON document"] --> B["OPENJSON #1<br/>starts at $.Invoice"]
+    B --> C["One row:<br/>CustomerID, InvoiceDate,<br/>+ raw Lines array text"]
+    C --> D["CROSS APPLY<br/>OPENJSON #2 on that text"]
+    D --> E["One row per line item:<br/>ProductID, Quantity, UnitPrice"]
+    style A fill:#fff3e0
+    style E fill:#c8e6c9
+```
+
+The first `OPENJSON` produces one row holding the header values **and** the untouched `Lines` array as raw text (that's what `AS JSON` below means: "don't try to parse this column, just hand me the text"). The second `OPENJSON`, run once per row via `CROSS APPLY`, then shreds that text into one row per line item:
 
 ```sql
 SELECT
@@ -907,6 +956,20 @@ JSON is the natural choice when the caller is a web service (React frontend, Fas
 ---
 
 # Section 7 – Five Methods: One Table, One Choice
+
+## Back to the Running Example
+
+Section 1 opened with one request — pass products `1, 2, 3` into a procedure — shown in five envelopes before you'd seen any of the mechanics. Now that you've built all five, here is the same table again, with the parameter declaration each method actually needs:
+
+| Method | Parameter declaration | What travels in the call |
+|--------|------------------------|---------------------------|
+| Client-side query *(never do this)* | *(no parameter at all — the values sit inside the SQL text itself)* | `...WHERE IDProduct = 1 OR IDProduct = 2 OR IDProduct = 3` |
+| Delimited string | `@IDList nvarchar(max)` | `'1,2,3'` |
+| XML | `@IDs xml` | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` |
+| TVP | `@IDs dbo.ProductIDList READONLY` | a table value: 3 rows, one column `ID` |
+| JSON | `@Json nvarchar(max)` | `[1, 2, 3]` |
+
+Same three products, five times. The only thing that changed from Section 1 to here is that you now know exactly how each row of this table is built, sent, and unpacked.
 
 ## The Comparison
 

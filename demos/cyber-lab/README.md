@@ -16,8 +16,10 @@ attacks against a live SQL Server database.
 - Windows + Python 3.10+
 - **Microsoft SQL Server** (Express is enough) reachable via Windows
   authentication
-- **ODBC Driver 17 for SQL Server**
+- **ODBC Driver 18 for SQL Server**
   ([download](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server))
+- **SQL Server Management Studio (SSMS)** or the `sqlcmd` command-line tool,
+  to run the setup scripts in step 3 below
 - Access to SQL Server with an account that has permission to create a database
 
 Check that the driver is installed:
@@ -26,16 +28,18 @@ Check that the driver is installed:
 python -c "import pyodbc; print(pyodbc.drivers())"
 ```
 
-The output must contain `ODBC Driver 17 for SQL Server`.
+The output must contain `ODBC Driver 18 for SQL Server`.
 
 ---
 
 ## Setup
 
-### 1. Clone and Python dependencies
+### 1. Create a virtual environment and install dependencies
 
 ```bash
 cd demos/cyber-lab
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -76,6 +80,7 @@ if the connection works.
 
 ```bash
 cd demos/cyber-lab
+.venv\Scripts\activate
 uvicorn app.main:app --reload
 ```
 
@@ -236,8 +241,12 @@ SQL Server logins, or switch the connection string to SQL auth
 **`Cannot open database "CyberLab"`** — you did not run `init.sql`. Run
 it from `sqlcmd` (above).
 
-**`Data source name not found`** — ODBC Driver 17 is missing. Install it
+**`Data source name not found`** — ODBC Driver 18 is missing. Install it
 (link above) and check again with `pyodbc.drivers()`.
+
+**Port 8000 already in use** — if `demos/obp-rest-demo` is already running
+on the same machine, it also defaults to port 8000. Stop it first, or
+start this app on a different port: `uvicorn app.main:app --reload --port 8001`.
 
 **Injection does not work (returns 0 rows even in vulnerable mode)** —
 verify that you actually clicked the red **Vulnerable** button, not the

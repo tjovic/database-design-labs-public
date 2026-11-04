@@ -475,9 +475,54 @@ In the following sections, we will explore each method, starting with the simple
 
 # Section 3 – Method 2: Delimited String Parameters
 
-The first real answer: glue values together into a string — `'1,2,3'` for our running example — and split them back apart inside the procedure.
+In Section 1, we wanted to pass several product IDs to a stored procedure using a single parameter.
 
-## STRING_SPLIT — The Modern Splitter
+A simple solution is to combine the IDs into one string, separating them with commas:
+
+```text
+1,2,3
+```
+
+Instead of passing three separate integers, we pass **one string containing three values**.
+
+Inside the stored procedure, SQL Server splits the string back into individual values.
+
+This technique is called a **delimited string parameter**.
+
+## 3.1 How It Works
+
+Consider the following parameter:
+
+```sql
+DECLARE @IDList nvarchar(max) = N'1,2,3';
+```
+
+Although it contains three numbers, SQL Server sees it as a single string.
+
+We need to convert it into a collection of values that can be used in a SQL query.
+
+```mermaid
+flowchart TD
+    A["String parameter<br/>'1,2,3'"] --> B["STRING_SPLIT"]
+    B --> C["Table with three rows"]
+    C --> D["1"]
+    C --> E["2"]
+    C --> F["3"]
+```
+
+SQL Server provides a built-in function called **`STRING_SPLIT`** for this purpose.
+
+## 3.2 The STRING_SPLIT Function
+
+The `STRING_SPLIT` function divides a string into separate values using a specified delimiter.
+
+Its basic syntax is:
+
+```sql
+STRING_SPLIT(string, separator)
+```
+
+For example:
 
 ```sql
 SELECT value
@@ -486,79 +531,255 @@ FROM STRING_SPLIT('1,2,5,7,11', ',');
 
 Result:
 
-```
-value
------
-1
-2
-5
-7
-11
+| value |
+|---|
+| 1 |
+| 2 |
+| 5 |
+| 7 |
+| 11 |
+
+The function returns a table containing one column named `value`.
+
+Each separated value becomes a row.
+
+Notice that the values are returned as **strings**, even though they look like numbers.
+
+To use them as integers, we can convert them:
+
+```sql
+SELECT CAST(value AS int) AS ProductID
+FROM STRING_SPLIT('1,2,5,7,11', ',');
 ```
 
-Pass it a string and a separator. Get back a table with one column — always named `value`. One row per piece.
-
-`STRING_SPLIT` is available in SQL Server 2016 and later.
+Now the result contains integer values that can be compared with integer columns in the database.
 
 > [!NOTE]
-> **Before `STRING_SPLIT` existed**, you had to walk the string yourself with `LEN`, `SUBSTRING`, and `CHARINDEX` — find the next separator, cut out the piece before it, repeat. Older code you inherit may still do it that way. You'll build one of these manual splitters yourself in the [exercises](../exercises/complex-parameters.md), which is the fastest way to appreciate what one built-in function saves you.
+> `STRING_SPLIT` is available in SQL Server 2016 and later, with database compatibility level 130 or higher.
+>
+> The function does not guarantee the order of returned rows. If order matters, it must be handled explicitly.
 
-## Full Pattern: Delete by ID List
+## 3.3 Using STRING_SPLIT in a Query
+
+Let's return to our example from Section 1.
+
+We want to retrieve products with IDs `1`, `2`, and `3`.
+
+First, we can write a normal query:
+
+```sql
+SELECT IDProduct, Name, PriceWithoutVAT
+FROM Product
+WHERE IDProduct IN (1, 2, 3);
+```
+
+Now replace the hardcoded list with `STRING_SPLIT`:
+
+```sql
+DECLARE @IDList nvarchar(max) = N'1,2,3';
+
+SELECT IDProduct, Name, PriceWithoutVAT
+FROM Product
+WHERE IDProduct IN
+(
+    SELECT CAST(value AS int)
+    FROM STRING_SPLIT(@IDList, ',')
+);
+```
+
+Let's examine the process:
+
+1. `@IDList` contains the string `'1,2,3'`.
+2. `STRING_SPLIT` separates it into three rows.
+3. `CAST` converts each value into an integer.
+4. The `IN` operator checks whether `IDProduct` matches any of these values.
+
+The result is the same as the original query, but the list of IDs is now supplied through a variable.
+
+This means we can use the same SQL statement with different lists of IDs.
+
+## 3.4 Passing the List to a Stored Procedure
+
+We can now create a stored procedure that accepts a list of product IDs.
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetProductsByIDList
+    @IDList nvarchar(max)
+AS
+BEGIN
+    SELECT IDProduct, Name, PriceWithoutVAT
+    FROM Product
+    WHERE IDProduct IN
+    (
+        SELECT CAST(value AS int)
+        FROM STRING_SPLIT(@IDList, ',')
+    );
+END;
+GO
+```
+
+Call the procedure:
+
+```sql
+EXEC dbo.usp_GetProductsByIDList
+    @IDList = N'1,2,3';
+```
+
+We can also pass a different list without modifying the procedure:
+
+```sql
+EXEC dbo.usp_GetProductsByIDList
+    @IDList = N'5,10,15,20';
+```
+
+**One parameter. Multiple IDs. One procedure call.**
+
+This solves our first problem: passing a collection of simple values to a stored procedure.
+
+## 3.5 Practical Example – Deleting Multiple Customers
+
+Now let's apply the same technique to a batch operation.
+
+Imagine an application where a user selects several customers and clicks **Delete**.
+
+Instead of sending a separate delete request for each customer, the application sends a comma-separated list of customer IDs.
+
+The procedure uses `STRING_SPLIT` to identify and delete all matching customers.
+
+### Step 1 – Create the procedure
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteCustomersByIDList
     @IDList nvarchar(max)
 AS
 BEGIN
-    DELETE FROM dbo.Customer
+    DELETE FROM Customer
     WHERE IDCustomer IN
     (
         SELECT CAST(value AS int)
         FROM STRING_SPLIT(@IDList, ',')
     );
-END
+END;
 GO
 ```
 
-Call it. Real customers in `AdventureWorksENG` have invoices pointing at them (`Invoice.CustomerID` is a required foreign key), so deleting a real `IDCustomer` would fail with a foreign key error. Insert two throwaway test customers instead, capture the IDs SQL Server assigned them, and delete those:
+### Step 2 – Prepare test data
+
+We should not delete existing customers from the training database.
+
+Instead, insert two temporary test customers:
 
 ```sql
--- Insert two throwaway test customers — never delete real seed data
 DECLARE @InsertedIDs TABLE (ID int);
 
-INSERT INTO dbo.Customer (FirstName, LastName)
+INSERT INTO Customer (FirstName, LastName)
 OUTPUT INSERTED.IDCustomer INTO @InsertedIDs
-VALUES (N'ZZ_Test', N'Customer1'), (N'ZZ_Test', N'Customer2');
-
--- In a real application this list comes from the UI (e.g. checked grid
--- rows); here we build it from the rows we just inserted
-DECLARE @TestIDList nvarchar(max) = (SELECT STRING_AGG(CAST(ID AS nvarchar(10)), ',') FROM @InsertedIDs);
-
--- Before: 2 test customers
-SELECT COUNT(*) FROM dbo.Customer WHERE FirstName = N'ZZ_Test';
-
--- Delete both test customers in a single call
-EXEC dbo.usp_DeleteCustomersByIDList @IDList = @TestIDList;
-
--- After: 0 test customers
-SELECT COUNT(*) FROM dbo.Customer WHERE FirstName = N'ZZ_Test';
+VALUES
+    (N'ZZ_Test', N'Customer1'),
+    (N'ZZ_Test', N'Customer2');
 ```
 
-Both deleted in one call, solving Problem 2 (batch key operation).
+The `OUTPUT INSERTED.IDCustomer` clause captures the IDs generated by SQL Server.
+
+We can now combine those IDs into one string:
+
+```sql
+DECLARE @TestIDList nvarchar(max);
+
+SELECT @TestIDList = STRING_AGG(CAST(ID AS nvarchar(20)), ',')
+FROM @InsertedIDs;
+
+SELECT @TestIDList AS IDList;
+```
+
+For example, if SQL Server generated IDs `701` and `702`, the result might be:
+
+```text
+701,702
+```
 
 > [!NOTE]
-> `STRING_AGG` is the mirror image of `STRING_SPLIT` — it joins rows into one delimited string instead of splitting one apart. It isn't the point of this example; it's only here to build a realistic ID list without hardcoding IDs that differ on every machine.
+> **`STRING_AGG` performs the opposite operation of `STRING_SPLIT`.**
+>
+> - `STRING_SPLIT` converts one string into multiple rows.
+> - `STRING_AGG` combines multiple rows into one string.
+>
+> We use `STRING_AGG` here because the generated customer IDs may differ between databases.
 
-## The Trade-Offs
+### Step 3 – Delete the test customers
 
-| Aspect | Details |
-|--------|---------|
-| **Pros** | Simple. Works on every SQL Server version. Small on the wire. |
-| **Cons** | Untyped — everything is text until you `CAST`. Fragile — pick a separator the data can't contain. No column structure — one flat list only. |
+Run the following statements in the same batch as the variable declarations and test-data insert above:
 
-Delimited strings work fine for a batch of integer IDs where the format is under your control. They fall apart the moment you need **structure** — an invoice with a customer ID, a date, **and** ten line items with a product ID, quantity, and price each.
+```sql
+-- Check before deletion
+SELECT *
+FROM Customer
+WHERE FirstName = N'ZZ_Test';
 
-For anything with structure, we need a richer format.
+-- Delete all selected customers
+EXEC dbo.usp_DeleteCustomersByIDList
+    @IDList = @TestIDList;
+
+-- Check after deletion
+SELECT *
+FROM Customer
+WHERE FirstName = N'ZZ_Test';
+```
+
+Both customers should be deleted by a single procedure call.
+
+> [!IMPORTANT]
+> The `@TestIDList` variable must remain in scope until the procedure is called.
+>
+> Do not place `GO` between its declaration and the `EXEC` statement, because `GO` ends the current batch.
+
+The procedure performs the deletion using one set-based `DELETE` statement, regardless of how many IDs are provided.
+
+> [!NOTE]
+> This example uses newly inserted test customers because existing customers may be referenced by invoices through foreign keys.
+>
+> Attempting to delete a referenced customer would result in a foreign key constraint error.
+
+## 3.6 Limitations of Delimited Strings
+
+Delimited strings are simple and convenient, but they have several limitations.
+
+| Limitation | Explanation |
+|---|---|
+| No type safety | Values arrive as text and may require conversion. |
+| Invalid values | A value such as `'1,ABC,3'` causes an error when converted to `int` using `CAST`. |
+| Delimiter conflicts | A comma cannot safely separate values that may themselves contain commas without additional rules. |
+| Limited structure | A string such as `'1,2,3'` represents a flat list, not a collection of records with multiple fields. |
+| No guaranteed order | `STRING_SPLIT` does not guarantee that rows are returned in their original order. |
+
+For example, consider an invoice containing several products.
+
+Each invoice item needs multiple values:
+
+| ProductID | Quantity | UnitPrice |
+|---|---|---|
+| 1 | 2 | 199.00 |
+| 2 | 1 | 49.90 |
+| 3 | 5 | 9.99 |
+
+We could try to represent this information as a string:
+
+```text
+1,2,199.00;2,1,49.90;3,5,9.99
+```
+
+But now we need two delimiters:
+
+- `;` to separate invoice items.
+- `,` to separate fields within each item.
+
+We would also need additional logic to extract and convert every value.
+
+This quickly becomes difficult to maintain.
+
+**Delimited strings work well for simple lists of values, but they are not ideal for structured data.**
+
+In the next section, we will introduce **XML**, which allows us to represent more complex information using elements, attributes, and nested structures.
 
 ---
 

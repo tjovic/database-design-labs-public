@@ -19,7 +19,7 @@ used throughout the course:
 These concepts are prerequisites for **Triggers (Lab 2)**, **Stored
 Procedures (Lab 3)**, **Functions (Lab 4)**, and **CRUD Operations
 (Lab 7)**.\
-**Lab 8 – T-SQL Programming** continues with `CONVERT` and `FORMAT`,
+**Lab 9 – T-SQL Programming** continues with `CONVERT` and `FORMAT`,
 and goes deeper into `TRY/CATCH`, building on the `WHILE` and `CASE`
 patterns introduced here.
 
@@ -1843,7 +1843,7 @@ Statement completes but affects zero rows
     -> check @@ROWCOUNT instead
 ```
 
-This lab only introduces the basic `TRY/CATCH` block. **Lab 8 – T-SQL
+This lab only introduces the basic `TRY/CATCH` block. **Lab 9 – T-SQL
 Programming** goes further, including `THROW` and re-raising errors.
 
 ### Check your understanding
@@ -2400,7 +2400,7 @@ These building blocks will reappear throughout the course:
 - **Lab 7 – CRUD Operations**: input parameters, control flow,
     `@@ROWCOUNT`, and the basic `TRY/CATCH` block, applied to insert,
     read, update, and delete operations;
-- **Lab 8 – T-SQL Programming**: `CONVERT`, `FORMAT`, and a deeper look
+- **Lab 9 – T-SQL Programming**: `CONVERT`, `FORMAT`, and a deeper look
     at `TRY/CATCH`, building on the `WHILE` and `CASE` patterns from
     this lab.
 

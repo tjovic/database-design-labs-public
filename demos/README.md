@@ -31,8 +31,9 @@ table — are built into the page as one-click buttons. Run the same
 payload against both endpoints and watch one of them do nothing while
 the other leaks every password in the database.
 
-See [cyber-lab/README.md](cyber-lab/README.md) for setup and a full
-walkthrough of each payload.
+See [cyber-lab/README.md](cyber-lab/README.md) for setup, and
+[cyber-lab/lab.md](cyber-lab/lab.md) for a guided, click-by-click
+classroom walkthrough of each payload.
 
 ---
 

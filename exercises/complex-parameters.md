@@ -218,42 +218,8 @@ DROP TABLE dbo.TestEmployee;
 DROP TABLE dbo.TestDepartment;
 ```
 
-**Alternative approach without a cursor** (more efficient in SQL Server):
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertEmployeeHierarchy
-    @Organization xml
-AS
-BEGIN
-    -- Create a working table to hold departments and their employee XML
-    DECLARE @WorkDepts TABLE
-    (
-        DepartmentID int,
-        EmployeeXml xml
-    );
-
-    -- Insert departments and capture their IDs
-    INSERT INTO dbo.TestDepartment (Name)
-    OUTPUT INSERTED.DepartmentID, (SELECT N'<Employees>' + 
-        CAST(dept.node.query('Employee') AS nvarchar(max)) + 
-        N'</Employees>')
-    INTO @WorkDepts
-    SELECT dept.node.value('@Name', 'nvarchar(50)')
-    FROM @Organization.nodes('/Organization/Department') AS dept(node);
-
-    -- Insert employees
-    INSERT INTO dbo.TestEmployee (DepartmentID, FirstName, LastName)
-    SELECT
-        wd.DepartmentID,
-        emp.node.value('@FirstName', 'nvarchar(50)'),
-        emp.node.value('@LastName', 'nvarchar(50)')
-    FROM @WorkDepts wd
-    CROSS APPLY wd.EmployeeXml.nodes('/Employees/Employee') AS emp(node);
-END
-GO
-
--- (Same test and cleanup as above)
-```
+> [!NOTE]
+> The cursor-based solution above is intentionally simple, not fast. For a production-quality version without a cursor, insert all departments first with `OUTPUT INSERTED.DepartmentID` into a table keyed by `Name`, then join that back to the original XML by department name to insert the employees in one set-based `INSERT ... SELECT`. The `OUTPUT` clause can only reference `INSERTED`/`DELETED` columns — not arbitrary expressions from the source `SELECT` — so the department name (not the raw XML fragment) is what you carry across the two inserts.
 
 </details>
 
@@ -261,7 +227,7 @@ GO
 
 ## Exercise 3 — Choose the Right Method [INTERMEDIATE]
 
-For each scenario below, decide which method from Lab 8 (delimited string, XML) or Lab 9 (TVP, JSON) is most appropriate. Write one sentence defending your choice.
+For each scenario below, decide which of the five methods from Lab 8 (client-side query, delimited string, XML, TVP, JSON) is most appropriate. Write one sentence defending your choice.
 
 There is not one single "right" answer — the argument is what counts.
 
@@ -398,13 +364,16 @@ FOR XML PATH('Product'), ROOT('PriceList');
 
 # Cleanup
 
-Remove any test procedures and tables created during these exercises.
+Remove any test procedures, functions, and tables created during these exercises. (Each exercise's solution already cleans up most of these inline; this is a safety net.)
 
 ```sql
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteProductsByNameList;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertEmployeeHierarchy;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDListWithValidation;
 DROP FUNCTION IF EXISTS dbo.fn_SplitInts;
+GO
+
+DROP TABLE IF EXISTS dbo.TestEmployee;
+DROP TABLE IF EXISTS dbo.TestDepartment;
 GO
 ```
 
@@ -412,8 +381,9 @@ GO
 
 # References
 
-- [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md) — Delimited strings, XML parameters, the anti-example of client-side query building.
-- [Lab 9 – Table-Valued Parameters and JSON](../labs/lab09-complex-parameters.md) — TVPs and JSON, the native solutions.
+- [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md) — all five methods: client-side query building (the anti-example), delimited strings, XML, Table-Valued Parameters, and JSON.
 - **Microsoft Learn**: [STRING_SPLIT (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/string-split-transact-sql)
 - **Microsoft Learn**: [Nodes() Method (xml Data Type)](https://learn.microsoft.com/en-us/sql/t-sql/xml/nodes-method-xml-data-type)
 - **Microsoft Learn**: [FOR XML (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/xml/for-xml-sql-server)
+- **Microsoft Learn**: [OPENJSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/openjson-transact-sql)
+- **Microsoft Learn**: [Table-Valued Parameters](https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-table-valued-parameters-database-engine)

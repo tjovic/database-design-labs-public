@@ -22,8 +22,9 @@ shreds it with `OPENJSON` and inserts it atomically.
 | "Thin API, fat stored procedure" | [api/routes.py](api/routes.py) — the route does no business logic, it only forwards JSON to SQL Server |
 
 The full guided walkthrough (what to click, what to say, what to look
-at in SSMS) is in [api/lab.md](api/lab.md). Setup details specific to
-the API itself are in [api/README.md](api/README.md).
+at in SSMS) is in [api/lab.md](api/lab.md). Once you've completed setup
+below, [api/README.md](api/README.md) is a quick reference for
+re-running the demo without repeating the full setup.
 
 ---
 
@@ -33,15 +34,27 @@ the API itself are in [api/README.md](api/README.md).
 - **Microsoft SQL Server** (Express is enough) reachable via Windows authentication
 - **ODBC Driver 18 for SQL Server**
   ([download](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server))
+- **SQL Server Management Studio (SSMS)** or the `sqlcmd` command-line tool,
+  to run the setup scripts in step 3 below
+
+Check that the driver is installed:
+
+```bash
+python -c "import pyodbc; print(pyodbc.drivers())"
+```
+
+The output must contain `ODBC Driver 18 for SQL Server`.
 
 ---
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Create a virtual environment and install dependencies
 
 ```bash
 cd demos/obp-rest-demo
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -68,13 +81,49 @@ sql/03_StoredProcedures.sql
 database — it does **not** touch `AdventureWorksENG`. `02_SeedData.sql`
 can be re-run at any time to reset the demo data.
 
-### 4. Run the API
+### 4. Verify the connection
 
 ```bash
+python -m api.database
+```
+
+This should print `Connected to SQL Server!`. If it fails, see
+[Common problems](#common-problems) below before continuing.
+
+### 5. Run the API
+
+```bash
+.venv\Scripts\activate
 uvicorn api.app:app --reload
 ```
 
 Open Swagger at <http://localhost:8000/docs>.
+
+> [!NOTE]
+> This defaults to port 8000. If [`demos/cyber-lab`](../cyber-lab/) is
+> already running on the same machine, it also defaults to port 8000 —
+> stop it first, or start this one on a different port:
+> `uvicorn api.app:app --reload --port 8001`.
+
+---
+
+## Common problems
+
+**`Login failed for user`** — SQL Server does not allow Windows auth for
+the account running the Python process. Add your Windows account to the
+SQL Server logins, or switch `.env` to SQL auth and adjust
+[api/database.py](api/database.py) to pass a username/password.
+
+**`Data source name not found`** — ODBC Driver 18 is missing. Install it
+(link above) and check again with `pyodbc.drivers()`.
+
+**`Cannot open database "OBPRestDemo"`** — you did not run
+`sql/01_CreateDatabase.sql`, or you ran it in a session connected to a
+different SQL Server instance than the one in `.env`.
+
+**`ModuleNotFoundError` when running `python -m api.database`** — run
+this command from the `demos/obp-rest-demo` folder itself, not from
+inside `api/`, and make sure the virtual environment is activated.
 
 ---
 

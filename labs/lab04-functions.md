@@ -1505,7 +1505,7 @@ GO
 ```
 
 > [!NOTE]
-> This trigger introduces two statements not used elsewhere yet: `ROLLBACK TRANSACTION` undoes the statement that fired the trigger, and `RAISERROR(message, severity, state)` reports the failure back to the caller as an error. [Lab 2's `trg_Employee_CheckSalary`](lab02-triggers.md) only printed a warning in a similar situation, because rejecting the change outright needs exactly these two statements, which that lab had not introduced yet. Handling a raised error gracefully inside a caller — with `TRY/CATCH` — starts in [Lab 7](lab07-crud-operations.md); `THROW` and re-raising errors are covered in Lab 8.
+> This trigger introduces two statements not used elsewhere yet: `ROLLBACK TRANSACTION` undoes the statement that fired the trigger, and `RAISERROR(message, severity, state)` reports the failure back to the caller as an error. [Lab 2's `trg_Employee_CheckSalary`](lab02-triggers.md) only printed a warning in a similar situation, because rejecting the change outright needs exactly these two statements, which that lab had not introduced yet. Handling a raised error gracefully inside a caller — with `TRY/CATCH` — starts in [Lab 7](lab07-crud-operations.md); `THROW` and re-raising errors are covered in Lab 9.
 
 Test a valid insert, then an invalid one:
 

@@ -2,6 +2,12 @@
 
 Demonstration application for lab exercises of the course **Database Design**.
 
+> [!NOTE]
+> This page is a **quick reference for re-running the demo** once
+> everything is already installed — it assumes the virtual environment,
+> `.env`, and the `OBPRestDemo` database already exist. For first-time
+> setup from a clean clone, follow the [main README](../README.md) instead.
+
 ---
 
 ## Before the lab

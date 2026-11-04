@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -43,6 +43,17 @@ The function collection is in [Function Exercises](functions.md) and follows the
 4. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic.
 
 The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
+
+### Complex Parameters
+
+The complex parameters collection is in [Complex Parameters Exercises](complex-parameters.md) and follows the learning goals in [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md):
+
+1. **Delimited strings** — accept a comma-separated list, split it with `STRING_SPLIT`, and use it in an `IN` clause or `JOIN`.
+2. **XML shredding** — use `.nodes()` and `.value()` to turn XML into rows.
+3. **Building XML** — use `FOR XML PATH` with dotted aliases to create nested XML structures from queries.
+4. **Choosing the right method** — reason about when to use delimited strings versus XML versus later methods (TVPs, JSON).
+
+These exercises range from direct SQL rewrites of Lab 08's core patterns to design scenarios where students must justify their method choice. They include building manual string splitters to understand why built-in functions matter, nested XML processing, and trade-off analysis across all five methods.
 
 ### Physical storage
 
@@ -101,6 +112,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Stored Procedure Exercises](procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
 - [Function Exercises](functions.md)
+- [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md)
+- [Complex Parameters Exercises](complex-parameters.md)
 - [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
 - [Physical Storage Exercises](physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)

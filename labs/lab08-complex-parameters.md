@@ -785,177 +785,311 @@ In the next section, we will introduce **XML**, which allows us to represent mor
 
 # Section 4 – Method 3: XML Parameters
 
-## The Idea
+In Section 3, we learned how to pass multiple values using a comma-separated string.
 
-XML is a text blob with **structure**. Tags. Attributes. Nesting. The moment you nest, you can carry an invoice header **and** all its line items in one value.
+This works well for simple lists, such as:
+
+```text
+1,2,3
+```
+
+But what if each item contains several values?
+
+For example, an invoice may contain multiple products, each with its own quantity and price.
+
+We need a format that can represent **structured data**, not just a list of values.
+
+One solution is **XML (Extensible Markup Language)**.
+
+## 4.1 What Is XML?
+
+XML is a text-based format used to represent structured information.
+
+It uses **elements**, **attributes**, and **nested structures** to describe data.
+
+Consider this example:
+
+```xml
+<Customers>
+    <Customer ID="1" Name="Alice" />
+    <Customer ID="2" Name="Bob" />
+    <Customer ID="3" Name="Charlie" />
+</Customers>
+```
+
+The XML document contains:
+
+- A root element: `<Customers>`.
+- Three child elements: `<Customer>`.
+- Two attributes for each customer: `ID` and `Name`.
+
+Unlike a comma-separated string, XML explicitly describes what each value represents.
+
+For example, we could represent an invoice and its items:
 
 ```xml
 <Invoice>
-    <Header>
-        <CustomerID>5</CustomerID>
-        <InvoiceDate>2026-07-23</InvoiceDate>
-    </Header>
-    <Lines>
-        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
-        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
-        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
-    </Lines>
+    <CustomerID>5</CustomerID>
+    <InvoiceDate>2026-11-04</InvoiceDate>
+    <Items>
+        <Item ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Item ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Item ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Items>
 </Invoice>
 ```
 
-One parameter. Whole structure.
+This document contains both the invoice information and a collection of invoice items.
 
-## Reading XML: `.nodes()` and `.value()`
+All the information can be passed to a stored procedure using **one XML parameter**.
 
-SQL Server gives us two methods on the `xml` type:
-- **`.nodes(path)`** — cut the XML into rows.
-- **`.value(path, type)`** — extract a column from each row.
+SQL Server has a built-in `xml` data type for storing and processing XML documents.
 
-### Minimal XQuery Syntax
+## 4.2 Reading XML in SQL Server
 
-You need four things:
+SQL Server provides several methods for working with XML.
 
-```
-/root/element      — from the root, find all elements at this path
-.                  — the current node's value
-@name              — the attribute called name
-..                 — the parent node
-```
+In this lab, we will focus on two:
 
-Slashes separate levels like a file path. `.` is "here". `@` is "attribute".
+| Method | Purpose |
+|---|---|
+| `.nodes()` | Converts matching XML elements into rows |
+| `.value()` | Extracts a value from an XML element or attribute |
 
-### Example: Shred Cities from XML
+Let's see how they work together.
 
-Picture the document as a tree before looking at the code — this is exactly what `/Cities/City` walks:
-
-```mermaid
-graph TD
-    Cities --> City1["City<br/>Name = Oslo<br/>PostalCode = 0001"]
-    Cities --> City2["City<br/>Name = Bergen<br/>PostalCode = 5003"]
-    Cities --> City3["City<br/>Name = Trondheim<br/>PostalCode = 7010"]
-```
-
-`.nodes('/Cities/City')` walks down to the three `City` boxes and returns one row per box. `.value('@Name', ...)` then reads one label inside the box you're standing on.
+### Step 1 – Declare an XML variable
 
 ```sql
 DECLARE @Cities xml = N'
 <Cities>
-    <City Name="Oslo"      PostalCode="0001" />
-    <City Name="Bergen"    PostalCode="5003" />
+    <City Name="Oslo" PostalCode="0001" />
+    <City Name="Bergen" PostalCode="5003" />
+    <City Name="Trondheim" PostalCode="7010" />
+</Cities>';
+```
+
+This variable contains one XML document with three cities.
+
+### Step 2 – Convert XML elements into rows
+
+We want to extract each `City` element.
+
+```sql
+DECLARE @Cities xml = N'
+<Cities>
+    <City Name="Oslo" PostalCode="0001" />
+    <City Name="Bergen" PostalCode="5003" />
     <City Name="Trondheim" PostalCode="7010" />
 </Cities>';
 
 SELECT
-    tbl.node.value('@Name',       'nvarchar(50)') AS CityName,
-    tbl.node.value('@PostalCode', 'nvarchar(10)') AS PostalCode
-FROM @Cities.nodes('/Cities/City') AS tbl(node);
+    c.node.query('.') AS CityXml
+FROM @Cities.nodes('/Cities/City') AS c(node);
 ```
 
-Breaking it down:
+The expression:
 
-- `@Cities.nodes('/Cities/City')` — start from the document root, find every `City` node under `Cities`, return them as rows.
-- The result is a one-column table; we alias both table and column — `AS tbl(node)`.
-- `tbl.node` is now one row per city — each still an XML fragment.
-- `.value('@Name', 'nvarchar(50)')` — read the `Name` attribute of the current node and cast it to `nvarchar(50)`.
-- Result: three clean rows, two columns.
+```sql
+@Cities.nodes('/Cities/City')
+```
+
+selects every `City` element inside the root `Cities` element.
+
+The result contains three rows, each holding one XML fragment.
+
+| CityXml |
+|---|
+| `<City Name="Oslo" PostalCode="0001" />` |
+| `<City Name="Bergen" PostalCode="5003" />` |
+| `<City Name="Trondheim" PostalCode="7010" />` |
+
+The syntax `AS c(node)` assigns names to the resulting table and XML column.
+
+> [!NOTE]
+> The path `/Cities/City` uses **XQuery**, a language for navigating XML.
+>
+> Think of it as a path through the XML structure:
+>
+> - `/Cities` — the root element.
+> - `/Cities/City` — all `City` elements inside `Cities`.
+> - `@Name` — the `Name` attribute.
+> - `.` — the current XML node.
+
+### Step 3 – Extract values using `.value()`
+
+Instead of returning XML fragments, we usually want ordinary SQL values.
+
+We can extract the attributes using `.value()`:
+
+```sql
+DECLARE @Cities xml = N'
+<Cities>
+    <City Name="Oslo" PostalCode="0001" />
+    <City Name="Bergen" PostalCode="5003" />
+    <City Name="Trondheim" PostalCode="7010" />
+</Cities>';
+
+SELECT
+    c.node.value('@Name', 'nvarchar(50)') AS CityName,
+    c.node.value('@PostalCode', 'nvarchar(10)') AS PostalCode
+FROM @Cities.nodes('/Cities/City') AS c(node);
+```
+
+Result:
 
 | CityName | PostalCode |
-|----------|-----------|
+|---|---|
 | Oslo | 0001 |
 | Bergen | 5003 |
 | Trondheim | 7010 |
 
-## Full Pattern: Insert a Batch of Cities
+Notice that we now have a normal SQL result set.
 
-Create the procedure first:
+**The XML document has been converted into relational rows and columns.**
+
+The two methods work together:
+
+1. `.nodes('/Cities/City')` identifies each city and creates a row.
+2. `.value('@Name', 'nvarchar(50)')` extracts the city name.
+3. `.value('@PostalCode', 'nvarchar(10)')` extracts the postal code.
+
+This process is sometimes called **XML shredding**.
+
+## 4.3 Passing XML to a Stored Procedure
+
+Now that we know how to extract data from XML, we can use it as a stored procedure parameter.
+
+Let's create a procedure that inserts multiple cities.
+
+Each city belongs to a state, so the procedure will accept:
+
+- `@StateID` — a scalar parameter identifying the state.
+- `@Cities` — an XML parameter containing multiple cities.
+
+### Step 1 – Create the procedure
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCityBatch
     @StateID int,
-    @Cities  xml
+    @Cities xml
 AS
 BEGIN
     INSERT INTO City (Name, StateID)
     SELECT
-        tbl.node.value('@Name', 'nvarchar(50)'),
+        c.node.value('@Name', 'nvarchar(50)'),
         @StateID
-    FROM @Cities.nodes('/Cities/City') AS tbl(node);
-END
+    FROM @Cities.nodes('/Cities/City') AS c(node);
+END;
 GO
 ```
 
-Then, in one unbroken batch, create a state to attach the cities to, call the procedure, verify, and clean up:
+Notice that the procedure uses `INSERT INTO ... SELECT`.
+
+The XML parameter is converted into rows, and all cities are inserted using one SQL statement.
+
+We do not need a `WHILE` loop or a separate `INSERT` statement for each city.
+
+### Step 2 – Call the procedure
+
+First, create a test state and capture its ID.
+
+Then pass the XML document to the procedure.
 
 ```sql
-DECLARE @NorwayID int;
+DECLARE @StateID int;
 
 INSERT INTO State (Name)
-VALUES ('Norway');
+VALUES (N'ZZ_TestNorway');
 
-SET @NorwayID = SCOPE_IDENTITY();
+SET @StateID = SCOPE_IDENTITY();
 
--- Call it
 EXEC dbo.usp_InsertCityBatch
-    @StateID = @NorwayID,
-    @Cities  = N'
+    @StateID = @StateID,
+    @Cities = N'
 <Cities>
-    <City Name="Oslo"      />
-    <City Name="Bergen"    />
+    <City Name="Oslo" />
+    <City Name="Bergen" />
     <City Name="Trondheim" />
 </Cities>';
 
 -- Verify
-SELECT c.Name, s.Name AS StateName
+SELECT c.Name AS CityName, s.Name AS StateName
 FROM City c
 JOIN State s ON s.IDState = c.StateID
-WHERE s.Name = 'Norway';
+WHERE s.IDState = @StateID;
 
 -- Cleanup
-DELETE FROM City  WHERE StateID = @NorwayID;
-DELETE FROM State WHERE IDState = @NorwayID;
+DELETE FROM City WHERE StateID = @StateID;
+DELETE FROM State WHERE IDState = @StateID;
 ```
+
+Run this entire block together because the variable `@StateID` must remain in scope.
+
+Finally, remove the procedure:
 
 ```sql
 DROP PROCEDURE dbo.usp_InsertCityBatch;
 ```
 
-> [!NOTE]
-> `@NorwayID` must stay in scope from the moment it is declared until it is last used. `GO` ends a batch and clears all local variables, so everything that reads `@NorwayID` — the `EXEC`, the cleanup `DELETE`s — must run in the same batch as the `DECLARE`. The procedure itself can be created separately beforehand, since it doesn't depend on the variable.
+**Three cities. One XML parameter. One procedure call.**
 
-**Three inserts. One procedure call. One round-trip.**
+## 4.4 XML Attributes vs. Element Values
 
-The application sent one `EXEC` with one XML parameter. The database received the whole batch in a single message and did the work in one `INSERT ... SELECT`, much faster than three separate `INSERT`s.
+XML can represent information in two common ways.
 
-## Element Text vs Attributes
-
-XML can store data two ways:
+**Using attributes:**
 
 ```xml
-<!-- As attributes -->
 <City Name="Oslo" />
+```
 
-<!-- As element text -->
+**Using element text:**
+
+```xml
 <City>Oslo</City>
 ```
 
-Read attributes with `@Name`. Read element text with `.`:
+Both represent the same city name, but the SQL expressions used to read them are different.
+
+For attributes, we use `@`:
 
 ```sql
-DECLARE @Cities xml = N'
-<Cities>
-    <City>Oslo</City>
-    <City>Bergen</City>
-</Cities>';
+DECLARE @City xml = N'<City Name="Oslo" />';
 
-SELECT tbl.node.value('.', 'nvarchar(50)') AS CityName
-FROM @Cities.nodes('/Cities/City') AS tbl(node);
+SELECT @City.value('(/City/@Name)[1]', 'nvarchar(50)') AS CityName;
 ```
 
-Same idea. Different key.
+For element text, we can use the element path:
 
-## Not Just Batches: One Entity, Many Fields
+```sql
+DECLARE @City xml = N'<City>Oslo</City>';
 
-Every XML example so far has been a **list** — several simple items, each with one or two attributes. XML is just as useful for the opposite case: **one entity with many different fields**, where naming each field is clearer than a long run of scalar parameters.
+SELECT @City.value('(/City/text())[1]', 'nvarchar(50)') AS CityName;
+```
+
+Both queries return:
+
+| CityName |
+|---|
+| Oslo |
+
+> [!IMPORTANT]
+> Notice the `[1]` in the expressions.
+>
+> When reading directly from an XML variable, SQL Server often requires us to specify that we expect a single value.
+>
+> The expression `(/City/@Name)[1]` selects the first matching `Name` attribute.
+>
+> In the earlier `.nodes()` examples, each row already represents a particular `City` node, so expressions such as `@Name` are evaluated relative to that node.
+
+## 4.5 Passing One Entity with Multiple Fields
+
+So far, we have used XML to pass collections of rows.
+
+However, XML can also represent **one entity containing multiple fields**.
+
+For example:
 
 ```xml
 <Customer>
@@ -965,7 +1099,9 @@ Every XML example so far has been a **list** — several simple items, each with
 </Customer>
 ```
 
-There is no list here — no `.nodes()` needed. `.value()` can read straight from the root, as long as the XQuery expression is wrapped so SQL Server knows it matches **exactly one** node:
+We could pass these values as three separate scalar parameters.
+
+Alternatively, we can pass the entire customer as one XML parameter.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerFromXml
@@ -978,24 +1114,24 @@ BEGIN
     VALUES
     (
         @Customer.value('(/Customer/FirstName)[1]', 'nvarchar(50)'),
-        @Customer.value('(/Customer/LastName)[1]',  'nvarchar(50)'),
-        @Customer.value('(/Customer/Email)[1]',     'nvarchar(50)')
+        @Customer.value('(/Customer/LastName)[1]', 'nvarchar(50)'),
+        @Customer.value('(/Customer/Email)[1]', 'nvarchar(100)')
     );
 
     SET @NewCustomerID = SCOPE_IDENTITY();
 
-    -- Show the row we just created
     SELECT *
     FROM Customer
     WHERE IDCustomer = @NewCustomerID;
-END
+END;
 GO
 ```
 
-Call it:
+Call the procedure:
 
 ```sql
-EXEC dbo.usp_InsertCustomerFromXml @Customer = N'
+EXEC dbo.usp_InsertCustomerFromXml
+    @Customer = N'
 <Customer>
     <FirstName>Nina</FirstName>
     <LastName>Novak</LastName>
@@ -1003,172 +1139,97 @@ EXEC dbo.usp_InsertCustomerFromXml @Customer = N'
 </Customer>';
 ```
 
+The procedure extracts the individual values from XML and inserts a new customer.
+
+Clean up the test data:
+
 ```sql
--- Cleanup
-DELETE FROM Customer WHERE Email = 'nina.novak@example.com';
+DELETE FROM Customer
+WHERE Email = N'nina.novak@example.com';
+
 DROP PROCEDURE dbo.usp_InsertCustomerFromXml;
 ```
 
-> [!NOTE]
-> `(/Customer/FirstName)[1]` — the parentheses plus `[1]` tell SQL Server "this path matches one node, trust me." Without them, `.value()` raises an error: it refuses to guess whether a path could match more than one node. You only need this singleton syntax when reading directly from the root; `.value()` calls made from inside a `.nodes()` row (as in every earlier example) are already scoped to one node and don't need it.
->
-> The `SELECT ... WHERE IDCustomer = @NewCustomerID` at the end is the same "insert, then show what you just inserted" pattern from the TVP invoice example in Section 5 — it works identically here because it has nothing to do with XML; it's just `SCOPE_IDENTITY()` plus a follow-up query.
+This example demonstrates that XML parameters are useful not only for lists but also for structured objects containing several related values.
 
-## Find-or-Create: Resolving a Chain of Foreign Keys
+## 4.6 Generating XML with FOR XML PATH
 
-The customer example above always inserts. But some data arrives already partially in the database — a customer's state and city might already exist, or might not. Inserting unconditionally would create duplicates.
+So far, we have received XML and converted it into SQL rows.
 
-Consider this XML, with every field as an attribute on one element:
+SQL Server can also perform the opposite operation: **convert query results into XML**.
 
-```xml
-<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />
-```
+This is useful when an application or external system expects XML output.
 
-`Customer` references a `City`, which references a `State` — a chain of two foreign keys. Before inserting anything, the procedure must check, at **each level**, whether that row already exists:
-
-```mermaid
-flowchart TD
-    A["Read State name from XML"] --> B{"State exists?"}
-    B -->|Yes| C["Use its IDState"]
-    B -->|No| D["INSERT State,<br/>capture new IDState"]
-    C --> E{"City exists<br/>in that State?"}
-    D --> E
-    E -->|Yes| F["Use its IDCity"]
-    E -->|No| G["INSERT City,<br/>capture new IDCity"]
-    F --> H{"Customer exists<br/>by name?"}
-    G --> H
-    H -->|Yes| I["Use existing row"]
-    H -->|No| J["INSERT Customer,<br/>linked to IDCity"]
-```
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
-    @Customer xml
-AS
-BEGIN
-    DECLARE @FirstName nvarchar(50) = @Customer.value('(/Customer/@FirstName)[1]', 'nvarchar(50)');
-    DECLARE @LastName  nvarchar(50) = @Customer.value('(/Customer/@LastName)[1]',  'nvarchar(50)');
-    DECLARE @CityName  nvarchar(50) = @Customer.value('(/Customer/@City)[1]',      'nvarchar(50)');
-    DECLARE @StateName nvarchar(50) = @Customer.value('(/Customer/@State)[1]',     'nvarchar(50)');
-
-    DECLARE @StateID    int;
-    DECLARE @CityID     int;
-    DECLARE @CustomerID int;
-
-    -- Find or create the state
-    SELECT @StateID = IDState FROM State WHERE Name = @StateName;
-    IF @StateID IS NULL
-    BEGIN
-        INSERT INTO State (Name) VALUES (@StateName);
-        SET @StateID = SCOPE_IDENTITY();
-    END
-
-    -- Find or create the city, scoped to that state
-    SELECT @CityID = IDCity FROM City WHERE Name = @CityName AND StateID = @StateID;
-    IF @CityID IS NULL
-    BEGIN
-        INSERT INTO City (Name, StateID) VALUES (@CityName, @StateID);
-        SET @CityID = SCOPE_IDENTITY();
-    END
-
-    -- Find or create the customer
-    SELECT @CustomerID = IDCustomer FROM Customer WHERE FirstName = @FirstName AND LastName = @LastName;
-    IF @CustomerID IS NULL
-    BEGIN
-        INSERT INTO Customer (FirstName, LastName, CityID) VALUES (@FirstName, @LastName, @CityID);
-        SET @CustomerID = SCOPE_IDENTITY();
-    END
-
-    SELECT c.IDCustomer, c.FirstName, c.LastName, ci.Name AS CityName, s.Name AS StateName
-    FROM Customer c
-    JOIN City ci ON ci.IDCity = c.CityID
-    JOIN State s ON s.IDState = ci.StateID
-    WHERE c.IDCustomer = @CustomerID;
-END
-GO
-```
-
-Call it twice with the **same** input:
-
-```sql
--- Run 1: Spain, Madrid, and Luka Modric do not exist yet — all three get inserted
-EXEC dbo.usp_InsertCustomerWithLocation
-    @Customer = N'<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />';
-
--- Run 2: the exact same call again — nothing new is inserted
-EXEC dbo.usp_InsertCustomerWithLocation
-    @Customer = N'<Customer FirstName="Luka" LastName="Modric" City="Madrid" State="Spain" />';
-
--- Confirm there is still only one of each
-SELECT COUNT(*) FROM State    WHERE Name = 'Spain';
-SELECT COUNT(*) FROM City     WHERE Name = 'Madrid';
-SELECT COUNT(*) FROM Customer WHERE FirstName = 'Luka' AND LastName = 'Modric';
-```
-
-Both runs return the same `IDCustomer`. Both counts stay at exactly `1`, no matter how many times the procedure is called with the same input.
-
-```sql
--- Cleanup
-DELETE FROM Customer WHERE FirstName = 'Luka' AND LastName = 'Modric';
-DELETE FROM City WHERE Name = 'Madrid';
-DELETE FROM State WHERE Name = 'Spain';
-DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
-```
-
-> [!NOTE]
-> The city lookup checks `Name = @CityName AND StateID = @StateID`, not `Name` alone. Two different states can each have a city with the same name — checking the name in isolation could match the wrong one, or skip creating a city that's genuinely new in this state.
-
-> [!IMPORTANT]
-> This "check, then insert only if missing" pattern is not specific to XML — the same `IF ... IS NULL BEGIN INSERT ... END` logic works identically whether the input arrived as XML attributes, a TVP row, or JSON properties. What XML (or JSON, or a TVP) buys you here is simply a single parameter that carries all four related values together, instead of four separate scalar parameters.
-
-## Building XML: FOR XML PATH
-
-XML works both ways. If a client sends XML in, sometimes we send XML back.
+For example:
 
 ```sql
 SELECT
-    c.IDCustomer       AS [@IDCustomer],
-    c.FirstName        AS [FirstName],
-    c.LastName         AS [LastName],
-    c.Email            AS [Emails/Email]
+    c.IDCustomer AS [@IDCustomer],
+    c.FirstName AS [FirstName],
+    c.LastName AS [LastName],
+    c.Email AS [Emails/Email]
 FROM Customer c
 WHERE c.IDCustomer <= 3
 FOR XML PATH('Customer'), ROOT('Customers');
 ```
 
-Look at the column aliases:
-
-- `[@IDCustomer]` — a name starting with `@` becomes an XML attribute.
-- `[FirstName]` — a plain name becomes a child element.
-- `[Emails/Email]` — a slash creates nested elements.
-- `FOR XML PATH('Customer')` — wrap each row in a `<Customer>` element.
-- `ROOT('Customers')` — wrap the whole thing in `<Customers>...</Customers>`.
-
-Expected shape:
+The result has a structure similar to this:
 
 ```xml
 <Customers>
-  <Customer IDCustomer="1">
-    <FirstName>Gustavo</FirstName>
-    <LastName>Achong</LastName>
-    <Emails>
-      <Email>gustavo0@adventure-works.com</Email>
-    </Emails>
-  </Customer>
-  ...
+    <Customer IDCustomer="1">
+        <FirstName>Gustavo</FirstName>
+        <LastName>Achong</LastName>
+        <Emails>
+            <Email>gustavo0@adventure-works.com</Email>
+        </Emails>
+    </Customer>
 </Customers>
 ```
 
-This is the mirror image of `.nodes()` and `.value()`. One converts XML into rows. The other converts rows into XML.
+The important parts are:
 
-## The Trade-Offs
+| SQL syntax | XML result |
+|---|---|
+| `[@IDCustomer]` | Creates an XML attribute |
+| `[FirstName]` | Creates a child element |
+| `[Emails/Email]` | Creates nested elements |
+| `FOR XML PATH('Customer')` | Creates one `Customer` element per row |
+| `ROOT('Customers')` | Wraps the result in a root element |
 
-| Aspect | Details |
-|--------|---------|
-| **Pros** | Handles arbitrarily nested structure. Standard. Self-documenting. Round-trips easily: `FOR XML` out, `.nodes()` in. |
-| **Cons** | Verbose — lots of angle brackets on the wire. Parsing slower than TVP or JSON. Weakly typed until you `CAST`. |
+Notice the use of `/` in column aliases.
 
-XML is fine when the data has structure and the wire format is already XML. It falls apart against a web API that speaks JSON.
+For example:
+
+```sql
+c.Email AS [Emails/Email]
+```
+
+creates:
+
+```xml
+<Emails>
+    <Email>...</Email>
+</Emails>
+```
+
+This is how we can build nested XML structures directly from relational data.
+
+## 4.7 Advantages and Limitations of XML
+
+| Advantages | Limitations |
+|---|---|
+| Supports nested and hierarchical data | More verbose than simpler formats |
+| Can represent collections and individual objects | XML syntax and XQuery require additional learning |
+| Built-in `xml` data type in SQL Server | XML processing introduces parsing overhead |
+| Can convert XML into relational rows | Requires careful handling of missing or invalid values |
+| Supports XML input and output | May be unnecessary when simpler formats are sufficient |
+
+XML remains useful when integrating with systems that already exchange XML documents, such as certain SOAP-based services.
+
+However, it is not the only way to pass structured data to SQL Server.
+
+In the next section, we will explore **Table-Valued Parameters (TVPs)**, which allow us to pass collections of typed rows directly to stored procedures without converting them into XML or delimited strings.
 
 ---
 
@@ -2177,6 +2238,291 @@ DROP TYPE dbo.ProductInput;
 </details>
 
 ---
+
+## Exercise 7 – XML: Find or Create Related Records [ADVANCED]
+
+In previous exercises, we used XML to insert multiple records into a database.
+
+Now consider a more realistic situation.
+
+An application receives information about a customer, including their city and state. However, some of this information may already exist in the database.
+
+We want to create a stored procedure that **inserts only the missing records**.
+
+### The problem
+
+Our database contains three related tables:
+
+- `State` — stores states or countries.
+- `City` — stores cities, each belonging to a state.
+- `Customer` — stores customers, each optionally linked to a city.
+
+The relationships are:
+
+```mermaid
+flowchart LR
+    A["State"] -->|"1:N"| B["City"]
+    B -->|"1:N"| C["Customer"]
+```
+
+The application sends the following XML document:
+
+```xml
+<Customer
+    FirstName="Luka"
+    LastName="Modric"
+    City="Madrid"
+    State="Spain" />
+```
+
+Before inserting the customer, the procedure must determine whether the state and city already exist.
+
+For example:
+
+- If `Spain` already exists, use its existing `IDState`.
+- If `Madrid` already exists within `Spain`, use its existing `IDCity`.
+- If the customer already exists, do not insert a duplicate.
+
+### Requirements
+
+Create a stored procedure named `dbo.usp_InsertCustomerWithLocation` that:
+
+1. Accepts one parameter named `@Customer` of type `xml`.
+2. Extracts `FirstName`, `LastName`, `City`, and `State` from the XML attributes.
+3. Checks whether the state exists. If not, inserts it and retrieves its new ID.
+4. Checks whether the city exists **within that state**. If not, inserts it and retrieves its new ID.
+5. Checks whether the customer exists using their first and last name. If not, inserts the customer and links them to the city.
+6. Uses a transaction to keep the insert operations together.
+7. Returns the customer's ID, name, city, and state.
+
+For this exercise, assume that the combination of first and last name uniquely identifies a customer. In a real application, a more reliable identifier would normally be required.
+
+### Expected behavior
+
+Call the procedure twice using the same XML:
+
+```sql
+EXEC dbo.usp_InsertCustomerWithLocation
+    @Customer = N'
+<Customer
+    FirstName="Luka"
+    LastName="Modric"
+    City="Madrid"
+    State="Spain" />';
+```
+
+After the first call, the required records should exist.
+
+After the second call, no additional records should be inserted.
+
+Both calls should return the same customer ID.
+
+### Hints
+
+- Use `.value()` to extract XML attributes.
+- Use `SELECT @Variable = Column FROM Table` to find existing IDs.
+- Use `IF @Variable IS NULL` to decide whether an insert is necessary.
+- Use `SCOPE_IDENTITY()` to retrieve newly generated IDs.
+- Check both `City.Name` and `City.StateID` when searching for an existing city.
+- Use `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` to manage the operation.
+
+> [!NOTE]
+> The find-or-create pattern is not specific to XML. The same database logic can be used with scalar parameters, JSON, or Table-Valued Parameters.
+>
+> XML is simply the format used to pass the input data.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
+    @Customer xml
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @FirstName nvarchar(50) =
+        @Customer.value('(/Customer/@FirstName)[1]', 'nvarchar(50)');
+
+    DECLARE @LastName nvarchar(50) =
+        @Customer.value('(/Customer/@LastName)[1]', 'nvarchar(50)');
+
+    DECLARE @CityName nvarchar(50) =
+        @Customer.value('(/Customer/@City)[1]', 'nvarchar(50)');
+
+    DECLARE @StateName nvarchar(50) =
+        @Customer.value('(/Customer/@State)[1]', 'nvarchar(50)');
+
+    DECLARE @StateID int;
+    DECLARE @CityID int;
+    DECLARE @CustomerID int;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Step 1: Find or create the state
+        SELECT @StateID = IDState
+        FROM State
+        WHERE Name = @StateName;
+
+        IF @StateID IS NULL
+        BEGIN
+            INSERT INTO State (Name)
+            VALUES (@StateName);
+
+            SET @StateID = SCOPE_IDENTITY();
+        END;
+
+        -- Step 2: Find or create the city
+        SELECT @CityID = IDCity
+        FROM City
+        WHERE Name = @CityName
+          AND StateID = @StateID;
+
+        IF @CityID IS NULL
+        BEGIN
+            INSERT INTO City (Name, StateID)
+            VALUES (@CityName, @StateID);
+
+            SET @CityID = SCOPE_IDENTITY();
+        END;
+
+        -- Step 3: Find or create the customer
+        SELECT @CustomerID = IDCustomer
+        FROM Customer
+        WHERE FirstName = @FirstName
+          AND LastName = @LastName;
+
+        IF @CustomerID IS NULL
+        BEGIN
+            INSERT INTO Customer (FirstName, LastName, CityID)
+            VALUES (@FirstName, @LastName, @CityID);
+
+            SET @CustomerID = SCOPE_IDENTITY();
+        END;
+
+        COMMIT TRANSACTION;
+
+        -- Return customer information
+        SELECT
+            c.IDCustomer,
+            c.FirstName,
+            c.LastName,
+            ci.Name AS CityName,
+            s.Name AS StateName
+        FROM Customer c
+        LEFT JOIN City ci ON ci.IDCity = c.CityID
+        LEFT JOIN State s ON s.IDState = ci.StateID
+        WHERE c.IDCustomer = @CustomerID;
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH;
+END;
+GO
+```
+
+### Test the procedure
+
+For an isolated test, use distinctive names that do not already exist in the training database.
+
+```sql
+-- First call
+EXEC dbo.usp_InsertCustomerWithLocation
+    @Customer = N'
+<Customer
+    FirstName="ZZ_TestLuka"
+    LastName="ZZ_TestModric"
+    City="ZZ_TestMadrid"
+    State="ZZ_TestSpain" />';
+
+-- Second call with identical data
+EXEC dbo.usp_InsertCustomerWithLocation
+    @Customer = N'
+<Customer
+    FirstName="ZZ_TestLuka"
+    LastName="ZZ_TestModric"
+    City="ZZ_TestMadrid"
+    State="ZZ_TestSpain" />';
+```
+
+### Verify the results
+
+```sql
+SELECT COUNT(*) AS StateCount
+FROM State
+WHERE Name = N'ZZ_TestSpain';
+
+SELECT COUNT(*) AS CityCount
+FROM City c
+JOIN State s ON s.IDState = c.StateID
+WHERE c.Name = N'ZZ_TestMadrid'
+  AND s.Name = N'ZZ_TestSpain';
+
+SELECT COUNT(*) AS CustomerCount
+FROM Customer
+WHERE FirstName = N'ZZ_TestLuka'
+  AND LastName = N'ZZ_TestModric';
+```
+
+Expected results:
+
+| StateCount | CityCount | CustomerCount |
+|---|---|---|
+| 1 | 1 | 1 |
+
+Running the procedure multiple times with the same input should not create additional records during this sequential test.
+
+### Cleanup
+
+Remove only the test records created for this exercise, in the correct order.
+
+```sql
+DELETE FROM Customer
+WHERE FirstName = N'ZZ_TestLuka'
+  AND LastName = N'ZZ_TestModric';
+
+DELETE FROM City
+WHERE Name = N'ZZ_TestMadrid'
+  AND StateID IN
+  (
+      SELECT IDState
+      FROM State
+      WHERE Name = N'ZZ_TestSpain'
+  );
+
+DELETE FROM State
+WHERE Name = N'ZZ_TestSpain';
+
+DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
+```
+
+</details>
+
+> [!IMPORTANT]
+> **Real-world consideration: concurrent execution**
+>
+> A transaction ensures that related changes are committed or rolled back together, but it does not automatically prevent duplicate records when two sessions execute the procedure simultaneously.
+>
+> In production systems, find-or-create operations should also use appropriate unique constraints and concurrency control.
+>
+> For this exercise, assume that the procedure is executed sequentially in an isolated training database.
+
+### What You Should Learn
+
+After completing this exercise, you should understand how to:
+
+- Extract several values from one XML parameter.
+- Resolve foreign key relationships before inserting records.
+- Reuse existing records instead of inserting duplicates.
+- Retrieve generated IDs using `SCOPE_IDENTITY()`.
+- Combine multiple database operations inside a transaction.
+- Return the resulting record to the caller.
 
 # Cleanup
 

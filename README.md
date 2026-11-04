@@ -34,10 +34,13 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 | 05 | [Physical Storage](labs/lab05-physical-storage.md) | pages, extents, buffer pool, logical vs. physical reads, `DBCC IND` / `DBCC PAGE` |
 | 06 | [Indexes](labs/lab06-indexes.md) | B+-tree structure, heap vs. clustered vs. nonclustered indexes, reading execution plans, composite indexes, selectivity, covering indexes |
 | 07 | [CRUD Operations](labs/lab07-crud-operations.md) | organizing Create/Read/Update/Delete with stored procedures, choosing between separate and combined procedures, read access through an inline table-valued function, `TRY/CATCH` with a CRUD example, referential integrity |
+| 08 | [Complex Parameters](labs/lab08-complex-parameters.md) | passing collections into a procedure: why client-side query building enables SQL injection, delimited strings, XML (`.nodes()` / `.value()` / `FOR XML PATH`), Table-Valued Parameters (`CREATE TYPE ... AS TABLE`), JSON (`OPENJSON` / `FOR JSON PATH`), choosing the right method |
 
 > Additional labs will be added as the course progresses.
 
-For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, indexes).
+For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, complex parameters, physical storage, indexes).
+
+Lab 8 also has two optional, self-contained live demos — a SQL-injection attack against a running login form, and a REST API that posts JSON into a stored procedure — see [demos/README.md](demos/README.md).
 
 ---
 
@@ -65,6 +68,8 @@ Lab 05 – Physical Storage
 Lab 06 – Indexes
         ↓
 Lab 07 – CRUD Operations
+        ↓
+Lab 08 – Complex Parameters
 ```
 
 A single lab may span more than one class session when the topic requires additional time.
@@ -89,11 +94,13 @@ Some examples intentionally produce SQL Server errors. These are part of the lea
 
 ## About the database
 
-Labs 00–04 and 07 use `AdventureWorksENG`, a training database prepared for the course.
+Labs 00–04, 07, and 08 use `AdventureWorksENG`, a training database prepared for the course.
 
 The examples may create temporary Views, tables, triggers, stored procedures, functions, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
 
 Labs 05–06 use a separate generated database, `IndexLab`, built specifically to demonstrate physical storage and indexing at a scale `AdventureWorksENG` cannot provide (10+ million rows in its largest tables). Run the [setup script](labs/setup/index-lab-data-setup.md) once before starting Lab 05; both labs then share that same database. Lab 07 returns to `AdventureWorksENG`.
+
+The two optional live demos linked from Lab 8 (see [demos/README.md](demos/README.md)) each use their own separate, dedicated database — neither touches `AdventureWorksENG`.
 
 ---
 

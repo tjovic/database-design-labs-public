@@ -266,7 +266,7 @@ GO
 Dropping the procedure removes the procedure itself. It does not remove the underlying tables or data.
 
 > [!TIP]
-> Use `EXEC` to call a procedure. In this lab, use `CREATE OR ALTER` so that your procedure can easily be executed again while you are developing it.
+> Use `EXEC` to call a procedure. In this lab, use `CREATE OR ALTER` so that your procedure definition can easily be run again while you are developing it.
 
 ---
 
@@ -444,6 +444,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetProductColor
     @Color     nvarchar(15) OUTPUT
 AS
 BEGIN
+    SET @Color = NULL;
+
     SELECT @Color = Color
     FROM Product
     WHERE IDProduct = @IDProduct;
@@ -472,6 +474,8 @@ Procedure call         -> @Color = @MyColor OUTPUT
 
 The caller needs a variable because the procedure needs somewhere to store the returned value.
 
+The procedure initializes `@Color` to `NULL`. If the product does not exist, the output remains `NULL` instead of retaining a value supplied by the caller.
+
 ### Common mistake
 
 > [!WARNING]
@@ -483,7 +487,7 @@ DECLARE @MyColor nvarchar(15);
 -- The procedure executes, but the value is not returned
 -- to @MyColor because OUTPUT is missing in the call.
 EXEC dbo.usp_GetProductColor
-    @IDProduct = 1,
+    @IDProduct = 742,
     @Color     = @MyColor;
 ```
 
@@ -602,14 +606,14 @@ flowchart TD
 For this example, create a small table that is independent of the rest of `AdventureWorksENG`:
 
 ```sql
-CREATE TABLE BankAccount
+CREATE TABLE dbo.BankAccount
 (
     AccountNumber int PRIMARY KEY,
     Balance       decimal(10,2) NOT NULL
 );
 GO
 
-INSERT INTO BankAccount (AccountNumber, Balance)
+INSERT INTO dbo.BankAccount (AccountNumber, Balance)
 VALUES
     (100, 5000.00),
     (101, 2000.00);
@@ -620,7 +624,7 @@ Check the initial balances:
 
 ```sql
 SELECT *
-FROM BankAccount;
+FROM dbo.BankAccount;
 ```
 
 Expected state:
@@ -645,7 +649,7 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM BankAccount
+        FROM dbo.BankAccount
         WHERE AccountNumber = @FromAccount
     )
         RETURN 1;
@@ -654,29 +658,29 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM BankAccount
+        FROM dbo.BankAccount
         WHERE AccountNumber = @ToAccount
     )
         RETURN 2;
 
     -- Transfer amount must be positive
-    IF @Amount <= 0
+    IF @Amount IS NULL OR @Amount <= 0
         RETURN 3;
 
     -- Source account must have enough funds
     IF
     (
         SELECT Balance
-        FROM BankAccount
+        FROM dbo.BankAccount
         WHERE AccountNumber = @FromAccount
     ) < @Amount
         RETURN 4;
 
-    UPDATE BankAccount
+    UPDATE dbo.BankAccount
     SET Balance = Balance - @Amount
     WHERE AccountNumber = @FromAccount;
 
-    UPDATE BankAccount
+    UPDATE dbo.BankAccount
     SET Balance = Balance + @Amount
     WHERE AccountNumber = @ToAccount;
 
@@ -720,7 +724,7 @@ Check the balances:
 
 ```sql
 SELECT *
-FROM BankAccount;
+FROM dbo.BankAccount;
 ```
 
 Expected result:
@@ -796,7 +800,7 @@ flowchart LR
     B --> C{Server continues running?}
     C -- Yes --> D[Add 3000 to account 101]
     D --> E[Transfer complete]
-    C -- No --> F[Money removed from 100<br/>but not added to 101]
+    C -- No --> F[Money removed from 100 / but not added to 101]
 ```
 
 The two updates logically belong together.
@@ -826,7 +830,9 @@ This is exactly the problem that **transactions** solve.
 Transactions are outside the scope of this lab, but this example shows why they are important when several data modifications form one logical operation.
 
 > [!NOTE]
-> A stored procedure can group several statements into one callable operation. A transaction guarantees that related changes succeed or fail together.
+> A stored procedure can group several statements into one callable operation. A correctly managed transaction makes the related changes atomic: either all are committed or none are.
+>
+> This simplified example assumes one user and no concurrent changes. With simultaneous transfers, another session could change the balance between the check and the `UPDATE`. A production implementation also needs suitable concurrency control. Transactions and concurrency control are covered separately.
 
 ---
 
@@ -876,7 +882,7 @@ The stored procedure calculates the customer's total spending and returns the ap
 
 ```mermaid
 flowchart LR
-    A["Application"] -->|"Customer ID<br/>Date from<br/>Date to"| B["Stored procedure"]
+    A["Application"] -->|"Customer ID / Date from / Date to"| B["Stored procedure"]
     B --> C["Calculate total spending"]
     C --> D["Determine discount"]
     D -->|"OUTPUT parameter"| A
@@ -894,6 +900,9 @@ This example demonstrates three different ways of working with values inside a s
 
 ---
 
+> [!NOTE]
+> For this example, assume a valid customer ID and non-NULL dates with `@DateFrom <= @DateTo`. The end date is inclusive. Input validation can be added as an extension.
+
 ### Calculating the customer's spending
 
 First, let's calculate how much customer `100` spent during 2003:
@@ -909,8 +918,8 @@ FROM Invoice i
 JOIN InvoiceItem ii
     ON ii.InvoiceID = i.IDInvoice
 WHERE i.CustomerID = 100
-  AND i.InvoiceDate >= '2003-01-01'
-  AND i.InvoiceDate <= '2003-12-31';
+  AND i.InvoiceDate >= '20030101'
+  AND i.InvoiceDate < '20040101';
 ```
 
 The result is:
@@ -933,9 +942,11 @@ FROM Invoice i
 JOIN InvoiceItem ii
     ON ii.InvoiceID = i.IDInvoice
 WHERE i.CustomerID = 100
-  AND i.InvoiceDate >= '2003-01-01'
-  AND i.InvoiceDate <= '2003-12-31';
+  AND i.InvoiceDate >= '20030101'
+  AND i.InvoiceDate < '20040101';
 ```
+
+The date range includes the beginning of the first day and stops before the beginning of the next year. This also includes invoices with a time component on December 31.
 
 Now we can use this calculation inside a stored procedure.
 
@@ -953,7 +964,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @TotalSpent decimal(10,2);
+    DECLARE @TotalSpent decimal(19,2);
 
     SELECT @TotalSpent =
         COALESCE(SUM(ii.TotalPrice), 0)
@@ -962,7 +973,7 @@ BEGIN
         ON ii.InvoiceID = i.IDInvoice
     WHERE i.CustomerID = @CustomerID
       AND i.InvoiceDate >= @DateFrom
-      AND i.InvoiceDate <= @DateTo;
+      AND i.InvoiceDate < DATEADD(day, 1, @DateTo);
 
     IF @TotalSpent >= 2000
         SET @DiscountPercent = 15;
@@ -975,6 +986,10 @@ BEGIN
 END;
 GO
 ```
+
+`SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does not hide query results or prevent `@@ROWCOUNT` from being updated. We will use `@@ROWCOUNT` in Exercise 5.
+
+The condition `i.InvoiceDate < DATEADD(day, 1, @DateTo)` includes the entire final day, even when `InvoiceDate` contains a time component.
 
 The procedure receives three **input parameters**:
 
@@ -989,7 +1004,7 @@ These values come from the caller.
 The procedure also declares a **local variable**:
 
 ```sql
-DECLARE @TotalSpent decimal(10,2);
+DECLARE @TotalSpent decimal(19,2);
 ```
 
 This variable exists only while the procedure is executing.
@@ -1004,7 +1019,7 @@ JOIN InvoiceItem ii
     ON ii.InvoiceID = i.IDInvoice
 WHERE i.CustomerID = @CustomerID
   AND i.InvoiceDate >= @DateFrom
-  AND i.InvoiceDate <= @DateTo;
+  AND i.InvoiceDate < DATEADD(day, 1, @DateTo);
 ```
 
 The procedure then applies the loyalty rules:
@@ -1054,8 +1069,8 @@ We can then execute the procedure:
 ```sql
 EXEC dbo.usp_GetLoyaltyDiscount
     @CustomerID = 100,
-    @DateFrom = '2003-01-01',
-    @DateTo = '2003-12-31',
+    @DateFrom = '20030101',
+    @DateTo = '20031231',
     @DiscountPercent = @Discount OUTPUT;
 ```
 
@@ -1072,8 +1087,8 @@ DECLARE @Discount decimal(5,2);
 
 EXEC dbo.usp_GetLoyaltyDiscount
     @CustomerID = 100,
-    @DateFrom = '2003-01-01',
-    @DateTo = '2003-12-31',
+    @DateFrom = '20030101',
+    @DateTo = '20031231',
     @DiscountPercent = @Discount OUTPUT;
 
 SELECT @Discount AS DiscountPercent;
@@ -1088,11 +1103,11 @@ The result should be:
 The procedure calculated that customer `100` spent **€1,728.51** during the selected period and therefore returned a **10% discount**.
 
 ```mermaid
-flowchart LR
-    A["@CustomerID = 100<br/>@DateFrom = 2003-01-01<br/>@DateTo = 2003-12-31"] -->|"INPUT"| B["usp_GetLoyaltyDiscount"]
-    B --> C["@TotalSpent<br/>1728.51"]
+flowchart TD
+    A["@CustomerID = 100 / @DateFrom = 2003-01-01 / @DateTo = 2003-12-31"] -->|"INPUT"| B["usp_GetLoyaltyDiscount"]
+    B --> C["@TotalSpent / 1728.51"]
     C --> D["IF / ELSE"]
-    D --> E["@DiscountPercent<br/>10%"]
+    D --> E["@DiscountPercent / 10%"]
     E -->|"OUTPUT"| F["Caller"]
 ```
 
@@ -1127,7 +1142,7 @@ Conceptually:
 ```mermaid
 flowchart LR
     A["Input parameters"] --> B["Stored procedure"]
-    B --> C["Local variable<br/>@TotalSpent"]
+    B --> C["Local variable / @TotalSpent"]
     C --> D["Business logic"]
     D --> E["OUTPUT parameter"]
 ```
@@ -1144,7 +1159,7 @@ flowchart LR
 
 1. If the customer has no purchases in the period, `SUM()` returns `NULL`. `COALESCE` makes the total spending `0` instead, so the discount logic still works correctly.
 2. `@TotalSpent` is not supplied by the caller — it is calculated inside the procedure from the input parameters, so it is a local variable rather than a parameter.
-3. The result is a single value (a percentage), not a set of rows, so an `OUTPUT` parameter is the appropriate mechanism — the same distinction covered in Section 4.
+3. An `OUTPUT` parameter lets the caller receive the percentage directly into a variable. A result set containing one value would also be possible; this example uses `OUTPUT` to demonstrate that interface.
 4. The procedure would still calculate the discount internally, but the caller's variable would not receive the value — the same mistake shown in Section 4's "Common mistake".
 
 </details>
@@ -1244,7 +1259,8 @@ The implementation uses the following T-SQL features:
 |---|---|
 | `IF` and `RETURN` | Reject invalid input and exit the procedure |
 | `DATALENGTH(@CardNumber)` | Detect empty input and determine the starting position |
-| `LIKE '%[^0-9]%'` | Detect a character outside the digit range |
+| `CHARINDEX(' ', @CardNumber)` | Explicitly detect spaces, including trailing spaces |
+| `COLLATE Latin1_General_100_BIN2` with `LIKE '%[^0-9]%'` | Restrict the accepted characters to ASCII digits |
 | `SUBSTRING(@CardNumber, @Position, 1)` | Extract one digit |
 | `CAST(... AS int)` | Convert the extracted digit to an integer |
 | `WHILE` | Process the digits one at a time |
@@ -1275,8 +1291,10 @@ BEGIN
     IF DATALENGTH(@CardNumber) = 0
         RETURN;
 
-    -- Reject input containing non-digit characters.
-    IF @CardNumber LIKE '%[^0-9]%'
+    -- Reject spaces explicitly and allow only ASCII digits.
+    -- The binary collation makes the digit range unambiguous.
+    IF CHARINDEX(' ', @CardNumber) > 0
+       OR @CardNumber COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
         RETURN;
 
     -------------------------------------------------------
@@ -1325,9 +1343,10 @@ GO
 
 - `@IsValid` starts at `0`, so every early `RETURN` leaves the output value at `0`.
 - Empty input is rejected before the calculation. Otherwise, the initial total of `0` would incorrectly pass the final divisibility check.
-- `LIKE '%[^0-9]%'` rejects input containing characters outside the digit range, including spaces.
+- `CHARINDEX(' ', @CardNumber)` explicitly rejects spaces, including trailing spaces.
+- `LIKE '%[^0-9]%'` with a binary collation rejects characters outside ASCII `0`–`9`, independently of the database's default collation.
 - `@Position` starts at the input length, so the loop processes the number from right to left regardless of its length.
-- `DATALENGTH` includes trailing spaces. Such input is rejected by the non-digit check.
+- `DATALENGTH` includes trailing spaces. The explicit space check rejects such input before the loop.
 - `@ShouldDouble` starts at `0`, because the rightmost digit—the check digit—is **not doubled**.
 - After each iteration, `@ShouldDouble` switches between `0` and `1`.
 - `@Total % 10 = 0` checks whether the final sum is divisible by `10`.
@@ -1384,7 +1403,7 @@ Also verify these cases:
 |---|---:|---|
 | `NULL` | 0 | Missing input |
 | `''` | 0 | Empty input |
-| `'4242'` | 0 | Incorrect checksum |
+| `'4242'` | 1 | Valid checksum; no card-length requirement |
 | `'12345674'` | 1 | Valid checksum |
 | `'12345675'` | 0 | Incorrect checksum |
 | `'424242424242424A'` | 0 | Contains a letter |
@@ -1419,7 +1438,7 @@ Also verify these cases:
 > In [Exercise 6](#exercise-6--validate-all-stored-card-numbers), you will reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
 
 > [!TIP]
-> [Lab 4, Section 9](lab04-functions.md#section-9--composing-a-function-with-a-procedure-and-a-trigger) moves this same Luhn calculation into a scalar function, then reuses it from this procedure, from a query over every row of `CreditCard`, and from a trigger that rejects an invalid `CardNumber` on `INSERT`/`UPDATE`.
+> The additional reading in [Lab 4 – Functions](lab04-functions.md) shows how to move this Luhn calculation into a scalar function and reuse it from a procedure, a query, and a trigger.
 
 
 ---
@@ -1548,6 +1567,11 @@ State: Canada, City: Vancouver
 
 Finally, verify that `Canada` exists only once in `State` and that both cities reference it.
 
+> [!NOTE]
+> This exercise assumes one user and at most one matching state before the first call. It prevents an additional state row in this sequential demonstration. Concurrent calls require additional protection.
+>
+> Repeating the two calls inserts the cities again; the procedure checks whether the state exists, but does not check for existing cities.
+
 <details>
 <summary>Show solution</summary>
 
@@ -1611,6 +1635,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetProductColor
     @Color     nvarchar(15) OUTPUT
 AS
 BEGIN
+    SET @Color = NULL;
+
     SELECT @Color = Color
     FROM Product
     WHERE IDProduct = @IDProduct;
@@ -1624,7 +1650,7 @@ A developer calls it like this:
 DECLARE @Color nvarchar(15);
 
 EXEC dbo.usp_GetProductColor
-    @IDProduct = 1,
+    @IDProduct = 742,
     @Color     = @Color;
 
 SELECT @Color AS ProductColor;
@@ -1649,7 +1675,7 @@ It must appear both in the procedure declaration and in the call when the caller
 DECLARE @Color nvarchar(15);
 
 EXEC dbo.usp_GetProductColor
-    @IDProduct = 1,
+    @IDProduct = 742,
     @Color     = @Color OUTPUT;
 
 SELECT @Color AS ProductColor;
@@ -1808,7 +1834,7 @@ Your task is to reuse this procedure to check **all existing card numbers** in t
 > Store the results only in the table variable. Do not modify `dbo.CreditCard`.
 
 > [!NOTE]
-> A result of `0` means that the number does not meet the rules of our procedure. It may have an incorrect checksum, contain non-digit characters, or fail the example's requirement of exactly 16 digits.
+> A result of `0` means that the number does not meet the rules of our procedure. It may have an incorrect checksum, contain non-digit characters, or be `NULL` or empty. The procedure does not require exactly 16 digits.
 
 ### Hints
 
@@ -1871,15 +1897,17 @@ BEGIN
 END;
 
 -- Individual results.
-SELECT CardNumber, IsValid
-FROM @Cards;
+SELECT IDCreditCard, IsValid
+FROM @Cards
+ORDER BY IDCreditCard;
 
 -- Summary: 0 = rejected, 1 = accepted.
 SELECT
     IsValid,
     COUNT(*) AS CardCount
 FROM @Cards
-GROUP BY IsValid;
+GROUP BY IsValid
+ORDER BY IsValid;
 GO
 ```
 
@@ -1895,7 +1923,7 @@ Run the complete script as **one batch**. The table variable and local variables
 </details>
 
 > [!TIP]
-> This example calls a procedure once for each card. In [Lab 4, Section 9](lab04-functions.md#section-9--composing-a-function-with-a-procedure-and-a-trigger), we will move the checksum calculation into a scalar function and call it directly from a `SELECT` statement.
+> This example calls a procedure once for each card. The additional reading in [Lab 4 – Functions](lab04-functions.md) shows how to move the checksum calculation into a scalar function and call it directly from a `SELECT` statement.
 
 ---
 
@@ -1922,6 +1950,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetProductInfo
     @Price     money OUTPUT
 AS
 BEGIN
+    SET @Price = NULL;
+
     IF NOT EXISTS
     (
         SELECT 1
@@ -1962,7 +1992,7 @@ The result set is appropriate for the product row, the output parameter returns 
 
 # Cleanup
 
-Remove the procedures and test data created during the lab.
+Remove the procedures and the standalone demonstration table created during the lab.
 
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_ListStates;
@@ -1972,6 +2002,7 @@ DROP PROCEDURE IF EXISTS dbo.usp_GetProductColor;
 DROP PROCEDURE IF EXISTS dbo.usp_CheckCustomerExists;
 DROP PROCEDURE IF EXISTS dbo.usp_ListCategories;
 DROP PROCEDURE IF EXISTS dbo.usp_CustomersByLastName;
+DROP PROCEDURE IF EXISTS dbo.usp_FindCustomersByLastName;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductInfo;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityInState;
 DROP PROCEDURE IF EXISTS dbo.usp_TransferMoney;
@@ -1980,22 +2011,17 @@ DROP PROCEDURE IF EXISTS dbo.usp_ValidateCardNumber;
 GO
 ```
 
-Remove only the test rows created in this lab:
+Remove the standalone demonstration table:
 
 ```sql
-DELETE FROM City
-WHERE Name IN ('Osaka', 'Tokyo', 'Toronto', 'Vancouver');
-
-DELETE FROM State
-WHERE Name IN ('Japan', 'Canada');
-GO
-
-DROP TABLE IF EXISTS BankAccount;
+DROP TABLE IF EXISTS dbo.BankAccount;
 GO
 ```
 
-> [!TIP]
-> Keep cleanup targeted to objects and rows created during the lab.
+> [!IMPORTANT]
+> Exercise 3 adds rows to the existing `State` and `City` tables. Those rows are not deleted automatically: rows with the same names may already have existed before this lab.
+>
+> To remove your test rows, first identify the exact IDs inserted during your run. Delete only those city rows, then delete the state only if you created it and no remaining rows reference it. Do not delete rows by name alone.
 
 ---
 

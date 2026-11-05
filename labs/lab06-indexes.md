@@ -486,7 +486,7 @@ For example, a nonclustered index on `SalesOrder(OrderDate)` can already make it
 <details>
 <summary>Show answers</summary>
 
-1. At the root page, unless the tree has only a single level.
+1. At the root page. In a single-page index, that page is also the leaf.
 2. They allow efficient traversal through neighboring key ranges.
 3. A clustered index.
 4. RID Lookup retrieves missing columns from a heap row via its RID; Key Lookup retrieves them from a clustered index using its clustering key.
@@ -614,7 +614,7 @@ The "Access operator" and "Main join operator" rows name things Section 7.1 has 
 
 ![Execution plan before indexing: two Table Scans feeding two Hash Match joins, a Hash Match Aggregate, and a Sort](../images/lab06/execution-plan-before.svg)
 
-This is a simplified redrawing of the actual plan measured on one computer (the reference results above) — same operators and row counts, laid out for readability. Your own plan's exact shape should match; icon style and layout will differ by SSMS version.
+This is a simplified redrawing of the actual plan measured on one computer (the reference results above) — same operators and row counts, laid out for readability. Your plan may differ from this reference example. Focus on the access methods, row counts, and amount of work performed rather than expecting an identical plan shape. Icon style and layout may also differ by SSMS version.
 
 Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
@@ -1099,7 +1099,7 @@ In the next sections, we will create nonclustered indexes specifically designed 
 | CPU time | 13.25 s |
 | Elapsed time | 14.1 s |
 
-Nearly identical to the heap baseline (57,143 / 198,020 / 161, ~14.7 s CPU / ~18.1 s elapsed) — a few extra logical reads come from the clustered index's new root and IAM pages, but both large tables are still read in full.
+Logical reads remain very similar to the heap baseline (57,143 / 198,020 / 161, ~14.7 s CPU / ~18.1 s elapsed). Creating the clustered indexes changed the storage structure, but both large tables are still read in full. The total logical-read counts alone do not identify which pages account for the small difference.
 
 </details>
 
@@ -1354,7 +1354,7 @@ In the next section, we will modify the index so that these additional accesses 
 | CPU time | 12.05 s | **0.28 s** |
 | Elapsed time | 13.1 s | **0.76 s** |
 
-This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats a 40-million-row `Hash Match` input by a wide margin, even with a `Key Lookup` on every one of the 21,908 matching rows. `SalesOrderItem`'s logical reads (106,449) are still far higher than they need to be, though: each lookup costs extra page accesses that a covering index can avoid entirely — the point of Section 8.4.
+This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats a 40-million-row `Hash Match` input by a wide margin, even with an additional clustered index access for each of the 21,908 matching rows. `SalesOrderItem`'s logical reads (106,449) are still far higher than they need to be, though: each lookup costs extra page accesses that a covering index can avoid entirely — the point of Section 8.4.
 
 </details>
 
@@ -1665,7 +1665,7 @@ Logical reads measure page accesses, not necessarily physical disk operations.
 
 We have now seen how indexes changed the execution plan. Let's measure how much these changes improved query performance.
 
-The following results were recorded during the original lab demonstration on **SQL Server Express**.
+The following approximate results summarize the original lab demonstration on **SQL Server Express**. They are representative measurements from demonstration runs, rather than exact copies of every measurement in Sections 7 and 8. For example, the detailed baseline in Section 7 reports 18.1 seconds; the rounded comparison below uses approximately 17 seconds. Use measurements from your own runs when calculating your improvement.
 
 The same SQL query was executed before and after creating the indexes.
 
@@ -2116,7 +2116,7 @@ However, **having an index does not guarantee that SQL Server will use it for ev
 
 Enable Actual Execution Plan and execute:
 
-**Query A – Common status**
+**Query A – Completed status**
 
 ```sql
 SELECT SalesOrderId, Status
@@ -2125,7 +2125,7 @@ WHERE Status = 'Completed';
 GO
 ```
 
-**Query B – Rare status**
+**Query B – Review status**
 
 ```sql
 SELECT SalesOrderId, Status
@@ -2134,7 +2134,9 @@ WHERE Status = 'Review';
 GO
 ```
 
-Both queries filter on the same indexed column, but they may return very different numbers of rows.
+Both queries filter on the same indexed column. Use the distribution query above to check how frequently these values actually occur. If other values are more suitable, replace the literals with the most frequent and least frequent status values in your data. If the frequencies are similar, expect little difference due to selectivity alone.
+
+These queries are covered by `IX_SalesOrder_Status` because `SalesOrderId` is the clustered key and is already available in the nonclustered index. Both queries may therefore use an Index Seek, even when one returns many rows. Compare the number of rows and logical reads; do not expect different operator types.
 
 Compare their execution plans and `STATISTICS IO` results.
 
@@ -2495,6 +2497,8 @@ WHERE CustomerId = 500
 - **B:** seek on `CustomerId`; rows for that customer are then in `OrderDate` order, potentially avoiding `Sort`.
 - **C:** seek using the equality on `CustomerId` and the range on `OrderDate`.
 
+Check the **Object** property to identify which index SQL Server actually used. Query A may use the separate `IX_SalesOrder_OrderDate` index created earlier; that does not mean the composite index supports an efficient seek on `OrderDate` alone.
+
 An actual plan may vary due to the cost of `SELECT *` and possible lookups.
 
 </details>
@@ -2535,14 +2539,16 @@ ORDER BY OrderDate;
 
 Before creating anything, consider:
 
-1. Does a similar index already exist (`IX_SalesOrder_Status` from Section 10.2)?
-2. Would an index on `(Status, OrderDate)` overlap with it?
-3. Is it better to create a new index, replace the existing one, or do nothing?
+1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from Section 10.2 and `IX_SalesOrder_Status_OrderDate` if you completed Exercise 1?
+2. Can an existing index support both the filter and the requested sort order?
+3. Is it better to create a new index, replace an overlapping index, or do nothing?
 
 <details>
 <summary>Show solution</summary>
 
-`IX_SalesOrder_Status` supports the filter, but not ordering by `OrderDate` within the same `Status`. An index on `(Status, OrderDate)` can support both. It overlaps with the previous index, so consider **replacing** the earlier index instead of maintaining both. In a real system, inspect the entire workload before making this change.
+If you completed Exercise 1, `IX_SalesOrder_Status_OrderDate` already covers this query. With `Status` fixed by the equality condition, SQL Server can read the relevant `OrderDate DESC` range backward to satisfy `ORDER BY OrderDate` in ascending order. No new index is needed for this exercise.
+
+If you skipped Exercise 1, `IX_SalesOrder_Status` supports the filter, but not ordering by `OrderDate` within the same `Status`. An index on `(Status, OrderDate)` can support both. It overlaps with the status-only index, so consider **replacing** the earlier index instead of maintaining both. In a real system, inspect the entire workload before making this change.
 
 </details>
 

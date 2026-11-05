@@ -1104,7 +1104,7 @@ We can support both operations using one procedure.
 
 ### Example – `usp_SaveState`
 
-``` sql
+```sql
 CREATE OR ALTER PROCEDURE dbo.usp_SaveState
     @IDState int OUTPUT,
     @Name    nvarchar(50)
@@ -1139,7 +1139,7 @@ The procedure uses the value of `@IDState` to determine which operation to perfo
 
 ### Test 1 – Insert a new state
 
-``` sql
+```sql
 DECLARE @IDState int = NULL;
 
 EXEC dbo.usp_SaveState
@@ -1153,9 +1153,9 @@ Because `@IDState` is `NULL`, the procedure inserts a new state and returns its 
 
 ### Test 2 – Update the same state
 
-Execute the following together with Test 1 in the same batch, or use the returned ID:
+Execute the following together with Test 1 in the same batch, or declare `@IDState` again and assign the ID returned by Test 1:
 
-``` sql
+```sql
 EXEC dbo.usp_SaveState
     @IDState = @IDState OUTPUT,
     @Name = N'ZZ_LabTestState_SavedRenamed';
@@ -1182,7 +1182,7 @@ Another approach is to let the caller explicitly specify which operation should 
 
 For example:
 
-``` sql
+```sql
 EXEC dbo.usp_ManageSubcategory
     @Action = N'GET',
     @IDSubcategory = 10;
@@ -1190,7 +1190,7 @@ EXEC dbo.usp_ManageSubcategory
 
 Or:
 
-``` sql
+```sql
 EXEC dbo.usp_ManageSubcategory
     @Action = N'DELETE',
     @IDSubcategory = 10;
@@ -1202,7 +1202,7 @@ The `@Action` parameter determines which branch of the procedure runs.
 
 Create a category with two subcategories. One subcategory will have a product, while the other will remain empty.
 
-``` sql
+```sql
 DECLARE @CategoryID int;
 
 INSERT INTO Category (Name)
@@ -1249,7 +1249,7 @@ The procedure supports two operations:
 - `GET` – retrieve a subcategory.
 - `DELETE` – delete a subcategory if it has no products.
 
-``` sql
+```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ManageSubcategory
     @Action        nvarchar(10),
     @IDSubcategory int
@@ -1288,7 +1288,7 @@ BEGIN
         DELETE FROM Subcategory
         WHERE IDSubcategory = @IDSubcategory;
 
-        RETURN 0;89
+        RETURN 0;
     END
 
     RETURN 99;
@@ -1309,7 +1309,7 @@ For `GET`, return code `0` indicates that the query executed, even if it returne
 
 ### Test the procedure
 
-``` sql
+```sql
 DECLARE @SubWithProduct int, @SubWithoutProduct int, @Result int;
 
 SELECT @SubWithProduct = IDSubcategory
@@ -1318,7 +1318,7 @@ WHERE Name = N'ZZ_LabTestSubcategory_Used';
 
 SELECT @SubWithoutProduct = IDSubcategory
 FROM Subcategory
-WHERE Name = N'ZZ_LabTestSubcategory_Unuse⁷d';
+WHERE Name = N'ZZ_LabTestSubcategory_Unused';
 
 -- Read an existing subcategory
 EXEC @Result = dbo.usp_ManageSubcategory
@@ -1384,7 +1384,7 @@ The Read operations will remain in the separate procedures created in Section 2.
 
 Create the procedure with these parameters:
 
-``` sql
+```sql
 @Action     nvarchar(10),
 @IDCategory int OUTPUT,
 @Name       nvarchar(50) = NULL
@@ -1425,7 +1425,7 @@ For `DELETE`, check whether the category exists and whether it has any subcatego
 <details>
 <summary>Solution</summary>
 
-``` sql
+```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ManageCategory
     @Action     nvarchar(10),
     @IDCategory int OUTPUT,
@@ -1484,7 +1484,7 @@ GO
 
 Test the procedure:
 
-``` sql
+```sql
 DECLARE @IDCategory int = NULL;
 DECLARE @Result int;
 
@@ -1656,9 +1656,24 @@ So far, we placed `TRY/CATCH` inside the stored procedure.
 
 However, error handling can also be implemented by the caller.
 
-For example, suppose `usp_DeleteCategory` contains only the original `DELETE` statement, without its own `TRY/CATCH`.
+For this demonstration, first restore the original version of `usp_DeleteCategory` from Section 2. That version does not catch the error internally.
 
-The caller can handle the error:
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
+    @IDCategory int
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM Category
+    WHERE IDCategory = @IDCategory;
+
+    SELECT @@ROWCOUNT AS RowsDeleted;
+END;
+GO
+```
+
+Now the caller can handle the error:
 
 ```sql
 DECLARE @CategoryID int;
@@ -1681,7 +1696,7 @@ END CATCH;
 
 The `ERROR_PROCEDURE()` function identifies the stored procedure in which the error occurred.
 
-In this example, it returns `usp_DeleteCategory`.
+In this example, it returns `usp_DeleteCategory`. If the procedure still contained the internal `CATCH` from Section 6.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
 
 Both approaches are valid, but they have different characteristics.
 
@@ -2515,28 +2530,67 @@ DROP PROCEDURE IF EXISTS dbo.usp_ManageProduct;
 GO
 ```
 
-Remove the test rows, children before parents:
+Remove the test rows, **children before parents**. Review the matching rows before executing these statements, especially if the training database is shared or you have used the same test names in other exercises.
 
 ```sql
-DELETE FROM InvoiceItem WHERE InvoiceID IN (
-    SELECT IDInvoice FROM Invoice WHERE InvoiceNumber LIKE N'ZZ-LAB-INV-%'
+-- Invoice items and invoices created in this lab
+DELETE FROM InvoiceItem
+WHERE InvoiceID IN (
+    SELECT IDInvoice
+    FROM Invoice
+    WHERE InvoiceNumber IN (N'ZZ-LAB-INV-0001', N'ZZ-LAB-INV-0002')
 );
-DELETE FROM Invoice WHERE InvoiceNumber LIKE N'ZZ-LAB-INV-%';
 
-DELETE FROM Product WHERE ProductNumber LIKE N'ZZ-LAB-%';
+DELETE FROM Invoice
+WHERE InvoiceNumber IN (N'ZZ-LAB-INV-0001', N'ZZ-LAB-INV-0002');
 
-DELETE FROM Subcategory WHERE Name LIKE N'ZZ_LabTest%';
-DELETE FROM Category WHERE Name LIKE N'ZZ_LabTest%';
+-- Products created in Sections 5 and 8
+DELETE FROM Product
+WHERE ProductNumber IN (N'ZZ-LAB-0001', N'ZZ-LAB-0002', N'ZZ-LAB-0003');
 
-DELETE FROM Customer WHERE LastName LIKE N'ZZ_LabTestCustomer%';
+-- Customers created in Sections 3, 4, and 8
+DELETE FROM Customer
+WHERE (FirstName = N'ZZ' AND LastName IN (
+    N'ZZ_LabTestCustomer_ForDeleteTest',
+    N'ZZ_LabTestCustomer_NoInvoices',
+    N'ZZ_LabTestCustomer_WithInvoice'
+))
+OR (FirstName IN (N'Ada', N'Grace') AND LastName = N'ZZ_LabTestCustomer'
+    AND CityID IN (SELECT IDCity FROM City WHERE Name = N'ZZ_LabTestCity3'));
 
-DELETE FROM City WHERE Name LIKE N'ZZ_LabTest%';
-DELETE FROM State WHERE Name LIKE N'ZZ_LabTest%';
+-- Subcategories and categories
+DELETE FROM Subcategory
+WHERE Name IN (
+    N'ZZ_LabTestSubcategory_Used',
+    N'ZZ_LabTestSubcategory_Unused',
+    N'ZZ_LabTestSubcategory_Blocking'
+);
+
+DELETE FROM Category
+WHERE Name IN (
+    N'ZZ_LabTestCategory',
+    N'ZZ_LabTestCategory_Renamed',
+    N'ZZ_LabTestCategory_ForSub',
+    N'ZZ_LabTestCategory_WithSub',
+    N'ZZ_LabTestCategory_Combined',
+    N'ZZ_LabTestCategory_CombinedRenamed'
+);
+
+-- Cities and states
+DELETE FROM City
+WHERE Name IN (N'ZZ_LabTestCity1', N'ZZ_LabTestCity2', N'ZZ_LabTestCity3');
+
+DELETE FROM State
+WHERE Name IN (
+    N'ZZ_LabTestState',
+    N'ZZ_LabTestState_Saved',
+    N'ZZ_LabTestState_SavedRenamed'
+);
 GO
 ```
 
-> [!TIP]
-> All test data in this lab used the `ZZ_LabTest` / `ZZ-LAB-` naming convention precisely so it can be found and removed safely, without touching the existing `AdventureWorksENG` sample data.
+> [!WARNING]
+> These statements are intended for the lab's isolated training data. Check the target rows before running them; names alone do not prove ownership. The cleanup also assumes that no additional dependent records were created outside the lab.
 
 ---
 
@@ -2548,7 +2602,7 @@ flowchart TD
     CRUD --> R[Read -> SELECT]
     CRUD --> U[Update -> UPDATE]
     CRUD --> D[Delete -> DELETE]
-    R --> F["sometimes a function,<br/>when used inside another query"]
+    R --> F["sometimes a function when used inside another query"]
 ```
 
 ```text
@@ -2561,14 +2615,15 @@ Separate procedures
     -> one clear purpose per procedure
 
 Combined procedure
-    -> one entry point, an @Action parameter, shared validation logic
+    -> one entry point; may use an @Action parameter or an ID-based decision
     -> common groupings: Create+Update, or Create+Update+Delete
-    -> Read stays separate (or becomes a function) in every grouping
+    -> Read may be separate, a function, or part of a combined procedure
 ```
 
 ```text
 TRY/CATCH
-    -> catches severity 11-19; not 1-10 (informational) or 20-25 (fatal)
+    -> handles many runtime SQL Server errors, including constraint violations
+    -> some errors cannot be caught (see Lab 0)
     -> can live inside the procedure (consistent for every caller)
        or at the caller (ERROR_PROCEDURE() still names where it failed)
 ```
@@ -2589,7 +2644,7 @@ Function
     -> read-only, usable inside FROM / JOIN
 
 Procedure
-    -> required for INSERT / UPDATE / DELETE
+    -> can implement INSERT / UPDATE / DELETE
 ```
 
 And remember:

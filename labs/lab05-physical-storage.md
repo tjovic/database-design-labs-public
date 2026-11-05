@@ -865,10 +865,10 @@ Consider the following query:
 ```sql
 SELECT *
 FROM dbo.Customer
-WHERE CustomerName = 'Customer 50000';
+WHERE LastName = 'ExampleSurname';
 ```
 
-The query may return only one row.
+Replace `ExampleSurname` with a value present in your database. The query may return only a small number of rows.
 
 But does that mean SQL Server needs to examine only one page?
 
@@ -1222,12 +1222,14 @@ The following page types are particularly important for this lab:
 | PageType | Name | Purpose |
 |---|---|---|
 | `1` | **Data page** | Stores table rows, including the leaf-level rows of a clustered index. |
-| `2` | **Index page** | Stores index entries used to navigate index structures. |
+| `2` | **Index page** | Stores index entries; in our clustered indexes, these are non-leaf navigation entries. |
 | `10` | **IAM page** | Tracks extents allocated to a particular allocation unit. |
 
 ![SQL Server page types](../images/lab05/sql-server-page-types.svg)
 
 For example, a small table may fit into a single data page, while a larger table may require hundreds of data pages and additional index pages.
+
+Nonclustered indexes also use index pages at their leaf level. In this lab, we focus on clustered indexes, whose leaf pages contain the actual table rows.
 
 SQL Server also uses other internal page types, such as **PFS, GAM, and SGAM**, to manage storage allocation. We will not examine these in detail.
 
@@ -1246,7 +1248,7 @@ In the following sections, we will use `DBCC IND` to identify these page types i
 <summary>Show answers</summary>
 
 1. A data page stores table rows, including the leaf-level rows of a clustered index.
-2. A data page stores actual table rows, while an index page contains entries used to navigate an index.
+2. In the clustered indexes examined here, data pages store actual table rows at the leaf level, while index pages store navigation entries above the leaf level.
 3. An IAM page tracks extents allocated to a particular allocation unit.
 
 </details>
@@ -1368,7 +1370,7 @@ The most important values for this lab are:
 | PageType | Meaning |
 |---|---|
 | `1` | **Data page** – contains table rows, including leaf-level rows of a clustered index. |
-| `2` | **Index page** – contains navigation entries in the non-leaf levels of an index. |
+| `2` | **Index page** – in our clustered indexes, contains non-leaf navigation entries. |
 | `10` | **IAM page** – tracks allocated extents associated with an allocation unit. |
 
 For example, a small table may require only one data page and one IAM page.
@@ -2476,13 +2478,13 @@ We have now examined three tables of different sizes.
 | Rows | 100 | 30,000 | 100,000 |
 | Leaf/data pages | 1 | 159 | 732 |
 | Intermediate pages | 0 | 0 | 2 |
-| Root index pages | 0 | 1 | 1 |
+| Separate non-leaf root pages | 0 | 1 | 1 |
 | Clustered index levels | 1 | 2 | 3 |
 | IAM pages | 1 | 1 | 1 |
 
 Notice how the clustered index structure changes as the number of data pages increases.
 
-- `Category` fits into a single leaf page.
+- `Category` fits into a single page that serves as both the root and the leaf level.
 - `Product` uses a root page and 159 leaf pages.
 - `Customer` introduces an intermediate level between the root and 732 leaf pages.
 
@@ -2665,7 +2667,7 @@ Understanding how SQL Server organizes and accesses database pages provides the 
 
 # Practice exercises
 
-Try each task before opening its solution. The first two use calculations and observation; the third uses a system view instead of generating a very large diagnostic result.
+Try each task before opening its solution. The exercises combine calculations and observation. Exercise 3 uses a system view instead of generating a very large diagnostic result.
 
 ## Exercise 1 – Page math
 
@@ -2688,7 +2690,7 @@ A table contains **2,000,000 rows** and fits **40 rows per page**.
 
 ## Exercise 2 – Logical versus physical reads
 
-In SSMS, execute the following **twice**, and inspect the **Messages** tab after each run:
+In SSMS, execute the following batch **once**. It runs the same query twice. Compare the two outputs in the **Messages** tab:
 
 ```sql
 USE IndexLab;
@@ -2719,7 +2721,7 @@ GO
 2. They may differ: pages read from storage can remain cached for subsequent executions.
 3. Another query or an earlier operation may already have loaded the required pages into memory.
 4. No. Inspect **logical reads** to see page accesses in the buffer pool. Also consider `read-ahead reads` when studying storage activity.
-5. No — `logical reads` is **161**, not 159. A full scan also has to visit the clustered index's root page and its IAM page to find the data pages in the first place, so `logical reads` counts **every** page type touched (data, root/intermediate, and IAM), not just the leaf-level data pages you counted with `DBCC IND`.
+5. Not necessarily. Our reference query reported **161 logical reads**, while `DBCC IND` listed **159 leaf-level data pages**. Logical reads count page accesses during execution, not distinct allocated pages. Additional or repeated page accesses can occur, so these counts need not match. The counts alone do not identify which additional page accesses occurred.
 
 </details>
 
@@ -2750,7 +2752,7 @@ WHERE ps.object_id = OBJECT_ID('dbo.SalesOrder')
 GROUP BY i.name, i.index_id;
 ```
 
-`in_row_data_page_count` counts in-row data (leaf) pages. `used_page_count` includes other pages allocated to that index or heap and can be higher.
+`row_count` is an approximate row count. `in_row_data_page_count` counts in-row data pages (leaf pages for a clustered index). `used_page_count` includes other pages allocated to that index or heap and can be higher.
 
 1. What are the reported row count and in-row data page count?
 2. Estimate the **average rows per in-row data page**.
@@ -2763,7 +2765,7 @@ GROUP BY i.name, i.index_id;
 1. Results depend on the generated database.
 2. Divide `RowCount` by `InRowDataPages`, provided the latter is nonzero. This is an average, not the exact occupancy of each page.
 3. Different row sizes and storage layouts lead to different page densities.
-4. The system view returns summary counts without producing a huge row-by-row list of page identifiers. Some environments may require `VIEW DATABASE STATE` or related DMV permissions.
+4. The system view returns summary counts without producing a huge row-by-row list of page identifiers. On SQL Server 2022 and later, this view requires `VIEW DATABASE PERFORMANCE STATE` and `VIEW SECURITY DEFINITION` on the database. Earlier SQL Server versions require `VIEW DATABASE STATE` and `VIEW DEFINITION`.
 
 </details>
 

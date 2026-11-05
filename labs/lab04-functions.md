@@ -285,7 +285,7 @@ CREATE OR ALTER FUNCTION schema.function_name
 RETURNS data_type
 AS
 BEGIN
-    – logic
+    -- logic
 
     RETURN value;
 END
@@ -783,12 +783,7 @@ scalar function.
 > Scalar functions are convenient and reusable, but always
 > consider how often the function may need to be evaluated.
 
-Remove the example:
-
-```sql
-DROP FUNCTION dbo.fn_ProductSoldQuantity;
-GO
-```
+Keep this function for the performance discussion in Section 7. It will be removed in the final cleanup.
 
 ---
 
@@ -1266,6 +1261,9 @@ CREATE OR ALTER FUNCTION dbo.fn_ProductPriceCategory
 RETURNS nvarchar(20)
 AS
 BEGIN
+    IF @Price IS NULL
+        RETURN NULL;
+
     IF @Price < 100
         RETURN 'Budget';
 
@@ -1301,6 +1299,11 @@ WHERE dbo.fn_ProductPriceCategory(PriceWithoutVAT) = 'Premium'
 ORDER BY PriceWithoutVAT DESC;
 ```
 
+> [!NOTE]
+> This filter demonstrates function reuse. For this category,
+> `WHERE PriceWithoutVAT >= 1000` expresses the condition directly and
+> is generally preferable for index use, as discussed in Section 7.
+
 > This example combines:
 >
 > -   function parameters;
@@ -1334,243 +1337,6 @@ GO
 2. A scalar function can be used anywhere a value of its return type is expected, including an expression in `SELECT` or a comparison in `WHERE`.
 3. T-SQL user-defined functions cannot modify application tables with `INSERT`, `UPDATE`, or `DELETE` — they can only calculate and return a result.
 4. Returning several columns means the result is no longer a single scalar value, so the function would need to become a table-valued function instead.
-
-</details>
-
----
-
-# Section 9 – Composing a Function with a Procedure and a Trigger
-
-[Lab 3, Section 7](lab03-stored-procedures.md#section-7--practical-example-validating-a-card-number) built the Luhn checksum entirely inside `dbo.usp_ValidateCardNumber`. Section 1 of this lab claimed that procedures and triggers can use a function's result wherever it is needed. This section makes that claim concrete: the Luhn calculation moves into one scalar function, and a query, a procedure, and a trigger all reuse it.
-
-## From procedure to function
-
-The Luhn logic itself does not change — only where it lives.
-
-```sql
-CREATE OR ALTER FUNCTION dbo.fn_IsValidCardNumber
-(
-    @CardNumber nvarchar(25)
-)
-RETURNS bit
-AS
-BEGIN
-    DECLARE @IsValid bit = 0;
-
-    IF @CardNumber IS NULL
-        RETURN @IsValid;
-
-    DECLARE @Length int = LEN(@CardNumber);
-
-    IF @Length NOT BETWEEN 12 AND 19
-        RETURN @IsValid;
-
-    IF @CardNumber LIKE '%[^0-9]%'
-        RETURN @IsValid;
-
-    -------------------------------------------------------
-    -- Calculate the Luhn checksum
-    -------------------------------------------------------
-    DECLARE @Position int = @Length;
-    DECLARE @Digit int;
-    DECLARE @Total int = 0;
-    DECLARE @ShouldDouble bit = 0;
-
-    WHILE @Position >= 1
-    BEGIN
-        SET @Digit = CAST(
-            SUBSTRING(@CardNumber, @Position, 1) AS int
-        );
-
-        IF @ShouldDouble = 1
-        BEGIN
-            SET @Digit = @Digit * 2;
-
-            IF @Digit > 9
-                SET @Digit = @Digit - 9;
-        END;
-
-        SET @Total = @Total + @Digit;
-
-        IF @ShouldDouble = 0
-            SET @ShouldDouble = 1;
-        ELSE
-            SET @ShouldDouble = 0;
-
-        SET @Position = @Position - 1;
-    END;
-
-    IF @Total % 10 = 0
-        SET @IsValid = 1;
-
-    RETURN @IsValid;
-END;
-GO
-```
-
-Two details differ from Lab 3's procedure:
-
-- The parameter is `nvarchar(25)`, matching `CreditCard.CardNumber`'s actual column type. Calling the function on that column with a mismatched type would force SQL Server to convert every row's value — the same implicit-conversion concern raised for `WHERE` conditions in Section 7.
-- The length check accepts **12 to 19 digits** instead of a fixed 16. Lab 3 stated its 16-digit rule as a simplification; `CreditCard` also stores a 15-digit American Express number, and real card numbers are commonly 12 to 19 digits long (Visa and MasterCard typically use 16, American Express uses 15).
-
-Test it with Lab 3's two card numbers, plus a real 15-digit American Express number:
-
-```sql
-SELECT dbo.fn_IsValidCardNumber('4242424242424242') AS IsValid; -- 1 (Visa, 16 digits)
-SELECT dbo.fn_IsValidCardNumber('4242424242424241') AS IsValid; -- 0 (wrong check digit)
-SELECT dbo.fn_IsValidCardNumber('378282246310005')  AS IsValid; -- 1 (American Express, 15 digits)
-```
-
-## Checking every card in CreditCard
-
-Because the check is now a scalar function, it can be used directly inside a query over the real table:
-
-```sql
-SELECT
-    IDCreditCard,
-    Type,
-    CardNumber,
-    dbo.fn_IsValidCardNumber(CardNumber) AS IsValid
-FROM CreditCard
-ORDER BY IsValid, Type;
-```
-
-The same pattern also supports aggregation:
-
-```sql
-SELECT
-    Type,
-    COUNT(*) AS TotalCards,
-    SUM(CAST(dbo.fn_IsValidCardNumber(CardNumber) AS int)) AS ValidCount
-FROM CreditCard
-GROUP BY Type;
-```
-
-> [!NOTE]
-> This is the same situation described in Section 4 and Section 7: SQL Server evaluates `dbo.fn_IsValidCardNumber` once for every row the query processes. `CreditCard` is small, so the cost here is negligible — but the question "how many rows will use this function?" still applies as a table grows.
-
-## Reusing the function in a procedure
-
-`dbo.usp_ValidateCardNumber` from Lab 3 can now delegate to the function instead of repeating its `WHILE` loop:
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_ValidateCardNumber
-    @CardNumber nvarchar(25),
-    @IsValid bit OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SET @IsValid = dbo.fn_IsValidCardNumber(@CardNumber);
-END;
-GO
-```
-
-This redefines the Lab 3 procedure: the parameters and the `OUTPUT` behaviour are unchanged, but the body is now one line, and it accepts the broader 12–19 digit range described above.
-
-```sql
-DECLARE @Result bit;
-
-EXEC dbo.usp_ValidateCardNumber
-    @CardNumber = '4242424242424242',
-    @IsValid = @Result OUTPUT;
-
-SELECT @Result AS IsValid; -- 1
-GO
-```
-
-## Reusing the function in a trigger
-
-A trigger can use the same function to reject an invalid `CardNumber` before it is stored:
-
-```sql
-CREATE OR ALTER TRIGGER dbo.trg_CreditCard_ValidateCardNumber
-ON dbo.CreditCard
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    IF EXISTS
-    (
-        SELECT 1
-        FROM inserted AS i
-        WHERE dbo.fn_IsValidCardNumber(i.CardNumber) = 0
-    )
-    BEGIN
-        ROLLBACK TRANSACTION;
-        RAISERROR('CardNumber failed the Luhn checksum.', 16, 1);
-        RETURN;
-    END;
-END;
-GO
-```
-
-> [!NOTE]
-> This trigger introduces two statements not used elsewhere yet: `ROLLBACK TRANSACTION` undoes the statement that fired the trigger, and `RAISERROR(message, severity, state)` reports the failure back to the caller as an error. [Lab 2's `trg_Employee_CheckSalary`](lab02-triggers.md) only printed a warning in a similar situation, because rejecting the change outright needs exactly these two statements, which that lab had not introduced yet. Handling a raised error gracefully inside a caller — with `TRY/CATCH` — starts in [Lab 7](lab07-crud-operations.md); `THROW` and re-raising errors are covered in Lab 9.
-
-Test a valid insert, then an invalid one:
-
-```sql
-INSERT INTO CreditCard (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('Visa', '4242424242424242', 12, 2030);
-GO
--- Succeeds.
-
-INSERT INTO CreditCard (Type, CardNumber, ExpirationMonth, ExpirationYear)
-VALUES ('Visa', '4242424242424241', 12, 2030);
-GO
--- Fails: CardNumber failed the Luhn checksum.
-
-SELECT *
-FROM CreditCard
-WHERE CardNumber = '4242424242424241';
--- 0 rows: the rejected insert never committed.
-```
-
-As in every trigger from Lab 2, `inserted` must be treated as a table: the `EXISTS` query checks every row in the batch, not just one.
-
-## How the pieces fit together
-
-```mermaid
-flowchart LR
-    Q[Ad-hoc query<br/>over CreditCard] --> F[fn_IsValidCardNumber]
-    P[usp_ValidateCardNumber] --> F
-    T[trg_CreditCard_ValidateCardNumber] --> F
-```
-
-> **Key idea:** The Luhn calculation exists in exactly one place. A query, a procedure, and a trigger each call it instead of each implementing their own copy.
-
-Remove the objects created in this section:
-
-```sql
-DELETE FROM CreditCard
-WHERE CardNumber = '4242424242424242';
-GO
-
-DROP TRIGGER IF EXISTS dbo.trg_CreditCard_ValidateCardNumber;
-GO
-DROP PROCEDURE IF EXISTS dbo.usp_ValidateCardNumber;
-DROP FUNCTION IF EXISTS dbo.fn_IsValidCardNumber;
-GO
-```
-
----
-
-## Check your understanding
-
-1. Why does moving the Luhn calculation into a function avoid duplicating it between the procedure and the trigger?
-2. Why does `fn_IsValidCardNumber` accept 12–19 digits instead of Lab 3's fixed 16?
-3. Why does the function use `nvarchar(25)` instead of Lab 3's `varchar(100)`?
-4. Why can this section's trigger reject an invalid card number, while Lab 2's `trg_Employee_CheckSalary` could only print a warning?
-5. If an `UPDATE` changes `CardNumber` for three rows at once, what must the trigger's `EXISTS` query account for?
-
-<details>
-<summary>Show answers</summary>
-
-1. Previously, only the procedure contained the checksum logic; a trigger enforcing the same rule would have needed its own copy of the `WHILE` loop. With the logic in one function, the procedure and the trigger both call it.
-2. `CreditCard` stores a real 15-digit American Express number. Lab 3's fixed 16-digit rule was stated as a simplification and would incorrectly reject it.
-3. `nvarchar(25)` matches `CreditCard.CardNumber`'s actual column type, so SQL Server does not need to implicitly convert every row's value when the function is called from a query or a trigger.
-4. The checksum logic already exists in the function, so the trigger only needs `ROLLBACK TRANSACTION` and `RAISERROR` to reject the change. Lab 2 introduced its trigger before transactions and error handling were covered.
-5. `inserted` would contain all three new rows. The `EXISTS` query must check all of them, not assume a single row — the same rule established for every trigger in Lab 2.
 
 </details>
 
@@ -1813,7 +1579,7 @@ For each requirement, decide which function type is the best fit.
 2. Given two dates, return all invoices between those dates.
 3. Build and return a table using several procedural steps.
 4. Given a string, return the first seven characters followed by `...`
-    when the string is longer than ten characters.
+    when the string has ten or more characters.
 
 Then explain **why** you chose each function type.
 
@@ -1993,7 +1759,7 @@ RETURN
     INNER JOIN Customer AS c
         ON c.IDCustomer = i.CustomerID
     WHERE i.InvoiceDate >= @DateFrom
-      AND i.InvoiceDate <= @DateTo
+      AND i.InvoiceDate < DATEADD(day, 1, @DateTo)
 );
 GO
 ```
@@ -2002,9 +1768,13 @@ Example call:
 
 ```sql
 SELECT *
-FROM dbo.fn_InvoicesBetween('2004-06-01', '2004-06-03');
+FROM dbo.fn_InvoicesBetween('20040601', '20040603');
 GO
 ```
+
+The exclusive upper boundary includes the entire final day even if
+`InvoiceDate` contains a time component. This example assumes an end
+date earlier than `9999-12-31`.
 
 </details>
 
@@ -2060,7 +1830,7 @@ BEGIN
     INNER JOIN Customer AS c
         ON c.IDCustomer = i.CustomerID
     WHERE i.InvoiceDate >= @DateFrom
-      AND i.InvoiceDate <= @DateTo;
+      AND i.InvoiceDate < DATEADD(day, 1, @DateTo);
 
     RETURN;
 END
@@ -2190,7 +1960,7 @@ Functions and other database objects
     -> functions can be composed with other functions
 ```
 
-Section 9 works through a complete example of this: one Luhn-checksum function reused by an ad-hoc query, a stored procedure, and a trigger.
+The optional additional reading works through a complete example of this: one Luhn-checksum function reused by an ad-hoc query, a stored procedure, and a trigger.
 
 ```text
 Performance
@@ -2218,6 +1988,269 @@ And remember:
 ## Additional practice
 
 More function exercises, covering scalar functions, inline TVFs, and multi-statement TVFs, are available in [Function Exercises](../exercises/functions.md).
+
+---
+
+# Additional Reading – Reusing a Function in a Procedure and a Trigger
+
+> [!NOTE]
+> Optional extension: this section connects functions with procedures and
+> triggers. Complete the main lab first. Use a dedicated training database
+> and run the insert tests in the default autocommit mode, outside an
+> explicit transaction.
+
+[Lab 3, Section 7](lab03-stored-procedures.md#section-7--practical-example-validating-a-card-number) built the Luhn checksum entirely inside `dbo.usp_ValidateCardNumber`. Section 1 introduced functions as reusable building blocks. This optional example moves the Luhn calculation into one scalar function, and a query, a procedure, and a trigger all reuse it.
+
+## From procedure to function
+
+The Luhn logic itself does not change — only where it lives.
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_IsValidCardNumber
+(
+    @CardNumber nvarchar(25)
+)
+RETURNS bit
+AS
+BEGIN
+    DECLARE @IsValid bit = 0;
+
+    IF @CardNumber IS NULL
+        RETURN @IsValid;
+
+    DECLARE @Length int = LEN(@CardNumber);
+
+    IF @Length NOT BETWEEN 12 AND 19
+        RETURN @IsValid;
+
+    IF @CardNumber COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
+        RETURN @IsValid;
+
+    -------------------------------------------------------
+    -- Calculate the Luhn checksum
+    -------------------------------------------------------
+    DECLARE @Position int = @Length;
+    DECLARE @Digit int;
+    DECLARE @Total int = 0;
+    DECLARE @ShouldDouble bit = 0;
+
+    WHILE @Position >= 1
+    BEGIN
+        SET @Digit = CAST(
+            SUBSTRING(@CardNumber, @Position, 1) AS int
+        );
+
+        IF @ShouldDouble = 1
+        BEGIN
+            SET @Digit = @Digit * 2;
+
+            IF @Digit > 9
+                SET @Digit = @Digit - 9;
+        END;
+
+        SET @Total = @Total + @Digit;
+
+        IF @ShouldDouble = 0
+            SET @ShouldDouble = 1;
+        ELSE
+            SET @ShouldDouble = 0;
+
+        SET @Position = @Position - 1;
+    END;
+
+    IF @Total % 10 = 0
+        SET @IsValid = 1;
+
+    RETURN @IsValid;
+END;
+GO
+```
+
+Two details differ from Lab 3's procedure:
+
+- The parameter is `nvarchar(25)`, matching the training table's `CreditCard.CardNumber` column. Matching types avoids unnecessary argument conversions. This is distinct from applying a conversion to an indexed column in a search predicate.
+- The length check accepts **12 to 19 digits** instead of a fixed 16. Lab 3 stated its 16-digit rule as a simplification; `CreditCard` also stores a 15-digit American Express number, and real card numbers are commonly 12 to 19 digits long (Visa and MasterCard typically use 16, American Express uses 15).
+
+Test it with Lab 3's two card numbers, plus a 15-digit American Express test number:
+
+```sql
+SELECT dbo.fn_IsValidCardNumber('4242424242424242') AS IsValid; -- 1 (Visa, 16 digits)
+SELECT dbo.fn_IsValidCardNumber('4242424242424241') AS IsValid; -- 0 (wrong check digit)
+SELECT dbo.fn_IsValidCardNumber('378282246310005')  AS IsValid; -- 1 (American Express, 15 digits)
+```
+
+> [!IMPORTANT]
+> Luhn validates a checksum only. Passing it does not prove that a card
+> exists, is active, belongs to a person, or can be used for payment.
+> The binary collation makes the digit check accept only ASCII `0`–`9`.
+
+## Checking every card in CreditCard
+
+Because the check is now a scalar function, it can be used directly inside a query over the real table:
+
+```sql
+SELECT
+    IDCreditCard,
+    Type,
+    CardNumber,
+    dbo.fn_IsValidCardNumber(CardNumber) AS IsValid
+FROM CreditCard
+ORDER BY IsValid, Type;
+```
+
+The same pattern also supports aggregation:
+
+```sql
+SELECT
+    Type,
+    COUNT(*) AS TotalCards,
+    SUM(CAST(dbo.fn_IsValidCardNumber(CardNumber) AS int)) AS ValidCount
+FROM CreditCard
+GROUP BY Type;
+```
+
+> [!NOTE]
+> This is the same situation described in Section 4 and Section 7: The function may be evaluated for each processed row; the physical execution depends on the query plan. `CreditCard` is small, so the cost here is negligible — but the question "how many rows will use this function?" still applies as a table grows.
+
+## Reusing the function in a procedure
+
+A separate demonstration procedure can delegate to the function instead of repeating Lab 3's `WHILE` loop:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_ValidateCardNumberUsingFunction
+    @CardNumber nvarchar(25),
+    @IsValid bit OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SET @IsValid = dbo.fn_IsValidCardNumber(@CardNumber);
+END;
+GO
+```
+
+This demonstration keeps the Lab 3 procedure intact. It uses an `OUTPUT` parameter and accepts the broader 12–19 digit range described above.
+
+```sql
+DECLARE @Result bit;
+
+EXEC dbo.usp_ValidateCardNumberUsingFunction
+    @CardNumber = '4242424242424242',
+    @IsValid = @Result OUTPUT;
+
+SELECT @Result AS IsValid; -- 1
+GO
+```
+
+## Reusing the function in a trigger
+
+A trigger can use the same function to reject an invalid `CardNumber` by checking the changed rows and rolling back the transaction if validation fails:
+
+```sql
+CREATE OR ALTER TRIGGER dbo.trg_CreditCard_ValidateCardNumber
+ON dbo.CreditCard
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted AS i
+        WHERE dbo.fn_IsValidCardNumber(i.CardNumber) = 0
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        RAISERROR('CardNumber failed the Luhn checksum.', 16, 1);
+        RETURN;
+    END;
+END;
+GO
+```
+
+> [!NOTE]
+> An `AFTER` trigger runs after the data modification. Here,
+> `ROLLBACK TRANSACTION` undoes the **entire current transaction**,
+> including any earlier changes within it; `RAISERROR` reports the failure.
+> In autocommit mode, the transaction covers the triggering statement.
+> These statements are one way to reject the change. Error handling with
+> `TRY/CATCH` is covered in [Lab 7](lab07-crud-operations.md);
+> `THROW` is covered in Lab 9.
+
+Test a valid insert, then an invalid one:
+
+```sql
+-- Keep this session open until the cleanup below.
+CREATE TABLE #Lab04InsertedCard (IDCreditCard int);
+
+INSERT INTO dbo.CreditCard (Type, CardNumber, ExpirationMonth, ExpirationYear)
+OUTPUT inserted.IDCreditCard INTO #Lab04InsertedCard (IDCreditCard)
+VALUES ('Visa', '4242424242424242', 12, 2030);
+
+GO
+-- Succeeds.
+
+INSERT INTO CreditCard (Type, CardNumber, ExpirationMonth, ExpirationYear)
+VALUES ('Visa', '4242424242424241', 12, 2030);
+GO
+-- Fails: CardNumber failed the Luhn checksum.
+
+SELECT *
+FROM CreditCard
+WHERE CardNumber = '4242424242424241';
+-- The rejected insert adds no row. A matching row could already exist.
+```
+
+As in every trigger from Lab 2, `inserted` must be treated as a table: the `EXISTS` query checks every row in the batch, not just one.
+
+## How the pieces fit together
+
+```mermaid
+flowchart LR
+    Q[Ad-hoc query<br/>over CreditCard] --> F[fn_IsValidCardNumber]
+    P[Validation procedure] --> F
+    T[trg_CreditCard_ValidateCardNumber] --> F
+```
+
+> **Key idea:** The Luhn calculation exists in exactly one place. A query, a procedure, and a trigger each call it instead of each implementing their own copy.
+
+Remove the objects created in this section:
+
+```sql
+DELETE FROM dbo.CreditCard
+WHERE IDCreditCard IN (SELECT IDCreditCard FROM #Lab04InsertedCard);
+
+DROP TABLE #Lab04InsertedCard;
+GO
+
+DROP TRIGGER IF EXISTS dbo.trg_CreditCard_ValidateCardNumber;
+GO
+DROP PROCEDURE IF EXISTS dbo.usp_ValidateCardNumberUsingFunction;
+DROP FUNCTION IF EXISTS dbo.fn_IsValidCardNumber;
+GO
+```
+
+---
+
+## Check your understanding
+
+1. Why does moving the Luhn calculation into a function avoid duplicating it between the procedure and the trigger?
+2. Why does `fn_IsValidCardNumber` accept 12–19 digits instead of Lab 3's fixed 16?
+3. Why does the function use `nvarchar(25)` instead of Lab 3's `varchar(100)`?
+4. Why can this section's trigger reject an invalid card number, while Lab 2's `trg_Employee_CheckSalary` could only print a warning?
+5. If an `UPDATE` changes `CardNumber` for three rows at once, what must the trigger's `EXISTS` query account for?
+
+<details>
+<summary>Show answers</summary>
+
+1. Previously, only the procedure contained the checksum logic; a trigger enforcing the same rule would have needed its own copy of the `WHILE` loop. With the logic in one function, the procedure and the trigger both call it.
+2. `CreditCard` stores a real 15-digit American Express number. Lab 3's fixed 16-digit rule was stated as a simplification and would incorrectly reject it.
+3. It matches the training column's type and avoids unnecessary argument conversions.
+4. This trigger explicitly rolls back the transaction and raises an error. A printed warning alone does not undo a change.
+5. `inserted` would contain all three new rows. The `EXISTS` query must check all of them, not assume a single row — the same rule established for every trigger in Lab 2.
+
+</details>
 
 ---
 

@@ -2,14 +2,16 @@
 
 **Database:** `AdventureWorksENG`
 
+**Requirements:** SQL Server 2017 or later, with database compatibility level 130 or higher. The lab uses `STRING_AGG`, introduced in SQL Server 2017.
+
 In Labs 3 and 4, we learned that stored procedures and functions package database operations behind a name. Every procedure and function we wrote accepted scalar parameters — one `int`, one `nvarchar`, one `money` at a time.
 
 But what happens when you need to pass **many** values in a single call? How do you insert an invoice header together with twenty line items? How do you delete multiple rows by ID? How do you accept the output of a web API that sends JSON?
 
-This lab introduces five methods for passing collections of data into procedures. Some are anti-patterns to avoid. Others are the native SQL Server way. One is essential for web integration. By the end, you'll know which to reach for in different situations.
+This lab compares five approaches to handling collections of data, starting with unsafe SQL concatenation and moving to delimited strings, XML, TVPs, and JSON. By the end, you will know how each approach works and which to consider in different situations.
 
 > [!IMPORTANT]
-> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some more natural for the wire protocol you're using. This lab covers three historical workarounds (client-side query building, delimited strings, XML) and the two native answers designed for this exact job (Table-Valued Parameters and JSON).
+> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some more natural for the wire protocol you're using. This lab compares unsafe client-side SQL concatenation with four ways to pass collections or structured data: delimited strings, XML, Table-Valued Parameters, and JSON. TVPs pass typed relational rows; XML and JSON represent structured documents.
 
 ---
 
@@ -1625,45 +1627,11 @@ We do not need a loop.
 >
 > The invoice number is generated using `NEWID()` as a demonstration placeholder. Real invoicing systems normally use a defined invoice-numbering mechanism.
 
-### Step 3 – Call the procedure
+### Step 3 – Call, verify, and clean up
 
-First, declare a table variable and insert the invoice items.
+Declare a table variable containing the invoice items, then call the procedure once and capture its returned invoice ID.
 
-```sql
-DECLARE @InvoiceLines dbo.InvoiceLineInput;
-
-INSERT INTO @InvoiceLines
-(
-    ProductID,
-    Quantity,
-    UnitPrice
-)
-VALUES
-    (1, 2, 199.00),
-    (2, 1, 49.90),
-    (3, 5, 9.99);
-
-EXEC dbo.usp_InvoiceInsert
-    @CustomerID = 1,
-    @InvoiceDate = '2026-11-04',
-    @Lines = @InvoiceLines;
-```
-
-The procedure receives:
-
-- Customer ID: `1`.
-- Invoice date: `2026-11-04`.
-- Three invoice items.
-
-It inserts the invoice header, retrieves the generated ID, and inserts all related items.
-
-All operations are performed inside one transaction.
-
-### Step 4 – Verify and clean up
-
-For testing, we can capture the invoice ID returned by the procedure.
-
-The following script creates a new invoice, displays its items, and removes the test data.
+The following script creates one invoice, displays its items, and removes that same invoice and its items.
 
 ```sql
 DECLARE @InvoiceLines dbo.InvoiceLineInput;
@@ -2113,6 +2081,9 @@ Notice the second argument:
 It tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
 
 ### Reading both levels with CROSS APPLY
+
+> [!TIP]
+> This is an optional advanced example. For the core lab, focus on reading the header with `JSON_VALUE` and the items with `OPENJSON`. Run the following query in the same batch as the declaration of `@Json`.
 
 Sometimes we want to combine the invoice header and line items in one result.
 
@@ -2599,7 +2570,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 ## Check your understanding
 
 1. What is the 1:N insert problem, and why is it hard without collection parameters?
-2. Name three concrete reasons never to build SQL by string concatenation in the client.
+2. Why should untrusted values be passed as parameters? How can parameterization help plan reuse, and how can collection parameters reduce network round-trips?
 3. What does `STRING_SPLIT` return, and what type is the `value` column?
 4. When you use XML, what does `@Name` mean in `.value('@Name', 'nvarchar(50)')`?
 5. When you use `FOR XML PATH`, how do you create nested elements in the output?
@@ -2611,17 +2582,17 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 <details>
 <summary>Show answers</summary>
 
-1. **1:N insert** — An invoice header and twenty line items need to go into the database together, all or nothing. Without collection parameters, you'd need one call for the header and twenty more for the lines. With one collection parameter, it's one call, one round-trip, one transaction.
+1. **1:N insert** — An invoice header and its line items must be inserted together. A simple implementation using a separate procedure call for every row would require one call for the header and twenty calls for twenty items. A collection parameter allows one call to carry all items, while the procedure uses a transaction to keep the related inserts together.
 
-2. **Three reasons never to concatenate** — (1) **SQL injection**: attacker input becomes SQL, letting the attacker execute their own statements. (2) **No plan-cache reuse**: Different SQL text may lead to separate execution plans, increasing compilation overhead and plan-cache usage; 30 different ID combinations = 30 different plans filling the cache. (3) **Network chatter**: the whole SQL string travels every time instead of just the procedure name and parameters.
+2. **Parameters, plans, and round-trips** — Passing untrusted values as parameters keeps data separate from executable SQL code. Keeping the statement text stable can also improve execution-plan reuse, although SQL Server can automatically parameterize some literal queries. Collection parameters reduce round-trips when they replace separate calls for individual items. A single dynamically constructed `IN (...)` query can also use one round-trip; the number of calls and safe handling of values are separate concerns.
 
-3. **STRING_SPLIT returns** — A one-column table with a column always named `value`, of type `nvarchar` (matching the input string's type). One row per split piece. If the input was `'1,2,5'` and separator was `,`, you get three rows: `1`, `2`, `5`.
+3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
 
 4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. If you wanted to read the node's text content instead (the value between opening and closing tags), you'd use `.` (dot).
 
 5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 8.)
 
-6. **Why `READONLY` is mandatory** — It allows SQL Server to pass the TVP data efficiently without copying it to a temporary structure. The procedure can only read it, not modify it. If you need to modify, copy the TVP into a local table variable (which is **not** `READONLY`) and modify the copy.
+6. **`READONLY` is required** — SQL Server requires TVPs to be input-only, read-only parameters. The procedure can query the rows but cannot insert, update, or delete rows in the parameter. If modifications are needed, copy the data into a local table variable or temporary table and modify the copy.
 
 7. **`'$.Invoice'` in OPENJSON** — It sets the **starting point** for shredding. Instead of starting at the document root (`$`), start at the `Invoice` property. All column paths in the `WITH` clause are then relative to each row starting from that point.
 
@@ -2639,7 +2610,7 @@ Try each exercise before opening the solution.
 
 ---
 
-## Exercise 1 — Delimited String: Delete by Name Pattern [INTERMEDIATE]
+## Exercise 1 — Delimited String: Delete by Name List [INTERMEDIATE]
 
 Create a procedure `dbo.usp_DeleteProductsByNameList` that takes one `nvarchar(max)` parameter — a comma-separated list of product names.
 
@@ -2990,6 +2961,9 @@ DROP TYPE dbo.ProductInput;
 
 ## Exercise 7 – XML: Find or Create Related Records [ADVANCED]
 
+> [!TIP]
+> Optional extension or homework: this exercise combines XML input with transactions and find-or-create logic across three related tables.
+
 In previous exercises, we used XML to insert multiple records into a database.
 
 Now consider a more realistic situation.
@@ -3268,6 +3242,8 @@ DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
 Remove the procedures and types created in the lab body. (Each exercise's solution already cleans up after itself.)
 
 ```sql
+DROP PROCEDURE IF EXISTS dbo.usp_GetProduct;
+DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerFromXml;
@@ -3280,7 +3256,6 @@ GO
 
 DROP TYPE IF EXISTS dbo.ProductIDList;
 DROP TYPE IF EXISTS dbo.InvoiceLineInput;
-DROP TYPE IF EXISTS dbo.InvoiceHeaderInput;
 GO
 ```
 
@@ -3290,27 +3265,27 @@ GO
 
 **Collection parameters are not scalars.** A scalar is one value. A collection is many. SQL Server provides multiple envelopes for different situations.
 
-**Never build SQL by concatenation in the client.** It enables SQL injection, fills the query plan cache with single-use plans, and sends data inefficiently.
+**Keep untrusted values separate from SQL code.** Use parameterized queries or properly implemented stored procedures. Dynamic SQL can be valid when values are passed as parameters rather than concatenated into the statement.
 
-**Delimited strings work for a flat list of IDs.** Nothing more. Use `STRING_SPLIT` to split. Avoid if the delimiter character might appear in the data.
+**Delimited strings suit simple flat lists.** Use `STRING_SPLIT` to produce rows and convert values as needed. Avoid this approach if values may contain the delimiter and no escaping rules are defined.
 
 **XML handles nesting and structure.** Use `.nodes()` to shred, `.value()` to extract columns, `FOR XML PATH` to build it back. It is verbose on the wire but standard and self-documenting.
 
-**Table-Valued Parameters (TVPs)** are SQL Server's native answer. `CREATE TYPE ... AS TABLE` once, then pass variables of that type as `READONLY` parameters. Type-safe, fast, multi-column. Default choice for T-SQL-to-T-SQL and .NET.
+**Table-Valued Parameters (TVPs)** pass typed relational rows. Define a type with `CREATE TYPE ... AS TABLE`, then use it as a `READONLY` parameter. TVPs are a natural choice for calls between T-SQL procedures and for clients that support them, including .NET. Performance depends on the workload.
 
-**JSON matches the web.** `OPENJSON ... WITH (...)` shreds it on the way in. `FOR JSON PATH` with dotted aliases builds it on the way out. Essential when the client is a REST API, frontend, or mobile app.
+**JSON fits applications that already exchange JSON.** Use `OPENJSON ... WITH (...)` to extract typed rows and `FOR JSON PATH` with dotted aliases to generate nested objects. A backend can pass JSON to SQL Server or transform it into a TVP.
 
 ## The Complete Comparison
 
 | Method | Use When | Why |
 |--------|----------|-----|
-| **Client-side query** | **Never.** | SQL injection, plan cache, network — three ways to lose. |
+| **Unsafe SQL concatenation** | Avoid embedding untrusted values in SQL text | Use parameterized statements instead. |
 | **Delimited string** | Flat list of IDs, simplicity over type safety | Simple, small on wire. No structure needed. |
 | **XML** | Hierarchical data; interop with XML systems | Standard, self-documenting. Verbose on wire. |
-| **TVP** | **Default for .NET and T-SQL–to–T-SQL** | Type-safe, fastest, best plans, multi-column. |
-| **JSON** | **Web APIs, REST endpoints, mobile clients** | Client already sends JSON. Zero translation. |
+| **TVP** | Typed relational data; client supports TVPs | Strong typing, multiple columns, direct use in SQL. |
+| **JSON** | Applications and services that already exchange JSON | Supports objects, arrays, and nested data without a custom table type. |
 
-**By the end of this lab, you have all five methods and know which to reach for.** The decision flowchart in Section 7 guides you. When in doubt: **TVP for database-to-database, JSON for web-facing APIs.**
+Use the decision flowchart in Section 7 as a guide. Consider TVPs for typed relational rows, JSON or XML when the source already uses those formats, and delimited strings for simple flat lists. Choose according to the client, data structure, and workload.
 
 ---
 

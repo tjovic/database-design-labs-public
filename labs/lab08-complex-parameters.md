@@ -993,39 +993,27 @@ First, create a test state and capture its ID.
 Then pass the XML document to the procedure.
 
 ```sql
-DECLARE @StateID int;
+-- Find Croatia's ID
+SELECT IDState, Name
+FROM State
+WHERE Name = N'Croatia';
 
-INSERT INTO State (Name)
-VALUES (N'ZZ_TestNorway');
-
-SET @StateID = SCOPE_IDENTITY();
-
+-- Use Croatia's ID (1) to insert three cities
 EXEC dbo.usp_InsertCityBatch
-    @StateID = @StateID,
+    @StateID = 1,
     @Cities = N'
 <Cities>
-    <City Name="Oslo" />
-    <City Name="Bergen" />
-    <City Name="Trondheim" />
+    <City Name="Nin" />
+    <City Name="Ilok" />
+    <City Name="Imotski" />
 </Cities>';
 
 -- Verify
-SELECT c.Name AS CityName, s.Name AS StateName
+SELECT c.IDCity, c.Name AS CityName, s.Name AS StateName
 FROM City c
 JOIN State s ON s.IDState = c.StateID
-WHERE s.IDState = @StateID;
-
--- Cleanup
-DELETE FROM City WHERE StateID = @StateID;
-DELETE FROM State WHERE IDState = @StateID;
-```
-
-Run this entire block together because the variable `@StateID` must remain in scope.
-
-Finally, remove the procedure:
-
-```sql
-DROP PROCEDURE dbo.usp_InsertCityBatch;
+WHERE s.IDState = 1
+  AND c.Name IN (N'Nin', N'Ilok', N'Imotski');
 ```
 
 **Three cities. One XML parameter. One procedure call.**

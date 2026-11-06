@@ -176,14 +176,18 @@ Ideally, we want to send the entire invoice in **one procedure call**.
 
 ```mermaid
 flowchart TD
-    A["Application"] --> B["One procedure call"]
-    B --> C["Invoice header + all items"]
-    C --> D["BEGIN TRANSACTION"]
-    D --> E["Insert invoice header"]
-    E --> F["Insert all invoice items"]
-    F --> G{"All operations successful?"}
-    G -->|Yes| H["COMMIT"]
-    G -->|No| I["ROLLBACK"]
+    A["Application"] -->|"One call: invoice header + all items"| B
+
+    subgraph P["Stored Procedure"]
+        B["BEGIN TRANSACTION"] --> C["Insert invoice header"]
+        C --> D["Use generated invoice ID to insert all items"]
+        D --> E["COMMIT"]
+        C -->|"Error"| F["ROLLBACK"]
+        D -->|"Error"| F
+    end
+
+    E --> G["Return new invoice ID"]
+    F --> H["Return error to application"]
 ```
 
 The procedure receives the invoice data, inserts the header and all items, and manages the transaction.

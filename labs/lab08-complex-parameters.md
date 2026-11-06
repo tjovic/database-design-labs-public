@@ -2,8 +2,6 @@
 
 **Database:** `AdventureWorksENG`
 
-**Requirements:** SQL Server 2017 or later, with database compatibility level 130 or higher. The lab uses `STRING_AGG`, introduced in SQL Server 2017.
-
 In Labs 3 and 4, we learned that stored procedures and functions package database operations behind a name. Every procedure and function we wrote accepted scalar parameters — one `int`, one `nvarchar`, one `money` at a time.
 
 But what happens when you need to pass **many** values in a single call? How do you insert an invoice header together with twenty line items? How do you delete multiple rows by ID? How do you accept the output of a web API that sends JSON?
@@ -120,21 +118,16 @@ What if the user selects 100 products?
 
 A better approach would be to pass all selected IDs in **one procedure call** and let SQL Server process them together.
 
-```text
-Application
-    |
-    | Selected IDs: 1, 2, 3
-    |
-    v
-Stored Procedure
-    |
-    | Process all selected IDs
-    |
-    v
-Product Table
-    |
-    v
-Return matching products
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant P as Stored Procedure
+    participant T as Product Table
+
+    A->>P: Selected IDs: 1, 2, 3
+    P->>T: Retrieve products matching the IDs
+    T-->>P: Matching products
+    P-->>A: One result set
 ```
 
 This type of operation is called a **batch operation**.

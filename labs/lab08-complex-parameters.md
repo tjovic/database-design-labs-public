@@ -247,14 +247,15 @@ One possible solution is to construct a SQL statement directly in the applicatio
 Consider the following Python example:
 
 ```python
-# Example of building a SQL statement in application code
 product_ids = [1, 2, 3]
 
-sql = "SELECT * FROM Product WHERE IDProduct IN ("
+# Convert the IDs into the text "1,2,3"
+id_list = ",".join(str(product_id) for product_id in product_ids)
 
-sql += ",".join(str(id) for id in product_ids)
-sql += ")"
+# Insert that text into the SQL statement
+sql = f"SELECT * FROM Product WHERE IDProduct IN ({id_list})"
 
+# Send the SQL statement to the database
 cursor.execute(sql)
 ```
 
@@ -283,10 +284,14 @@ Consider an application that allows users to search for customers by last name.
 The application builds a SQL statement like this:
 
 ```python
-# UNSAFE — do not use this pattern
+# UNSAFE — user input is inserted directly into SQL text
+first_name = input("Enter first name: ")
 last_name = input("Enter last name: ")
 
-sql = "SELECT * FROM Customer WHERE LastName = '" + last_name + "'"
+sql = (
+    f"SELECT * FROM Customer "
+    f"WHERE FirstName = '{first_name}' AND LastName = '{last_name}'"
+)
 
 cursor.execute(sql)
 ```
@@ -296,7 +301,8 @@ cursor.execute(sql)
 The user enters:
 
 ```text
-Smith
+First name: Gustavo
+Last name: Achong
 ```
 
 The application generates:
@@ -304,7 +310,7 @@ The application generates:
 ```sql
 SELECT *
 FROM Customer
-WHERE LastName = 'Smith';
+WHERE FirstName = 'Gustavo' AND LastName = 'Achong';
 ```
 
 Everything works as expected.
@@ -314,7 +320,8 @@ Everything works as expected.
 Now imagine the user enters:
 
 ```text
-' OR 1=1 --
+First name: Gustavo
+Last name: Achong' OR 1=1 --
 ```
 
 The application generates:
@@ -322,53 +329,66 @@ The application generates:
 ```sql
 SELECT *
 FROM Customer
-WHERE LastName = '' OR 1=1 --';
+WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
 ```
 
 Let's examine what happened:
 
 1. The first `'` closes the original string.
 2. `OR 1=1` adds a condition that is always true.
-3. `--` comments out the remaining part of the SQL statement.
+3. `--` starts a comment, causing SQL Server to ignore the closing quote added by the application and everything else on that line.
 
 Because `1=1` is always true, the query returns **all customers**, not just those with a particular last name.
 
 The user has changed the meaning of the SQL statement without changing the application code.
 
-### Example 3 – A more dangerous attack
+### The solution – Parameterized queries
 
-A malicious user might enter:
+Instead of inserting user input directly into SQL text, pass the values as parameters:
+
+```python
+first_name = input("Enter first name: ")
+last_name = input("Enter last name: ")
+
+sql = "SELECT * FROM Customer WHERE FirstName = ? AND LastName = ?"
+
+cursor.execute(sql, (first_name, last_name))
+```
+
+The `?` placeholders mark where parameter values belong. The values are supplied separately through `cursor.execute`.
+
+If a user enters:
 
 ```text
-'; DROP TABLE Customer; --
+First name: Gustavo
+Last name: Achong' OR 1=1 --
 ```
 
-The generated SQL becomes:
+SQL Server treats the entire last-name input as **a value to search for**, rather than as SQL code.
 
-```sql
-SELECT *
-FROM Customer
-WHERE LastName = '';
+The query searches for a customer whose last name is literally `Achong' OR 1=1 --`. It does not return all customers.
 
-DROP TABLE Customer; --';
-```
+> [!IMPORTANT]
+> Do not put quotes around the `?` placeholders. The database driver handles parameter values.
 
-If the database account has sufficient permissions, SQL Server could execute the second statement and delete the entire `Customer` table.
-
-> [!WARNING]
-> **SQL injection is a security vulnerability, not a syntax error.**
->
-> The database executes the SQL it receives. If an application mixes untrusted input with SQL code, an attacker may be able to change what the database does.
->
-> The actual impact depends on the permissions granted to the database account.
+Besides keeping input separate from SQL code, parameters can also help SQL Server reuse execution plans. We will examine that benefit next.
 
 ## 2.3 Problem 2 – Query Plan Reuse
 
-Before executing a query, SQL Server normally needs an **execution plan**.
+Before executing a query, SQL Server needs an **execution plan** — instructions describing how to access the required data.
 
-An execution plan describes how SQL Server will access the required data.
+Preparing a plan takes work. SQL Server can therefore **cache the plan and reuse it** when the same query runs again.
 
-Consider these statements:
+### When values are part of the SQL text
+
+Suppose an application retrieves a product using this Python code:
+
+```python
+sql = f"SELECT * FROM Product WHERE IDProduct = {product_id}"
+cursor.execute(sql)
+```
+
+When the application searches for products `1`, `2`, and `3`, it sends these statements in separate calls:
 
 ```sql
 SELECT * FROM Product WHERE IDProduct = 1;
@@ -376,36 +396,54 @@ SELECT * FROM Product WHERE IDProduct = 2;
 SELECT * FROM Product WHERE IDProduct = 3;
 ```
 
-Although the statements are logically similar, their SQL text is different.
+The operation is the same each time: find a product by its ID.
 
-SQL Server may compile and cache separate execution plans for them.
+However, because the ID is embedded in the statement, **the SQL text changes with every different ID**.
 
-If an application generates thousands of different SQL statements, this can lead to unnecessary compilation work and increased plan-cache usage.
+SQL Server may compile and cache separate plans for these statements. With many different IDs, this can increase compilation work and plan-cache usage.
 
-A parameterized statement avoids embedding each value directly into the SQL text.
+### When values are passed as parameters
 
-For example:
+Instead, the application can use a parameterized query:
 
-```sql
-SELECT *
-FROM Product
-WHERE IDProduct = @ProductID;
+```python
+cursor.execute(
+    "SELECT * FROM Product WHERE IDProduct = ?",
+    (product_id,)
+)
 ```
 
-The SQL statement remains the same, while the parameter value changes.
+The `?` is a parameter placeholder. The application supplies the product ID separately.
 
-This makes execution-plan reuse more predictable.
+The query text stays the same across executions:
+
+| Execution | Query text | Parameter value |
+|---|---|---|
+| 1 | `SELECT * FROM Product WHERE IDProduct = ?` | `1` |
+| 2 | `SELECT * FROM Product WHERE IDProduct = ?` | `2` |
+| 3 | `SELECT * FROM Product WHERE IDProduct = ?` | `3` |
+
+SQL Server can reuse a cached plan for the parameterized query while processing a different ID each time.
+
+**The key idea: keep the query the same and pass changing values as parameters.**
 
 > [!NOTE]
-> SQL Server can sometimes reuse execution plans for queries containing literal values through automatic parameterization. Therefore, different SQL text does not always mean a completely new execution plan.
+> SQL Server can automatically parameterize some queries containing literal values, so different SQL text does not always produce separate execution plans.
+>
+> Explicit parameters make plan reuse more predictable.
 
-## 2.4 Problem 3 – Network Overhead
+> [!IMPORTANT]
+> Parameterization does not reduce the number of calls.
+>
+> Retrieving three products separately still requires three executions. Passing multiple IDs together — the main topic of this lab — addresses that separate problem.
 
-When an application communicates with a database server, requests and results travel over the network.
+## 2.4 Problem 3 – Many Separate Database Calls
 
-Suppose an application needs to retrieve 100 products.
+Parameterized queries keep values separate from SQL code and can help SQL Server reuse execution plans.
 
-One approach is to execute a separate query for each product:
+However, they do not reduce the number of database calls.
+
+Suppose an application needs to retrieve 100 products. It could execute the same parameterized query once for each product ID:
 
 ```python
 for product_id in product_ids:
@@ -413,38 +451,45 @@ for product_id in product_ids:
         "SELECT * FROM Product WHERE IDProduct = ?",
         (product_id,)
     )
-    # Process the result before executing the next query
+    products = cursor.fetchall()
 ```
 
-This example uses **parameterized queries**, so it avoids the SQL injection problem.
+The query text stays the same, but the application executes it **100 times**.
 
-However, it still executes 100 separate queries.
+Each execution sends a request to SQL Server and waits for a response before continuing to the next product.
 
-If each query requires a separate request to the database server, the application performs 100 network round-trips.
+Even if each query runs quickly, the time spent communicating with the server can add up. This is especially noticeable when the application and database run on different servers.
 
-A better solution for this scenario is to send all 100 IDs together and retrieve the matching products in one operation.
+### Send the IDs together
 
-```mermaid
-flowchart LR
-    A["Application"] -->|"100 separate requests"| B["SQL Server"]
-    C["Application"] -->|"One request with 100 IDs"| D["SQL Server"]
-```
+Instead of retrieving one product at a time, the application can send all 100 IDs in **one call**.
 
-Reducing the number of round-trips can improve performance, especially when the application and database run on different servers.
+SQL Server then processes the collection and returns all matching products in one result set.
+
+| Approach | IDs per call | Number of calls |
+|---|---|---|
+| Query inside a loop | 1 | 100 |
+| Pass a collection | 100 | 1 |
+
+This reduces communication overhead and allows SQL Server to process the IDs together using a set-based query.
 
 > [!IMPORTANT]
-> **Parameterized queries and collection parameters solve different problems.**
+> **Parameters and collections address different needs.**
 >
-> - Parameterized queries keep data separate from SQL code, helping prevent SQL injection.
-> - Collection parameters allow multiple values or records to be passed together.
+> - Parameterization keeps values separate from SQL code and can support execution-plan reuse.
+> - A collection parameter allows multiple values or records to be sent in one call.
 >
-> Both techniques can be used together.
+> A collection can also be passed as a parameter. The following sections show several ways to do this.
 
 ## 2.5 The Better Approach
 
-We should avoid constructing SQL statements by concatenating untrusted input directly into the SQL text.
+We have seen three separate problems:
 
-Instead, applications should use **parameterized queries or stored procedures with properly defined parameters**.
+| Problem | Better approach |
+|---|---|
+| User input can change the SQL command | Pass values as parameters |
+| Changing SQL text can reduce execution-plan reuse | Keep query text consistent and use parameters |
+| Separate queries require many database calls | Send multiple values together |
 
 For a single product ID, a scalar parameter is sufficient:
 
@@ -452,23 +497,20 @@ For a single product ID, a scalar parameter is sufficient:
 EXEC dbo.usp_GetProduct @ProductID = 1;
 ```
 
-But what if we want to pass 100 product IDs?
+But calling this procedure once for each of 100 product IDs still requires **100 calls**.
 
-We need a parameter capable of representing a collection.
+To process all selected products in one call, we need a way to pass **a collection of IDs**.
 
-SQL Server provides several approaches:
+In the following sections, we will explore four ways to represent that collection:
 
-- **Delimited strings** — pass multiple values as text.
-- **XML** — pass structured data.
+- **Delimited strings** — combine values into one string.
+- **XML** — represent data using elements and attributes.
 - **Table-Valued Parameters (TVPs)** — pass typed rows.
-- **JSON** — pass structured JSON data.
+- **JSON** — represent data using arrays and objects.
 
-These approaches allow us to send collections to a stored procedure without inserting untrusted values directly into SQL code.
+Each approach allows a procedure to receive multiple values through one parameter. The procedure then reads those values and processes them together.
 
-In the following sections, we will explore each method, starting with the simplest: **delimited strings**.
-
-> [!TIP]
-> Want to see this attack land against a real, running application? [`demos/cyber-lab/`](../demos/cyber-lab/) is a small FastAPI login form with a vulnerable and a secure endpoint side by side, plus the exact payloads from this section as one-click buttons. Entirely optional — not required for this lab.
+We will begin with the simplest format: **delimited strings**.
 
 ---
 

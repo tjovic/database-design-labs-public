@@ -124,10 +124,10 @@ sequenceDiagram
     participant P as Stored Procedure
     participant T as Product Table
 
-    A->>P: Selected IDs: 1, 2, 3
-    P->>T: Retrieve products matching the IDs
-    T-->>P: Matching products
-    P-->>A: One result set
+    A->>P: One procedure call with IDs: 1, 2, 3
+    P->>T: SELECT products WHERE IDProduct IN (1, 2, 3)
+    T-->>P: Matching product rows
+    P-->>A: One result set containing all matches
 ```
 
 This type of operation is called a **batch operation**.

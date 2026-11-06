@@ -1018,54 +1018,65 @@ WHERE s.IDState = 1
 
 **Three cities. One XML parameter. One procedure call.**
 
-## 4.4 XML Attributes vs. Element Values
+## 4.4 XML Attributes vs. Element Text
 
-XML can represent information in two common ways.
+XML can store the same value in different ways.
 
-**Using attributes:**
-
-```xml
-<City Name="Oslo" />
-```
-
-**Using element text:**
+**As an attribute:**
 
 ```xml
-<City>Oslo</City>
+<City Name="Nin" />
 ```
 
-Both represent the same city name, but the SQL expressions used to read them are different.
+**As element text:**
 
-For attributes, we use `@`:
+```xml
+<City>Nin</City>
+```
+
+Both examples contain the city name `Nin`, but its location inside the XML is different.
+
+### Reading an attribute
+
+Use `@Name` to read the attribute named `Name`:
 
 ```sql
-DECLARE @City xml = N'<City Name="Oslo" />';
+DECLARE @City xml = N'<City Name="Nin" />';
 
 SELECT @City.value('(/City/@Name)[1]', 'nvarchar(50)') AS CityName;
 ```
 
-For element text, we can use the element path:
+### Reading element text
+
+Use `text()` to read the text inside the `City` element:
 
 ```sql
-DECLARE @City xml = N'<City>Oslo</City>';
+DECLARE @City xml = N'<City>Nin</City>';
 
 SELECT @City.value('(/City/text())[1]', 'nvarchar(50)') AS CityName;
 ```
+
+Run these examples separately because each declares a variable named `@City`.
 
 Both queries return:
 
 | CityName |
 |---|
-| Oslo |
+| Nin |
+
+### Understanding the expressions
+
+| Expression | Meaning |
+|---|---|
+| `/City` | Select the `City` element |
+| `/City/@Name` | Select its `Name` attribute |
+| `/City/text()` | Select the text inside it |
+| `(...)[1]` | Select the first matching item |
 
 > [!IMPORTANT]
-> Notice the `[1]` in the expressions.
+> The `.value()` method extracts a single SQL value. Adding `[1]` makes it explicit that the expression selects at most one item.
 >
-> When reading directly from an XML variable, SQL Server often requires us to specify that we expect a single value.
->
-> The expression `(/City/@Name)[1]` selects the first matching `Name` attribute.
->
-> In the earlier `.nodes()` examples, each row already represents a particular `City` node, so expressions such as `@Name` are evaluated relative to that node.
+> In the earlier `.nodes()` examples, each row has a `City` node as its context. Therefore, `@Name` reads the attribute relative to that node.
 
 ## 4.5 Passing One Entity with Multiple Fields
 

@@ -15,14 +15,12 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 >
 > Try to solve the exercises independently before looking at the solutions. This will help you identify which topics you may need to review before the midterm exam.
 
-> [!WARNING]
+> [!NOTE]
 > **This lab works on the real `AdventureWorksENG` data.**
 >
-> Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects are equally real, and safe: nothing is modified when an operation is refused.
+> Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects change nothing.
 >
-> Two deletions in Section 8 **succeed and are permanent**: customer `16` (Lili Alameda, who has no invoices) and product `680` (HL Road Frame - Black, 58, which was never sold). After you run the lab, those rows are gone.
->
-> This means the lab is not repeatable on the same database copy — a second run reports "does not exist" instead of "deleted". Restore `AdventureWorksENG` from a backup before another group runs the lab.
+> Two deletions in Section 8 **succeed**: customer `16` (Lili Alameda, who has no invoices) and product `680` (HL Road Frame - Black, 58, which was never sold). The expected results in this lab assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, those two deletions return "does not exist" instead of "deleted".
 
 ---
 
@@ -283,7 +281,7 @@ EXEC dbo.usp_FindCategoriesByName
     @NamePattern = N'%';
 ```
 
-The first call returns one row, `Bicycles`. The second returns all four categories, sorted by name:
+The first call returns one row, `Bicycles`. The second returns every category, sorted by name — the four real ones plus `ZZ_LabTestCategory`, which you created in Section 2.1:
 
 | IDCategory | Name |
 |---:|---|
@@ -291,6 +289,9 @@ The first call returns one row, `Bicycles`. The second returns all four categori
 | 1 | Bicycles |
 | 3 | Clothes |
 | 2 | Parts |
+| 5 | ZZ_LabTestCategory |
+
+On a freshly created database the test category receives ID `5`.
 
 Searching for a pattern that matches nothing, such as `N'Q%'`, returns zero rows rather than an error.
 
@@ -403,28 +404,23 @@ SELECT @CategoryID = IDCategory
 FROM Category
 WHERE Name = N'ZZ_LabTestCategory_Renamed';
 
+-- First attempt
+EXEC dbo.usp_DeleteCategory
+    @IDCategory = @CategoryID;
+
+-- Try deleting the same category again
 EXEC dbo.usp_DeleteCategory
     @IDCategory = @CategoryID;
 ```
 
-Expected result:
+Both calls run in the same batch, so the second one can reuse `@CategoryID`.
 
-| RowsDeleted |
-|---:|
-| 1 |
+Expected results:
 
-Try deleting the same category again:
-
-```sql
-EXEC dbo.usp_DeleteCategory
-    @IDCategory = @CategoryID;
-```
-
-Expected result:
-
-| RowsDeleted |
-|---:|
-| 0 |
+| Call | RowsDeleted |
+|---|---:|
+| First attempt | 1 |
+| Same category again | 0 |
 
 The second call affects zero rows because the category has already been deleted.
 
@@ -582,6 +578,9 @@ Use your procedure to insert two cities into the state created in Exercise 1:
 
 - `ZZ_LabTestCity1`
 - `ZZ_LabTestCity2`
+
+> [!TIP]
+> Make sure Exercise 1 actually created the state. If `@StateID` ends up `NULL`, the cities are still inserted — without a state — because `City.StateID` is nullable. No error warns you. Exercise 3 will then return no cities for your test state.
 
 <details>
 <summary>Hint</summary>
@@ -1171,25 +1170,21 @@ The procedure uses the value of `@IDState` to determine which operation to perfo
 | Existing ID | Update the state with that ID |
 | Nonexistent ID | Update affects zero rows |
 
-### Test 1 – Insert a new state
+### Test the procedure
+
+Run both calls together in one batch, so the second call receives the ID returned by the first:
 
 ```sql
 DECLARE @IDState int = NULL;
 
+-- Test 1: Insert a new state
 EXEC dbo.usp_SaveState
     @IDState = @IDState OUTPUT,
     @Name = N'ZZ_LabTestState_Saved';
 
 SELECT @IDState AS NewStateID;
-```
 
-Because `@IDState` is `NULL`, the procedure inserts a new state and returns its generated ID.
-
-### Test 2 – Update the same state
-
-Execute the following together with Test 1 in the same batch, or declare `@IDState` again and assign the ID returned by Test 1:
-
-```sql
+-- Test 2: Update the same state
 EXEC dbo.usp_SaveState
     @IDState = @IDState OUTPUT,
     @Name = N'ZZ_LabTestState_SavedRenamed';
@@ -1199,7 +1194,9 @@ FROM State
 WHERE IDState = @IDState;
 ```
 
-The second call updates the existing state instead of inserting another one.
+In the first call `@IDState` is `NULL`, so the procedure inserts a new state and returns its generated ID.
+
+The second call receives that ID, so it updates the existing state instead of inserting another one.
 
 > [!IMPORTANT]
 > The same `OUTPUT` parameter can be used to pass an ID into a procedure and return an ID to the caller.
@@ -1214,12 +1211,12 @@ Notice that it does not automatically insert a new row when the supplied ID does
 
 Another approach is to let the caller explicitly specify which operation should be performed.
 
-For example:
+For example, once the procedure below exists, a caller could write:
 
 ```sql
 EXEC dbo.usp_ManageSubcategory
     @Action = N'GET',
-    @IDSubcategory = 10;
+    @IDSubcategory = 7;
 ```
 
 Or:
@@ -1227,10 +1224,10 @@ Or:
 ```sql
 EXEC dbo.usp_ManageSubcategory
     @Action = N'DELETE',
-    @IDSubcategory = 10;
+    @IDSubcategory = 7;
 ```
 
-The `@Action` parameter determines which branch of the procedure runs.
+The `@Action` parameter determines which branch of the procedure runs. Do not run these two calls yet — the procedure is created later in this section.
 
 ### Prepare test data
 
@@ -1578,14 +1575,27 @@ EXEC dbo.usp_DeleteCategory
 
 SQL Server rejects the `DELETE` because the category is still referenced by its subcategories.
 
-The error is:
+The output is:
 
 ```text
-Msg 547, Level 16
-The DELETE statement conflicted with the REFERENCE constraint.
+Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteCategory, Line 7
+The DELETE statement conflicted with the REFERENCE constraint "FK_Subcategory_Category".
+The conflict occurred in database "AdventureWorksENG", table "dbo.Subcategory", column 'CategoryID'.
+The statement has been terminated.
 ```
 
+followed by a result set:
+
+| RowsDeleted |
+|---:|
+| 0 |
+
 `Bicycles` and its three subcategories remain in the database.
+
+Notice the last line of the message: *the statement has been terminated*. Error 547 stops only the failed `DELETE`. The procedure then continues with the next statement, so `SELECT @@ROWCOUNT` still runs and reports zero deleted rows.
+
+> [!WARNING]
+> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a category that does not exist. Section 6.4 returns to why these two outcomes must not be confused.
 
 > [!IMPORTANT]
 > **A foreign key constraint protects referential integrity.**
@@ -1677,7 +1687,7 @@ END CATCH;
 
 The `ERROR_PROCEDURE()` function identifies the stored procedure in which the error occurred.
 
-In this example, it returns `usp_DeleteCategory`. If the procedure still contained the internal `CATCH` from Section 6.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
+In this example, it returns `dbo.usp_DeleteCategory` — the schema-qualified name. If the procedure still contained the internal `CATCH` from Section 6.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
 
 Both approaches are valid, but they have different characteristics.
 
@@ -2022,9 +2032,6 @@ No test data is needed. `AdventureWorksENG` already contains both cases — 1911
 | 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
 | 16 | Lili Alameda | 0 | Deletion must **succeed** |
 
-> [!WARNING]
-> Deleting customer `16` is permanent. After this exercise, Lili Alameda no longer exists in the database.
-
 ### Test your implementation
 
 Your implementation should produce the following results:
@@ -2220,9 +2227,6 @@ Again, no test data is needed. Of the 504 real products, 266 have been sold at l
 | 707 | Sport-100 Helmet, Red | 3083 | Deletion must be **rejected** |
 | 680 | HL Road Frame - Black, 58 | 0 | Deletion must **succeed** |
 
-> [!WARNING]
-> Deleting product `680` is permanent. After this exercise, `HL Road Frame - Black, 58` no longer exists in the catalog.
-
 ### Test your implementation
 
 | Test | Expected result |
@@ -2405,81 +2409,6 @@ The appropriate design depends on the application's requirements, how the result
 5. Consistent return codes make it easier for applications to handle operation results in a predictable way.
 
 </details>
----
-
-# Cleanup
-
-Remove the procedures and functions created in this lab:
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCategory;
-DROP PROCEDURE IF EXISTS dbo.usp_GetCategory;
-DROP PROCEDURE IF EXISTS dbo.usp_FindCategoriesByName;
-DROP PROCEDURE IF EXISTS dbo.usp_UpdateCategoryName;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteCategory;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertState;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCity;
-DROP PROCEDURE IF EXISTS dbo.usp_GetCitiesByState;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteCity;
-DROP PROCEDURE IF EXISTS dbo.usp_SaveState;
-DROP PROCEDURE IF EXISTS dbo.usp_GetCustomersByCity;
-DROP FUNCTION  IF EXISTS dbo.fn_CustomersByCity;
-DROP PROCEDURE IF EXISTS dbo.usp_ManageSubcategory;
-DROP PROCEDURE IF EXISTS dbo.usp_ManageCategory;
-DROP FUNCTION  IF EXISTS dbo.fn_GetCustomer;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomer;
-DROP PROCEDURE IF EXISTS dbo.usp_ManageProduct;
-GO
-```
-
-Most of this lab reads and deletes **real** `AdventureWorksENG` records, so there is little to clean up. Only the rows created to demonstrate `INSERT` remain, and several of them were already deleted by the exercises themselves.
-
-Remove whatever is left, **children before parents**:
-
-```sql
--- Subcategory created in Section 5 (deleted by the exercise if it ran to the end)
-DELETE FROM Subcategory
-WHERE Name = N'ZZ_LabTestSubcategory_Unused';
-
--- Categories created in Sections 2 and 5
-DELETE FROM Category
-WHERE Name IN (
-    N'ZZ_LabTestCategory',
-    N'ZZ_LabTestCategory_Renamed',
-    N'ZZ_LabTestCategory_Combined',
-    N'ZZ_LabTestCategory_CombinedRenamed'
-);
-
--- Cities and states created in Section 3 and 5.2
-DELETE FROM City
-WHERE Name IN (N'ZZ_LabTestCity1', N'ZZ_LabTestCity2');
-
-DELETE FROM State
-WHERE Name IN (
-    N'ZZ_LabTestState',
-    N'ZZ_LabTestState_Saved',
-    N'ZZ_LabTestState_SavedRenamed'
-);
-GO
-```
-
-Confirm nothing is left behind:
-
-```sql
-SELECT 'Category' AS TableName, Name FROM Category WHERE Name LIKE N'ZZ[_]%'
-UNION ALL SELECT 'Subcategory', Name FROM Subcategory WHERE Name LIKE N'ZZ[_]%'
-UNION ALL SELECT 'City', Name FROM City WHERE Name LIKE N'ZZ[_]%'
-UNION ALL SELECT 'State', Name FROM State WHERE Name LIKE N'ZZ[_]%';
-```
-
-The query should return zero rows.
-
-> [!WARNING]
-> **The deletions in Section 8 cannot be undone by this cleanup.**
->
-> Customer `16` (Lili Alameda) and product `680` (HL Road Frame - Black, 58) were permanently removed from the real data. Re-running the lab on the same database will report return code `1` instead of `0` for those two deletions.
->
-> Restore `AdventureWorksENG` from a backup before the next group runs this lab.
 
 ---
 
@@ -2544,6 +2473,6 @@ And remember:
 
 # Where to Go Next
 
-**Lab 8 – Complex Parameters** tackles one of the core problems in database design: how to pass a collection of rows into a procedure in a single call. It covers the three historical approaches (client-side query building — never do it, delimited strings, and XML) and explains why they fall short. The two native solutions (Table-Valued Parameters and JSON) arrive in Lab 9.
+**Lab 8 – Complex Parameters** tackles one of the core problems in database design: how to pass a collection of values into a procedure in a single call. It starts with client-side query building and why it opens the door to SQL injection, then compares four safe methods: delimited strings, XML, Table-Valued Parameters, and JSON.
 
-**Lab 9 – T-SQL Programming** goes further with error handling, including `THROW` and re-raising errors, together with `CONVERT` and `FORMAT` for working with dates and formatted output.
+**Lab 9 – Transactions** returns to a problem noted in this lab: a business-rule check followed by a `DELETE` is not automatically atomic. It covers `BEGIN`/`COMMIT`/`ROLLBACK TRANSACTION`, combining transactions with `TRY/CATCH` and `THROW`, and deciding whether a procedure or its caller owns the transaction.

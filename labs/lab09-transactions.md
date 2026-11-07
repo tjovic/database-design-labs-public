@@ -705,7 +705,28 @@ Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs c
 
 [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
 
-## 5.1 The basic pattern
+## 5.1 SET XACT_ABORT ON
+
+`SET XACT_ABORT ON` makes many execution errors abort the whole transaction rather than merely undoing the statement that failed.
+
+```sql
+SET XACT_ABORT ON;
+```
+
+Inside `TRY/CATCH`, an error can leave a transaction **uncommittable** when control reaches `CATCH`. We therefore keep the explicit rollback in the handler.
+
+It does not mean that every possible problem is automatically handled:
+
+- syntax and compilation errors are not controlled by this setting;
+- an `UPDATE` that matches zero rows is not automatically an error;
+- business-rule failures must be detected by your code.
+
+`THROW` honors `XACT_ABORT`. Use `THROW` for new error-handling examples in this lab.
+
+> [!IMPORTANT]
+> `XACT_ABORT` supports the error-handling pattern. It does not replace `TRY/CATCH`, validation, or a deliberate rollback policy.
+
+## 5.2 The basic pattern
 
 ```sql
 SET XACT_ABORT ON;
@@ -729,6 +750,7 @@ This pattern assumes that the block owns the whole operation and that a full rol
 
 | Element | Purpose |
 |---|---|
+| `SET XACT_ABORT ON` | Make execution errors abort the transaction instead of only the failing statement (5.1) |
 | `TRY` | Execute the operation and its successful commit |
 | `CATCH` | Handle execution errors caught by T-SQL |
 | `IF @@TRANCOUNT > 0` | Check that a transaction still exists before rolling it back |
@@ -736,23 +758,6 @@ This pattern assumes that the block owns the whole operation and that a full rol
 | `THROW;` | Pass the original error to the caller |
 
 Some errors may already have ended the transaction. The counter check avoids a second error from trying to roll back when no transaction exists.
-
-## 5.2 SET XACT_ABORT ON
-
-`SET XACT_ABORT ON` makes many execution errors abort the whole transaction rather than merely undoing the statement that failed.
-
-Inside `TRY/CATCH`, an error can leave a transaction **uncommittable** when control reaches `CATCH`. We therefore keep the explicit rollback in the handler.
-
-It does not mean that every possible problem is automatically handled:
-
-- syntax and compilation errors are not controlled by this setting;
-- an `UPDATE` that matches zero rows is not automatically an error;
-- business-rule failures must be detected by your code.
-
-`THROW` honors `XACT_ABORT`. Use `THROW` for new error-handling examples in this lab.
-
-> [!IMPORTANT]
-> `XACT_ABORT` supports the error-handling pattern. It does not replace `TRY/CATCH`, validation, or a deliberate rollback policy.
 
 ## 5.3 Repeat the failing example with protection
 

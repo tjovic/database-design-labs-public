@@ -143,6 +143,29 @@ is equivalent to:
 
 `ROLLUP` with three columns gave four levels; `CUBE` gives eight. The difference is the "middle" combinations `CUBE` includes — group by `(b, c)` while skipping `a` entirely, group by just `b`, and so on. `ROLLUP` is a straight line up the hierarchy; `CUBE` is the entire lattice of combinations.
 
+```mermaid
+flowchart TB
+    subgraph R["ROLLUP(a, b, c) — a line"]
+        direction TB
+        R1["(a, b, c)"] --> R2["(a, b)"] --> R3["(a)"] --> R4["()"]
+    end
+    subgraph C["CUBE(a, b, c) — a lattice"]
+        direction TB
+        C1["(a, b, c)"] --> C2["(a, b)"] & C3["(a, c)"] & C4["(b, c)"]
+        C2 --> C5["(a)"]
+        C2 --> C6["(b)"]
+        C3 --> C5
+        C3 --> C7["(c)"]
+        C4 --> C6
+        C4 --> C7
+        C5 --> C8["()"]
+        C6 --> C8
+        C7 --> C8
+    end
+```
+
+*Diagram 1 – `ROLLUP` drops one column at a time along a single path. `CUBE` branches into every combination before converging back on the grand total.*
+
 ## 3.2 Demo: the same query, every combination
 
 ```sql

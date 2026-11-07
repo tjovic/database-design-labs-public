@@ -1921,6 +1921,15 @@ EXEC dbo.usp_InsertCustomerBatchFromJson
         "Email": "janica.kostelic@example.com"
     }
 ]';
+
+-- Verify the inserted customers
+SELECT IDCustomer, FirstName, LastName, Email
+FROM Customer
+WHERE Email IN
+(
+    N'rudjer.boskovic@example.com',
+    N'janica.kostelic@example.com'
+);
 ```
 
 **Two customers. One JSON parameter. One procedure call.**

@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **transactions**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -67,6 +67,16 @@ The transaction collection is in [Transaction Exercises](transactions.md) and fo
 
 Unlike Lab 9, which uses its own dedicated `TransactionsLab` database with fictional bank accounts, these exercises apply the same concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows for safe, precise cleanup.
 
+### Concurrency
+
+The concurrency collection is in [Concurrency Exercises](concurrency.md) and follows the learning goals in [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md):
+
+1. **Dirty read** — reproduce it under `READ UNCOMMITTED`, then prevent it with `READ COMMITTED`.
+2. **Non-repeatable read** — reproduce it under `READ COMMITTED`, then prevent it with `REPEATABLE READ`.
+3. **Phantom read** — reproduce it under `REPEATABLE READ`, then prevent it with `SERIALIZABLE`.
+
+Like Lab 10, every exercise needs two SSMS query windows (Session A / Session B). Unlike Lab 10, which uses `TransactionsLab`'s fictional bank accounts, these exercises apply the same three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — cleaned up at the end, with the real `Croatia`/`Germany`/`Italy` rows never touched.
+
 ### Physical storage
 
 The physical storage collection is in [Physical Storage Exercises](physical-storage.md) and follows the learning goals in [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md):
@@ -128,6 +138,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Complex Parameters Exercises](complex-parameters.md)
 - [Lab 9 – Transactions](../labs/lab09-transactions.md)
 - [Transaction Exercises](transactions.md)
+- [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md)
+- [Concurrency Exercises](concurrency.md)
 - [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
 - [Physical Storage Exercises](physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)

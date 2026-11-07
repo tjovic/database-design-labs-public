@@ -182,10 +182,10 @@ Our problem is different: the transfer contains **two separate statements**.
 | Mode | Transaction boundary | Typical use |
 |---|---|---|
 | Autocommit | One statement | A single independent change |
-| Explicit transaction | Statements between `BEGIN TRANSACTION` and `COMMIT` or `ROLLBACK` | Several changes that belong together |
+| Explicit transaction | Several statements, grouped under your control | Several changes that belong together |
 
 > [!IMPORTANT]
-> SQL Server already uses transactions when you do not write `BEGIN TRANSACTION`. An explicit transaction lets you group multiple statements into one unit of work.
+> SQL Server already uses transactions even when you write nothing extra — autocommit treats every statement as its own transaction. Section 2 introduces the commands for grouping several statements into one transaction yourself.
 
 **Check your understanding**
 

@@ -39,10 +39,14 @@ Run examples **section by section** — some deliberately produce errors. This l
 USE master;
 GO
 
-IF DB_ID(N'TransactionsLab') IS NULL
+IF DB_ID(N'TransactionsLab') IS NOT NULL
 BEGIN
-    CREATE DATABASE TransactionsLab;
+    ALTER DATABASE TransactionsLab SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE TransactionsLab;
 END;
+GO
+
+CREATE DATABASE TransactionsLab;
 GO
 
 USE TransactionsLab;
@@ -54,7 +58,7 @@ SET XACT_ABORT OFF;
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-The expected transaction count is `0`. If it isn't, finish or roll back any transaction left open from a previous session before continuing.
+This always starts from a fresh, empty `TransactionsLab` — rerun it any time you want a clean slate instead of resetting balances by hand. The expected transaction count is `0`. If it isn't, finish or roll back any transaction left open on your connection before continuing.
 
 > [!IMPORTANT]
 > Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not finish it automatically.
@@ -2212,9 +2216,9 @@ The scope of this lab is transactional changes to ordinary SQL Server tables.
 
 ## E. Optional Cleanup
 
-Keep `TransactionsLab` if you want to repeat the lab later — rerunning the setup script in *Before you start* is enough; it does not recreate the database if one already exists.
+You can leave `TransactionsLab` in place — the next time you start the lab, rerunning the setup script in *Before you start* drops it and creates a fresh copy, so there's nothing to clean up between sessions.
 
-Because the lab lives in its own dedicated database, cleanup is a single drop. Finish all open transactions first:
+To remove it for good instead (e.g. at the end of the course), finish all open transactions first, then:
 
 ```sql
 USE master;

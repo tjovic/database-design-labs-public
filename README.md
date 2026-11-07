@@ -37,6 +37,8 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 | 08 | [Complex Parameters](labs/lab08-complex-parameters.md) | passing collections into a procedure: why client-side query building enables SQL injection, delimited strings, XML (`.nodes()` / `.value()` / `FOR XML PATH`), Table-Valued Parameters (`CREATE TYPE ... AS TABLE`), JSON (`OPENJSON` / `FOR JSON PATH`), choosing the right method |
 | 09 | [Transactions](labs/lab09-transactions.md) | `BEGIN/COMMIT/ROLLBACK TRANSACTION`, ACID properties, write-ahead logging, checkpoints, savepoints, `@@TRANCOUNT`, combining transactions with `TRY/CATCH` and `THROW`, transaction ownership between a procedure and its caller |
 | 10 | [Concurrency and Isolation](labs/lab10-concurrency.md) | dirty reads, non-repeatable reads, phantom reads, the four isolation levels, two-session demos, shared/exclusive locks, two-phase locking, lock granularity and escalation, deadlocks, MVCC and `READ_COMMITTED_SNAPSHOT` |
+| 11 | [Advanced Grouping](labs/lab11-advanced-grouping.md) | `GROUP BY ()` as the grand-total idiom, `ROLLUP`, `CUBE`, `GROUPING SETS`, rewriting `ROLLUP`/`CUBE` as `GROUPING SETS`, disambiguating grouping `NULL`s from data `NULL`s with `GROUPING()` |
+| 12 | [Window Functions](labs/lab12-window-functions.md) | the `OVER` clause, ranking functions (`ROW_NUMBER`/`RANK`/`DENSE_RANK`/`NTILE`), aggregate windows and running totals, analytical functions (`LAG`/`LEAD`/`FIRST_VALUE`/`LAST_VALUE`), the `LAST_VALUE` default-frame trap, `ROWS`/`RANGE` frames |
 
 > Additional labs will be added as the course progresses.
 
@@ -76,6 +78,10 @@ Lab 08 – Complex Parameters
 Lab 09 – Transactions
         ↓
 Lab 10 – Concurrency and Isolation
+        ↓
+Lab 11 – Advanced Grouping
+        ↓
+Lab 12 – Window Functions
 ```
 
 A single lab may span more than one class session when the topic requires additional time.
@@ -100,7 +106,7 @@ Some examples intentionally produce SQL Server errors. These are part of the lea
 
 ## About the database
 
-Labs 00–04, 07, and 08 use `AdventureWorksENG`, a training database prepared for the course.
+Labs 00–04, 07, 08, 11, and 12 use `AdventureWorksENG`, a training database prepared for the course.
 
 The examples may create temporary Views, tables, triggers, stored procedures, functions, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
 

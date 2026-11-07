@@ -25,6 +25,9 @@ After completing this lab, you should be able to:
 - explain the ACID properties and, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep those promises after a crash.
 
 > [!NOTE]
+> **Suggested route for a 90-minute lab:** prioritize Sections 1–2 and 5–7, then complete Exercises 1 and 4. Sections 3–4, the caller-managed examples in Section 8, and the detailed recovery material in Section 9 are extensions for instructor demonstration or self-study. The full document is a reference, so students do not need to complete every example during one lab session.
+
+> [!NOTE]
 > **Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`.
 >
 > This lab uses **one SSMS query window**; concurrency, locking, isolation levels, and two-session demonstrations are covered in **Lab 10**.
@@ -363,6 +366,9 @@ On the first run against this newly created table, the final IDs are `1` and `3`
 
 # Section 3 – Savepoints: Undoing Part of a Transaction
 
+> [!NOTE]
+> **Extension:** This section introduces savepoints. For the core transaction workflow, understand the single example in 3.1; Sections 3.3–3.4 show less common details and can be left for self-study.
+
 A full `ROLLBACK` undoes the complete transaction. Sometimes we want to undo only the work done after a particular point.
 
 A **savepoint** is a named marker inside an open transaction.
@@ -495,7 +501,7 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 | After second transfer | 850.00 | 650.00 |
 | After full rollback | 1000.00 | 500.00 |
 
-Compare this with 4.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
+Compare this with 3.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
 
 > [!IMPORTANT]
 > A savepoint marks a point for a partial rollback. It does not create a boundary that a full rollback must respect. The number of savepoints inside a transaction has no effect on what a full `ROLLBACK` undoes.
@@ -583,6 +589,9 @@ The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` i
 ---
 
 # Section 4 – @@TRANCOUNT and Nested Transactions
+
+> [!NOTE]
+> **Extension:** The key point is that nested `BEGIN` statements do not create independently committable transactions. Sections 4.1–4.2 are the essential example; 4.3 and the prediction table are optional practice.
 
 `@@TRANCOUNT` reports the transaction nesting count for the **current connection**.
 
@@ -1057,6 +1066,9 @@ For these standalone calls, `@@TRANCOUNT` must be `0` after each test.
 
 # Section 8 – Who Manages the Transaction?
 
+> [!NOTE]
+> **Extension:** For the core lab, learn the ownership rule in 8.1 and the summary in 8.5. The caller-managed and nested examples in 8.2–8.4 are useful follow-up reading; they demonstrate advanced consequences of transaction ownership.
+
 A transaction can be managed by the procedure or by its caller. The important question is: **which code owns the complete business operation?**
 
 [Lab 7 – CRUD Operations](lab07-crud-operations.md), Section 6.3, asked the same ownership question about `TRY/CATCH` placement — inside a procedure or at its caller. Here it returns for transactions, and the stakes are higher: the wrong choice does not just mis-handle an error message, it can commit or roll back the wrong amount of work.
@@ -1238,6 +1250,9 @@ The third approach is discussed briefly in Additional Reading. It is not require
 ---
 
 # Section 9 – ACID, the Transaction Log, and Recovery
+
+> [!NOTE]
+> **Core reading:** 9.1–9.6 introduce ACID, the transaction log, write-ahead logging, and the basic ideas of UNDO and REDO. Sections 9.7–9.10 go deeper into recovery behavior and are optional. They are intended to connect this lab with physical storage, not as additional SQL programming tasks.
 
 By now you can write, verify, and troubleshoot transactions: `BEGIN/COMMIT/ROLLBACK`, savepoints, `@@TRANCOUNT`, and the `TRY/CATCH` pattern inside a procedure. This section steps back and explains **how SQL Server can keep the promises you have been relying on**, even if the server stops unexpectedly. Nothing here changes how you write a transaction — it explains why the commands from Sections 2–8 behave the way they do.
 
@@ -1651,7 +1666,7 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 </details>
 
-## Exercise 2 – Keep One Change, Cancel Another
+## Exercise 2 – Keep One Change, Cancel Another (Extension)
 
 Using `dbo.Note` from Section 2.5:
 
@@ -1695,7 +1710,7 @@ Only the first exercise note is stored. Repeating the exercise adds another copy
 
 </details>
 
-## Exercise 3 – An Unused Savepoint
+## Exercise 3 – An Unused Savepoint (Extension)
 
 Using `dbo.Note`:
 
@@ -1748,7 +1763,7 @@ Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
 Cases 1–3 repeat scenarios from 7.3–7.5 — write them **from memory**, without looking back, as a quick retrieval check. Cases 4 and 5 are new: Section 7 never actually triggered errors `50011` or `50012`, so this is the first time you confirm they fire.
 
-After each call, verify the balances and transaction count. Use `TRY/CATCH` around expected errors so verification still runs.
+Verify the balances and transaction count after the successful call, then after each expected-error call. Use a separate `TRY/CATCH` for each expected error so verification still runs.
 
 <details>
 <summary>Show solution</summary>
@@ -1795,7 +1810,7 @@ ORDER BY AccountID;
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-Repeat the same `TRY/CATCH` block, one call per test. Each call needs its **own** `TRY/CATCH` — an uncaught `THROW` ends the whole batch, so stacking three bare `EXEC` calls without one each would silently skip the tests after the first failure:
+Repeat the same `TRY/CATCH` pattern, one call per test. Each call needs its **own** `TRY/CATCH` — an uncaught `THROW` ends the whole batch, so stacking bare `EXEC` calls without one each would skip the tests after the first failure. Run the balance and transaction-count `SELECT` statements after each call, as shown for the missing-destination case:
 
 ```sql
 -- Insufficient funds.
@@ -1810,6 +1825,12 @@ BEGIN CATCH
            ERROR_MESSAGE() AS ErrorMessage;
 END CATCH;
 
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+
 -- Invalid amount.
 BEGIN TRY
     EXEC dbo.usp_TransferFunds
@@ -1821,6 +1842,12 @@ BEGIN CATCH
     SELECT ERROR_NUMBER() AS ErrorNumber,
            ERROR_MESSAGE() AS ErrorMessage;
 END CATCH;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 -- Same account.
 BEGIN TRY
@@ -1841,6 +1868,8 @@ ORDER BY AccountID;
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
+Expected balances remain `750.00` and `750.00`, and `@@TRANCOUNT` remains `0` after each test.
+
 | Test | Account 1 | Account 2 | Expected error | Final count |
 |---|---:|---:|---|---:|
 | Valid transfer | 750.00 | 750.00 | None | 0 |
@@ -1851,7 +1880,7 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 </details>
 
-## Exercise 5 – Add a Transfer Record
+## Exercise 5 – Add a Transfer Record (Extension)
 
 Extend the transfer operation so that it also stores a record of the successful transfer.
 
@@ -2016,7 +2045,7 @@ This demonstration intentionally resets balances between tests, so the history t
 
 </details>
 
-## Exercise 6 – Connect Transactions to Lab 8
+## Exercise 6 – Connect Transactions to Lab 8 (Extension)
 
 In Lab 8, one procedure inserted a parent row and related child rows from structured input.
 
@@ -2118,7 +2147,7 @@ Preserve the tested table names, column names, and insert logic from Lab 8 when 
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
 
-Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. Every tool in this lab — explicit transactions, savepoints, `@@TRANCOUNT`, `TRY/CATCH` with `THROW`, and a clear ownership convention — exists to guarantee that, and Section 9 explained why SQL Server can make that guarantee stick even after a crash.
+Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Section 9 explains, at a conceptual level, how SQL Server preserves committed work after a crash.
 
 **Looking ahead:** What happens if two sessions try to change the same data at the same time? Lab 10 introduces concurrency, locking, isolation levels, and deadlocks.
 

@@ -2,20 +2,12 @@
 
 **Database:** `TransactionsLab` (created in this lab — see *Before you start*)
 
-**Version:** 2.3 – Reordered for pedagogy: procedures before internals; ACID/log moved to Section 9
+In previous labs we wrote procedures that insert, update, and delete data, and in Lab 8 we passed several rows to a procedure in one call. But one procedure call can run several SQL statements — what happens if the first one succeeds and the second one fails?
 
-Diagrams use Mermaid code blocks rendered directly by GitHub. No separate image files are required.
-
-In previous labs, we wrote procedures that insert, update, and delete data. In Lab 8, we also learned how to pass several rows to a procedure in one call.
-
-But one procedure call can execute several SQL statements. What happens if the first statement succeeds and the second one fails?
-
-Consider a bank transfer. We subtract money from one account and add it to another account. These two changes belong together. Keeping only the first change would lose money; keeping only the second would create money.
-
-In this lab, you will use **transactions** to treat several database changes as one unit of work. You will start with manual `COMMIT` and `ROLLBACK`, then add error handling and move the complete operation into a stored procedure.
+Consider a bank transfer: subtract money from one account, add it to another. Keeping only one half would lose or create money. In this lab you will use **transactions** to treat several database changes as one unit of work — starting with manual `COMMIT`/`ROLLBACK`, then adding error handling, then moving the complete operation into a stored procedure.
 
 > [!IMPORTANT]
-> **Core idea:** Related changes should be confirmed together or undone together. A transaction defines the boundary of that unit of work. Your code must also detect unsuccessful business operations and choose the correct outcome.
+> **Core idea:** Related changes should be confirmed together or undone together. A transaction defines that boundary. Your code must also detect unsuccessful business operations and choose the correct outcome.
 
 ---
 
@@ -23,35 +15,25 @@ In this lab, you will use **transactions** to treat several database changes as 
 
 After completing this lab, you should be able to:
 
-- explain why several related SQL statements may need one transaction;
-- distinguish autocommit transactions from explicit transactions;
-- use `BEGIN TRANSACTION`, `COMMIT TRANSACTION`, and `ROLLBACK TRANSACTION`;
-- inspect changes inside a transaction before deciding whether to keep them;
+- explain why several related SQL statements may need one transaction, and distinguish autocommit from explicit transactions;
+- use `BEGIN TRANSACTION`, `COMMIT TRANSACTION`, and `ROLLBACK TRANSACTION`, and inspect uncommitted changes;
 - use a savepoint to undo part of a transaction;
 - explain `@@TRANCOUNT` and why an inner `COMMIT` does not independently commit changes;
 - combine transactions with `TRY/CATCH`, `THROW`, and `SET XACT_ABORT ON`;
 - use `@@ROWCOUNT` to detect an operation that did not affect the expected row;
-- implement and verify a transaction inside a stored procedure;
-- distinguish a transaction managed by a procedure from one managed by its caller;
-- explain the ACID properties, write-ahead logging, and the roles of the buffer pool and log buffer;
-- distinguish UNDO from REDO and explain why a fully durable commit survives a system crash;
-- explain the purpose of a checkpoint and distinguish it from a commit.
+- implement and verify a transaction inside a stored procedure, and distinguish a transaction managed by a procedure from one managed by its caller;
+- explain the ACID properties and, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep those promises after a crash.
 
 > [!NOTE]
-> **Prerequisites:** This lab builds on [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md).
+> **Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`.
 >
-> You should know variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`. The error-handling pattern is explained again where it becomes important for transactions.
-
-> [!NOTE]
-> This lab uses **one SSMS query window**. Concurrency, locking, isolation levels, and two-session demonstrations are covered in **Lab 10**. The examples here illustrate transaction boundaries and error handling in a single session.
+> This lab uses **one SSMS query window**; concurrency, locking, isolation levels, and two-session demonstrations are covered in **Lab 10**.
 
 ---
 
 ## Before you start
 
-Run examples **section by section**. Some examples deliberately produce errors. Read the instructions before executing them.
-
-This lab runs in its own dedicated database, `TransactionsLab`, separate from `AdventureWorksENG` (the same pattern used by the `IndexLab` and `PayrollLab` databases in other labs). All account names and balances are fictional. No other training database is read or modified.
+Run examples **section by section** — some deliberately produce errors. This lab runs in its own dedicated database, `TransactionsLab`, separate from `AdventureWorksENG` (the same pattern as the `IndexLab` and `PayrollLab` databases in other labs). All account names and balances are fictional.
 
 ```sql
 USE master;
@@ -72,17 +54,12 @@ SET XACT_ABORT OFF;
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-The expected transaction count is `0`.
-
-If the count is greater than zero, finish the transaction you previously opened before continuing. If those unfinished changes should be discarded, use `ROLLBACK TRANSACTION`.
+The expected transaction count is `0`. If it isn't, finish or roll back any transaction left open from a previous session before continuing.
 
 > [!IMPORTANT]
-> Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not automatically finish an explicit transaction.
+> Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not finish it automatically.
 
-The examples are written for SQL Server 2016 SP1 or later because they use `CREATE OR ALTER PROCEDURE`.
-
-> [!NOTE]
-> **Validation status:** These are new teaching examples. The code and expected results have been reviewed, but the scripts have not been executed against a SQL Server instance during preparation. Run the demonstrations on your training database before class.
+Requires SQL Server 2016 SP1 or later (`CREATE OR ALTER PROCEDURE`).
 
 ---
 

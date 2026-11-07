@@ -9,7 +9,7 @@ But what happens when you need to pass **many** values in a single call? How do 
 This lab compares five approaches to handling collections of data, starting with unsafe SQL concatenation and moving to delimited strings, XML, TVPs, and JSON. By the end, you will know how each approach works and which to consider in different situations.
 
 > [!IMPORTANT]
-> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some more natural for the wire protocol you're using. This lab compares unsafe client-side SQL concatenation with four ways to pass collections or structured data: delimited strings, XML, Table-Valued Parameters, and JSON. TVPs pass typed relational rows; XML and JSON represent structured documents.
+> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some better suited to the format used by the application. This lab compares unsafe client-side SQL concatenation with four ways to pass collections or structured data: delimited strings, XML, Table-Valued Parameters, and JSON. TVPs pass typed relational rows; XML and JSON represent structured documents.
 
 ---
 
@@ -18,13 +18,13 @@ This lab compares five approaches to handling collections of data, starting with
 After completing this lab, you should be able to:
 
 - identify the two classic collection-parameter problems: the 1:N insert and the batch key operation;
-- understand why client-side query building is dangerous and how it fails in three concrete ways;
+- explain the risks of unsafe SQL concatenation, the benefits of parameterization, and the overhead of separate database calls;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
 - pass hierarchical data as XML, shred it with `.nodes()` and `.value()`, and build it back with `FOR XML PATH`;
 - use XML to pass a single entity with many fields, not just a batch of simple items, and insert it with `.value()`'s singleton syntax;
 - define a table type with `CREATE TYPE ... AS TABLE` and pass tables as parameters using Table-Valued Parameters (TVPs);
 - accept JSON data with `OPENJSON(@json) WITH (...)`, shred it into typed columns, and build JSON output with `FOR JSON PATH` and dotted aliases;
-- insert a parent row and its children from a single nested JSON document, using `JSON_VALUE` and `OPENJSON` together inside one transaction;
+- insert a parent row and its children from a single nested JSON document, using `JSON_VALUE` and `OPENJSON` together;
 - compare all five methods (client-side query, delimited string, XML, TVP, JSON) and know which to reach for in different situations.
 
 ---
@@ -34,11 +34,14 @@ After completing this lab, you should be able to:
 >
 > - **Stored procedures (Lab 3)** — how to create them, what `EXEC` does, what parameters are.
 > - **Functions (Lab 4)** — scalar and table-valued functions.
-> - **T-SQL programming (Lab 0)** — variables (Section 2), `IF/BEGIN/END` (Section 4), `WHILE` loops (Section 7), inline type conversion (Section 6), and basic `TRY/CATCH` (Section 10).
+> - **T-SQL programming (Lab 0)** — variables (Section 2), `IF/BEGIN/END` (Section 4), `WHILE` loops (Section 7), and inline type conversion (Section 6).
 >
-> String functions (`LEN`, `SUBSTRING`, `CHARINDEX`) and XML/JSON literals are introduced inline as needed.
+> XML and JSON formats are introduced inline as needed.
 
 ---
+
+> [!NOTE]
+> Run each insert example once, except where an exercise explicitly asks you to repeat a call. Repeating an insert may create duplicate rows or fail if a unique constraint prevents duplicates.
 
 Start by selecting the training database:
 
@@ -176,28 +179,21 @@ Ideally, we want to send the entire invoice in **one procedure call**.
 
 ```mermaid
 flowchart TD
-    A["Application"] -->|"One call: invoice header + all items"| B
-
+    A["Application"] -->|"One call: header + all items"| B
     subgraph P["Stored Procedure"]
-        B["BEGIN TRANSACTION"] --> C["Insert invoice header"]
-        C --> D["Use generated invoice ID to insert all items"]
-        D --> E["COMMIT"]
-        C -->|"Error"| F["ROLLBACK"]
-        D -->|"Error"| F
+        B["Insert invoice header"] --> C["Get generated invoice ID"]
+        C --> D["Insert all items using that ID"]
     end
-
-    E --> G["Return new invoice ID"]
-    F --> H["Return error to application"]
+    D --> E["Return new invoice ID"]
 ```
 
-The procedure receives the invoice data, inserts the header and all items, and manages the transaction.
-
-If an error occurs, the transaction can be rolled back so that the invoice is not partially inserted.
+The procedure receives the invoice data, inserts the header, and uses its generated ID to link all items to the invoice.
 
 > [!IMPORTANT]
 > **One procedure call does not necessarily mean one SQL statement.**
 >
-> A procedure may execute several SQL statements inside a transaction. The transaction ensures that related changes are committed or rolled back together.
+> A procedure may execute several SQL statements. One call alone does not ensure that all changes succeed or fail together. In the next lab, we will use transactions to provide that behavior.
+
 
 ## 1.3 The Solution – Complex Parameters
 
@@ -228,7 +224,7 @@ All five approaches can represent the same list of product IDs, but they differ 
 
 Some approaches are safer, more efficient, or better suited to particular applications than others.
 
-We will begin with a problematic approach — building SQL statements directly in application code — and then explore better alternatives.
+We will begin with SQL statements built by embedding values in application code, then explore parameterized alternatives.
 
 By the end of this lab, you should understand **how to pass collections of data to stored procedures and how to choose an appropriate method for a given situation**.
 
@@ -269,7 +265,7 @@ WHERE IDProduct IN (1, 2, 3);
 
 The database receives a complete SQL statement and executes it.
 
-At first glance, this approach seems simple and convenient.
+This example uses a fixed list of integers, so it contains no untrusted user input.
 
 However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
 
@@ -338,7 +334,7 @@ Let's examine what happened:
 2. `OR 1=1` adds a condition that is always true.
 3. `--` starts a comment, causing SQL Server to ignore the closing quote added by the application and everything else on that line.
 
-Because `1=1` is always true, the query returns **all customers**, not just those with a particular last name.
+Because `1=1` is always true, the query returns **all customers**, not just those matching the supplied first and last name.
 
 The user has changed the meaning of the SQL statement without changing the application code.
 
@@ -544,7 +540,7 @@ We need to convert it into a collection of values that can be used in a SQL quer
 
 ```mermaid
 flowchart TD
-    A["String parameter<br/>'1,2,3'"] --> B["STRING_SPLIT"]
+    A["String parameter: 1,2,3"] --> B["STRING_SPLIT"]
     B --> C["Table with three rows"]
     C --> D["1"]
     C --> E["2"]
@@ -988,9 +984,7 @@ We do not need a `WHILE` loop or a separate `INSERT` statement for each city.
 
 ### Step 2 – Call the procedure
 
-First, create a test state and capture its ID.
-
-Then pass the XML document to the procedure.
+First, find Croatia's ID. Then pass that ID and the XML document to the procedure.
 
 ```sql
 -- Find Croatia's ID
@@ -1135,15 +1129,6 @@ EXEC dbo.usp_InsertCustomerFromXml
 ```
 
 The procedure extracts the individual values from XML and inserts a new customer.
-
-Clean up the test data:
-
-```sql
-DELETE FROM Customer
-WHERE Email = N'nina.novak@example.com';
-
-DROP PROCEDURE dbo.usp_InsertCustomerFromXml;
-```
 
 This example demonstrates that XML parameters are useful not only for lists but also for structured objects containing several related values.
 
@@ -1434,19 +1419,6 @@ This means that the procedure can use the input data without changing the collec
 
 If we need to modify the data, we can copy it into a local table variable or temporary table.
 
-### Cleanup
-
-```sql
-DROP PROCEDURE dbo.usp_GetProductsByIDs;
-DROP TYPE dbo.ProductIDList;
-GO
-```
-
-> [!IMPORTANT]
-> Drop the procedure before dropping the table type.
->
-> SQL Server does not allow a table type to be dropped while a stored procedure still depends on it.
-
 ## 5.4 Practical Example – Inserting an Invoice with Multiple Items
 
 Let's return to the invoice problem introduced in Section 1.
@@ -1611,7 +1583,7 @@ Run this entire block together so that `@InvoiceLines` remains in scope.
 
 The procedure receives the header through three scalar parameters and all three items through one TVP.
 
-It returns the generated invoice ID. **Record this ID for the next step.**
+The procedure returns the generated invoice ID.
 
 ### Step 4 – Verify the result
 
@@ -2090,7 +2062,7 @@ We want to insert:
 - One record into the `State` table.
 - Three records into the `City` table, linked to the new state.
 
-The procedure must perform both operations inside a transaction.
+The procedure inserts the state first, then uses its generated ID when inserting the cities.
 
 ### Step 1 – Create the procedure
 
@@ -2127,7 +2099,6 @@ The procedure uses:
 - `JSON_VALUE` to extract the state name.
 - `SCOPE_IDENTITY()` to retrieve the new state ID.
 - `OPENJSON` to convert the city array into rows.
-- A transaction to keep the inserts together.
 
 Notice that `OPENJSON` is used without `WITH` because the `Cities` array contains simple strings rather than objects.
 
@@ -2146,9 +2117,23 @@ EXEC dbo.usp_InsertStateWithCities
 }';
 ```
 
+Verify the inserted state and cities:
+
+```sql
+SELECT
+    s.IDState,
+    s.Name AS StateName,
+    c.IDCity,
+    c.Name AS CityName
+FROM State s
+JOIN City c ON c.StateID = s.IDState
+WHERE s.Name = N'Sweden';
+```
+
 The procedure inserts one state and three related cities in a single call.
 
-If an error occurs during the insert, the transaction is rolled back.
+> [!NOTE]
+> If inserting the cities fails, the state may remain in the database. In the next lab, we will use a transaction to keep these operations together.
 
 This is the same parent-child pattern we previously used with Table-Valued Parameters. The difference is that the data now arrives as JSON.
 
@@ -2279,12 +2264,12 @@ For stored procedures, the corresponding parameter declarations are:
 | Method | Parameter declaration |
 |---|---|
 | Client-side query building | No collection parameter; values are embedded in SQL text |
-| Delimited string | `@IDList nvarchar(max)` |
+| Delimited string | `@IDList nvarchar(200)` |
 | XML | `@IDs xml` |
 | TVP | `@IDs dbo.ProductIDList READONLY` |
 | JSON | `@Json nvarchar(max)` |
 
-Notice that both delimited strings and JSON commonly use `nvarchar(max)`, but their contents have different structures.
+Delimited strings and JSON are both passed as text, but their contents have different structures. This lab uses `nvarchar(200)` for the ID lists and `nvarchar(max)` for JSON documents.
 
 XML has its own SQL Server data type, while TVPs use a user-defined table type.
 
@@ -2476,13 +2461,13 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 <details>
 <summary>Show answers</summary>
 
-1. **1:N insert** — An invoice header and its line items must be inserted together. A simple implementation using a separate procedure call for every row would require one call for the header and twenty calls for twenty items. A collection parameter allows one call to carry all items, while the procedure uses a transaction to keep the related inserts together.
+1. **1:N insert** — An invoice header and its line items must be inserted together. A simple implementation using a separate procedure call for every row would require one call for the header and twenty calls for twenty items. A collection parameter allows one call to carry all items. Ensuring that all related inserts succeed or fail together is a separate concern, covered in the next lab.
 
 2. **Parameters, plans, and round-trips** — Passing untrusted values as parameters keeps data separate from executable SQL code. Keeping the statement text stable can also improve execution-plan reuse, although SQL Server can automatically parameterize some literal queries. Collection parameters reduce round-trips when they replace separate calls for individual items. A single dynamically constructed `IN (...)` query can also use one round-trip; the number of calls and safe handling of values are separate concerns.
 
 3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
 
-4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. If you wanted to read the node's text content instead (the value between opening and closing tags), you'd use `.` (dot).
+4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. To read the text inside the element, use `text()`, as demonstrated in Section 4.4.
 
 5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 8.)
 
@@ -2551,8 +2536,6 @@ EXEC dbo.usp_DeleteProductsByNameList @NameList = N'ZZ_TestProduct1,ZZ_TestProdu
 
 -- Verify they are gone
 SELECT * FROM Product WHERE Name LIKE N'ZZ_TestProduct%';
-
-DROP PROCEDURE dbo.usp_DeleteProductsByNameList;
 ```
 
 </details>
@@ -2577,7 +2560,7 @@ The procedure must:
 2. Insert all rows into the `State` table.
 3. Use `.nodes()` and `.value()` to shred the XML.
 
-Test it with at least three state names. Verify. Delete the rows, then drop the procedure.
+Test it with at least three state names and verify the inserted rows.
 
 ### Hints
 
@@ -2610,10 +2593,6 @@ EXEC dbo.usp_InsertStatesBatch @States = N'
 
 -- Verify
 SELECT * FROM State WHERE Name LIKE N'NewCountry%';
-
--- Cleanup
-DELETE FROM State WHERE Name LIKE N'NewCountry%';
-DROP PROCEDURE dbo.usp_InsertStatesBatch;
 ```
 
 </details>
@@ -2675,35 +2654,34 @@ Run it and inspect the XML. Notice:
 
 ## Exercise 4 — TVP Fundamentals [INTERMEDIATE]
 
-Create a **table type** `dbo.ProductIDList` with a single `int` column called `ID` (primary key).
+Create a **table type** `dbo.ProductIDsExercise` with a single `int` column called `ID` (primary key).
 
 Write a procedure `dbo.usp_ListProductsByIDList` that:
 
-1. Accepts one `dbo.ProductIDList READONLY` parameter.
+1. Accepts one `dbo.ProductIDsExercise READONLY` parameter.
 2. Returns `IDProduct`, `Name`, and `PriceWithoutVAT` for all products in the list.
 3. Joins the TVP against the `Product` table.
 
-Call it with three product IDs. Verify the results. Then drop the procedure and the type (in the right order).
+Call it with three product IDs and verify the results.
 
 ### Hints
 
 - `CREATE TYPE ... AS TABLE` defines the type; `CREATE OR ALTER PROCEDURE` uses it as a parameter type.
 - Remember `READONLY` is mandatory.
-- After `DECLARE @List dbo.ProductIDList;`, you can `INSERT INTO @List (ID) VALUES (...), (...);`
-- Drop the procedure first, then the type.
+- After `DECLARE @List dbo.ProductIDsExercise;`, you can `INSERT INTO @List (ID) VALUES (...), (...);`
 
 <details>
 <summary>Show solution</summary>
 
 ```sql
-CREATE TYPE dbo.ProductIDList AS TABLE
+CREATE TYPE dbo.ProductIDsExercise AS TABLE
 (
     ID int PRIMARY KEY
 );
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_ListProductsByIDList
-    @IDs dbo.ProductIDList READONLY
+    @IDs dbo.ProductIDsExercise READONLY
 AS
 BEGIN
     SELECT
@@ -2717,14 +2695,10 @@ END
 GO
 
 -- Test
-DECLARE @ProductList dbo.ProductIDList;
+DECLARE @ProductList dbo.ProductIDsExercise;
 INSERT INTO @ProductList (ID) VALUES (1), (2), (5);
 
 EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
-
--- Cleanup (procedure first, then type)
-DROP PROCEDURE dbo.usp_ListProductsByIDList;
-DROP TYPE dbo.ProductIDList;
 ```
 
 </details>
@@ -2740,7 +2714,7 @@ Write a procedure `dbo.usp_InsertCustomersFromJson` that:
 3. Uses `OPENJSON ... WITH (...)` to shred the JSON into rows.
 4. Inserts all rows into the `Customer` table.
 
-Call it with at least two customers in JSON format. Verify they were inserted. Clean up by deleting those rows.
+Call it with at least two customers in JSON format and verify they were inserted.
 
 ### Hints
 
@@ -2780,10 +2754,6 @@ EXEC dbo.usp_InsertCustomersFromJson @JsonCustomers = N'
 SELECT FirstName, LastName, Email
 FROM Customer
 WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
-
--- Cleanup
-DELETE FROM Customer WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
-DROP PROCEDURE dbo.usp_InsertCustomersFromJson;
 ```
 
 </details>
@@ -2799,13 +2769,12 @@ Write a procedure `dbo.usp_InsertProducts` that:
 1. Accepts one `dbo.ProductInput READONLY` parameter.
 2. Inserts every row from it into the `Product` table.
 
-Call it with at least two test products. Verify they were inserted with a query. Clean up by deleting those rows, then drop the procedure and the type (in the right order).
+Call it with at least two test products and verify they were inserted with a query.
 
 ### Hints
 
 - `Product.MinimumQuantityInStock` is `NOT NULL` with no default — supply a value (e.g. `0`) in the `INSERT`, even though the TVP itself doesn't carry that column.
-- Use a distinctive name prefix (e.g. `ZZ_Test`) for your test products so cleanup is a single `WHERE Name LIKE ...`.
-- Drop the procedure first, then the type.
+- Use a distinctive name prefix (e.g. `ZZ_Test`) to make your test products easy to find.
 
 <details>
 <summary>Show solution</summary>
@@ -2842,11 +2811,6 @@ EXEC dbo.usp_InsertProducts @Products = @NewProducts;
 SELECT IDProduct, Name, ProductNumber, PriceWithoutVAT
 FROM Product
 WHERE Name LIKE N'ZZ_TestWidget%';
-
--- Cleanup (procedure first, then type)
-DELETE FROM Product WHERE Name LIKE N'ZZ_TestWidget%';
-DROP PROCEDURE dbo.usp_InsertProducts;
-DROP TYPE dbo.ProductInput;
 ```
 
 </details>
@@ -2856,7 +2820,7 @@ DROP TYPE dbo.ProductInput;
 ## Exercise 7 – XML: Find or Create Related Records [ADVANCED]
 
 > [!TIP]
-> Optional extension or homework: this exercise combines XML input with transactions and find-or-create logic across three related tables.
+> Optional extension or homework: this exercise combines XML input with find-or-create logic across three related tables.
 
 In previous exercises, we used XML to insert multiple records into a database.
 
@@ -2909,8 +2873,7 @@ Create a stored procedure named `dbo.usp_InsertCustomerWithLocation` that:
 3. Checks whether the state exists. If not, inserts it and retrieves its new ID.
 4. Checks whether the city exists **within that state**. If not, inserts it and retrieves its new ID.
 5. Checks whether the customer exists using their first and last name. If not, inserts the customer and links them to the city.
-6. Uses a transaction to keep the insert operations together.
-7. Returns the customer's ID, name, city, and state.
+6. Returns the customer's ID, name, city, and state.
 
 For this exercise, assume that the combination of first and last name uniquely identifies a customer. In a real application, a more reliable identifier would normally be required.
 
@@ -2941,7 +2904,6 @@ Both calls should return the same customer ID.
 - Use `IF @Variable IS NULL` to decide whether an insert is necessary.
 - Use `SCOPE_IDENTITY()` to retrieve newly generated IDs.
 - Check both `City.Name` and `City.StateID` when searching for an existing city.
-- Use `BEGIN TRANSACTION`, `COMMIT`, and `ROLLBACK` to manage the operation.
 
 > [!NOTE]
 > The find-or-create pattern is not specific to XML. The same database logic can be used with scalar parameters, JSON, or Table-Valued Parameters.
@@ -2957,7 +2919,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
     DECLARE @FirstName nvarchar(50) =
         @Customer.value('(/Customer/@FirstName)[1]', 'nvarchar(50)');
@@ -2975,71 +2936,59 @@ BEGIN
     DECLARE @CityID int;
     DECLARE @CustomerID int;
 
-    BEGIN TRY
-        BEGIN TRANSACTION;
+    -- Step 1: Find or create the state
+    SELECT @StateID = IDState
+    FROM State
+    WHERE Name = @StateName;
 
-        -- Step 1: Find or create the state
-        SELECT @StateID = IDState
-        FROM State
-        WHERE Name = @StateName;
+    IF @StateID IS NULL
+    BEGIN
+        INSERT INTO State (Name)
+        VALUES (@StateName);
 
-        IF @StateID IS NULL
-        BEGIN
-            INSERT INTO State (Name)
-            VALUES (@StateName);
+        SET @StateID = SCOPE_IDENTITY();
+    END;
 
-            SET @StateID = SCOPE_IDENTITY();
-        END;
+    -- Step 2: Find or create the city
+    SELECT @CityID = IDCity
+    FROM City
+    WHERE Name = @CityName
+      AND StateID = @StateID;
 
-        -- Step 2: Find or create the city
-        SELECT @CityID = IDCity
-        FROM City
-        WHERE Name = @CityName
-          AND StateID = @StateID;
+    IF @CityID IS NULL
+    BEGIN
+        INSERT INTO City (Name, StateID)
+        VALUES (@CityName, @StateID);
 
-        IF @CityID IS NULL
-        BEGIN
-            INSERT INTO City (Name, StateID)
-            VALUES (@CityName, @StateID);
+        SET @CityID = SCOPE_IDENTITY();
+    END;
 
-            SET @CityID = SCOPE_IDENTITY();
-        END;
+    -- Step 3: Find or create the customer
+    SELECT @CustomerID = IDCustomer
+    FROM Customer
+    WHERE FirstName = @FirstName
+      AND LastName = @LastName;
 
-        -- Step 3: Find or create the customer
-        SELECT @CustomerID = IDCustomer
-        FROM Customer
-        WHERE FirstName = @FirstName
-          AND LastName = @LastName;
+    IF @CustomerID IS NULL
+    BEGIN
+        INSERT INTO Customer (FirstName, LastName, CityID)
+        VALUES (@FirstName, @LastName, @CityID);
 
-        IF @CustomerID IS NULL
-        BEGIN
-            INSERT INTO Customer (FirstName, LastName, CityID)
-            VALUES (@FirstName, @LastName, @CityID);
+        SET @CustomerID = SCOPE_IDENTITY();
+    END;
 
-            SET @CustomerID = SCOPE_IDENTITY();
-        END;
+    -- Return customer information
+    SELECT
+        c.IDCustomer,
+        c.FirstName,
+        c.LastName,
+        ci.Name AS CityName,
+        s.Name AS StateName
+    FROM Customer c
+    LEFT JOIN City ci ON ci.IDCity = c.CityID
+    LEFT JOIN State s ON s.IDState = ci.StateID
+    WHERE c.IDCustomer = @CustomerID;
 
-        COMMIT TRANSACTION;
-
-        -- Return customer information
-        SELECT
-            c.IDCustomer,
-            c.FirstName,
-            c.LastName,
-            ci.Name AS CityName,
-            s.Name AS StateName
-        FROM Customer c
-        LEFT JOIN City ci ON ci.IDCity = c.CityID
-        LEFT JOIN State s ON s.IDState = ci.StateID
-        WHERE c.IDCustomer = @CustomerID;
-
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        THROW;
-    END CATCH;
 END;
 GO
 ```
@@ -3095,63 +3044,15 @@ Expected results:
 
 Running the procedure multiple times with the same input should not create additional records during this sequential test.
 
-### Cleanup
-
-Remove only the test records created for this exercise, in the correct order.
-
-```sql
-DELETE FROM Customer
-WHERE FirstName = N'ZZ_TestLuka'
-  AND LastName = N'ZZ_TestModric';
-
-DELETE FROM City
-WHERE Name = N'ZZ_TestMadrid'
-  AND StateID IN
-  (
-      SELECT IDState
-      FROM State
-      WHERE Name = N'ZZ_TestSpain'
-  );
-
-DELETE FROM State
-WHERE Name = N'ZZ_TestSpain';
-
-DROP PROCEDURE dbo.usp_InsertCustomerWithLocation;
-```
-
 </details>
 
 > [!IMPORTANT]
-> **Real-world consideration: concurrent execution**
+> **Real-world considerations**
 >
-> A transaction ensures that related changes are committed or rolled back together, but it does not automatically prevent duplicate records when two sessions execute the procedure simultaneously.
+> This simplified procedure assumes sequential execution in an isolated training database. Concurrent calls require appropriate unique constraints and concurrency control to prevent duplicates.
 >
-> In production systems, find-or-create operations should also use appropriate unique constraints and concurrency control.
->
-> For this exercise, assume that the procedure is executed sequentially in an isolated training database.
+> If a later insert fails, earlier inserts may remain in the database. Transactions, covered in the next lab, allow related changes to succeed or fail together.
 
-
-# Cleanup
-
-Remove the procedures and types created in the lab body. (Each exercise's solution already cleans up after itself.)
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_GetProduct;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDList;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteCustomersByIDList;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCityBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerFromXml;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerWithLocation;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDs;
-DROP PROCEDURE IF EXISTS dbo.usp_InvoiceInsert;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerBatchFromJson;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertStateWithCities;
-GO
-
-DROP TYPE IF EXISTS dbo.ProductIDList;
-DROP TYPE IF EXISTS dbo.InvoiceLineInput;
-GO
-```
 
 ---
 
@@ -3193,4 +3094,4 @@ More exercises on delimited strings, XML, and mixed scenarios are available in [
 
 You now have the complete collection-parameters toolkit — all five methods, their trade-offs, and when each one is the right choice.
 
-**Lab 9 – T-SQL Programming** continues with deeper error handling, including `THROW` and re-raising errors, and introduces `CONVERT` and `FORMAT` for working with dates and formatted text output. These patterns build on the `TRY/CATCH` foundations from Lab 0 and the transaction patterns you've seen here (the `BEGIN TRANSACTION` / `ROLLBACK TRANSACTION` in the TVP 1:N insert example).
+**In the next lab**, we will introduce transactions and error handling. We will build on the related-insert examples from this lab and learn how to ensure that either all related changes succeed or none are saved.

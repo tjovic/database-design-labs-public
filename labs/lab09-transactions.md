@@ -130,8 +130,6 @@ We will deliberately make the second statement violate the balance constraint. T
 Run this complete block:
 
 ```sql
-SET XACT_ABORT OFF;
-
 -- Reset before the demonstration.
 UPDATE dbo.BankAccount
 SET Balance = CASE AccountID

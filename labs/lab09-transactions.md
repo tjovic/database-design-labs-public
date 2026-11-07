@@ -1,8 +1,8 @@
 # Lab 9 – Transactions
 
-**Database:** `AdventureWorksENG`
+**Database:** `TransactionsLab` (created in this lab — see *Before you start*)
 
-**Version:** 2.1 – Mermaid diagrams and transaction log tables
+**Version:** 2.2 – Dedicated TransactionsLab database; renamed practice objects
 
 Diagrams use Mermaid code blocks rendered directly by GitHub. No separate image files are required.
 
@@ -51,10 +51,19 @@ After completing this lab, you should be able to:
 
 Run examples **section by section**. Some examples deliberately produce errors. Read the instructions before executing them.
 
-The lab creates its own practice tables. All account names and balances are fictional. Existing training tables are not modified.
+This lab runs in its own dedicated database, `TransactionsLab`, separate from `AdventureWorksENG` (the same pattern used by the `IndexLab` and `PayrollLab` databases in other labs). All account names and balances are fictional. No other training database is read or modified.
 
 ```sql
-USE AdventureWorksENG;
+USE master;
+GO
+
+IF DB_ID(N'TransactionsLab') IS NULL
+BEGIN
+    CREATE DATABASE TransactionsLab;
+END;
+GO
+
+USE TransactionsLab;
 GO
 
 SET IMPLICIT_TRANSACTIONS OFF;
@@ -86,24 +95,24 @@ The examples are written for SQL Server 2016 SP1 or later because they use `CREA
 Create a small table for two accounts:
 
 ```sql
-CREATE TABLE dbo.Lab09Account
+CREATE TABLE dbo.BankAccount
 (
     AccountID int NOT NULL
-        CONSTRAINT PK_Lab09Account PRIMARY KEY,
+        CONSTRAINT PK_BankAccount PRIMARY KEY,
     AccountName nvarchar(50) NOT NULL,
     Balance decimal(12, 2) NOT NULL,
-    CONSTRAINT CK_Lab09Account_Balance
+    CONSTRAINT CK_BankAccount_Balance
         CHECK (Balance >= 0)
 );
 GO
 
-INSERT INTO dbo.Lab09Account (AccountID, AccountName, Balance)
+INSERT INTO dbo.BankAccount (AccountID, AccountName, Balance)
 VALUES
     (1, N'Account A', 1000.00),
     (2, N'Account B',  500.00);
 
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
@@ -127,11 +136,11 @@ A transfer of `200.00` requires two changes:
 
 ```sql
 -- Read this example first. The next subsection demonstrates the failure.
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 200.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 ```
@@ -150,19 +159,19 @@ Run this complete block:
 SET XACT_ABORT OFF;
 
 -- Reset before the demonstration.
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
 
 BEGIN TRY
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = Balance - 200.00
     WHERE AccountID = 1;
 
     -- Deliberate error: a negative balance violates CHECK.
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = -1.00
     WHERE AccountID = 2;
 END TRY
@@ -171,11 +180,11 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT SUM(Balance) AS TotalBalance
-FROM dbo.Lab09Account;
+FROM dbo.BankAccount;
 ```
 
 Expected balances:
@@ -250,7 +259,7 @@ Alternatively, end the transaction with `ROLLBACK TRANSACTION` to discard the ch
 First reset the balances:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -262,28 +271,28 @@ Now run the transfer:
 ```sql
 BEGIN TRANSACTION;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 200.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 
 -- This session can read its own uncommitted changes.
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 COMMIT TRANSACTION;
 
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT SUM(Balance) AS TotalBalance,
        @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.Lab09Account;
+FROM dbo.BankAccount;
 ```
 
 Expected balances are `800.00` and `700.00`. The total is still `1500.00`, and the transaction count is `0`.
@@ -295,22 +304,22 @@ The previous committed balances are now our starting point.
 ```sql
 BEGIN TRANSACTION;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 100.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
 SELECT AccountID, Balance AS BalanceBeforeRollback
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 ROLLBACK TRANSACTION;
 
 SELECT AccountID, Balance AS BalanceAfterRollback
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
@@ -416,11 +425,11 @@ The SQL operation contains two updates:
 -- Illustration only: the executable examples are in Sections 2 and 9.
 BEGIN TRANSACTION;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 200.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 
@@ -694,7 +703,7 @@ A **savepoint** is a named marker inside an open transaction.
 Reset the account balances before this independent demonstration:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -707,33 +716,33 @@ Run this block:
 BEGIN TRANSACTION;
 
 -- First transfer: keep this one.
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 100.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterFirstTransfer;
 
 -- Second transfer: we will cancel this one.
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 50.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 50.00
 WHERE AccountID = 2;
 
 SELECT AccountID, Balance AS BeforeSavepointRollback
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 ROLLBACK TRANSACTION AfterFirstTransfer;
 
 SELECT AccountID, Balance AS AfterSavepointRollback
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -801,7 +810,7 @@ SQL Server does not provide independently committable nested transactions.
 Run this complete example:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -811,11 +820,11 @@ BEGIN TRANSACTION;
 
     BEGIN TRANSACTION;
 
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = Balance - 100.00
     WHERE AccountID = 1;
 
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = Balance + 100.00
     WHERE AccountID = 2;
 
@@ -826,7 +835,7 @@ BEGIN TRANSACTION;
 ROLLBACK TRANSACTION;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS AfterOuterRollback; -- 0
@@ -882,33 +891,33 @@ Rolling back an inserted row does not return its allocated identity value for re
 Create a separate demonstration table:
 
 ```sql
-CREATE TABLE dbo.Lab09Note
+CREATE TABLE dbo.Note
 (
     NoteID int IDENTITY(1, 1) NOT NULL
-        CONSTRAINT PK_Lab09Note PRIMARY KEY,
+        CONSTRAINT PK_Note PRIMARY KEY,
     NoteText nvarchar(100) NOT NULL
 );
 GO
 
-INSERT INTO dbo.Lab09Note (NoteText)
+INSERT INTO dbo.Note (NoteText)
 VALUES (N'First committed note');
 
 BEGIN TRANSACTION;
 
-INSERT INTO dbo.Lab09Note (NoteText)
+INSERT INTO dbo.Note (NoteText)
 VALUES (N'This note will be rolled back');
 
 SELECT NoteID, NoteText
-FROM dbo.Lab09Note
+FROM dbo.Note
 ORDER BY NoteID;
 
 ROLLBACK TRANSACTION;
 
-INSERT INTO dbo.Lab09Note (NoteText)
+INSERT INTO dbo.Note (NoteText)
 VALUES (N'Next committed note');
 
 SELECT NoteID, NoteText
-FROM dbo.Lab09Note
+FROM dbo.Note
 ORDER BY NoteID;
 ```
 
@@ -979,7 +988,7 @@ It does not mean that every possible problem is automatically handled:
 Reset the balances, then run the protected operation:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -990,12 +999,12 @@ SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = Balance - 200.00
     WHERE AccountID = 1;
 
     -- Deliberate CHECK constraint violation.
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = -1.00
     WHERE AccountID = 2;
 
@@ -1013,12 +1022,12 @@ An error message is expected. After it appears, run this verification **separate
 
 ```sql
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT SUM(Balance) AS TotalBalance,
        @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.Lab09Account;
+FROM dbo.BankAccount;
 ```
 
 Expected results:
@@ -1042,7 +1051,7 @@ The first update succeeded initially, but the handler rolled it back when the se
 The following statement is valid SQL:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 999;
 
@@ -1058,7 +1067,7 @@ If we had already debited another account, SQL Server would not automatically kn
 We must check the number of affected rows directly after the relevant statement:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 999;
 
@@ -1088,7 +1097,7 @@ Instead of reading a balance and later deciding whether to subtract, we can incl
 ```sql
 DECLARE @Amount decimal(12, 2) = 2000.00;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - @Amount
 WHERE AccountID = 1
   AND Balance >= @Amount;
@@ -1124,7 +1133,7 @@ For the first tests, call this procedure with **no transaction already open**. S
 ## 9.2 Create the procedure
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Lab09Transfer
+CREATE OR ALTER PROCEDURE dbo.usp_TransferFunds
     @SourceAccountID int,
     @DestinationAccountID int,
     @Amount decimal(12, 2)
@@ -1147,7 +1156,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE dbo.Lab09Account
+        UPDATE dbo.BankAccount
         SET Balance = Balance - @Amount
         WHERE AccountID = @SourceAccountID
           AND Balance >= @Amount;
@@ -1156,7 +1165,7 @@ BEGIN
             THROW 50013,
                 'Source account does not exist or has insufficient funds.', 1;
 
-        UPDATE dbo.Lab09Account
+        UPDATE dbo.BankAccount
         SET Balance = Balance + @Amount
         WHERE AccountID = @DestinationAccountID;
 
@@ -1180,24 +1189,24 @@ The parameter checks happen before the procedure opens its transaction, keeping 
 ## 9.3 Test a successful transfer
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
 
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 200.00;
 
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT SUM(Balance) AS TotalBalance,
        @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.Lab09Account;
+FROM dbo.BankAccount;
 ```
 
 Expected balances: `800.00` and `700.00`. Expected total: `1500.00`. Expected transaction count: `0`.
@@ -1210,7 +1219,7 @@ For an expected error, the test's outer `CATCH` displays the message and allows 
 
 ```sql
 BEGIN TRY
-    EXEC dbo.usp_Lab09Transfer
+    EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
         @DestinationAccountID = 999,
         @Amount = 100.00;
@@ -1221,7 +1230,7 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1233,7 +1242,7 @@ Expected error: `50014`. Balances remain `800.00` and `700.00`. The transaction 
 
 ```sql
 BEGIN TRY
-    EXEC dbo.usp_Lab09Transfer
+    EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
         @DestinationAccountID = 2,
         @Amount = 2000.00;
@@ -1244,7 +1253,7 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1279,7 +1288,7 @@ A transaction can be managed by the procedure or by its caller. The important qu
 Our transfer procedure represents one complete operation. It starts a transaction, performs the work, and commits or rolls back.
 
 ```sql
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 50.00;
@@ -1294,7 +1303,7 @@ An application or another procedure may need to combine several operations into 
 Here is a small helper procedure with no transaction commands:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Lab09ChangeBalance
+CREATE OR ALTER PROCEDURE dbo.usp_ChangeBalance
     @AccountID int,
     @Change decimal(12, 2)
 AS
@@ -1304,7 +1313,7 @@ BEGIN
     IF @Change IS NULL
         THROW 50020, 'Balance change is required.', 1;
 
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = Balance + @Change
     WHERE AccountID = @AccountID;
 
@@ -1317,7 +1326,7 @@ GO
 The caller groups two calls:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -1328,10 +1337,10 @@ SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    EXEC dbo.usp_Lab09ChangeBalance
+    EXEC dbo.usp_ChangeBalance
         @AccountID = 1, @Change = -100.00;
 
-    EXEC dbo.usp_Lab09ChangeBalance
+    EXEC dbo.usp_ChangeBalance
         @AccountID = 2, @Change = 100.00;
 
     COMMIT TRANSACTION;
@@ -1344,7 +1353,7 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
@@ -1360,7 +1369,7 @@ The helper participates in the caller's transaction without starting its own. If
 Reset the balances and run this complete block:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -1368,7 +1377,7 @@ SET Balance = CASE AccountID
 
 BEGIN TRANSACTION; -- count: 0 -> 1
 
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 100.00;
@@ -1378,13 +1387,13 @@ EXEC dbo.usp_Lab09Transfer
 SELECT @@TRANCOUNT AS AfterProcedure; -- 1
 
 SELECT AccountID, Balance AS InsideOuterTransaction
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 ROLLBACK TRANSACTION; -- count: 1 -> 0
 
 SELECT AccountID, Balance AS AfterOuterRollback
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
@@ -1403,12 +1412,12 @@ BEGIN TRY
     BEGIN TRANSACTION;
 
     -- Earlier work belonging to the caller.
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET AccountName = N'Temporary account name'
     WHERE AccountID = 1;
 
     -- The procedure debits the source, then finds no destination.
-    EXEC dbo.usp_Lab09Transfer
+    EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
         @DestinationAccountID = 999,
         @Amount = 100.00;
@@ -1423,7 +1432,7 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, AccountName, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1470,7 +1479,7 @@ Predict the final balances before running the code.
 <summary>Show solution</summary>
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
@@ -1478,38 +1487,38 @@ SET Balance = CASE AccountID
 
 BEGIN TRANSACTION;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 150.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 150.00
 WHERE AccountID = 2;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 ROLLBACK TRANSACTION;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 BEGIN TRANSACTION;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance - 150.00
 WHERE AccountID = 1;
 
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = Balance + 150.00
 WHERE AccountID = 2;
 
 COMMIT TRANSACTION;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1521,7 +1530,7 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 ## Exercise 2 – Keep One Change, Cancel Another
 
-Using `dbo.Lab09Note` from Section 6:
+Using `dbo.Note` from Section 6:
 
 1. Start a transaction.
 2. Insert the note `Exercise 2: keep this note`.
@@ -1537,12 +1546,12 @@ Using `dbo.Lab09Note` from Section 6:
 ```sql
 BEGIN TRANSACTION;
 
-INSERT INTO dbo.Lab09Note (NoteText)
+INSERT INTO dbo.Note (NoteText)
 VALUES (N'Exercise 2: keep this note');
 
 SAVE TRANSACTION KeepFirstNote;
 
-INSERT INTO dbo.Lab09Note (NoteText)
+INSERT INTO dbo.Note (NoteText)
 VALUES (N'Exercise 2: cancel this note');
 
 ROLLBACK TRANSACTION KeepFirstNote;
@@ -1552,7 +1561,7 @@ SELECT @@TRANCOUNT AS BeforeCommit; -- 1
 COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
-FROM dbo.Lab09Note
+FROM dbo.Note
 WHERE NoteText LIKE N'Exercise 2:%'
 ORDER BY NoteID;
 
@@ -1565,7 +1574,7 @@ Only the first exercise note is stored. Repeating the exercise adds another copy
 
 ## Exercise 3 – Test the Transfer Procedure
 
-Reset balances to `1000.00` and `500.00`. Test `dbo.usp_Lab09Transfer` with:
+Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
 1. a valid transfer of `250.00` from account 1 to account 2;
 2. a transfer of `100.00` to account `999`;
@@ -1581,19 +1590,19 @@ After each call, verify the balances and transaction count. Use `TRY/CATCH` arou
 Reset and run the successful test:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
 
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 250.00;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1603,7 +1612,7 @@ Use this block for the missing destination:
 
 ```sql
 BEGIN TRY
-    EXEC dbo.usp_Lab09Transfer
+    EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
         @DestinationAccountID = 999,
         @Amount = 100.00;
@@ -1614,7 +1623,7 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @@TRANCOUNT AS OpenTransactionCount;
@@ -1624,19 +1633,19 @@ Repeat the same testing block with these calls, one call per test:
 
 ```sql
 -- Insufficient funds.
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 5000.00;
 
 -- Invalid amount.
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 0.00;
 
 -- Same account.
-EXEC dbo.usp_Lab09Transfer
+EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 1,
     @Amount = 100.00;
@@ -1659,30 +1668,30 @@ Extend the transfer operation so that it also stores a record of the successful 
 Create this table:
 
 ```sql
-CREATE TABLE dbo.Lab09TransferHistory
+CREATE TABLE dbo.TransferHistory
 (
     TransferID int IDENTITY(1, 1) NOT NULL
-        CONSTRAINT PK_Lab09TransferHistory PRIMARY KEY,
+        CONSTRAINT PK_TransferHistory PRIMARY KEY,
     SourceAccountID int NOT NULL,
     DestinationAccountID int NOT NULL,
     Amount decimal(12, 2) NOT NULL,
     CreatedAt datetime2(0) NOT NULL
-        CONSTRAINT DF_Lab09TransferHistory_CreatedAt
+        CONSTRAINT DF_TransferHistory_CreatedAt
         DEFAULT SYSDATETIME(),
-    CONSTRAINT FK_Lab09TransferHistory_Source
+    CONSTRAINT FK_TransferHistory_Source
         FOREIGN KEY (SourceAccountID)
-        REFERENCES dbo.Lab09Account (AccountID),
-    CONSTRAINT FK_Lab09TransferHistory_Destination
+        REFERENCES dbo.BankAccount (AccountID),
+    CONSTRAINT FK_TransferHistory_Destination
         FOREIGN KEY (DestinationAccountID)
-        REFERENCES dbo.Lab09Account (AccountID),
-    CONSTRAINT CK_Lab09TransferHistory_Amount CHECK (Amount > 0),
-    CONSTRAINT CK_Lab09TransferHistory_Accounts
+        REFERENCES dbo.BankAccount (AccountID),
+    CONSTRAINT CK_TransferHistory_Amount CHECK (Amount > 0),
+    CONSTRAINT CK_TransferHistory_Accounts
         CHECK (SourceAccountID <> DestinationAccountID)
 );
 GO
 ```
 
-Create `dbo.usp_Lab09TransferWithHistory` by adapting the procedure from Section 9.
+Create `dbo.usp_TransferFundsWithHistory` by adapting the procedure from Section 9.
 
 Requirements:
 
@@ -1696,7 +1705,7 @@ Requirements:
 <summary>Show solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Lab09TransferWithHistory
+CREATE OR ALTER PROCEDURE dbo.usp_TransferFundsWithHistory
     @SourceAccountID int,
     @DestinationAccountID int,
     @Amount decimal(12, 2)
@@ -1719,7 +1728,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE dbo.Lab09Account
+        UPDATE dbo.BankAccount
         SET Balance = Balance - @Amount
         WHERE AccountID = @SourceAccountID
           AND Balance >= @Amount;
@@ -1728,14 +1737,14 @@ BEGIN
             THROW 50013,
                 'Source account does not exist or has insufficient funds.', 1;
 
-        UPDATE dbo.Lab09Account
+        UPDATE dbo.BankAccount
         SET Balance = Balance + @Amount
         WHERE AccountID = @DestinationAccountID;
 
         IF @@ROWCOUNT <> 1
             THROW 50014, 'Destination account does not exist.', 1;
 
-        INSERT INTO dbo.Lab09TransferHistory
+        INSERT INTO dbo.TransferHistory
             (SourceAccountID, DestinationAccountID, Amount)
         VALUES
             (@SourceAccountID, @DestinationAccountID, @Amount);
@@ -1755,30 +1764,30 @@ GO
 Test success:
 
 ```sql
-UPDATE dbo.Lab09Account
+UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
 
 SELECT COUNT(*) AS HistoryRowsBefore
-FROM dbo.Lab09TransferHistory;
+FROM dbo.TransferHistory;
 
-EXEC dbo.usp_Lab09TransferWithHistory
+EXEC dbo.usp_TransferFundsWithHistory
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
     @Amount = 100.00;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT TransferID, SourceAccountID, DestinationAccountID, Amount, CreatedAt
-FROM dbo.Lab09TransferHistory
+FROM dbo.TransferHistory
 ORDER BY TransferID;
 
 SELECT COUNT(*) AS HistoryRowsAfterSuccess
-FROM dbo.Lab09TransferHistory;
+FROM dbo.TransferHistory;
 ```
 
 Balances become `900.00` and `600.00`. The number of history rows increases by one.
@@ -1789,10 +1798,10 @@ Test failure:
 DECLARE @HistoryRowsBefore int;
 
 SELECT @HistoryRowsBefore = COUNT(*)
-FROM dbo.Lab09TransferHistory;
+FROM dbo.TransferHistory;
 
 BEGIN TRY
-    EXEC dbo.usp_Lab09TransferWithHistory
+    EXEC dbo.usp_TransferFundsWithHistory
         @SourceAccountID = 1,
         @DestinationAccountID = 999,
         @Amount = 100.00;
@@ -1802,13 +1811,13 @@ BEGIN CATCH
 END CATCH;
 
 SELECT AccountID, Balance
-FROM dbo.Lab09Account
+FROM dbo.BankAccount
 ORDER BY AccountID;
 
 SELECT @HistoryRowsBefore AS HistoryRowsBeforeFailure,
        COUNT(*) AS HistoryRowsAfterFailure,
        @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.Lab09TransferHistory;
+FROM dbo.TransferHistory;
 ```
 
 Balances remain `900.00` and `600.00`. The history count is unchanged, and the transaction count is `0`.
@@ -1948,7 +1957,7 @@ BEGIN TRY
     BEGIN TRANSACTION;
 
     -- Deliberately violate the CHECK constraint.
-    UPDATE dbo.Lab09Account
+    UPDATE dbo.BankAccount
     SET Balance = -1.00
     WHERE AccountID = 1;
 
@@ -2009,18 +2018,15 @@ The scope of this lab is transactional changes to ordinary SQL Server tables.
 
 ## E. Optional Cleanup
 
-Keep the practice objects if you want to repeat the lab. If you want to remove them, finish all open transactions first and run only the statements for objects you created.
+Keep `TransactionsLab` if you want to repeat the lab later — rerunning the setup script in *Before you start* is enough; it does not recreate the database if one already exists.
+
+Because the lab lives in its own dedicated database, cleanup is a single drop. Finish all open transactions first:
 
 ```sql
--- Procedures: run only those that were created.
-DROP PROCEDURE dbo.usp_Lab09TransferWithHistory;
-DROP PROCEDURE dbo.usp_Lab09ChangeBalance;
-DROP PROCEDURE dbo.usp_Lab09Transfer;
+USE master;
+GO
 
--- Drop the referencing table before the accounts table.
-DROP TABLE dbo.Lab09TransferHistory;
-DROP TABLE dbo.Lab09Note;
-DROP TABLE dbo.Lab09Account;
+DROP DATABASE TransactionsLab;
 ```
 
 The history table and its procedure are created in Exercise 4. Omit their drop statements if you did not complete that exercise.

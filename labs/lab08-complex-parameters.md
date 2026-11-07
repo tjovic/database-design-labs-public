@@ -1911,37 +1911,16 @@ EXEC dbo.usp_InsertCustomerBatchFromJson
     @JsonCustomers = N'
 [
     {
-        "FirstName": "ZZ_TestAlice",
-        "LastName": "Anderson",
-        "Email": "zz_alice@example.com"
+        "FirstName": "Ruđer",
+        "LastName": "Bošković",
+        "Email": "rudjer.boskovic@example.com"
     },
     {
-        "FirstName": "ZZ_TestBob",
-        "LastName": "Brown",
-        "Email": "zz_bob@example.com"
+        "FirstName": "Janica",
+        "LastName": "Kostelić",
+        "Email": "janica.kostelic@example.com"
     }
 ]';
-```
-
-### Step 3 – Verify and clean up
-
-```sql
-SELECT IDCustomer, FirstName, LastName, Email
-FROM Customer
-WHERE Email IN
-(
-    N'zz_alice@example.com',
-    N'zz_bob@example.com'
-);
-
-DELETE FROM Customer
-WHERE Email IN
-(
-    N'zz_alice@example.com',
-    N'zz_bob@example.com'
-);
-
-DROP PROCEDURE dbo.usp_InsertCustomerBatchFromJson;
 ```
 
 **Two customers. One JSON parameter. One procedure call.**
@@ -2112,37 +2091,24 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertStateWithCities
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
     DECLARE @NewStateID int;
     DECLARE @StateName nvarchar(50);
 
     SET @StateName = JSON_VALUE(@Json, '$.StateName');
 
-    BEGIN TRY
-        BEGIN TRANSACTION;
+    -- Insert the state
+    INSERT INTO State (Name)
+    VALUES (@StateName);
 
-        -- Insert the state
-        INSERT INTO State (Name)
-        VALUES (@StateName);
+    SET @NewStateID = SCOPE_IDENTITY();
 
-        SET @NewStateID = SCOPE_IDENTITY();
+    -- Insert all cities
+    INSERT INTO City (Name, StateID)
+    SELECT value, @NewStateID
+    FROM OPENJSON(@Json, '$.Cities');
 
-        -- Insert all cities
-        INSERT INTO City (Name, StateID)
-        SELECT value, @NewStateID
-        FROM OPENJSON(@Json, '$.Cities');
-
-        COMMIT TRANSACTION;
-
-        SELECT @NewStateID AS NewStateID;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        THROW;
-    END CATCH;
+    SELECT @NewStateID AS NewStateID;
 END;
 GO
 ```
@@ -2162,39 +2128,13 @@ Notice that `OPENJSON` is used without `WITH` because the `Cities` array contain
 EXEC dbo.usp_InsertStateWithCities
     @Json = N'
 {
-    "StateName": "ZZ_TestSweden",
+    "StateName": "Sweden",
     "Cities": [
         "Stockholm",
         "Gothenburg",
         "Malmo"
     ]
 }';
-```
-
-### Step 3 – Verify and clean up
-
-```sql
-SELECT
-    s.IDState,
-    s.Name AS StateName,
-    c.Name AS CityName
-FROM State s
-JOIN City c ON c.StateID = s.IDState
-WHERE s.Name = N'ZZ_TestSweden';
-
--- Cleanup
-DELETE FROM City
-WHERE StateID IN
-(
-    SELECT IDState
-    FROM State
-    WHERE Name = N'ZZ_TestSweden'
-);
-
-DELETE FROM State
-WHERE Name = N'ZZ_TestSweden';
-
-DROP PROCEDURE dbo.usp_InsertStateWithCities;
 ```
 
 The procedure inserts one state and three related cities in a single call.

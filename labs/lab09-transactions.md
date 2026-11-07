@@ -2,7 +2,7 @@
 
 **Database:** `TransactionsLab` (created in this lab — see *Before you start*)
 
-**Version:** 2.2 – Dedicated TransactionsLab database; renamed practice objects
+**Version:** 2.3 – Reordered for pedagogy: procedures before internals; ACID/log moved to Section 9
 
 Diagrams use Mermaid code blocks rendered directly by GitHub. No separate image files are required.
 
@@ -27,15 +27,15 @@ After completing this lab, you should be able to:
 - distinguish autocommit transactions from explicit transactions;
 - use `BEGIN TRANSACTION`, `COMMIT TRANSACTION`, and `ROLLBACK TRANSACTION`;
 - inspect changes inside a transaction before deciding whether to keep them;
-- explain the ACID properties, write-ahead logging, and the roles of the buffer pool and log buffer;
-- distinguish UNDO from REDO and explain why a fully durable commit survives a system crash;
-- explain the purpose of a checkpoint and distinguish it from a commit;
 - use a savepoint to undo part of a transaction;
 - explain `@@TRANCOUNT` and why an inner `COMMIT` does not independently commit changes;
 - combine transactions with `TRY/CATCH`, `THROW`, and `SET XACT_ABORT ON`;
 - use `@@ROWCOUNT` to detect an operation that did not affect the expected row;
 - implement and verify a transaction inside a stored procedure;
-- distinguish a transaction managed by a procedure from one managed by its caller.
+- distinguish a transaction managed by a procedure from one managed by its caller;
+- explain the ACID properties, write-ahead logging, and the roles of the buffer pool and log buffer;
+- distinguish UNDO from REDO and explain why a fully durable commit survives a system crash;
+- explain the purpose of a checkpoint and distinguish it from a commit.
 
 > [!NOTE]
 > **Prerequisites:** This lab builds on [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md).
@@ -87,6 +87,8 @@ The examples are written for SQL Server 2016 SP1 or later because they use `CREA
 ---
 
 # Part A – Understanding Transactions
+
+---
 
 # Section 1 – Why We Need Transactions
 
@@ -266,7 +268,7 @@ SET Balance = CASE AccountID
               END;
 ```
 
-Now run the transfer:
+Predict the two balances after `COMMIT` before you run this. Then run the transfer:
 
 ```sql
 BEGIN TRANSACTION;
@@ -299,7 +301,7 @@ Expected balances are `800.00` and `700.00`. The total is still `1500.00`, and t
 
 ## 2.3 Undo a transfer
 
-The previous committed balances are now our starting point.
+The previous committed balances are now our starting point. Predict both balances *after* the `ROLLBACK` before you run this.
 
 ```sql
 BEGIN TRANSACTION;
@@ -345,362 +347,59 @@ These two constructs have different purposes:
 
 A procedure's `BEGIN ... END` body does not create a transaction.
 
----
+## 2.5 ROLLBACK and IDENTITY values
 
-# Section 3 – ACID, the Transaction Log, and Recovery
+Rolling back also interacts with other table features — not just with the data you changed on purpose.
 
-The previous section showed **what** `COMMIT` and `ROLLBACK` do. Now we will explain **how SQL Server can keep those promises**, even if the server stops unexpectedly.
-
-This section builds on the data pages and buffer pool introduced in Lab 5. It uses diagrams and conceptual examples; there is no need to shut down SQL Server or inspect its internal log format.
-
-## 3.1 Four transaction properties
-
-The acronym **ACID** describes four properties associated with reliable transaction processing.
-
-| Property | Meaning | Connection to our example |
-|---|---|---|
-| **Atomicity** | A transaction's changes are kept together or undone together | The debit and credit must form one operation |
-| **Consistency** | A correct transaction preserves defined rules | Balances stay non-negative and the transfer preserves the total |
-| **Isolation** | Rules control interactions between concurrent transactions | Two simultaneous operations must be handled appropriately |
-| **Durability** | Committed changes survive a system restart or crash | A confirmed transfer must not disappear after a restart |
-
-We focus on **Atomicity**, **Consistency**, and **Durability** here. Lab 10 explains isolation and the trade-offs between isolation levels.
-
-> [!IMPORTANT]
-> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements could succeed and be committed. Atomicity cannot correct the wrong calculation.
->
-> Consistency depends on correctly designed constraints and business logic as well as transaction boundaries.
-
-## 3.2 The missing link: memory is not permanent storage
-
-Recall the buffer pool from Lab 5. SQL Server reads data pages into memory and performs changes there. A modified page is called a **dirty page**. In this context, *dirty* means modified in memory and not yet written back to its data file.
-
-Memory is fast, but its contents can be lost if the server crashes or loses power. If a changed page exists only in memory, how can SQL Server promise that a committed change will survive?
-
-The answer is the **transaction log**.
-
-SQL Server maintains both data pages and log records in memory, with separate mechanisms for writing them to files:
-
-```mermaid
-flowchart TB
-    subgraph RAM["RAM - contents can be lost in a crash"]
-        BP["Buffer pool: data pages"]
-        LB["Log buffer: recovery records"]
-    end
-    subgraph DISK["Durable storage"]
-        DF["Data files: table and index pages"]
-        LF["Log file: durable recovery records"]
-    end
-    BP -->|"Write modified pages"| DF
-    LB -->|"Flush log records"| LF
-    LF -.->|"Required log records must be durable first"| DF
-```
-
-*Diagram 1 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
-
-| Component | Location | Purpose |
-|---|---|---|
-| Buffer pool | RAM | Holds data pages, including modified pages |
-| Log buffer | RAM | Temporarily holds generated log records before they are flushed |
-| Data files | Durable storage | Store table and index pages |
-| Transaction log file | Durable storage | Stores log records used for recovery |
-
-A database has at least one data file and one log file. Common extensions are `.mdf` for the primary data file, `.ndf` for additional data files, and `.ldf` for log files.
-
-> [!NOTE]
-> The diagram separates logical roles. It does not require the data and log files to be on separate physical disks. A record in the **log buffer** is still in memory; a log flush writes records to durable storage.
-
-## 3.3 Follow one transfer into the log
-
-Use the same transfer as before, starting from these illustrative balances:
-
-| Account | Before transfer | After successful transfer |
-|---|---:|---:|
-| A | 1000.00 | 800.00 |
-| B | 500.00 | 700.00 |
-
-The SQL operation contains two updates:
+Create a separate demonstration table:
 
 ```sql
--- Illustration only: the executable examples are in Sections 2 and 9.
+CREATE TABLE dbo.Note
+(
+    NoteID int IDENTITY(1, 1) NOT NULL
+        CONSTRAINT PK_Note PRIMARY KEY,
+    NoteText nvarchar(100) NOT NULL
+);
+GO
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'First committed note');
+
 BEGIN TRANSACTION;
 
-UPDATE dbo.BankAccount
-SET Balance = Balance - 200.00
-WHERE AccountID = 1;
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'This note will be rolled back');
 
-UPDATE dbo.BankAccount
-SET Balance = Balance + 200.00
-WHERE AccountID = 2;
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
 
-COMMIT TRANSACTION;
+ROLLBACK TRANSACTION;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'Next committed note');
+
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
 ```
 
-As SQL Server processes the changes, it generates log records associated with the transaction. Those records provide information needed to recover the changes.
-
-The following table is a conceptual log for one transfer. Read it from top to bottom.
-
-| Order | Transaction | Record | Simplified recovery information |
-|---|---|---|---|
-| 1 | T1 | Begin | Start of the logged transaction |
-| 2 | T1 | Change account A | Old balance: 1000.00; new balance: 800.00 |
-| 3 | T1 | Change account B | Old balance: 500.00; new balance: 700.00 |
-| 4 | T1 | Commit | Successful completion |
-
-Two directions are now possible:
-
-- **UNDO:** restore the old values when the transaction must be rolled back.
-- **REDO:** reconstruct logged changes that need to be reapplied during recovery.
-
-> [!IMPORTANT]
-> This is a **teaching model**, not the physical format of SQL Server log records. Real records contain internal recovery information and are not simply a readable table of every column's old and new values.
->
-> The transaction log is also not a substitute for an application audit trail that records who performed a business action and why.
-
-The `BEGIN` row is a conceptual boundary. In SQL Server, executing `BEGIN TRANSACTION` alone does not necessarily write a log record immediately; the logged transaction begins when work requiring logging occurs.
-
-## 3.4 Write-ahead logging: which information must be written first?
-
-The rule is called **Write-Ahead Logging (WAL)**:
-
-> Log records describing a page modification must reach durable storage before that modified page is written to its data file.
-
-This rule matters even **before commit**. SQL Server may write an uncommitted dirty page to a data file. The relevant log information must already be durable so the change can later be undone if necessary.
-
-There is also a requirement for a normal, **fully durable commit**:
-
-> The log records required for the transaction, including its commit record, must be durable before SQL Server acknowledges the commit as successful.
-
-These are related but distinct requirements:
-
-| Event | What must already be durable? |
-|---|---|
-| Writing a modified data page to its data file | The log records describing the page changes |
-| Acknowledging a fully durable commit | The transaction's required log records, including its commit record |
-
-> [!IMPORTANT]
-> **COMMIT does not have to write every changed data page immediately.** The durable log provides the information needed to recover the confirmed operation.
->
-> Conversely, finding a change in a data file does not prove that its transaction committed.
-
-The two durability rules can be read separately:
-
-```mermaid
-flowchart TD
-    READY["Log records for a modification are generated in RAM"] --> EVENT{"Which event is being completed?"}
-    EVENT -->|"Write a modified data page"| PAGELOG["Make the related log records durable"]
-    PAGELOG --> PAGE["The modified data page may now be written"]
-    EVENT -->|"Acknowledge a fully durable COMMIT"| COMMITLOG["Make all required records, including COMMIT, durable"]
-    COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
-```
-
-*Diagram 2 – WAL constrains page writes; fully durable commit also requires the commit record to be durable. These paths illustrate separate requirements, not the only times a log flush can occur.*
-
-All examples in this section assume normal fully durable commits and storage that honors durability guarantees. Delayed durability is outside this lab.
-
-## 3.5 ROLLBACK and UNDO: restore the previous values
-
-Suppose both account updates have run, but the operation is canceled before commit.
-
-The balances visible inside our session are now `800.00` and `700.00`. A full rollback must restore `1000.00` and `500.00`.
-
-Conceptually, the system follows the transaction's changes backward:
-
-1. Undo the later update: restore account B from `700.00` to `500.00`.
-2. Undo the earlier update: restore account A from `800.00` to `1000.00`.
-
-Follow the restored balances in the table below:
-
-| Point | Account A | Account B |
-|---|---:|---:|
-| Before the transaction | 1000.00 | 500.00 |
-| After both updates | 800.00 | 700.00 |
-| After undoing B | 800.00 | 500.00 |
-| After undoing A | 1000.00 | 500.00 |
-
-The final outcome illustrates **Atomicity**: neither update remains.
-
-If a crash happens after only the first update, recovery must undo that incomplete transaction's effects. The second update never happened, so there is no second update to undo.
+On the first run against this newly created table, the final IDs are `1` and `3`. The row with ID `2` was rolled back, but its allocated identity value was consumed.
 
 > [!NOTE]
-> Rollback does not erase the transaction's history from the log. Recovery and rollback can generate additional log records. The illustration shows the restored values, not the full internal rollback algorithm.
-
-## 3.6 COMMIT, a crash, and REDO: preserve the confirmed operation
-
-Now consider a different sequence:
-
-1. Both account updates run.
-2. The required log records and the commit record reach durable storage.
-3. SQL Server reports a successful commit.
-4. The server crashes before all changed data pages have been written to the data files.
-
-The memory contents are lost, but the durable transaction log survives. During recovery, SQL Server can reconstruct any logged changes that are missing from the data pages.
-
-```mermaid
-flowchart TD
-    CR["Server crashes; RAM contents are lost"] --> LOG["Durable log contains the changes and COMMIT"]
-    LOG --> CHECK{"Are the required page changes already present?"}
-    CHECK -->|"Yes"| KEEP["Keep the existing page changes"]
-    CHECK -->|"No"| REDO["REDO the missing changes using the log"]
-    KEEP --> RESULT["Recovered balances: A = 800; B = 700"]
-    REDO --> RESULT
-```
-
-*Diagram 3 – A conceptual recovery decision for this committed transfer. The diagram shows the required result, not SQL Server's complete recovery algorithm.*
-
-The recovered result must preserve the confirmed transfer:
-
-| Account | Required recovered balance |
-|---|---:|
-| A | 800.00 |
-| B | 700.00 |
-
-This illustrates **Durability**.
-
-> [!IMPORTANT]
-> **REDO does not mean calling the transfer procedure again.** Recovery uses internal log information to restore the required page changes. It must not subtract another `200.00` from the recovered balance.
->
-> Some page changes may already be present and need no reapplication. Recovery determines which work is necessary.
-
-## 3.7 Several transactions share the log
-
-A database normally has many transactions. Their log records can be interleaved in the same log stream.
-
-For example, transaction T1 can begin first, while another transaction T2 finishes first:
-
-| Log order | Transaction | Conceptual record |
-|---|---|---|
-| 1 | T1 | Begin |
-| 2 | T1 | Change A |
-| 3 | T2 | Begin |
-| 4 | T2 | Change another row |
-| 5 | T1 | Change B |
-| 6 | T2 | Commit |
-| 7 | T1 | Commit |
-
-Read the table from top to bottom. T1 begins first, but T2 commits first. The transaction identifier distinguishes their records within one shared log stream.
-
-This explains two important points:
-
-- Undoing T1 does not mean undoing every later record in the whole database log.
-- SQL Server can identify T1's changes separately from T2's changes.
-
-We are looking only at logging and recovery here. Which operations can proceed simultaneously, and when one session must wait, are questions for Lab 10.
-
-## 3.8 Checkpoints help recovery
-
-Over time, SQL Server writes dirty data pages to their files. A **checkpoint** coordinates page flushing and records recovery information, reducing the work needed after an unexpected shutdown.
-
-A checkpoint is different from a commit:
-
-| COMMIT | Checkpoint |
-|---|---|
-| Completes a transaction when it is the outermost successful commit | Helps manage page flushing and recovery work |
-| Confirms the transaction's changes | Does not confirm every transaction currently open |
-| Requires the necessary log records to be durable for fully durable completion | Writes recovery information and flushes dirty pages according to the checkpoint mechanism |
-
-A transaction can begin before a checkpoint and still be active afterward. Relevant information before the checkpoint may therefore still be needed for recovery.
-
-> [!NOTE]
-> A checkpoint is not a backup and is not a promise that all transactions have completed. It does not remove the need to preserve committed work or undo incomplete work.
-
-## 3.9 Recovery exercise: which outcomes must survive?
-
-The following diagram shows five transactions, a checkpoint, and a later crash. Each bar starts when the transaction begins. Labels marked `COMMIT` indicate successful fully durable completion; labels marked `ACTIVE at crash` identify incomplete transactions. Read the labels rather than relying on colors, which depend on the GitHub theme.
-
-```mermaid
-gantt
-    title Five transactions, a checkpoint, and a crash
-    dateFormat HH:mm
-    axisFormat %H:%M
-    section Events
-    Checkpoint          :milestone, cp, 09:03, 0m
-    System crash        :milestone, crash, 09:10, 0m
-    section Transactions
-    T1 - COMMIT at 09.02 :done, t1, 09:00, 2m
-    T2 - COMMIT at 09.05 :done, t2, 09:01, 4m
-    T3 - ACTIVE at crash :active, t3, 09:02, 8m
-    T4 - COMMIT at 09.08 :done, t4, 09:04, 4m
-    T5 - ACTIVE at crash :active, t5, 09:06, 4m
-```
-
-*Diagram 4 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
-
-**Questions**
-
-1. Which transactions have committed before the crash?
-2. Which transactions were incomplete and must have their effects undone?
-3. Do we know from this timeline exactly which data pages require REDO?
-4. Does the checkpoint commit T3?
-
-<details>
-<summary>Show answers</summary>
-
-| Transaction | State at the crash | Required outcome |
-|---|---|---|
-| T1 | Committed before the checkpoint | Preserve its confirmed effects |
-| T2 | Committed after the checkpoint | Preserve its confirmed effects; redo missing changes where needed |
-| T3 | Incomplete; started before the checkpoint | Undo its effects |
-| T4 | Committed after the checkpoint | Preserve its confirmed effects; redo missing changes where needed |
-| T5 | Incomplete; started after the checkpoint | Undo its effects |
-
-The timeline does **not** show the complete page and log state. We cannot identify every required REDO operation from transaction end times alone.
-
-The checkpoint does not commit T3. Its changes remain unconfirmed until that transaction commits, and it is still incomplete when the crash occurs.
-
-</details>
-
-> [!NOTE]
-> This exercise describes the required recovered outcome. Real recovery is not simply “redo only the committed transactions, then undo the others.” Traditional SQL Server recovery includes analysis, redo of needed logged modifications, and undo of incomplete work; redo can also involve changes from transactions later undone. Features such as Accelerated Database Recovery change implementation details. Those algorithms are outside this lab.
-
-## 3.10 A system crash is different from losing the storage
-
-The examples above assume that the data and log storage remain usable after the server restarts.
-
-| Failure | What is affected? | Basic response |
-|---|---|---|
-| Operation canceled or rolled back | One transaction's work | Undo the transaction's changes |
-| Server crash or power loss | In-memory state; files remain available | Recover using the surviving data files and log |
-| Loss or corruption of required storage | Data and/or log files | Appropriate backups, log backups, or another recovery strategy are needed |
-
-The transaction log does not replace backups. A log stored on a failed device cannot be assumed to remain available for recovery.
-
-## 3.11 Check your understanding
-
-1. Which ACID property explains all-or-nothing behavior?
-2. Why is a log record in RAM insufficient for durability?
-3. Must all changed data pages be written at commit?
-4. Can an uncommitted change already be present in a data file?
-5. What is the difference between UNDO and REDO?
-6. Does REDO execute the bank transfer procedure again?
-7. Does a checkpoint confirm active transactions?
-8. Why must business logic still be correct inside a transaction?
-
-<details>
-<summary>Show answers</summary>
-
-1. Atomicity.
-2. RAM can be lost in a crash. The required log records must be durable for a fully durable commit.
-3. No. Data pages may be written later, provided the logging rules are followed.
-4. Yes. Its log information must be durable first so the change can be undone if necessary.
-5. UNDO removes a transaction's effects; REDO reconstructs logged changes where recovery needs them.
-6. No. Recovery works from log information, not by calling application procedures again.
-7. No. A checkpoint helps page flushing and recovery; it does not commit active transactions.
-8. Atomicity groups the specified changes. It cannot determine whether the operation implements the correct business rule.
-
-</details>
+> `IDENTITY` generates identifiers; it does not guarantee a gap-free sequence. Rollbacks, failed inserts, and other events can leave gaps. Do not use the largest identity value as a row count.
 
 ---
 
-# Section 4 – Savepoints: Undoing Part of a Transaction
+# Section 3 – Savepoints: Undoing Part of a Transaction
 
 A full `ROLLBACK` undoes the complete transaction. Sometimes we want to undo only the work done after a particular point.
 
 A **savepoint** is a named marker inside an open transaction.
 
-## 4.1 Create a savepoint
+## 3.1 Create a savepoint
 
-Reset the account balances before this independent demonstration:
+Reset the account balances before this independent demonstration. Based on 2.2 and 2.3, predict what `ROLLBACK TRANSACTION AfterFirstTransfer` will leave behind before reading on.
 
 ```sql
 UPDATE dbo.BankAccount
@@ -758,7 +457,7 @@ COMMIT TRANSACTION;
 | After rollback to savepoint | 900.00 | 600.00 |
 | After final commit | 900.00 | 600.00 |
 
-## 4.2 What a savepoint does not do
+## 3.2 What a savepoint does not do
 
 `SAVE TRANSACTION` does not commit earlier work or start an independent transaction.
 
@@ -769,7 +468,7 @@ If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would b
 > [!NOTE]
 > This example deliberately cancels valid work. Recovering from an actual SQL error using a savepoint is more complicated: some errors leave the transaction unable to commit, and a savepoint cannot repair that state. The main error-handling pattern in this lab rolls back the entire business operation.
 
-## 4.3 A full rollback removes work recorded before the savepoint too
+## 3.3 A full rollback removes work recorded before the savepoint too
 
 A savepoint only protects work from a **partial** rollback. It does not protect that work from a **full** rollback.
 
@@ -831,7 +530,7 @@ Compare this with 4.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid on
 > [!IMPORTANT]
 > A savepoint marks a point for a partial rollback. It does not create a boundary that a full rollback must respect. The number of savepoints inside a transaction has no effect on what a full `ROLLBACK` undoes.
 
-## 4.4 Rolling back to an earlier savepoint invalidates later ones
+## 3.4 Rolling back to an earlier savepoint invalidates later ones
 
 A transaction can contain several savepoints. Rolling back to an earlier one also discards any savepoint defined after it.
 
@@ -913,11 +612,11 @@ The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` i
 
 ---
 
-# Section 5 – @@TRANCOUNT and Nested Transactions
+# Section 4 – @@TRANCOUNT and Nested Transactions
 
 `@@TRANCOUNT` reports the transaction nesting count for the **current connection**.
 
-## 5.1 How the counter changes
+## 4.1 How the counter changes
 
 Assuming an active, valid local transaction where required:
 
@@ -945,7 +644,7 @@ COMMIT TRANSACTION;
 SELECT @@TRANCOUNT AS AfterOuterCommit;  -- 0
 ```
 
-## 5.2 An inner COMMIT does not independently commit
+## 4.2 An inner COMMIT does not independently commit
 
 SQL Server does not provide independently committable nested transactions.
 
@@ -990,7 +689,7 @@ The inner `COMMIT` reduced the counter from `2` to `1`. The changes were still p
 > [!IMPORTANT]
 > An inner `COMMIT` does not make its changes independent of the outer transaction. Only the outermost successful `COMMIT` completes the transaction.
 
-## 5.3 Full rollback is different
+## 4.3 Full rollback is different
 
 ```sql
 BEGIN TRANSACTION;
@@ -1026,57 +725,17 @@ The second and fourth sequences leave a transaction open. If you run them, finis
 
 ---
 
-# Section 6 – ROLLBACK and IDENTITY Values
-
-Rolling back an inserted row does not return its allocated identity value for reuse.
-
-Create a separate demonstration table:
-
-```sql
-CREATE TABLE dbo.Note
-(
-    NoteID int IDENTITY(1, 1) NOT NULL
-        CONSTRAINT PK_Note PRIMARY KEY,
-    NoteText nvarchar(100) NOT NULL
-);
-GO
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'First committed note');
-
-BEGIN TRANSACTION;
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'This note will be rolled back');
-
-SELECT NoteID, NoteText
-FROM dbo.Note
-ORDER BY NoteID;
-
-ROLLBACK TRANSACTION;
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'Next committed note');
-
-SELECT NoteID, NoteText
-FROM dbo.Note
-ORDER BY NoteID;
-```
-
-On the first run against this newly created table, the final IDs are `1` and `3`. The row with ID `2` was rolled back, but its allocated identity value was consumed.
-
-> [!NOTE]
-> `IDENTITY` generates identifiers; it does not guarantee a gap-free sequence. Rollbacks, failed inserts, and other events can leave gaps. Do not use the largest identity value as a row count.
+# Part B – Transactions and Stored Procedures
 
 ---
 
-# Part B – Transactions and Stored Procedures
-
-# Section 7 – Handling Errors Inside a Transaction
+# Section 5 – Handling Errors Inside a Transaction
 
 Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs code that chooses the correct outcome when an operation fails.
 
-## 7.1 The basic pattern
+[Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
+
+## 5.1 The basic pattern
 
 ```sql
 SET XACT_ABORT ON;
@@ -1096,7 +755,7 @@ BEGIN CATCH
 END CATCH;
 ```
 
-This pattern assumes that the block owns the whole operation and that a full rollback is the required response to an error. Section 10 explains how an outer transaction changes that responsibility.
+This pattern assumes that the block owns the whole operation and that a full rollback is the required response to an error. Section 8 explains how an outer transaction changes that responsibility.
 
 | Element | Purpose |
 |---|---|
@@ -1108,7 +767,7 @@ This pattern assumes that the block owns the whole operation and that a full rol
 
 Some errors may already have ended the transaction. The counter check avoids a second error from trying to roll back when no transaction exists.
 
-## 7.2 SET XACT_ABORT ON
+## 5.2 SET XACT_ABORT ON
 
 `SET XACT_ABORT ON` makes many execution errors abort the whole transaction rather than merely undoing the statement that failed.
 
@@ -1125,7 +784,7 @@ It does not mean that every possible problem is automatically handled:
 > [!IMPORTANT]
 > `XACT_ABORT` supports the error-handling pattern. It does not replace `TRY/CATCH`, validation, or a deliberate rollback policy.
 
-## 7.3 Repeat the failing example with protection
+## 5.3 Repeat the failing example with protection
 
 Reset the balances, then run the protected operation:
 
@@ -1186,9 +845,9 @@ The first update succeeded initially, but the handler rolled it back when the se
 
 ---
 
-# Section 8 – When SQL Succeeds but the Business Operation Fails
+# Section 6 – When SQL Succeeds but the Business Operation Fails
 
-## 8.1 Zero affected rows is not an SQL error
+## 6.1 Zero affected rows is not an SQL error
 
 The following statement is valid SQL:
 
@@ -1204,7 +863,7 @@ The result is `0` because account `999` does not exist.
 
 If we had already debited another account, SQL Server would not automatically know that the intended transfer was incomplete.
 
-## 8.2 Check @@ROWCOUNT immediately
+## 6.2 Check @@ROWCOUNT immediately
 
 We must check the number of affected rows directly after the relevant statement:
 
@@ -1232,7 +891,7 @@ Run this as an independent example. The custom error is expected; no account is 
 > [!IMPORTANT]
 > Read `@@ROWCOUNT` immediately. Other statements can change or reset its value.
 
-## 8.3 Detect insufficient funds in the update
+## 6.3 Detect insufficient funds in the update
 
 Instead of reading a balance and later deciding whether to subtract, we can include the condition in the update itself:
 
@@ -1256,9 +915,9 @@ The next section puts the checks and both account updates into one procedure.
 
 ---
 
-# Section 9 – A Complete Transfer Procedure
+# Section 7 – A Complete Transfer Procedure
 
-## 9.1 Define the operation
+## 7.1 Define the operation
 
 The procedure accepts a source account, a destination account, and an amount.
 
@@ -1270,9 +929,9 @@ It must:
 4. commit both changes on success;
 5. roll back the operation and report the error on failure.
 
-For the first tests, call this procedure with **no transaction already open**. Section 10 deliberately calls it inside an outer transaction to explore nesting.
+For the first tests, call this procedure with **no transaction already open**. Section 8 deliberately calls it inside an outer transaction to explore nesting.
 
-## 9.2 Create the procedure
+## 7.2 Create the procedure
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_TransferFunds
@@ -1326,9 +985,9 @@ END;
 GO
 ```
 
-The parameter checks happen before the procedure opens its transaction, keeping the transaction focused on database work. If this procedure is invoked inside an outer transaction, its errors can still affect that transaction; see Section 10.
+The parameter checks happen before the procedure opens its transaction, keeping the transaction focused on database work. If this procedure is invoked inside an outer transaction, its errors can still affect that transaction; see Section 8.
 
-## 9.3 Test a successful transfer
+## 7.3 Test a successful transfer
 
 ```sql
 UPDATE dbo.BankAccount
@@ -1353,7 +1012,7 @@ FROM dbo.BankAccount;
 
 Expected balances: `800.00` and `700.00`. Expected total: `1500.00`. Expected transaction count: `0`.
 
-## 9.4 Test a missing destination
+## 7.4 Test a missing destination
 
 The source update will succeed first. The procedure must undo it when the destination update affects zero rows.
 
@@ -1380,7 +1039,7 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 Expected error: `50014`. Balances remain `800.00` and `700.00`. The transaction count is `0`.
 
-## 9.5 Test insufficient funds
+## 7.5 Test insufficient funds
 
 ```sql
 BEGIN TRY
@@ -1403,7 +1062,7 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 Expected error: `50013`. Both balances remain unchanged, and no transaction remains open.
 
-## 9.6 Verify behavior, not only messages
+## 7.6 Verify behavior, not only messages
 
 | Test | Expected result | What to verify |
 |---|---|---|
@@ -1421,11 +1080,13 @@ For these standalone calls, `@@TRANCOUNT` must be `0` after each test.
 
 ---
 
-# Section 10 – Who Manages the Transaction?
+# Section 8 – Who Manages the Transaction?
 
 A transaction can be managed by the procedure or by its caller. The important question is: **which code owns the complete business operation?**
 
-## 10.1 The procedure manages the transaction
+[Lab 7 – CRUD Operations](lab07-crud-operations.md), Section 6.3, asked the same ownership question about `TRY/CATCH` placement — inside a procedure or at its caller. Here it returns for transactions, and the stakes are higher: the wrong choice does not just mis-handle an error message, it can commit or roll back the wrong amount of work.
+
+## 8.1 The procedure manages the transaction
 
 Our transfer procedure represents one complete operation. It starts a transaction, performs the work, and commits or rolls back.
 
@@ -1438,7 +1099,7 @@ EXEC dbo.usp_TransferFunds
 
 This is convenient when one call corresponds to the entire operation. This example changes the balances; later demonstrations reset them explicitly.
 
-## 10.2 The caller manages the transaction
+## 8.2 The caller manages the transaction
 
 An application or another procedure may need to combine several operations into one transaction.
 
@@ -1506,7 +1167,7 @@ The helper participates in the caller's transaction without starting its own. If
 > [!NOTE]
 > This helper illustrates transaction ownership. It is a low-level building block: it does not itself enforce a complete transfer or preserve the combined account balance.
 
-## 10.3 An outer transaction wraps our transfer procedure
+## 8.3 An outer transaction wraps our transfer procedure
 
 Reset the balances and run this complete block:
 
@@ -1543,7 +1204,7 @@ The final balances are `1000.00` and `500.00`.
 
 The procedure returned successfully, but its inner `COMMIT` did not independently confirm the transfer. The caller's rollback undid it.
 
-## 10.4 A rollback inside a procedure can undo the caller's work
+## 8.4 A rollback inside a procedure can undo the caller's work
 
 The reverse is equally important. Our transfer procedure uses a **full rollback** when an execution error reaches its handler.
 
@@ -1589,7 +1250,7 @@ SQL Server may also report a transaction-count mismatch because the procedure en
 >
 > For this lab's transfer procedure, a failure means the complete enclosing operation must fail. A caller must not continue toward a commit after that failure.
 
-## 10.5 Choose a clear convention
+## 8.5 Choose a clear convention
 
 | Approach | Appropriate when… | Responsibility |
 |---|---|---|
@@ -1601,7 +1262,352 @@ The third approach is discussed briefly in Additional Reading. It is not require
 
 ---
 
-# Section 11 – Practice Exercises
+# Section 9 – ACID, the Transaction Log, and Recovery
+
+By now you can write, verify, and troubleshoot transactions: `BEGIN/COMMIT/ROLLBACK`, savepoints, `@@TRANCOUNT`, and the `TRY/CATCH` pattern inside a procedure. This section steps back and explains **how SQL Server can keep the promises you have been relying on**, even if the server stops unexpectedly. Nothing here changes how you write a transaction — it explains why the commands from Sections 2–8 behave the way they do.
+
+This section builds on the data pages and buffer pool introduced in Lab 5. It uses diagrams and conceptual examples; there is no need to shut down SQL Server or inspect its internal log format.
+
+## 9.1 Four transaction properties
+
+The acronym **ACID** describes four properties associated with reliable transaction processing.
+
+| Property | Meaning | Connection to our example |
+|---|---|---|
+| **Atomicity** | A transaction's changes are kept together or undone together | The debit and credit must form one operation |
+| **Consistency** | A correct transaction preserves defined rules | Balances stay non-negative and the transfer preserves the total |
+| **Isolation** | Rules control interactions between concurrent transactions | Two simultaneous operations must be handled appropriately |
+| **Durability** | Committed changes survive a system restart or crash | A confirmed transfer must not disappear after a restart |
+
+We focus on **Atomicity**, **Consistency**, and **Durability** here. Lab 10 explains isolation and the trade-offs between isolation levels.
+
+> [!IMPORTANT]
+> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements could succeed and be committed. Atomicity cannot correct the wrong calculation.
+>
+> Consistency depends on correctly designed constraints and business logic as well as transaction boundaries.
+
+## 9.2 The missing link: memory is not permanent storage
+
+Recall the buffer pool from Lab 5. SQL Server reads data pages into memory and performs changes there. A modified page is called a **dirty page**. In this context, *dirty* means modified in memory and not yet written back to its data file.
+
+Memory is fast, but its contents can be lost if the server crashes or loses power. If a changed page exists only in memory, how can SQL Server promise that a committed change will survive?
+
+The answer is the **transaction log**.
+
+SQL Server maintains both data pages and log records in memory, with separate mechanisms for writing them to files:
+
+```mermaid
+flowchart TB
+    subgraph RAM["RAM - contents can be lost in a crash"]
+        BP["Buffer pool: data pages"]
+        LB["Log buffer: recovery records"]
+    end
+    subgraph DISK["Durable storage"]
+        DF["Data files: table and index pages"]
+        LF["Log file: durable recovery records"]
+    end
+    BP -->|"Write modified pages"| DF
+    LB -->|"Flush log records"| LF
+    LF -.->|"Required log records must be durable first"| DF
+```
+
+*Diagram 1 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
+
+| Component | Location | Purpose |
+|---|---|---|
+| Buffer pool | RAM | Holds data pages, including modified pages |
+| Log buffer | RAM | Temporarily holds generated log records before they are flushed |
+| Data files | Durable storage | Store table and index pages |
+| Transaction log file | Durable storage | Stores log records used for recovery |
+
+A database has at least one data file and one log file. Common extensions are `.mdf` for the primary data file, `.ndf` for additional data files, and `.ldf` for log files.
+
+> [!NOTE]
+> The diagram separates logical roles. It does not require the data and log files to be on separate physical disks. A record in the **log buffer** is still in memory; a log flush writes records to durable storage.
+
+## 9.3 Follow one transfer into the log
+
+Use the same transfer as before, starting from these illustrative balances:
+
+| Account | Before transfer | After successful transfer |
+|---|---:|---:|
+| A | 1000.00 | 800.00 |
+| B | 500.00 | 700.00 |
+
+The SQL operation contains two updates:
+
+```sql
+-- Illustration only: the executable examples are in Sections 2 and 9.
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 200.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 200.00
+WHERE AccountID = 2;
+
+COMMIT TRANSACTION;
+```
+
+As SQL Server processes the changes, it generates log records associated with the transaction. Those records provide information needed to recover the changes.
+
+The following table is a conceptual log for one transfer. Read it from top to bottom.
+
+| Order | Transaction | Record | Simplified recovery information |
+|---|---|---|---|
+| 1 | T1 | Begin | Start of the logged transaction |
+| 2 | T1 | Change account A | Old balance: 1000.00; new balance: 800.00 |
+| 3 | T1 | Change account B | Old balance: 500.00; new balance: 700.00 |
+| 4 | T1 | Commit | Successful completion |
+
+Two directions are now possible:
+
+- **UNDO:** restore the old values when the transaction must be rolled back.
+- **REDO:** reconstruct logged changes that need to be reapplied during recovery.
+
+> [!IMPORTANT]
+> This is a **teaching model**, not the physical format of SQL Server log records. Real records contain internal recovery information and are not simply a readable table of every column's old and new values.
+>
+> The transaction log is also not a substitute for an application audit trail that records who performed a business action and why.
+
+The `BEGIN` row is a conceptual boundary. In SQL Server, executing `BEGIN TRANSACTION` alone does not necessarily write a log record immediately; the logged transaction begins when work requiring logging occurs.
+
+## 9.4 Write-ahead logging: which information must be written first?
+
+The rule is called **Write-Ahead Logging (WAL)**:
+
+> Log records describing a page modification must reach durable storage before that modified page is written to its data file.
+
+This rule matters even **before commit**. SQL Server may write an uncommitted dirty page to a data file. The relevant log information must already be durable so the change can later be undone if necessary.
+
+There is also a requirement for a normal, **fully durable commit**:
+
+> The log records required for the transaction, including its commit record, must be durable before SQL Server acknowledges the commit as successful.
+
+These are related but distinct requirements:
+
+| Event | What must already be durable? |
+|---|---|
+| Writing a modified data page to its data file | The log records describing the page changes |
+| Acknowledging a fully durable commit | The transaction's required log records, including its commit record |
+
+> [!IMPORTANT]
+> **COMMIT does not have to write every changed data page immediately.** The durable log provides the information needed to recover the confirmed operation.
+>
+> Conversely, finding a change in a data file does not prove that its transaction committed.
+
+The two durability rules can be read separately:
+
+```mermaid
+flowchart TD
+    READY["Log records for a modification are generated in RAM"] --> EVENT{"Which event is being completed?"}
+    EVENT -->|"Write a modified data page"| PAGELOG["Make the related log records durable"]
+    PAGELOG --> PAGE["The modified data page may now be written"]
+    EVENT -->|"Acknowledge a fully durable COMMIT"| COMMITLOG["Make all required records, including COMMIT, durable"]
+    COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
+```
+
+*Diagram 2 – WAL constrains page writes; fully durable commit also requires the commit record to be durable. These paths illustrate separate requirements, not the only times a log flush can occur.*
+
+All examples in this section assume normal fully durable commits and storage that honors durability guarantees. Delayed durability is outside this lab.
+
+## 9.5 ROLLBACK and UNDO: restore the previous values
+
+Suppose both account updates have run, but the operation is canceled before commit.
+
+The balances visible inside our session are now `800.00` and `700.00`. A full rollback must restore `1000.00` and `500.00`.
+
+Conceptually, the system follows the transaction's changes backward:
+
+1. Undo the later update: restore account B from `700.00` to `500.00`.
+2. Undo the earlier update: restore account A from `800.00` to `1000.00`.
+
+Follow the restored balances in the table below:
+
+| Point | Account A | Account B |
+|---|---:|---:|
+| Before the transaction | 1000.00 | 500.00 |
+| After both updates | 800.00 | 700.00 |
+| After undoing B | 800.00 | 500.00 |
+| After undoing A | 1000.00 | 500.00 |
+
+The final outcome illustrates **Atomicity**: neither update remains.
+
+If a crash happens after only the first update, recovery must undo that incomplete transaction's effects. The second update never happened, so there is no second update to undo.
+
+> [!NOTE]
+> Rollback does not erase the transaction's history from the log. Recovery and rollback can generate additional log records. The illustration shows the restored values, not the full internal rollback algorithm.
+
+## 9.6 COMMIT, a crash, and REDO: preserve the confirmed operation
+
+Now consider a different sequence:
+
+1. Both account updates run.
+2. The required log records and the commit record reach durable storage.
+3. SQL Server reports a successful commit.
+4. The server crashes before all changed data pages have been written to the data files.
+
+The memory contents are lost, but the durable transaction log survives. During recovery, SQL Server can reconstruct any logged changes that are missing from the data pages.
+
+```mermaid
+flowchart TD
+    CR["Server crashes; RAM contents are lost"] --> LOG["Durable log contains the changes and COMMIT"]
+    LOG --> CHECK{"Are the required page changes already present?"}
+    CHECK -->|"Yes"| KEEP["Keep the existing page changes"]
+    CHECK -->|"No"| REDO["REDO the missing changes using the log"]
+    KEEP --> RESULT["Recovered balances: A = 800; B = 700"]
+    REDO --> RESULT
+```
+
+*Diagram 3 – A conceptual recovery decision for this committed transfer. The diagram shows the required result, not SQL Server's complete recovery algorithm.*
+
+The recovered result must preserve the confirmed transfer:
+
+| Account | Required recovered balance |
+|---|---:|
+| A | 800.00 |
+| B | 700.00 |
+
+This illustrates **Durability**.
+
+> [!IMPORTANT]
+> **REDO does not mean calling the transfer procedure again.** Recovery uses internal log information to restore the required page changes. It must not subtract another `200.00` from the recovered balance.
+>
+> Some page changes may already be present and need no reapplication. Recovery determines which work is necessary.
+
+## 9.7 Several transactions share the log
+
+A database normally has many transactions. Their log records can be interleaved in the same log stream.
+
+For example, transaction T1 can begin first, while another transaction T2 finishes first:
+
+| Log order | Transaction | Conceptual record |
+|---|---|---|
+| 1 | T1 | Begin |
+| 2 | T1 | Change A |
+| 3 | T2 | Begin |
+| 4 | T2 | Change another row |
+| 5 | T1 | Change B |
+| 6 | T2 | Commit |
+| 7 | T1 | Commit |
+
+Read the table from top to bottom. T1 begins first, but T2 commits first. The transaction identifier distinguishes their records within one shared log stream.
+
+This explains two important points:
+
+- Undoing T1 does not mean undoing every later record in the whole database log.
+- SQL Server can identify T1's changes separately from T2's changes.
+
+We are looking only at logging and recovery here. Which operations can proceed simultaneously, and when one session must wait, are questions for Lab 10.
+
+## 9.8 Checkpoints help recovery
+
+Over time, SQL Server writes dirty data pages to their files. A **checkpoint** coordinates page flushing and records recovery information, reducing the work needed after an unexpected shutdown.
+
+A checkpoint is different from a commit:
+
+| COMMIT | Checkpoint |
+|---|---|
+| Completes a transaction when it is the outermost successful commit | Helps manage page flushing and recovery work |
+| Confirms the transaction's changes | Does not confirm every transaction currently open |
+| Requires the necessary log records to be durable for fully durable completion | Writes recovery information and flushes dirty pages according to the checkpoint mechanism |
+
+A transaction can begin before a checkpoint and still be active afterward. Relevant information before the checkpoint may therefore still be needed for recovery.
+
+> [!NOTE]
+> A checkpoint is not a backup and is not a promise that all transactions have completed. It does not remove the need to preserve committed work or undo incomplete work.
+
+## 9.9 Recovery exercise: which outcomes must survive?
+
+The following diagram shows five transactions, a checkpoint, and a later crash. Each bar starts when the transaction begins. Labels marked `COMMIT` indicate successful fully durable completion; labels marked `ACTIVE at crash` identify incomplete transactions. Read the labels rather than relying on colors, which depend on the GitHub theme.
+
+```mermaid
+gantt
+    title Five transactions, a checkpoint, and a crash
+    dateFormat HH:mm
+    axisFormat %H:%M
+    section Events
+    Checkpoint          :milestone, cp, 09:03, 0m
+    System crash        :milestone, crash, 09:10, 0m
+    section Transactions
+    T1 - COMMIT at 09.02 :done, t1, 09:00, 2m
+    T2 - COMMIT at 09.05 :done, t2, 09:01, 4m
+    T3 - ACTIVE at crash :active, t3, 09:02, 8m
+    T4 - COMMIT at 09.08 :done, t4, 09:04, 4m
+    T5 - ACTIVE at crash :active, t5, 09:06, 4m
+```
+
+*Diagram 4 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
+
+**Questions**
+
+1. Which transactions have committed before the crash?
+2. Which transactions were incomplete and must have their effects undone?
+3. Do we know from this timeline exactly which data pages require REDO?
+4. Does the checkpoint commit T3?
+
+<details>
+<summary>Show answers</summary>
+
+| Transaction | State at the crash | Required outcome |
+|---|---|---|
+| T1 | Committed before the checkpoint | Preserve its confirmed effects |
+| T2 | Committed after the checkpoint | Preserve its confirmed effects; redo missing changes where needed |
+| T3 | Incomplete; started before the checkpoint | Undo its effects |
+| T4 | Committed after the checkpoint | Preserve its confirmed effects; redo missing changes where needed |
+| T5 | Incomplete; started after the checkpoint | Undo its effects |
+
+The timeline does **not** show the complete page and log state. We cannot identify every required REDO operation from transaction end times alone.
+
+The checkpoint does not commit T3. Its changes remain unconfirmed until that transaction commits, and it is still incomplete when the crash occurs.
+
+</details>
+
+> [!NOTE]
+> This exercise describes the required recovered outcome. Real recovery is not simply “redo only the committed transactions, then undo the others.” Traditional SQL Server recovery includes analysis, redo of needed logged modifications, and undo of incomplete work; redo can also involve changes from transactions later undone. Features such as Accelerated Database Recovery change implementation details. Those algorithms are outside this lab.
+
+## 9.10 A system crash is different from losing the storage
+
+The examples above assume that the data and log storage remain usable after the server restarts.
+
+| Failure | What is affected? | Basic response |
+|---|---|---|
+| Operation canceled or rolled back | One transaction's work | Undo the transaction's changes |
+| Server crash or power loss | In-memory state; files remain available | Recover using the surviving data files and log |
+| Loss or corruption of required storage | Data and/or log files | Appropriate backups, log backups, or another recovery strategy are needed |
+
+The transaction log does not replace backups. A log stored on a failed device cannot be assumed to remain available for recovery.
+
+## 9.11 Check your understanding
+
+1. Which ACID property explains all-or-nothing behavior?
+2. Why is a log record in RAM insufficient for durability?
+3. Must all changed data pages be written at commit?
+4. Can an uncommitted change already be present in a data file?
+5. What is the difference between UNDO and REDO?
+6. Does REDO execute the bank transfer procedure again?
+7. Does a checkpoint confirm active transactions?
+8. Why must business logic still be correct inside a transaction?
+
+<details>
+<summary>Show answers</summary>
+
+1. Atomicity.
+2. RAM can be lost in a crash. The required log records must be durable for a fully durable commit.
+3. No. Data pages may be written later, provided the logging rules are followed.
+4. Yes. Its log information must be durable first so the change can be undone if necessary.
+5. UNDO removes a transaction's effects; REDO reconstructs logged changes where recovery needs them.
+6. No. Recovery works from log information, not by calling application procedures again.
+7. No. A checkpoint helps page flushing and recovery; it does not commit active transactions.
+8. Atomicity groups the specified changes. It cannot determine whether the operation implements the correct business rule.
+
+</details>
+
+---
+
+# Section 10 – Practice Exercises
 
 Try each exercise before opening the solution. Start each exercise with `@@TRANCOUNT = 0`.
 
@@ -1672,7 +1678,7 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 ## Exercise 2 – Keep One Change, Cancel Another
 
-Using `dbo.Note` from Section 6:
+Using `dbo.Note` from Section 2.5:
 
 1. Start a transaction.
 2. Insert the note `Exercise 2: keep this note`.
@@ -1714,14 +1720,14 @@ Only the first exercise note is stored. Repeating the exercise adds another copy
 
 </details>
 
-## Exercise 2b – An Unused Savepoint
+## Exercise 3 – An Unused Savepoint
 
 Using `dbo.Note`:
 
 1. Start a transaction.
-2. Insert the note `Exercise 2b: first note`.
+2. Insert the note `Exercise 3: first note`.
 3. Create a savepoint.
-4. Insert the note `Exercise 2b: second note`.
+4. Insert the note `Exercise 3: second note`.
 5. Commit the transaction **without** rolling back to the savepoint.
 6. Verify which notes were kept.
 
@@ -1734,18 +1740,18 @@ Predict the result before running the code: does creating a savepoint that is ne
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 2b: first note');
+VALUES (N'Exercise 3: first note');
 
 SAVE TRANSACTION FirstNoteDone;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 2b: second note');
+VALUES (N'Exercise 3: second note');
 
 COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
 FROM dbo.Note
-WHERE NoteText LIKE N'Exercise 2b:%'
+WHERE NoteText LIKE N'Exercise 3:%'
 ORDER BY NoteID;
 
 SELECT @@TRANCOUNT AS AfterCommit; -- 0
@@ -1755,7 +1761,7 @@ Both notes are stored. A savepoint that is never used in a `ROLLBACK TRANSACTION
 
 </details>
 
-## Exercise 3 – Test the Transfer Procedure
+## Exercise 4 – Test the Transfer Procedure
 
 Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
@@ -1764,6 +1770,8 @@ Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 3. a transfer of `5000.00` from account 1;
 4. a transfer amount of `0.00`;
 5. the same source and destination account.
+
+Cases 1–3 repeat scenarios from 7.3–7.5 — write them **from memory**, without looking back, as a quick retrieval check. Cases 4 and 5 are new: Section 7 never actually triggered errors `50011` or `50012`, so this is the first time you confirm they fire.
 
 After each call, verify the balances and transaction count. Use `TRY/CATCH` around expected errors so verification still runs.
 
@@ -1812,26 +1820,50 @@ ORDER BY AccountID;
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-Repeat the same testing block with these calls, one call per test:
+Repeat the same `TRY/CATCH` block, one call per test. Each call needs its **own** `TRY/CATCH` — an uncaught `THROW` ends the whole batch, so stacking three bare `EXEC` calls without one each would silently skip the tests after the first failure:
 
 ```sql
 -- Insufficient funds.
-EXEC dbo.usp_TransferFunds
-    @SourceAccountID = 1,
-    @DestinationAccountID = 2,
-    @Amount = 5000.00;
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 2,
+        @Amount = 5000.00;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS ErrorNumber,
+           ERROR_MESSAGE() AS ErrorMessage;
+END CATCH;
 
 -- Invalid amount.
-EXEC dbo.usp_TransferFunds
-    @SourceAccountID = 1,
-    @DestinationAccountID = 2,
-    @Amount = 0.00;
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 2,
+        @Amount = 0.00;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS ErrorNumber,
+           ERROR_MESSAGE() AS ErrorMessage;
+END CATCH;
 
 -- Same account.
-EXEC dbo.usp_TransferFunds
-    @SourceAccountID = 1,
-    @DestinationAccountID = 1,
-    @Amount = 100.00;
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 1,
+        @Amount = 100.00;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS ErrorNumber,
+           ERROR_MESSAGE() AS ErrorMessage;
+END CATCH;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
 | Test | Account 1 | Account 2 | Expected error | Final count |
@@ -1844,7 +1876,7 @@ EXEC dbo.usp_TransferFunds
 
 </details>
 
-## Exercise 4 – Add a Transfer Record
+## Exercise 5 – Add a Transfer Record
 
 Extend the transfer operation so that it also stores a record of the successful transfer.
 
@@ -1874,7 +1906,7 @@ CREATE TABLE dbo.TransferHistory
 GO
 ```
 
-Create `dbo.usp_TransferFundsWithHistory` by adapting the procedure from Section 9.
+Create `dbo.usp_TransferFundsWithHistory` by adapting the procedure from Section 7.
 
 Requirements:
 
@@ -2009,7 +2041,7 @@ This demonstration intentionally resets balances between tests, so the history t
 
 </details>
 
-## Exercise 5 – Connect Transactions to Lab 8
+## Exercise 6 – Connect Transactions to Lab 8
 
 In Lab 8, one procedure inserted a parent row and related child rows from structured input.
 
@@ -2061,9 +2093,9 @@ Preserve the tested table names, column names, and insert logic from Lab 8 when 
 
 ---
 
-# Section 12 – Common Mistakes and Final Review
+# Section 11 – Common Mistakes and Final Review
 
-## 12.1 Common mistakes
+## 11.1 Common mistakes
 
 | Mistake | Why it matters | Better approach |
 |---|---|---|
@@ -2078,7 +2110,7 @@ Preserve the tested table names, column names, and insert logic from Lab 8 when 
 | Expecting savepoint rollback to close the transaction | The transaction stays open | Finish it explicitly |
 | Expecting identity values to be gap-free | Allocations are not undone with the inserted rows | Treat IDs as identifiers |
 
-## 12.2 Final questions
+## 11.2 Final questions
 
 1. What does an explicit transaction add to autocommit behavior?
 2. What is the difference between full rollback and rollback to a savepoint?
@@ -2103,13 +2135,15 @@ Preserve the tested table names, column names, and insert logic from Lab 8 when 
 
 </details>
 
-## 12.3 Key takeaways
+## 11.3 Key takeaways
 
 - **A business operation can require several SQL statements.** Use a transaction when those changes must be kept or undone together.
 - **`COMMIT` confirms; `ROLLBACK` undoes.** A savepoint allows partial rollback without closing the transaction.
 - **Errors need a policy.** Detect missing rows and business failures, roll back the required scope, and report the error.
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
+
+Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. Every tool in this lab — explicit transactions, savepoints, `@@TRANCOUNT`, `TRY/CATCH` with `THROW`, and a clear ownership convention — exists to guarantee that, and Section 9 explained why SQL Server can make that guarantee stick even after a crash.
 
 **Looking ahead:** What happens if two sessions try to change the same data at the same time? Lab 10 introduces concurrency, locking, isolation levels, and deadlocks.
 
@@ -2212,7 +2246,7 @@ GO
 DROP DATABASE TransactionsLab;
 ```
 
-The history table and its procedure are created in Exercise 4. Omit their drop statements if you did not complete that exercise.
+The history table and its procedure are created in Exercise 5. Omit their drop statements if you did not complete that exercise.
 
 ## F. References
 

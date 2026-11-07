@@ -370,7 +370,7 @@ The answer is the **transaction log**.
 
 SQL Server maintains both data pages and log records in memory, with separate mechanisms for writing them to files:
 
-![Buffer pool and log buffer in RAM, with separate data files and transaction log on disk](assets/lab09/01-memory-and-files.svg)
+![Buffer pool and log buffer in RAM, with separate data files and transaction log on disk](../images/lab09/01-memory-and-files.svg)
 
 *Figure 1 – Data pages and log records have different roles and can be written to disk at different times.*
 
@@ -414,7 +414,7 @@ COMMIT TRANSACTION;
 
 As SQL Server processes the changes, it generates log records associated with the transaction. Those records provide information needed to recover the changes.
 
-![Simplified log records for transaction T1: begin, account A change, account B change, commit](assets/lab09/02-log-records.svg)
+![Simplified log records for transaction T1: begin, account A change, account B change, commit](../images/lab09/02-log-records.svg)
 
 *Figure 2 – A conceptual log for one transfer. Read it from top to bottom.*
 
@@ -474,7 +474,7 @@ Conceptually, the system follows the transaction's changes backward:
 1. Undo the later update: restore account B from `700.00` to `500.00`.
 2. Undo the earlier update: restore account A from `800.00` to `1000.00`.
 
-![UNDO restores account B first and account A second, returning both balances to their original values](assets/lab09/03-rollback-undo.svg)
+![UNDO restores account B first and account A second, returning both balances to their original values](../images/lab09/03-rollback-undo.svg)
 
 *Figure 3 – Conceptual UNDO for a transaction that performed both updates.*
 
@@ -503,7 +503,7 @@ Now consider a different sequence:
 
 The memory contents are lost, but the durable transaction log survives. During recovery, SQL Server can reconstruct any logged changes that are missing from the data pages.
 
-![A fully durable commit survives a later crash because recovery can redo missing logged changes](assets/lab09/04-commit-crash-redo.svg)
+![A fully durable commit survives a later crash because recovery can redo missing logged changes](../images/lab09/04-commit-crash-redo.svg)
 
 *Figure 4 – Durability does not require all modified data pages to be flushed at commit.*
 
@@ -527,7 +527,7 @@ A database normally has many transactions. Their log records can be interleaved 
 
 For example, transaction T1 can begin first, while another transaction T2 finishes first:
 
-![A shared log stream with interleaved records for T1 and T2](assets/lab09/05-shared-log.svg)
+![A shared log stream with interleaved records for T1 and T2](../images/lab09/05-shared-log.svg)
 
 *Figure 5 – A common log stream can still identify the records belonging to each transaction.*
 
@@ -559,7 +559,7 @@ A transaction can begin before a checkpoint and still be active afterward. Relev
 
 The following diagram shows five transactions, a checkpoint, and a later crash. A green endpoint labeled `COMMIT` means a successful fully durable commit. An orange line reaching the crash is still active.
 
-![Five transaction timelines with a checkpoint and crash: T1 T2 and T4 committed, while T3 and T5 were active](assets/lab09/06-recovery-timeline.svg)
+![Five transaction timelines with a checkpoint and crash: T1 T2 and T4 committed, while T3 and T5 were active](../images/lab09/06-recovery-timeline.svg)
 
 *Figure 6 – Decide the required outcome before considering the internal recovery work.*
 

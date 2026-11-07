@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **transactions**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -54,6 +54,18 @@ The complex parameters collection is in [Complex Parameters Exercises](complex-p
 4. **Choosing the right method** — reason about when to use delimited strings versus XML versus later methods (TVPs, JSON).
 
 These exercises range from direct SQL rewrites of Lab 08's core patterns to design scenarios where students must justify their method choice. They include building manual string splitters to understand why built-in functions matter, nested XML processing, and trade-off analysis across all five methods.
+
+### Transactions
+
+The transaction collection is in [Transaction Exercises](transactions.md) and follows the learning goals in [Lab 9 – Transactions](../labs/lab09-transactions.md):
+
+1. **Commit or cancel** — confirm or undo a multi-row insert with an explicit transaction.
+2. **Savepoints in practice** — a staged exercise covering rollback-to-savepoint, a full rollback that reaches past the savepoint, an unused savepoint, and a cascading two-savepoint rollback.
+3. **Caller-managed transactions** — a procedure with no transaction of its own, wrapped by a caller that commits on success and rolls back on a real constraint-violation error.
+4. **Procedure-managed transactions** — a procedure that owns its transaction across three related deletes.
+5. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
+
+Unlike Lab 9, which uses its own dedicated `TransactionsLab` database with fictional bank accounts, these exercises apply the same concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows for safe, precise cleanup.
 
 ### Physical storage
 
@@ -114,6 +126,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Function Exercises](functions.md)
 - [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md)
 - [Complex Parameters Exercises](complex-parameters.md)
+- [Lab 9 – Transactions](../labs/lab09-transactions.md)
+- [Transaction Exercises](transactions.md)
 - [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
 - [Physical Storage Exercises](physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)

@@ -73,16 +73,18 @@ A ranking function without `ORDER BY` makes no sense — ranked by what? Same fo
 
 ## 1.3 Where it runs in the query
 
-```
-FROM / JOIN   →  raw rows come in
-    WHERE     →  filter them
-    GROUP BY  →  collapse into groups (loses rows)
-    HAVING    →  filter the groups
-    SELECT    →  ← window functions run here
-    ORDER BY  →  order the final result
+```mermaid
+flowchart LR
+    A["FROM / JOIN\nraw rows come in"] --> B["WHERE\nfilter rows"]
+    B --> C["GROUP BY\ncollapse into groups\n(loses rows)"]
+    C --> D["HAVING\nfilter the groups"]
+    D --> E["SELECT\nwindow functions run here"]
+    E --> F["ORDER BY\norder the final result"]
 ```
 
-Window functions run in the `SELECT`, after `JOIN`/`WHERE`/`GROUP BY`, before the outer `ORDER BY`. If a query has a `GROUP BY`, the window function sees the **aggregated** rows, not the original table — usually not what you want, since the whole point of a window function is to keep individual rows. Most window-function queries have no `GROUP BY` at all.
+*Diagram 1 – Window functions run inside the `SELECT`, after `JOIN`/`WHERE`/`GROUP BY` have already shaped the rows, and before the outer `ORDER BY` reorders the result.*
+
+If a query has a `GROUP BY`, the window function sees the **aggregated** rows, not the original table — usually not what you want, since the whole point of a window function is to keep individual rows. Most window-function queries have no `GROUP BY` at all.
 
 ## 1.4 Check your understanding
 

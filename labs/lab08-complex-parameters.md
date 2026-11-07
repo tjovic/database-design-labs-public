@@ -1454,16 +1454,16 @@ Let's return to the invoice problem introduced in Section 1.
 An invoice contains:
 
 - One header with customer information and invoice date.
-- Multiple line items containing products, quantities, and prices.
+- Multiple items containing products, quantities, and prices.
 
 We want to insert the entire invoice using **one stored procedure call**.
 
 For this example, we will use:
 
-- Scalar parameters for the invoice header.
-- A Table-Valued Parameter for the invoice items.
+- **Scalar parameters** for the invoice header.
+- A **Table-Valued Parameter** for the invoice items.
 
-This is a natural design because the header contains a fixed number of values, while the number of invoice items can vary.
+The header contains a fixed number of values, while the number of items can vary.
 
 ### Step 1 – Define the table type
 
@@ -1487,11 +1487,7 @@ CREATE TYPE dbo.InvoiceLineInput AS TABLE
 GO
 ```
 
-Notice that the table type contains multiple columns.
-
-TVPs are not limited to simple lists of IDs.
-
-They can represent collections of records with different data types.
+Unlike our earlier table type containing only IDs, this type represents **records with multiple columns**.
 
 ### Step 2 – Create the procedure
 
@@ -1503,61 +1499,37 @@ CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsert
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
     DECLARE @NewInvoiceID int;
 
-    BEGIN TRY
-        BEGIN TRANSACTION;
+    -- Insert the invoice header
+    INSERT INTO Invoice (CustomerID, InvoiceDate)
+    VALUES (@CustomerID, @InvoiceDate);
 
-        -- Insert the invoice header
-        INSERT INTO Invoice
-        (
-            CustomerID,
-            InvoiceDate,
-            InvoiceNumber
-        )
-        VALUES
-        (
-            @CustomerID,
-            @InvoiceDate,
-            LEFT(CONVERT(nvarchar(36), NEWID()), 20)
-        );
+    -- Get the generated invoice ID
+    SET @NewInvoiceID = SCOPE_IDENTITY();
 
-        -- Get the generated invoice ID
-        SET @NewInvoiceID = SCOPE_IDENTITY();
+    -- Insert all invoice items
+    INSERT INTO InvoiceItem
+    (
+        InvoiceID,
+        ProductID,
+        Quantity,
+        InitialPrice,
+        Discount,
+        TotalPrice
+    )
+    SELECT
+        @NewInvoiceID,
+        ProductID,
+        Quantity,
+        UnitPrice,
+        0,
+        Quantity * UnitPrice
+    FROM @Lines;
 
-        -- Insert all invoice items
-        INSERT INTO InvoiceItem
-        (
-            InvoiceID,
-            ProductID,
-            Quantity,
-            InitialPrice,
-            Discount,
-            TotalPrice
-        )
-        SELECT
-            @NewInvoiceID,
-            ProductID,
-            Quantity,
-            UnitPrice,
-            0,
-            Quantity * UnitPrice
-        FROM @Lines;
-
-        COMMIT TRANSACTION;
-
-        -- Return the generated invoice ID
-        SELECT @NewInvoiceID AS NewInvoiceID;
-
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        THROW;
-    END CATCH;
+    -- Return the generated invoice ID
+    SELECT @NewInvoiceID AS NewInvoiceID;
 END;
 GO
 ```
@@ -1571,7 +1543,7 @@ Let's examine the important parts.
 @InvoiceDate date
 ```
 
-These represent the invoice header.
+These supply the customer and date for the invoice header.
 
 **2. Table-Valued Parameter**
 
@@ -1579,21 +1551,9 @@ These represent the invoice header.
 @Lines dbo.InvoiceLineInput READONLY
 ```
 
-This contains all invoice items.
+This supplies all invoice items as typed rows.
 
-**3. Transaction**
-
-```sql
-BEGIN TRANSACTION;
-...
-COMMIT TRANSACTION;
-```
-
-The invoice header and its items must be inserted together.
-
-If an error occurs, the `CATCH` block rolls back the transaction.
-
-**4. SCOPE_IDENTITY()**
+**3. SCOPE_IDENTITY()**
 
 ```sql
 SET @NewInvoiceID = SCOPE_IDENTITY();
@@ -1601,9 +1561,9 @@ SET @NewInvoiceID = SCOPE_IDENTITY();
 
 This retrieves the ID generated when the invoice header was inserted.
 
-We use it to link every invoice item to the correct invoice.
+Every item needs this ID to reference the same invoice.
 
-**5. Set-based INSERT**
+**4. Set-based INSERT**
 
 ```sql
 INSERT INTO InvoiceItem (...)
@@ -1611,37 +1571,38 @@ SELECT ...
 FROM @Lines;
 ```
 
-This inserts all invoice items using one SQL statement.
+This inserts all invoice items using one SQL statement. The same `@NewInvoiceID` is assigned to every item.
 
 We do not need a loop.
 
 > [!NOTE]
-> In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
+> `InvoiceNumber` is generated automatically by the database as `SO` followed by the invoice ID, so it is omitted from the `INSERT`.
 >
-> The invoice number is generated using `NEWID()` as a demonstration placeholder. Real invoicing systems normally use a defined invoice-numbering mechanism.
+> In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
+
+> [!IMPORTANT]
+> One procedure call does not automatically make all statements succeed or fail together.
+>
+> If inserting the items fails, the invoice header may remain in the database. In the next lab, we will use a transaction to keep these operations together.
 
 ### Step 3 – Call, verify, and clean up
 
-Declare a table variable containing the invoice items, then call the procedure once and capture its returned invoice ID.
+Declare a table variable and fill it with three invoice items.
 
-The following script creates one invoice, displays its items, and removes that same invoice and its items.
+The following script calls the procedure once, captures the returned invoice ID, displays the inserted data, and then removes it.
 
 ```sql
 DECLARE @InvoiceLines dbo.InvoiceLineInput;
 DECLARE @Result TABLE (NewInvoiceID int);
 DECLARE @NewInvoiceID int;
 
-INSERT INTO @InvoiceLines
-(
-    ProductID,
-    Quantity,
-    UnitPrice
-)
+INSERT INTO @InvoiceLines (ProductID, Quantity, UnitPrice)
 VALUES
     (1, 2, 199.00),
     (2, 1, 49.90),
     (3, 5, 9.99);
 
+-- Create the invoice and capture its returned ID
 INSERT INTO @Result (NewInvoiceID)
 EXEC dbo.usp_InvoiceInsert
     @CustomerID = 1,
@@ -1654,6 +1615,7 @@ FROM @Result;
 -- Verify the invoice and its items
 SELECT
     i.IDInvoice,
+    i.InvoiceNumber,
     i.InvoiceDate,
     ii.ProductID,
     ii.Quantity,
@@ -1663,28 +1625,21 @@ FROM Invoice i
 JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
 WHERE i.IDInvoice = @NewInvoiceID;
 
--- Remove only the invoice created by this test
-DELETE FROM InvoiceItem
-WHERE InvoiceID = @NewInvoiceID;
-
-DELETE FROM Invoice
-WHERE IDInvoice = @NewInvoiceID;
 ```
+
+`INSERT INTO @Result ... EXEC` stores the result returned by the procedure in a table variable. We then read that ID into `@NewInvoiceID` for verification and cleanup.
 
 Run this entire script as one batch so that all variables remain in scope.
 
 Finally, remove the procedure and table type:
 
-```sql
-DROP PROCEDURE dbo.usp_InvoiceInsert;
-DROP TYPE dbo.InvoiceLineInput;
-GO
-```
 
 > [!IMPORTANT]
-> We use the generated invoice ID to identify the test data.
+> Use the ID returned by the procedure to identify the inserted invoice.
 >
-> Avoid using `MAX(IDInvoice)` to find the last inserted invoice. Another session may insert a different invoice, making that approach unreliable.
+> Avoid using `MAX(IDInvoice)`: another session may have inserted a different invoice.
+
+**One invoice header. Three items. One procedure call.**
 
 ## 5.5 Advantages and Limitations of TVPs
 

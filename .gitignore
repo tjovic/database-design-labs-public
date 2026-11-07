@@ -5,3 +5,9 @@ __pycache__/
 
 # Local environment configuration — copy .env.example to .env instead
 .env
+
+# Local lab test runs and verification output
+lab*.test.sql
+lab*_out.txt
+lab*_verify.sql
+lab*_verify_out.txt

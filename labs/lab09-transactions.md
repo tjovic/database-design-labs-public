@@ -2,7 +2,9 @@
 
 **Database:** `AdventureWorksENG`
 
-**Version:** 2.0 – Expanded transaction log and recovery explanations
+**Version:** 2.1 – Mermaid diagrams and transaction log tables
+
+Diagrams use Mermaid code blocks rendered directly by GitHub. No separate image files are required.
 
 In previous labs, we wrote procedures that insert, update, and delete data. In Lab 8, we also learned how to pass several rows to a procedure in one call.
 
@@ -370,9 +372,22 @@ The answer is the **transaction log**.
 
 SQL Server maintains both data pages and log records in memory, with separate mechanisms for writing them to files:
 
-![Buffer pool and log buffer in RAM, with separate data files and transaction log on disk](../images/lab09/01-memory-and-files.svg)
+```mermaid
+flowchart TB
+    subgraph RAM["RAM - contents can be lost in a crash"]
+        BP["Buffer pool: data pages"]
+        LB["Log buffer: recovery records"]
+    end
+    subgraph DISK["Durable storage"]
+        DF["Data files: table and index pages"]
+        LF["Log file: durable recovery records"]
+    end
+    BP -->|"Write modified pages"| DF
+    LB -->|"Flush log records"| LF
+    LF -.->|"Required log records must be durable first"| DF
+```
 
-*Figure 1 – Data pages and log records have different roles and can be written to disk at different times.*
+*Diagram 1 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
 
 | Component | Location | Purpose |
 |---|---|---|
@@ -414,9 +429,7 @@ COMMIT TRANSACTION;
 
 As SQL Server processes the changes, it generates log records associated with the transaction. Those records provide information needed to recover the changes.
 
-![Simplified log records for transaction T1: begin, account A change, account B change, commit](../images/lab09/02-log-records.svg)
-
-*Figure 2 – A conceptual log for one transfer. Read it from top to bottom.*
+The following table is a conceptual log for one transfer. Read it from top to bottom.
 
 | Order | Transaction | Record | Simplified recovery information |
 |---|---|---|---|
@@ -461,6 +474,19 @@ These are related but distinct requirements:
 >
 > Conversely, finding a change in a data file does not prove that its transaction committed.
 
+The two durability rules can be read separately:
+
+```mermaid
+flowchart TD
+    READY["Log records for a modification are generated in RAM"] --> EVENT{"Which event is being completed?"}
+    EVENT -->|"Write a modified data page"| PAGELOG["Make the related log records durable"]
+    PAGELOG --> PAGE["The modified data page may now be written"]
+    EVENT -->|"Acknowledge a fully durable COMMIT"| COMMITLOG["Make all required records, including COMMIT, durable"]
+    COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
+```
+
+*Diagram 2 – WAL constrains page writes; fully durable commit also requires the commit record to be durable. These paths illustrate separate requirements, not the only times a log flush can occur.*
+
 All examples in this section assume normal fully durable commits and storage that honors durability guarantees. Delayed durability is outside this lab.
 
 ## 3.5 ROLLBACK and UNDO: restore the previous values
@@ -474,9 +500,7 @@ Conceptually, the system follows the transaction's changes backward:
 1. Undo the later update: restore account B from `700.00` to `500.00`.
 2. Undo the earlier update: restore account A from `800.00` to `1000.00`.
 
-![UNDO restores account B first and account A second, returning both balances to their original values](../images/lab09/03-rollback-undo.svg)
-
-*Figure 3 – Conceptual UNDO for a transaction that performed both updates.*
+Follow the restored balances in the table below:
 
 | Point | Account A | Account B |
 |---|---:|---:|
@@ -503,9 +527,17 @@ Now consider a different sequence:
 
 The memory contents are lost, but the durable transaction log survives. During recovery, SQL Server can reconstruct any logged changes that are missing from the data pages.
 
-![A fully durable commit survives a later crash because recovery can redo missing logged changes](../images/lab09/04-commit-crash-redo.svg)
+```mermaid
+flowchart TD
+    CR["Server crashes; RAM contents are lost"] --> LOG["Durable log contains the changes and COMMIT"]
+    LOG --> CHECK{"Are the required page changes already present?"}
+    CHECK -->|"Yes"| KEEP["Keep the existing page changes"]
+    CHECK -->|"No"| REDO["REDO the missing changes using the log"]
+    KEEP --> RESULT["Recovered balances: A = 800; B = 700"]
+    REDO --> RESULT
+```
 
-*Figure 4 – Durability does not require all modified data pages to be flushed at commit.*
+*Diagram 3 – A conceptual recovery decision for this committed transfer. The diagram shows the required result, not SQL Server's complete recovery algorithm.*
 
 The recovered result must preserve the confirmed transfer:
 
@@ -527,9 +559,17 @@ A database normally has many transactions. Their log records can be interleaved 
 
 For example, transaction T1 can begin first, while another transaction T2 finishes first:
 
-![A shared log stream with interleaved records for T1 and T2](../images/lab09/05-shared-log.svg)
+| Log order | Transaction | Conceptual record |
+|---|---|---|
+| 1 | T1 | Begin |
+| 2 | T1 | Change A |
+| 3 | T2 | Begin |
+| 4 | T2 | Change another row |
+| 5 | T1 | Change B |
+| 6 | T2 | Commit |
+| 7 | T1 | Commit |
 
-*Figure 5 – A common log stream can still identify the records belonging to each transaction.*
+Read the table from top to bottom. T1 begins first, but T2 commits first. The transaction identifier distinguishes their records within one shared log stream.
 
 This explains two important points:
 
@@ -557,11 +597,25 @@ A transaction can begin before a checkpoint and still be active afterward. Relev
 
 ## 3.9 Recovery exercise: which outcomes must survive?
 
-The following diagram shows five transactions, a checkpoint, and a later crash. A green endpoint labeled `COMMIT` means a successful fully durable commit. An orange line reaching the crash is still active.
+The following diagram shows five transactions, a checkpoint, and a later crash. Each bar starts when the transaction begins. Labels marked `COMMIT` indicate successful fully durable completion; labels marked `ACTIVE at crash` identify incomplete transactions. Read the labels rather than relying on colors, which depend on the GitHub theme.
 
-![Five transaction timelines with a checkpoint and crash: T1 T2 and T4 committed, while T3 and T5 were active](../images/lab09/06-recovery-timeline.svg)
+```mermaid
+gantt
+    title Five transactions, a checkpoint, and a crash
+    dateFormat HH:mm
+    axisFormat %H:%M
+    section Events
+    Checkpoint          :milestone, cp, 09:03, 0m
+    System crash        :milestone, crash, 09:10, 0m
+    section Transactions
+    T1 - COMMIT at 09.02 :done, t1, 09:00, 2m
+    T2 - COMMIT at 09.05 :done, t2, 09:01, 4m
+    T3 - ACTIVE at crash :active, t3, 09:02, 8m
+    T4 - COMMIT at 09.08 :done, t4, 09:04, 4m
+    T5 - ACTIVE at crash :active, t5, 09:06, 4m
+```
 
-*Figure 6 – Decide the required outcome before considering the internal recovery work.*
+*Diagram 4 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
 
 **Questions**
 

@@ -39,11 +39,7 @@ Run examples **section by section** — some deliberately produce errors. This l
 USE master;
 GO
 
-IF DB_ID(N'TransactionsLab') IS NOT NULL
-BEGIN
-    ALTER DATABASE TransactionsLab SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE TransactionsLab;
-END;
+DROP DATABASE IF EXISTS TransactionsLab;
 GO
 
 CREATE DATABASE TransactionsLab;
@@ -51,14 +47,9 @@ GO
 
 USE TransactionsLab;
 GO
-
-SET IMPLICIT_TRANSACTIONS OFF;
-SET XACT_ABORT OFF;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-This always starts from a fresh, empty `TransactionsLab` — rerun it any time you want a clean slate instead of resetting balances by hand. The expected transaction count is `0`. If it isn't, finish or roll back any transaction left open on your connection before continuing.
+Rerun this any time you want a clean slate instead of resetting balances by hand.
 
 > [!IMPORTANT]
 > Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not finish it automatically.

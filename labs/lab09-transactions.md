@@ -769,6 +769,148 @@ If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would b
 > [!NOTE]
 > This example deliberately cancels valid work. Recovering from an actual SQL error using a savepoint is more complicated: some errors leave the transaction unable to commit, and a savepoint cannot repair that state. The main error-handling pattern in this lab rolls back the entire business operation.
 
+## 4.3 A full rollback removes work recorded before the savepoint too
+
+A savepoint only protects work from a **partial** rollback. It does not protect that work from a **full** rollback.
+
+Reset the balances, then run this block:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = CASE AccountID
+                  WHEN 1 THEN 1000.00
+                  WHEN 2 THEN  500.00
+              END;
+```
+
+```sql
+BEGIN TRANSACTION;
+
+-- First transfer.
+UPDATE dbo.BankAccount
+SET Balance = Balance - 100.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 100.00
+WHERE AccountID = 2;
+
+SAVE TRANSACTION AfterFirstTransfer;
+
+-- Second transfer.
+UPDATE dbo.BankAccount
+SET Balance = Balance - 50.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 50.00
+WHERE AccountID = 2;
+
+SELECT AccountID, Balance AS BeforeFullRollback
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+ROLLBACK TRANSACTION;
+
+SELECT AccountID, Balance AS AfterFullRollback
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| Point | Account A | Account B |
+|---|---:|---:|
+| Initial state | 1000.00 | 500.00 |
+| After first transfer | 900.00 | 600.00 |
+| After second transfer | 850.00 | 650.00 |
+| After full rollback | 1000.00 | 500.00 |
+
+Compare this with 4.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
+
+> [!IMPORTANT]
+> A savepoint marks a point for a partial rollback. It does not create a boundary that a full rollback must respect. The number of savepoints inside a transaction has no effect on what a full `ROLLBACK` undoes.
+
+## 4.4 Rolling back to an earlier savepoint invalidates later ones
+
+A transaction can contain several savepoints. Rolling back to an earlier one also discards any savepoint defined after it.
+
+Reset the balances, then run this block:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = CASE AccountID
+                  WHEN 1 THEN 1000.00
+                  WHEN 2 THEN  500.00
+              END;
+```
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 100.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 100.00
+WHERE AccountID = 2;
+
+SAVE TRANSACTION AfterFirstTransfer;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 50.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 50.00
+WHERE AccountID = 2;
+
+SAVE TRANSACTION AfterSecondTransfer;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 25.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 25.00
+WHERE AccountID = 2;
+
+SELECT AccountID, Balance AS BeforeAnyRollback
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+-- Discards the third transfer AND the AfterSecondTransfer savepoint itself.
+ROLLBACK TRANSACTION AfterFirstTransfer;
+
+SELECT AccountID, Balance AS AfterSavepointRollback
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS StillOpen; -- 1
+
+ROLLBACK TRANSACTION;
+
+SELECT AccountID, Balance AS AfterFullRollback
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS FinalCount; -- 0
+```
+
+| Point | Account A | Account B |
+|---|---:|---:|
+| Initial state | 1000.00 | 500.00 |
+| After first transfer | 900.00 | 600.00 |
+| After second transfer | 850.00 | 650.00 |
+| After third transfer | 875.00 | 625.00 |
+| After rollback to `AfterFirstTransfer` | 900.00 | 600.00 |
+| After full rollback | 1000.00 | 500.00 |
+
+After `ROLLBACK TRANSACTION AfterFirstTransfer`, the savepoint `AfterSecondTransfer` no longer exists. Running `ROLLBACK TRANSACTION AfterSecondTransfer` at that point would fail with an error, because that savepoint was defined after the point we already rolled back to.
+
+The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` is `1`). It must still be finished with `COMMIT` or a full `ROLLBACK`, exactly as in 4.2.
+
 ---
 
 # Section 5 – @@TRANCOUNT and Nested Transactions
@@ -1569,6 +1711,47 @@ SELECT @@TRANCOUNT AS AfterCommit; -- 0
 ```
 
 Only the first exercise note is stored. Repeating the exercise adds another copy of that note. Identity values may contain gaps.
+
+</details>
+
+## Exercise 2b – An Unused Savepoint
+
+Using `dbo.Note`:
+
+1. Start a transaction.
+2. Insert the note `Exercise 2b: first note`.
+3. Create a savepoint.
+4. Insert the note `Exercise 2b: second note`.
+5. Commit the transaction **without** rolling back to the savepoint.
+6. Verify which notes were kept.
+
+Predict the result before running the code: does creating a savepoint that is never rolled back to change anything?
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+BEGIN TRANSACTION;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'Exercise 2b: first note');
+
+SAVE TRANSACTION FirstNoteDone;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'Exercise 2b: second note');
+
+COMMIT TRANSACTION;
+
+SELECT NoteID, NoteText
+FROM dbo.Note
+WHERE NoteText LIKE N'Exercise 2b:%'
+ORDER BY NoteID;
+
+SELECT @@TRANCOUNT AS AfterCommit; -- 0
+```
+
+Both notes are stored. A savepoint that is never used in a `ROLLBACK TRANSACTION <savepoint>` has no effect at all — `SAVE TRANSACTION` only records a possible point to return to; it does not change what `COMMIT` confirms.
 
 </details>
 

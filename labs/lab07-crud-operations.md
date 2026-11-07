@@ -15,6 +15,15 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 >
 > Try to solve the exercises independently before looking at the solutions. This will help you identify which topics you may need to review before the midterm exam.
 
+> [!WARNING]
+> **This lab works on the real `AdventureWorksENG` data.**
+>
+> Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects are equally real, and safe: nothing is modified when an operation is refused.
+>
+> Two deletions in Section 8 **succeed and are permanent**: customer `16` (Lili Alameda, who has no invoices) and product `680` (HL Road Frame - Black, 58, which was never sold). After you run the lab, those rows are gone.
+>
+> This means the lab is not repeatable on the same database copy — a second run reports "does not exist" instead of "deleted". Restore `AdventureWorksENG` from a backup before another group runs the lab.
+
 ---
 
 ## Learning objectives
@@ -215,7 +224,14 @@ END;
 GO
 ```
 
-Test the procedure:
+Test the procedure against the real catalog. `AdventureWorksENG` contains four categories:
+
+| IDCategory | Name |
+|---:|---|
+| 1 | Bicycles |
+| 2 | Parts |
+| 3 | Clothes |
+| 4 | Accessories |
 
 ```sql
 EXEC dbo.usp_GetCategory @IDCategory = 1;
@@ -223,9 +239,9 @@ EXEC dbo.usp_GetCategory @IDCategory = 1;
 EXEC dbo.usp_GetCategory @IDCategory = 999999;
 ```
 
-The first call retrieves the category with `IDCategory = 1`, if it exists.
+The first call retrieves the real category `Bicycles`.
 
-The second call returns an empty result set if the specified ID does not exist.
+The second call returns an empty result set, because no category has that ID.
 
 > [!IMPORTANT]
 > A `SELECT` statement that finds no matching records does not raise an error.
@@ -255,14 +271,28 @@ END;
 GO
 ```
 
-Execute the procedure:
+Execute the procedure against the real catalog:
 
 ```sql
+-- Categories starting with 'B'
 EXEC dbo.usp_FindCategoriesByName
-    @NamePattern = N'ZZ%';
+    @NamePattern = N'B%';
+
+-- Every category
+EXEC dbo.usp_FindCategoriesByName
+    @NamePattern = N'%';
 ```
 
-The procedure returns all categories whose names start with `ZZ`.
+The first call returns one row, `Bicycles`. The second returns all four categories, sorted by name:
+
+| IDCategory | Name |
+|---:|---|
+| 4 | Accessories |
+| 1 | Bicycles |
+| 3 | Clothes |
+| 2 | Parts |
+
+Searching for a pattern that matches nothing, such as `N'Q%'`, returns zero rows rather than an error.
 
 Compare the two Read procedures:
 
@@ -401,9 +431,9 @@ The second call affects zero rows because the category has already been deleted.
 > [!WARNING]
 > Not every category can be deleted successfully.
 >
-> If a category has related subcategories, the database's foreign key constraint may prevent its deletion.
+> The test category deleted cleanly because nothing referenced it. Every **real** category in `AdventureWorksENG` has subcategories — `Bicycles` has 3, `Parts` has 14, `Clothes` has 8, `Accessories` has 12 — so the foreign key constraint prevents deleting any of them.
 >
-> We will examine this situation later in the lab.
+> Section 6 runs exactly that deletion against the real `Bicycles` category and examines the error.
 
 ## 2.6 Summary – Complete CRUD interface
 
@@ -626,9 +656,11 @@ Create a stored procedure named `dbo.usp_GetCitiesByState`.
 - Return `IDCity` and `Name` for all cities belonging to the specified state.
 - Sort the results alphabetically by city name.
 
-Test the procedure using the state created in Exercise 1.
+Test the procedure twice: once against the real state `Croatia` (`IDState = 1`), and once against the state you created in Exercise 1.
 
-**Expected result:** Two rows containing `ZZ_LabTestCity1` and `ZZ_LabTestCity2`, assuming the test data was inserted once.
+**Expected result for Croatia:** five real cities — `Osijek`, `Pula`, `Rijeka`, `Split`, `Zagreb`.
+
+**Expected result for the test state:** two rows containing `ZZ_LabTestCity1` and `ZZ_LabTestCity2`, assuming the test data was inserted once.
 
 <details>
 <summary>Hint</summary>
@@ -659,7 +691,24 @@ END;
 GO
 ```
 
-Test the procedure:
+Test the procedure against the real state `Croatia`:
+
+```sql
+EXEC dbo.usp_GetCitiesByState
+    @IDState = 1;
+```
+
+Expected result:
+
+| IDCity | Name |
+|---:|---|
+| 2 | Osijek |
+| 3 | Pula |
+| 4 | Rijeka |
+| 5 | Split |
+| 1 | Zagreb |
+
+Then test it against the state created in Exercise 1:
 
 ```sql
 DECLARE @StateID int;
@@ -725,28 +774,13 @@ Expected return code: `1`.
 
 **Test 3 – Attempt to delete a city with customers**
 
-Insert a test customer associated with `ZZ_LabTestCity2`:
+No test data is needed here: every real city in `AdventureWorksENG` already has customers. `Zagreb` (`IDCity = 1`) has 1492 of them.
 
-```sql
-DECLARE @CityID int;
-
-SELECT @CityID = IDCity
-FROM City
-WHERE Name = N'ZZ_LabTestCity2';
-
-INSERT INTO Customer (FirstName, LastName, CityID)
-VALUES (
-    N'ZZ',
-    N'ZZ_LabTestCustomer_ForDeleteTest',
-    @CityID
-);
-```
-
-Now try deleting `ZZ_LabTestCity2`.
+Try deleting `Zagreb`.
 
 Expected return code: `2`.
 
-Verify that the city still exists.
+Verify that `Zagreb` and its customers still exist — a rejected deletion changes nothing.
 
 <details>
 <summary>Hint</summary>
@@ -803,41 +837,43 @@ GO
 Test the procedure:
 
 ```sql
-DECLARE @City1 int, @City2 int, @Result int;
+DECLARE @City1 int, @Result int;
 
 SELECT @City1 = IDCity
 FROM City
 WHERE Name = N'ZZ_LabTestCity1';
 
-SELECT @City2 = IDCity
-FROM City
-WHERE Name = N'ZZ_LabTestCity2';
-
--- Test 1: Existing city without customers
+-- Test 1: Existing test city without customers
 EXEC @Result = dbo.usp_DeleteCity @IDCity = @City1;
-SELECT @Result AS DeleteCity1_FirstTry;
+SELECT @Result AS DeleteTestCity_FirstTry;
 
 -- Test 2: Same city again
 EXEC @Result = dbo.usp_DeleteCity @IDCity = @City1;
-SELECT @Result AS DeleteCity1_SecondTry;
+SELECT @Result AS DeleteTestCity_SecondTry;
 
--- Test 3: City with customers
-EXEC @Result = dbo.usp_DeleteCity @IDCity = @City2;
-SELECT @Result AS DeleteCity2_WithCustomer;
+-- Test 3: Real city that has customers (Zagreb)
+EXEC @Result = dbo.usp_DeleteCity @IDCity = 1;
+SELECT @Result AS DeleteZagreb;
 
--- Verify that City2 still exists
-SELECT *
+-- Verify that Zagreb is untouched
+SELECT IDCity, Name, StateID
 FROM City
-WHERE IDCity = @City2;
+WHERE IDCity = 1;
+
+SELECT COUNT(*) AS ZagrebCustomers
+FROM Customer
+WHERE CityID = 1;
 ```
 
 Expected results:
 
 | Test | Return code |
 |---|---:|
-| Delete City1 | 0 |
-| Delete City1 again | 1 |
-| Delete City2 with customers | 2 |
+| Delete test city | 0 |
+| Delete test city again | 1 |
+| Delete Zagreb (1492 customers) | 2 |
+
+`Zagreb` still exists and still has 1492 customers. The business rule stopped the operation before any `DELETE` ran.
 
 > [!NOTE]
 > The procedure checks the business rule before executing `DELETE`.
@@ -879,25 +915,17 @@ In Lab 4, you learned how inline table-valued functions (TVFs) return tables tha
 
 In this section, we will implement the same Read operation using both a stored procedure and an inline TVF, then compare how they can be used.
 
-## 4.1 Prepare test data
+## 4.1 The data we will read
 
-First, create a test city and two customers.
+No test data is needed for this section. `AdventureWorksENG` already contains 13 cities with customers in each one, so we can read real records:
 
-```sql
-INSERT INTO City (Name, StateID)
-VALUES (N'ZZ_LabTestCity3', NULL);
+| City | Customers |
+|---|---:|
+| Zagreb | 1492 |
+| Osijek | 1552 |
+| Rijeka | 1601 |
 
-DECLARE @CityID int = SCOPE_IDENTITY();
-
-INSERT INTO Customer (FirstName, LastName, CityID)
-VALUES
-    (N'Ada',   N'ZZ_LabTestCustomer', @CityID),
-    (N'Grace', N'ZZ_LabTestCustomer', @CityID);
-```
-
-Both customers belong to the same city.
-
-The `StateID` column is nullable, so the test city does not need to be associated with a state.
+We will use `Zagreb` throughout this section.
 
 ## 4.2 Read using a stored procedure
 
@@ -928,10 +956,10 @@ Execute the procedure:
 
 ```sql
 EXEC dbo.usp_GetCustomersByCity
-    @CityName = N'ZZ_LabTestCity3';
+    @CityName = N'Zagreb';
 ```
 
-The procedure returns the customers belonging to the specified city.
+The procedure returns all 1492 customers who live in `Zagreb`, sorted by last name.
 
 ## 4.3 Read using an inline table-valued function
 
@@ -963,7 +991,7 @@ Execute the function:
 
 ```sql
 SELECT *
-FROM dbo.fn_CustomersByCity(N'ZZ_LabTestCity3');
+FROM dbo.fn_CustomersByCity(N'Zagreb');
 ```
 
 Both implementations return the same customer information.
@@ -976,27 +1004,33 @@ Suppose we want to retrieve customers from a particular city together with their
 
 Because an inline TVF can be used as a table source, we can join its result directly with the `Invoice` table.
 
+To keep the output readable, we also filter by last name — something the function's own parameter does not support, but the surrounding query can add freely:
+
 ```sql
 SELECT
     f.FirstName,
     f.LastName,
     i.IDInvoice,
-    i.InvoiceDate
-FROM dbo.fn_CustomersByCity(N'ZZ_LabTestCity3') AS f
+    CONVERT(date, i.InvoiceDate) AS InvoiceDate
+FROM dbo.fn_CustomersByCity(N'Zagreb') AS f
 LEFT JOIN Invoice AS i
-    ON i.CustomerID = f.IDCustomer;
+    ON i.CustomerID = f.IDCustomer
+WHERE f.LastName = N'Beck'
+ORDER BY f.FirstName, i.InvoiceDate;
 ```
 
-Expected result for our newly created customers:
+Expected result:
 
 | FirstName | LastName | IDInvoice | InvoiceDate |
-|---|---|---|---|
-| Ada | ZZ_LabTestCustomer | NULL | NULL |
-| Grace | ZZ_LabTestCustomer | NULL | NULL |
+|---|---|---:|---|
+| Bradley | Beck | NULL | NULL |
+| Calvin | Beck | 45004 | 2001-12-27 |
+| Christy | Beck | 49558 | 2003-03-02 |
+| Christy | Beck | 66272 | 2004-03-16 |
 
-The `LEFT JOIN` returns both customers even though they have no invoices.
+Three real customers from Zagreb share the last name `Beck`. Christy appears twice because she has two invoices.
 
-The invoice columns contain `NULL` because no matching invoice records exist.
+Bradley appears with `NULL` invoice columns: the `LEFT JOIN` keeps him in the result even though he has no invoices at all.
 
 We cannot use a stored procedure in the same way:
 
@@ -1004,7 +1038,7 @@ We cannot use a stored procedure in the same way:
 -- Invalid SQL: a stored procedure cannot be used in FROM
 
 SELECT *
-FROM dbo.usp_GetCustomersByCity(N'ZZ_LabTestCity3');
+FROM dbo.usp_GetCustomersByCity(N'Zagreb');
 ```
 
 A stored procedure is executed using `EXEC`, while an inline TVF can participate directly in a `SELECT`, `JOIN`, or subquery.
@@ -1200,46 +1234,17 @@ The `@Action` parameter determines which branch of the procedure runs.
 
 ### Prepare test data
 
-Create a category with two subcategories. One subcategory will have a product, while the other will remain empty.
+To test the `DELETE` action we need two subcategories: one that has products and one that is empty.
+
+A subcategory **with** products already exists in the real catalog — `Chains` (`IDSubcategory = 7`), which contains the product `Chain`. We will use it directly.
+
+An **empty** subcategory does not exist: all 37 real subcategories contain at least one product. So we create one, attached to the real `Parts` category (`IDCategory = 2`):
 
 ```sql
-DECLARE @CategoryID int;
-
-INSERT INTO Category (Name)
-VALUES (N'ZZ_LabTestCategory_ForSub');
-
-SET @CategoryID = SCOPE_IDENTITY();
-
-DECLARE @SubWithProduct int, @SubWithoutProduct int;
-
 INSERT INTO Subcategory (CategoryID, Name)
-VALUES (@CategoryID, N'ZZ_LabTestSubcategory_Used');
+VALUES (2, N'ZZ_LabTestSubcategory_Unused');
 
-SET @SubWithProduct = SCOPE_IDENTITY();
-
-INSERT INTO Subcategory (CategoryID, Name)
-VALUES (@CategoryID, N'ZZ_LabTestSubcategory_Unused');
-
-SET @SubWithoutProduct = SCOPE_IDENTITY();
-
-INSERT INTO Product (
-    Name,
-    ProductNumber,
-    MinimumQuantityInStock,
-    PriceWithoutVAT,
-    SubcategoryID
-)
-VALUES (
-    N'ZZ_LabTestProduct',
-    N'ZZ-LAB-0001',
-    0,
-    1.00,
-    @SubWithProduct
-);
-
-SELECT
-    @SubWithProduct AS SubWithProduct,
-    @SubWithoutProduct AS SubWithoutProduct;
+SELECT SCOPE_IDENTITY() AS SubWithoutProduct;
 ```
 
 ### Example – `usp_ManageSubcategory`
@@ -1310,20 +1315,16 @@ For `GET`, return code `0` indicates that the query executed, even if it returne
 ### Test the procedure
 
 ```sql
-DECLARE @SubWithProduct int, @SubWithoutProduct int, @Result int;
-
-SELECT @SubWithProduct = IDSubcategory
-FROM Subcategory
-WHERE Name = N'ZZ_LabTestSubcategory_Used';
+DECLARE @SubWithoutProduct int, @Result int;
 
 SELECT @SubWithoutProduct = IDSubcategory
 FROM Subcategory
 WHERE Name = N'ZZ_LabTestSubcategory_Unused';
 
--- Read an existing subcategory
+-- Read the real subcategory 'Chains'
 EXEC @Result = dbo.usp_ManageSubcategory
     @Action = N'GET',
-    @IDSubcategory = @SubWithProduct;
+    @IDSubcategory = 7;
 
 -- Delete a nonexistent subcategory
 EXEC @Result = dbo.usp_ManageSubcategory
@@ -1332,20 +1333,30 @@ EXEC @Result = dbo.usp_ManageSubcategory
 
 SELECT @Result AS DeleteMissing; -- 1
 
--- Try deleting a subcategory that has products
+-- Try deleting 'Chains', which contains the product 'Chain'
 EXEC @Result = dbo.usp_ManageSubcategory
     @Action = N'DELETE',
-    @IDSubcategory = @SubWithProduct;
+    @IDSubcategory = 7;
 
-SELECT @Result AS DeleteUsed; -- 2
+SELECT @Result AS DeleteChains; -- 2
 
--- Delete an unused subcategory
+-- Delete the empty subcategory
 EXEC @Result = dbo.usp_ManageSubcategory
     @Action = N'DELETE',
     @IDSubcategory = @SubWithoutProduct;
 
 SELECT @Result AS DeleteUnused; -- 0
+
+-- 'Chains' and its product are untouched
+SELECT IDSubcategory, CategoryID, Name FROM Subcategory WHERE IDSubcategory = 7;
+SELECT IDProduct, Name FROM Product WHERE SubcategoryID = 7;
 ```
+
+The `GET` action returns the real subcategory:
+
+| IDSubcategory | CategoryID | Name |
+|---:|---:|---|
+| 7 | 2 | Chains |
 
 The same procedure supports different operations, but the caller must supply the correct `@Action`.
 
@@ -1556,34 +1567,16 @@ Consider the relationship between `Category` and `Subcategory`.
 
 Each subcategory belongs to a category through the foreign key `Subcategory.CategoryID`.
 
-Let's create a category with one subcategory.
+No setup is required: the real category `Bicycles` (`IDCategory = 1`) already has three subcategories — `Mountain Bikes`, `Road Bikes`, and `Touring Bikes`.
+
+Try deleting it using `usp_DeleteCategory` from Section 2.
 
 ```sql
-DECLARE @CategoryID int;
-
-INSERT INTO Category (Name)
-VALUES (N'ZZ_LabTestCategory_WithSub');
-
-SET @CategoryID = SCOPE_IDENTITY();
-
-INSERT INTO Subcategory (CategoryID, Name)
-VALUES (@CategoryID, N'ZZ_LabTestSubcategory_Blocking');
-```
-
-Now try deleting the category using `usp_DeleteCategory` from Section 2.
-
-```sql
-DECLARE @CategoryID int;
-
-SELECT @CategoryID = IDCategory
-FROM Category
-WHERE Name = N'ZZ_LabTestCategory_WithSub';
-
 EXEC dbo.usp_DeleteCategory
-    @IDCategory = @CategoryID;
+    @IDCategory = 1;
 ```
 
-SQL Server rejects the `DELETE` because the category is still referenced by a subcategory.
+SQL Server rejects the `DELETE` because the category is still referenced by its subcategories.
 
 The error is:
 
@@ -1592,7 +1585,7 @@ Msg 547, Level 16
 The DELETE statement conflicted with the REFERENCE constraint.
 ```
 
-The category and its subcategory remain in the database.
+`Bicycles` and its three subcategories remain in the database.
 
 > [!IMPORTANT]
 > **A foreign key constraint protects referential integrity.**
@@ -1625,17 +1618,11 @@ END;
 GO
 ```
 
-Execute the same procedure again:
+Execute the same deletion again:
 
 ```sql
-DECLARE @CategoryID int;
-
-SELECT @CategoryID = IDCategory
-FROM Category
-WHERE Name = N'ZZ_LabTestCategory_WithSub';
-
 EXEC dbo.usp_DeleteCategory
-    @IDCategory = @CategoryID;
+    @IDCategory = 1;
 ```
 
 Instead of propagating the original SQL Server error to the caller, the procedure catches it and returns information about the failure.
@@ -1646,7 +1633,7 @@ Expected result:
 |---:|---|
 | 547 | The DELETE statement conflicted with the REFERENCE constraint... |
 
-Notice that the category is **still not deleted**.
+Notice that `Bicycles` is **still not deleted**.
 
 `TRY/CATCH` changes how the error is handled, not whether the database constraint is enforced.
 
@@ -1676,15 +1663,9 @@ GO
 Now the caller can handle the error:
 
 ```sql
-DECLARE @CategoryID int;
-
-SELECT @CategoryID = IDCategory
-FROM Category
-WHERE Name = N'ZZ_LabTestCategory_WithSub';
-
 BEGIN TRY
     EXEC dbo.usp_DeleteCategory
-        @IDCategory = @CategoryID;
+        @IDCategory = 1;
 END TRY
 BEGIN CATCH
     SELECT
@@ -1756,20 +1737,6 @@ By contrast, attempting to delete a referenced category raises a constraint viol
 >
 > These mechanisms serve different purposes and can be combined when necessary.
 
-## 6.5 Clean up test data
-
-Remove the test subcategory before deleting its parent category.
-
-```sql
-DELETE FROM Subcategory
-WHERE Name = N'ZZ_LabTestSubcategory_Blocking';
-
-DELETE FROM Category
-WHERE Name = N'ZZ_LabTestCategory_WithSub';
-```
-
-The order matters because the subcategory references the category through a foreign key.
-
 ## Check your understanding
 
 1. Why does SQL Server reject the deletion of a category that has subcategories?
@@ -1833,22 +1800,22 @@ This column is nullable, so a product can exist without belonging to a subcatego
 
 However, if a product currently references a subcategory, SQL Server normally prevents that subcategory from being deleted.
 
-For example:
+A real example from `AdventureWorksENG`:
 
 ```text
 Subcategory
 ------------
-IDSubcategory = 10
-Name = 'Laptops'
+IDSubcategory = 7
+Name = 'Chains'
 
 Product
 ------------
-IDProduct = 100
-Name = 'Laptop A'
-SubcategoryID = 10
+IDProduct = 952
+Name = 'Chain'
+SubcategoryID = 7
 ```
 
-Even though `Product.SubcategoryID` is nullable, deleting subcategory `10` would leave an invalid reference.
+Even though `Product.SubcategoryID` is nullable — and 209 real products do leave it `NULL` — deleting subcategory `7` would leave the product `Chain` pointing at a row that no longer exists.
 
 With the default `NO ACTION` foreign key behavior, SQL Server rejects the deletion.
 
@@ -2046,28 +2013,17 @@ Use the following return codes:
 | `2` | Customer has invoices; deletion rejected |
 | `3` | SQL Server error occurred |
 
-### Prepare test data
+### The customers we will use
 
-Create two test customers. One will have no invoices, while the other will have an invoice.
+No test data is needed. `AdventureWorksENG` already contains both cases — 19119 customers have invoices and 853 do not:
 
-```sql
-INSERT INTO Customer (FirstName, LastName)
-VALUES (N'ZZ', N'ZZ_LabTestCustomer_NoInvoices');
+| IDCustomer | Name | Invoices | Role in this exercise |
+|---:|---|---:|---|
+| 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
+| 16 | Lili Alameda | 0 | Deletion must **succeed** |
 
-DECLARE @CustomerNoInvoices int = SCOPE_IDENTITY();
-
-INSERT INTO Customer (FirstName, LastName)
-VALUES (N'ZZ', N'ZZ_LabTestCustomer_WithInvoice');
-
-DECLARE @CustomerWithInvoice int = SCOPE_IDENTITY();
-
-INSERT INTO Invoice (InvoiceDate, InvoiceNumber, CustomerID)
-VALUES (GETDATE(), N'ZZ-LAB-INV-0001', @CustomerWithInvoice);
-
-SELECT
-    @CustomerNoInvoices AS CustomerNoInvoices,
-    @CustomerWithInvoice AS CustomerWithInvoice;
-```
+> [!WARNING]
+> Deleting customer `16` is permanent. After this exercise, Lili Alameda no longer exists in the database.
 
 ### Test your implementation
 
@@ -2075,13 +2031,13 @@ Your implementation should produce the following results:
 
 | Test | Expected result |
 |---|---|
-| Get an existing customer | One row |
-| Get a nonexistent customer | Zero rows |
-| Delete customer without invoices | Return `0` |
-| Delete customer with invoices | Return `2` |
-| Delete nonexistent customer | Return `1` |
+| Get customer `1` (Gustavo Achong) | One row |
+| Get customer `999999` | Zero rows |
+| Delete customer `16` (no invoices) | Return `0` |
+| Delete customer `1` (7 invoices) | Return `2` |
+| Delete customer `16` again | Return `1` |
 
-Also verify that the customer with an invoice still exists after the rejected deletion.
+Also verify that Gustavo Achong and his seven invoices still exist after the rejected deletion.
 
 <details>
 <summary>Hints</summary>
@@ -2171,44 +2127,44 @@ GO
 Test the implementation:
 
 ```sql
-DECLARE @CustomerNoInvoices int;
-DECLARE @CustomerWithInvoice int;
 DECLARE @Result int;
 
-SELECT @CustomerNoInvoices = IDCustomer
-FROM Customer
-WHERE LastName = N'ZZ_LabTestCustomer_NoInvoices';
-
-SELECT @CustomerWithInvoice = IDCustomer
-FROM Customer
-WHERE LastName = N'ZZ_LabTestCustomer_WithInvoice';
-
--- Read existing customer
+-- Read a real customer: Gustavo Achong
 SELECT *
-FROM dbo.fn_GetCustomer(@CustomerNoInvoices);
+FROM dbo.fn_GetCustomer(1);
 
--- Read nonexistent customer
+-- Read a nonexistent customer
 SELECT *
 FROM dbo.fn_GetCustomer(999999);
 
--- Delete customer without invoices
+-- Delete Lili Alameda, who has no invoices
 EXEC @Result = dbo.usp_DeleteCustomer
-    @IDCustomer = @CustomerNoInvoices;
+    @IDCustomer = 16;
 
 SELECT @Result AS DeleteNoInvoices; -- 0
 
--- Attempt to delete customer with invoices
+-- Attempt to delete Gustavo Achong, who has 7 invoices
 EXEC @Result = dbo.usp_DeleteCustomer
-    @IDCustomer = @CustomerWithInvoice;
+    @IDCustomer = 1;
 
 SELECT @Result AS DeleteWithInvoice; -- 2
 
--- Delete already deleted customer
+-- Delete Lili Alameda again
 EXEC @Result = dbo.usp_DeleteCustomer
-    @IDCustomer = @CustomerNoInvoices;
+    @IDCustomer = 16;
 
 SELECT @Result AS DeleteAgain; -- 1
+
+-- Gustavo Achong and his invoices are untouched
+SELECT IDCustomer, FirstName, LastName FROM Customer WHERE IDCustomer = 1;
+SELECT COUNT(*) AS AchongInvoices FROM Invoice WHERE CustomerID = 1;
 ```
+
+Reading customer `1` returns the real record:
+
+| IDCustomer | FirstName | LastName | Email | PhoneNumber | CityID |
+|---:|---|---|---|---|---:|
+| 1 | Gustavo | Achong | gustavo0@adventure-works.com | 398-555-0132 | 9 |
 
 </details>
 
@@ -2255,81 +2211,27 @@ When `@Action = N'DELETE'`:
 
 For `GET`, return code `0` indicates successful execution, even when no product is found.
 
-### Prepare test data
+### The products we will use
 
-Create two products. One will remain unsold, while the other will appear on an invoice.
+Again, no test data is needed. Of the 504 real products, 266 have been sold at least once and 238 never have:
 
-```sql
-INSERT INTO Product (
-    Name,
-    ProductNumber,
-    MinimumQuantityInStock,
-    PriceWithoutVAT
-)
-VALUES (
-    N'ZZ_LabTestProduct_NeverSold',
-    N'ZZ-LAB-0002',
-    0,
-    9.99
-);
+| IDProduct | Name | Times sold | Role in this exercise |
+|---:|---|---:|---|
+| 707 | Sport-100 Helmet, Red | 3083 | Deletion must be **rejected** |
+| 680 | HL Road Frame - Black, 58 | 0 | Deletion must **succeed** |
 
-DECLARE @ProductNeverSold int = SCOPE_IDENTITY();
-
-INSERT INTO Product (
-    Name,
-    ProductNumber,
-    MinimumQuantityInStock,
-    PriceWithoutVAT
-)
-VALUES (
-    N'ZZ_LabTestProduct_Sold',
-    N'ZZ-LAB-0003',
-    0,
-    9.99
-);
-
-DECLARE @ProductSold int = SCOPE_IDENTITY();
-
-INSERT INTO Invoice (InvoiceDate, InvoiceNumber, CustomerID)
-VALUES (
-    GETDATE(),
-    N'ZZ-LAB-INV-0002',
-    (SELECT TOP (1) IDCustomer FROM Customer ORDER BY IDCustomer)
-);
-
-DECLARE @InvoiceID int = SCOPE_IDENTITY();
-
-INSERT INTO InvoiceItem (
-    InvoiceID,
-    ProductID,
-    Quantity,
-    InitialPrice,
-    Discount,
-    TotalPrice
-)
-VALUES (
-    @InvoiceID,
-    @ProductSold,
-    1,
-    9.99,
-    0,
-    9.99
-);
-
-SELECT
-    @ProductNeverSold AS ProductNeverSold,
-    @ProductSold AS ProductSold;
-```
+> [!WARNING]
+> Deleting product `680` is permanent. After this exercise, `HL Road Frame - Black, 58` no longer exists in the catalog.
 
 ### Test your implementation
 
 | Test | Expected result |
 |---|---|
-| GET existing product | One row |
-| GET nonexistent product | Zero rows |
-| DELETE product never sold | Return `0` |
-| DELETE product already sold | Return `2` |
-| DELETE nonexistent product | Return `1` |
+| GET product `707` | One row |
+| GET product `999999` | Zero rows |
+| DELETE product `680` (never sold) | Return `0` |
+| DELETE product `707` (sold 3083 times) | Return `2` |
+| DELETE product `680` again | Return `1` |
 | Unknown action | Return `99` |
 
 <details>
@@ -2416,56 +2318,56 @@ GO
 Test the procedure:
 
 ```sql
-DECLARE @ProductNeverSold int;
-DECLARE @ProductSold int;
 DECLARE @Result int;
 
-SELECT @ProductNeverSold = IDProduct
-FROM Product
-WHERE ProductNumber = N'ZZ-LAB-0002';
-
-SELECT @ProductSold = IDProduct
-FROM Product
-WHERE ProductNumber = N'ZZ-LAB-0003';
-
--- GET existing product
+-- GET a real product: Sport-100 Helmet, Red
 EXEC dbo.usp_ManageProduct
     @Action = N'GET',
-    @IDProduct = @ProductNeverSold;
+    @IDProduct = 707;
 
 -- GET nonexistent product
 EXEC dbo.usp_ManageProduct
     @Action = N'GET',
     @IDProduct = 999999;
 
--- DELETE product never sold
+-- DELETE HL Road Frame - Black, 58, which was never sold
 EXEC @Result = dbo.usp_ManageProduct
     @Action = N'DELETE',
-    @IDProduct = @ProductNeverSold;
+    @IDProduct = 680;
 
 SELECT @Result AS DeleteNeverSold; -- 0
 
--- DELETE product already sold
+-- DELETE Sport-100 Helmet, Red, which was sold 3083 times
 EXEC @Result = dbo.usp_ManageProduct
     @Action = N'DELETE',
-    @IDProduct = @ProductSold;
+    @IDProduct = 707;
 
 SELECT @Result AS DeleteSold; -- 2
 
--- DELETE nonexistent product
+-- DELETE the already deleted product
 EXEC @Result = dbo.usp_ManageProduct
     @Action = N'DELETE',
-    @IDProduct = 999999;
+    @IDProduct = 680;
 
 SELECT @Result AS DeleteMissing; -- 1
 
 -- Unknown action
 EXEC @Result = dbo.usp_ManageProduct
     @Action = N'UNKNOWN',
-    @IDProduct = @ProductSold;
+    @IDProduct = 707;
 
 SELECT @Result AS UnknownAction; -- 99
+
+-- Sport-100 Helmet, Red and its invoice items are untouched
+SELECT IDProduct, Name FROM Product WHERE IDProduct = 707;
+SELECT COUNT(*) AS HelmetInvoiceItems FROM InvoiceItem WHERE ProductID = 707;
 ```
+
+The `GET` action returns the real product:
+
+| IDProduct | Name | ProductNumber | Color | PriceWithoutVAT | SubcategoryID |
+|---:|---|---|---|---:|---:|
+| 707 | Sport-100 Helmet, Red | HL-U509-R | Crvena | 34.9900 | 31 |
 
 </details>
 
@@ -2530,55 +2432,27 @@ DROP PROCEDURE IF EXISTS dbo.usp_ManageProduct;
 GO
 ```
 
-Remove the test rows, **children before parents**. Review the matching rows before executing these statements, especially if the training database is shared or you have used the same test names in other exercises.
+Most of this lab reads and deletes **real** `AdventureWorksENG` records, so there is little to clean up. Only the rows created to demonstrate `INSERT` remain, and several of them were already deleted by the exercises themselves.
+
+Remove whatever is left, **children before parents**:
 
 ```sql
--- Invoice items and invoices created in this lab
-DELETE FROM InvoiceItem
-WHERE InvoiceID IN (
-    SELECT IDInvoice
-    FROM Invoice
-    WHERE InvoiceNumber IN (N'ZZ-LAB-INV-0001', N'ZZ-LAB-INV-0002')
-);
-
-DELETE FROM Invoice
-WHERE InvoiceNumber IN (N'ZZ-LAB-INV-0001', N'ZZ-LAB-INV-0002');
-
--- Products created in Sections 5 and 8
-DELETE FROM Product
-WHERE ProductNumber IN (N'ZZ-LAB-0001', N'ZZ-LAB-0002', N'ZZ-LAB-0003');
-
--- Customers created in Sections 3, 4, and 8
-DELETE FROM Customer
-WHERE (FirstName = N'ZZ' AND LastName IN (
-    N'ZZ_LabTestCustomer_ForDeleteTest',
-    N'ZZ_LabTestCustomer_NoInvoices',
-    N'ZZ_LabTestCustomer_WithInvoice'
-))
-OR (FirstName IN (N'Ada', N'Grace') AND LastName = N'ZZ_LabTestCustomer'
-    AND CityID IN (SELECT IDCity FROM City WHERE Name = N'ZZ_LabTestCity3'));
-
--- Subcategories and categories
+-- Subcategory created in Section 5 (deleted by the exercise if it ran to the end)
 DELETE FROM Subcategory
-WHERE Name IN (
-    N'ZZ_LabTestSubcategory_Used',
-    N'ZZ_LabTestSubcategory_Unused',
-    N'ZZ_LabTestSubcategory_Blocking'
-);
+WHERE Name = N'ZZ_LabTestSubcategory_Unused';
 
+-- Categories created in Sections 2 and 5
 DELETE FROM Category
 WHERE Name IN (
     N'ZZ_LabTestCategory',
     N'ZZ_LabTestCategory_Renamed',
-    N'ZZ_LabTestCategory_ForSub',
-    N'ZZ_LabTestCategory_WithSub',
     N'ZZ_LabTestCategory_Combined',
     N'ZZ_LabTestCategory_CombinedRenamed'
 );
 
--- Cities and states
+-- Cities and states created in Section 3 and 5.2
 DELETE FROM City
-WHERE Name IN (N'ZZ_LabTestCity1', N'ZZ_LabTestCity2', N'ZZ_LabTestCity3');
+WHERE Name IN (N'ZZ_LabTestCity1', N'ZZ_LabTestCity2');
 
 DELETE FROM State
 WHERE Name IN (
@@ -2589,8 +2463,23 @@ WHERE Name IN (
 GO
 ```
 
+Confirm nothing is left behind:
+
+```sql
+SELECT 'Category' AS TableName, Name FROM Category WHERE Name LIKE N'ZZ[_]%'
+UNION ALL SELECT 'Subcategory', Name FROM Subcategory WHERE Name LIKE N'ZZ[_]%'
+UNION ALL SELECT 'City', Name FROM City WHERE Name LIKE N'ZZ[_]%'
+UNION ALL SELECT 'State', Name FROM State WHERE Name LIKE N'ZZ[_]%';
+```
+
+The query should return zero rows.
+
 > [!WARNING]
-> These statements are intended for the lab's isolated training data. Check the target rows before running them; names alone do not prove ownership. The cleanup also assumes that no additional dependent records were created outside the lab.
+> **The deletions in Section 8 cannot be undone by this cleanup.**
+>
+> Customer `16` (Lili Alameda) and product `680` (HL Road Frame - Black, 58) were permanently removed from the real data. Re-running the lab on the same database will report return code `1` instead of `0` for those two deletions.
+>
+> Restore `AdventureWorksENG` from a backup before the next group runs this lab.
 
 ---
 

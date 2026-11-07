@@ -2119,6 +2119,12 @@ Back to the opening question: a transfer that subtracts from one account and add
 
 ---
 
+## Additional practice
+
+Everything above uses the fictional `TransactionsLab` database. To practice the same ideas — explicit transactions, savepoints, caller-vs-procedure ownership — against real `AdventureWorksENG` tables, work through [Transaction Exercises](../exercises/transactions.md).
+
+---
+
 # Additional Reading
 
 The following topics extend the lab. They are not required for the main exercises.

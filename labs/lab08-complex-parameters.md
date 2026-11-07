@@ -1615,7 +1615,7 @@ It returns the generated invoice ID. **Record this ID for the next step.**
 
 ### Step 4 – Verify the result
 
-Replace `12345` below with the ID returned by the procedure:
+Find the invoice and its items using the invoice number supplied in the procedure call:
 
 ```sql
 SELECT
@@ -1628,10 +1628,13 @@ SELECT
     ii.TotalPrice
 FROM Invoice i
 JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.IDInvoice = 12345;
+WHERE i.InvoiceNumber = N'SO-TEST-001';
 ```
 
 The result should contain three items linked to the same invoice.
+
+> [!NOTE]
+> Use an invoice number that does not already exist in the training database.
 
 **One invoice header. Three items. One procedure call.**
 

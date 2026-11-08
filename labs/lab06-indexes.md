@@ -23,7 +23,7 @@ By the end of this lab, you should be able to:
 - interpret relevant operators in an Actual Execution Plan;
 - compare query performance using `STATISTICS IO` and `STATISTICS TIME`;
 - design useful nonclustered, composite, and covering indexes;
-- explain selectivity, index maintenance, and the cost of additional indexes;
+- explain selectivity, index maintenance, and the cost of additional indexes.
 
 > [!NOTE]
 > **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database as described in [Lab 05, Section 2](lab05-physical-storage.md#2-create-the-indexlab-database), using the [IndexLab setup script](setup/index-lab-data-setup.md), before starting the SQL exercises below. This lab assumes the reference data and table names from that script.
@@ -32,7 +32,7 @@ By the end of this lab, you should be able to:
 
 # 1. Why do we need indexes?
 
-In Lab 05, we saw that SQL Server stores data in **8 KB pages**. The database engine reads pages, not individual rows directly from storage. If a query needs only a few rows from a very large table, reading many unrelated pages is wasted work.
+In Lab 05, we saw that SQL Server stores data in **8 KB pages**. The database engine always reads whole pages; it never reads an individual row from storage on its own. If a query needs only a few rows from a very large table, reading many unrelated pages is wasted work.
 
 Imagine a library with thousands of books. If books are not arranged by author, finding a particular book could require inspecting many shelves.
 
@@ -51,6 +51,8 @@ A typical search is:
 
 **The catalog is separate from the books.** Its entries are ordered even if the books themselves are not. Another catalog could be organized by title instead of author, without moving any books.
 
+If the library instead arranged the books themselves on the shelves by author, no separate catalog would be needed to search by author, but the books could be arranged in only one order at a time. This corresponds to a **clustered index**, which we will meet in Section 4.
+
 This is the central idea of a database index: an additional structure helps locate relevant data without examining the whole table.
 
 | Library | Database analogy |
@@ -62,6 +64,7 @@ This is the central idea of a database index: an additional structure helps loca
 | Reference to a shelf | Row locator |
 | Search every shelf | Table/clustered index scan, depending on table structure |
 | Search catalog then find book | Index seek, optionally followed by a lookup |
+| Books arranged on shelves by author | Clustered index (rows ordered by the key) |
 
 > [!NOTE]
 > **Is using an index always faster?**
@@ -87,13 +90,13 @@ Similarly, a database can have **multiple indexes on the same table**, each supp
 
 </details>
 
-### From library catalogs to database indexes
+## From library catalogs to database indexes
 
 The library catalog helps us understand **why an index is useful**. However, there is another important question:
 
 **How can a database efficiently search an index containing millions of entries?**
 
-A simple alphabetical list would still require searching through many entries. We need a structure that allows the database engine to quickly narrow down the search to a small part of the index.
+A sorted list can be searched with binary search, but when the list is stored across thousands of pages, each step of the search may jump to a different page. Inserting a new entry into a sorted list would also require shifting all the entries that follow it. We need a structure that narrows the search to a small part of the index in very few page reads and that can absorb new entries locally.
 
 SQL Server uses a tree-based structure for this purpose.
 
@@ -2137,7 +2140,7 @@ WHERE Status = 'Review';
 GO
 ```
 
-Both queries filter on the same indexed column. Use the distribution query above to check how frequently these values actually occur. If other values are more suitable, replace the literals with the most frequent and least frequent status values in your data. If the frequencies are similar, expect little difference due to selectivity alone.
+Both queries filter on the same indexed column. In `IndexLab`, the distribution query shows four status values: `Completed` (about 80% of orders), `Processing` (about 10%), `Cancelled` (about 7%), and `Review` (about 3%). Query A therefore asks for the most frequent value and Query B for the rarest one.
 
 These queries are covered by `IX_SalesOrder_Status` because `SalesOrderId` is the clustered key and is already available in the nonclustered index. Both queries may therefore use an Index Seek, even when one returns many rows. Compare the number of rows and logical reads; do not expect different operator types.
 
@@ -2145,9 +2148,9 @@ Compare their execution plans and `STATISTICS IO` results.
 
 Pay attention to:
 
-- **Access operator:** Does SQL Server use an `Index Seek` or an `Index Scan`?
+- **Access operator:** Confirm that both queries use an `Index Seek` on `IX_SalesOrder_Status`.
 - **Actual Number of Rows:** How many rows does each query return?
-- **Logical reads:** How much page-access work does each query perform?
+- **Logical reads:** How much page-access work does each query perform? Since both queries seek, the difference in work comes from the number of matching index entries.
 
 > [!IMPORTANT]
 > **An index is often most beneficial when a query needs only a small portion of the table.**
@@ -2158,11 +2161,11 @@ Pay attention to:
 
 A column with only a few different values is sometimes described as having **low cardinality**.
 
-For example, `Status` might contain only `Completed`, `Processing`, and `Review`.
+For example, `Status` in `IndexLab` contains only four values: `Completed`, `Processing`, `Cancelled`, and `Review`.
 
 However, this does not automatically make an index on `Status` useless.
 
-If `Review` occurs in only 1% of the rows, searching for that value can still be highly selective.
+`Review` occurs in only about 3% of the rows, so searching for that value is far more selective than searching for `Completed`.
 
 The important distinction is:
 
@@ -2469,7 +2472,9 @@ INCLUDE (CustomerId, TotalAmount);
 GO
 ```
 
-`Status` is the leading key because of the equality filter. `OrderDate DESC` follows it to support the requested order. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
+`Status` is the leading key because of the equality filter. `OrderDate` follows it, so within one status the entries are already in date order and no `Sort` is needed. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
+
+Declaring `OrderDate DESC` matches the requested order, but it is not required: SQL Server can read an ascending index backward just as well (Exercise 4 relies on exactly this). The direction of a key column matters when `ORDER BY` mixes directions, for example `ORDER BY Status ASC, OrderDate DESC` without an equality filter on `Status`.
 
 </details>
 
@@ -2496,13 +2501,13 @@ WHERE CustomerId = 500
 <details>
 <summary>Show solution</summary>
 
-- **A:** no efficient seek on `OrderDate` alone using this index because the first key (`CustomerId`) is missing; the index can still be scanned.
+- **A:** no efficient seek on `OrderDate` alone using this index because the first key (`CustomerId`) is missing.
 - **B:** seek on `CustomerId`; rows for that customer are then in `OrderDate` order, potentially avoiding `Sort`.
 - **C:** seek using the equality on `CustomerId` and the range on `OrderDate`.
 
-Check the **Object** property to identify which index SQL Server actually used. Query A may use the separate `IX_SalesOrder_OrderDate` index created earlier; that does not mean the composite index supports an efficient seek on `OrderDate` alone.
+Check the **Object** property to identify which index SQL Server actually used. For Query A, the separate `IX_SalesOrder_OrderDate` index could locate the date range, but the condition matches roughly one fifth of the table (about 2 million rows) and `SELECT *` would require a lookup for each of them. Expect a `Clustered Index Scan` instead. Neither outcome means that the composite index supports an efficient seek on `OrderDate` alone.
 
-An actual plan may vary due to the cost of `SELECT *` and possible lookups.
+For Queries B and C, `SELECT *` requires a Key Lookup for every matching order. An actual plan may vary due to these lookup costs.
 
 </details>
 

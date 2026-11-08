@@ -451,7 +451,7 @@ A **clustered index** also has root and intermediate pages, but its **leaf level
 
 ![Clustered index search: actual table rows at the leaf level](../images/lab06/clustered-index-search.svg)
 
-### Finding `MemberID = 61`
+## 4.1 Finding `MemberID = 61` in a clustered index
 
 The search still follows the appropriate pointers from the root to a leaf page. But once the leaf entry for 61 is reached, **the full row is already there**.
 
@@ -467,16 +467,18 @@ A table cannot store its entire rowset in two different clustered-key orders at 
 > [!WARNING]
 > A clustered index defines a **logical ordering** by key. It does not guarantee adjacent physical positions on disk, and it does not guarantee output ordering without `ORDER BY`.
 
-## 4.1 Nonclustered indexes on clustered tables
+## 4.2 Nonclustered indexes on clustered tables
 
 In our practical demo, we will create clustered primary keys and then add nonclustered indexes. A nonclustered index on a clustered table generally uses the clustered key as the row locator. If more columns are required, SQL Server may use a **Key Lookup** into the clustered index.
 
 For example, a nonclustered index on `SalesOrder(OrderDate)` can already make its clustered key `SalesOrderId` available. We do not need to explicitly `INCLUDE (SalesOrderId)` when `SalesOrderId` is the clustered key.
 
+Because every nonclustered index stores the clustered key in each of its entries, the choice of clustered key affects all indexes on the table. A good clustered key is usually **narrow** (a wide key makes every nonclustered index wider), **unique** (if it is not, SQL Server adds a hidden 4-byte *uniquifier* to duplicate key values), and **rarely changed** (changing it requires updating every nonclustered index). An **ever-increasing** key, such as an identity column, also places new rows at the end of the index, which reduces page splits (Section 11.2).
+
 ### Check your understanding
 
 1. Where does a B+ tree search start?
-2. Why are leaf pages linked?
+2. Why does a query using `SELECT *` not need a RID Lookup or Key Lookup when it finds a row through the clustered index?
 3. What does a heap lack?
 4. What is the difference between RID Lookup and Key Lookup?
 5. Why can a table have only one clustered index?
@@ -485,7 +487,7 @@ For example, a nonclustered index on `SalesOrder(OrderDate)` can already make it
 <summary>Show answers</summary>
 
 1. At the root page. In a single-page index, that page is also the leaf.
-2. They allow efficient traversal through neighboring key ranges.
+2. The leaf level of the clustered index already contains the complete row.
 3. A clustered index.
 4. RID Lookup retrieves missing columns from a heap row via its RID; Key Lookup retrieves them from a clustered index using its clustering key.
 5. The table's full rows form one clustered leaf-level organization.
@@ -505,6 +507,10 @@ PRIMARY KEY CLUSTERED
 ```
 
 This makes the physical design decision visible. A primary key is excellent for finding a row by its key, but it does not automatically make all other search patterns efficient.
+
+A primary key does not have to be clustered. A table may use `PRIMARY KEY NONCLUSTERED` and place its clustered index on a different column (or columns) that better matches how the data is most often read.
+
+Unlike primary keys and unique constraints, a **`FOREIGN KEY` constraint does not create an index**. Columns used to join a child table to its parent, such as `SalesOrderItem.SalesOrderId`, often need an index created explicitly. We will see exactly this situation in Section 8.3.
 
 ---
 

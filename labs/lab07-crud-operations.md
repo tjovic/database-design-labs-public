@@ -177,13 +177,13 @@ END;
 GO
 ```
 
-Execute the procedure:
+The shop is adding a new product line, scooters. Execute the procedure:
 
 ```sql
 DECLARE @NewID int;
 
 EXEC dbo.usp_InsertCategory
-    @Name = N'ZZ_LabTestCategory',
+    @Name = N'Scooters',
     @NewCategoryID = @NewID OUTPUT;
 
 SELECT @NewID AS NewCategoryID;
@@ -196,7 +196,7 @@ Verify the result:
 ```sql
 SELECT *
 FROM Category
-WHERE Name = N'ZZ_LabTestCategory';
+WHERE Name = N'Scooters';
 ```
 
 > [!NOTE]
@@ -281,7 +281,7 @@ EXEC dbo.usp_FindCategoriesByName
     @NamePattern = N'%';
 ```
 
-The first call returns one row, `Bicycles`. The second returns every category, sorted by name — the four real ones plus `ZZ_LabTestCategory`, which you created in Section 2.1:
+The first call returns one row, `Bicycles`. The second returns every category, sorted by name — the four real ones plus `Scooters`, which you created in Section 2.1:
 
 | IDCategory | Name |
 |---:|---|
@@ -289,9 +289,9 @@ The first call returns one row, `Bicycles`. The second returns every category, s
 | 1 | Bicycles |
 | 3 | Clothes |
 | 2 | Parts |
-| 5 | ZZ_LabTestCategory |
+| 5 | Scooters |
 
-On a freshly created database the test category receives ID `5`.
+On a freshly created database `Scooters` receives ID `5`.
 
 Searching for a pattern that matches nothing, such as `N'Q%'`, returns zero rows rather than an error.
 
@@ -327,18 +327,18 @@ END;
 GO
 ```
 
-First, retrieve the ID of the test category created in Section 2.1.
+First, retrieve the ID of the `Scooters` category created in Section 2.1.
 
 ```sql
 DECLARE @CategoryID int;
 
 SELECT @CategoryID = IDCategory
 FROM Category
-WHERE Name = N'ZZ_LabTestCategory';
+WHERE Name = N'Scooters';
 
 EXEC dbo.usp_UpdateCategoryName
     @IDCategory = @CategoryID,
-    @NewName = N'ZZ_LabTestCategory_Renamed';
+    @NewName = N'Electric Scooters';
 ```
 
 Expected result:
@@ -352,7 +352,7 @@ Verify the change:
 ```sql
 SELECT *
 FROM Category
-WHERE Name = N'ZZ_LabTestCategory_Renamed';
+WHERE Name = N'Electric Scooters';
 ```
 
 Now try updating a category that does not exist:
@@ -395,14 +395,14 @@ END;
 GO
 ```
 
-Delete the test category:
+The scooter line is discontinued. Delete the category:
 
 ```sql
 DECLARE @CategoryID int;
 
 SELECT @CategoryID = IDCategory
 FROM Category
-WHERE Name = N'ZZ_LabTestCategory_Renamed';
+WHERE Name = N'Electric Scooters';
 
 -- First attempt
 EXEC dbo.usp_DeleteCategory
@@ -427,7 +427,7 @@ The second call affects zero rows because the category has already been deleted.
 > [!WARNING]
 > Not every category can be deleted successfully.
 >
-> The test category deleted cleanly because nothing referenced it. Every **real** category in `AdventureWorksENG` has subcategories — `Bicycles` has 3, `Parts` has 14, `Clothes` has 8, `Accessories` has 12 — so the foreign key constraint prevents deleting any of them.
+> `Electric Scooters` deleted cleanly because nothing referenced it. Every **real** category in `AdventureWorksENG` has subcategories — `Bicycles` has 3, `Parts` has 14, `Clothes` has 8, `Accessories` has 12 — so the foreign key constraint prevents deleting any of them.
 >
 > Section 6 runs exactly that deletion against the real `Bicycles` category and examines the error.
 
@@ -520,13 +520,13 @@ Create a stored procedure named `dbo.usp_InsertState` that inserts a new state i
 - Insert the new state.
 - Return its generated ID through `@NewStateID`.
 
-Test your procedure using:
+The shop is expanding to Slovenia. Test your procedure using:
 
 ```sql
 DECLARE @NewID int;
 
 EXEC dbo.usp_InsertState
-    @Name = N'ZZ_LabTestState',
+    @Name = N'Slovenia',
     @NewStateID = @NewID OUTPUT;
 
 SELECT @NewID AS NewStateID;
@@ -574,13 +574,13 @@ Create a stored procedure named `dbo.usp_InsertCity` that inserts a new city int
 - Insert the city and associate it with the specified state.
 - Return the generated city ID.
 
-Use your procedure to insert two cities into the state created in Exercise 1:
+Use your procedure to insert the first two Slovenian cities into the state created in Exercise 1:
 
-- `ZZ_LabTestCity1`
-- `ZZ_LabTestCity2`
+- `Ljubljana`
+- `Maribor`
 
 > [!TIP]
-> Make sure Exercise 1 actually created the state. If `@StateID` ends up `NULL`, the cities are still inserted — without a state — because `City.StateID` is nullable. No error warns you. Exercise 3 will then return no cities for your test state.
+> Make sure Exercise 1 actually created the state. If `@StateID` ends up `NULL`, the cities are still inserted — without a state — because `City.StateID` is nullable. No error warns you. Exercise 3 will then return no cities for Slovenia.
 
 <details>
 <summary>Hint</summary>
@@ -618,15 +618,15 @@ DECLARE @StateID int;
 
 SELECT @StateID = IDState
 FROM State
-WHERE Name = N'ZZ_LabTestState';
+WHERE Name = N'Slovenia';
 
 DECLARE @City1 int, @City2 int;
 
 EXEC dbo.usp_InsertCity
-    N'ZZ_LabTestCity1', @StateID, @City1 OUTPUT;
+    N'Ljubljana', @StateID, @City1 OUTPUT;
 
 EXEC dbo.usp_InsertCity
-    N'ZZ_LabTestCity2', @StateID, @City2 OUTPUT;
+    N'Maribor', @StateID, @City2 OUTPUT;
 
 SELECT
     @City1 AS City1ID,
@@ -659,7 +659,7 @@ Test the procedure twice: once against the real state `Croatia` (`IDState = 1`),
 
 **Expected result for Croatia:** five real cities — `Osijek`, `Pula`, `Rijeka`, `Split`, `Zagreb`.
 
-**Expected result for the test state:** two rows containing `ZZ_LabTestCity1` and `ZZ_LabTestCity2`, assuming the test data was inserted once.
+**Expected result for Slovenia:** two rows containing `Ljubljana` and `Maribor`, assuming the test data was inserted once.
 
 <details>
 <summary>Hint</summary>
@@ -714,7 +714,7 @@ DECLARE @StateID int;
 
 SELECT @StateID = IDState
 FROM State
-WHERE Name = N'ZZ_LabTestState';
+WHERE Name = N'Slovenia';
 
 EXEC dbo.usp_GetCitiesByState
     @IDState = @StateID;
@@ -724,8 +724,8 @@ Expected result:
 
 | IDCity | Name |
 |---|---|
-| Generated ID | ZZ_LabTestCity1 |
-| Generated ID | ZZ_LabTestCity2 |
+| Generated ID | Ljubljana |
+| Generated ID | Maribor |
 
 </details>
 
@@ -761,13 +761,13 @@ Test all three situations.
 
 **Test 1 – Delete an existing city without customers**
 
-Delete `ZZ_LabTestCity1`.
+Delete `Ljubljana`.
 
 Expected return code: `0`.
 
 **Test 2 – Delete the same city again**
 
-Try deleting `ZZ_LabTestCity1` using the same ID.
+Try deleting `Ljubljana` using the same ID.
 
 Expected return code: `1`.
 
@@ -840,9 +840,9 @@ DECLARE @City1 int, @Result int;
 
 SELECT @City1 = IDCity
 FROM City
-WHERE Name = N'ZZ_LabTestCity1';
+WHERE Name = N'Ljubljana';
 
--- Test 1: Existing test city without customers
+-- Test 1: Ljubljana exists and has no customers yet
 EXEC @Result = dbo.usp_DeleteCity @IDCity = @City1;
 SELECT @Result AS DeleteTestCity_FirstTry;
 
@@ -868,8 +868,8 @@ Expected results:
 
 | Test | Return code |
 |---|---:|
-| Delete test city | 0 |
-| Delete test city again | 1 |
+| Delete Ljubljana | 0 |
+| Delete Ljubljana again | 1 |
 | Delete Zagreb (1492 customers) | 2 |
 
 `Zagreb` still exists and still has 1492 customers. The business rule stopped the operation before any `DELETE` ran.
@@ -1180,14 +1180,14 @@ DECLARE @IDState int = NULL;
 -- Test 1: Insert a new state
 EXEC dbo.usp_SaveState
     @IDState = @IDState OUTPUT,
-    @Name = N'ZZ_LabTestState_Saved';
+    @Name = N'Austria';
 
 SELECT @IDState AS NewStateID;
 
 -- Test 2: Update the same state
 EXEC dbo.usp_SaveState
     @IDState = @IDState OUTPUT,
-    @Name = N'ZZ_LabTestState_SavedRenamed';
+    @Name = N'Republic of Austria';
 
 SELECT *
 FROM State
@@ -1239,7 +1239,7 @@ An **empty** subcategory does not exist: all 37 real subcategories contain at le
 
 ```sql
 INSERT INTO Subcategory (CategoryID, Name)
-VALUES (2, N'ZZ_LabTestSubcategory_Unused');
+VALUES (2, N'Kickstands');
 
 SELECT SCOPE_IDENTITY() AS SubWithoutProduct;
 ```
@@ -1316,7 +1316,7 @@ DECLARE @SubWithoutProduct int, @Result int;
 
 SELECT @SubWithoutProduct = IDSubcategory
 FROM Subcategory
-WHERE Name = N'ZZ_LabTestSubcategory_Unused';
+WHERE Name = N'Kickstands';
 
 -- Read the real subcategory 'Chains'
 EXEC @Result = dbo.usp_ManageSubcategory
@@ -1409,9 +1409,9 @@ Implement the following behavior:
 
 ### Test your procedure
 
-1. Insert a new category named `ZZ_LabTestCategory_Combined`.
+1. Insert a new category named `Gift Cards`.
 2. Capture its generated ID.
-3. Update its name to `ZZ_LabTestCategory_CombinedRenamed`.
+3. Update its name to `Gift Vouchers`.
 4. Delete the category.
 5. Try deleting the same category again.
 
@@ -1500,7 +1500,7 @@ DECLARE @Result int;
 EXEC @Result = dbo.usp_ManageCategory
     @Action = N'INSERT',
     @IDCategory = @IDCategory OUTPUT,
-    @Name = N'ZZ_LabTestCategory_Combined';
+    @Name = N'Gift Cards';
 
 SELECT @IDCategory AS CategoryID, @Result AS InsertResult;
 
@@ -1508,7 +1508,7 @@ SELECT @IDCategory AS CategoryID, @Result AS InsertResult;
 EXEC @Result = dbo.usp_ManageCategory
     @Action = N'UPDATE',
     @IDCategory = @IDCategory OUTPUT,
-    @Name = N'ZZ_LabTestCategory_CombinedRenamed';
+    @Name = N'Gift Vouchers';
 
 SELECT @Result AS UpdateResult;
 

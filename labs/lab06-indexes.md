@@ -115,9 +115,9 @@ A tree is a hierarchy of nodes connected by links. Database rowstore indexes use
 - **Root:** the entry point to the tree.
 - **Internal (intermediate) nodes:** contain separator keys and links to child pages.
 - **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
-- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. In database documentation, index depth may also be expressed as the number of levels, including the root and leaf levels.
+- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. SQL Server itself counts differently: `sys.dm_db_index_physical_stats` reports `index_depth` as the **number of levels** (for example, 3 for root + intermediate + leaf), and its `index_level` column numbers levels **from the leaf upward**, so the leaf level is 0 and the root has the highest number. In this lab's diagrams, we number levels from the root downward.
 
-An index may consist of a single page; it does not always need three levels. The examples below intentionally use three levels so that navigation is visible.
+An index may consist of a single page; it does not always need three levels. The search examples in Sections 3 and 4 use three levels (root, intermediate, leaf) so that navigation is visible.
 
 ## 2.2 Why balanced trees?
 
@@ -138,7 +138,7 @@ A B+ tree organizes data using **keys** and **pointers**.
 A **key** is a value used to organize and search the index.
 For example, imagine a table containing information about library members. Each member has a unique `MemberID`.
 If we create an index on `MemberID`, the index organizes its entries by these values.
-Unlike a simple list, a B+ tree does not require searching through all index entries one by one.
+The tree structure lets the engine skip whole groups of entries at each step instead of examining them.
 
 ### Pointers
 
@@ -167,6 +167,8 @@ Leaf pages are also linked to neighboring leaf pages.
 This is particularly useful for **range queries**, where the database needs multiple consecutive key values rather than just one.
 Instead of starting a completely new tree search for every matching key, SQL Server can locate the beginning of a range and continue reading the relevant leaf pages.
 
+In SQL Server, each leaf page stores links to both its previous and its next page. The engine can therefore read a range in ascending or descending key order. This will be useful when a query sorts in the opposite direction from the index.
+
 ### Free space in index pages
 
 In the following diagrams, some nodes contain empty slots.
@@ -183,7 +185,7 @@ If an index page does not have enough space for a new entry, SQL Server may need
 > - **Pointers** lead to the next page.
 > - **Leaf pages** contain the information needed to locate or retrieve the data.
 >
-> In the next section, we will follow a real example and search for `MemberID = 61`.
+> In Section 3.2, we will follow a real example and search for `MemberID = 61`.
 
 ---
 

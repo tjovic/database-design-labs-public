@@ -1024,6 +1024,8 @@ Until now, `SalesOrder` and `SalesOrderItem` have been stored as **heaps**, with
 
 We will now create a clustered primary key on each table.
 
+In a real design, both tables would have had primary keys from the start. We add them here as a separate step for two reasons: to show that a primary key alone does not support our query, and because the nonclustered indexes created next will then use the clustered key, rather than a heap RID, as their row locator.
+
 ```sql
 ALTER TABLE dbo.SalesOrder
 ADD CONSTRAINT PK_SalesOrder
@@ -1207,6 +1209,8 @@ You should see a condition corresponding to the requested `OrderDate` range.
 Unlike the previous scan, SQL Server can use the index's ordered keys to locate the beginning of the range and read the matching entries.
 
 Compare **Actual Number of Rows Read** and **Actual Number of Rows**. In our reference plan, these values are approximately equal because the seek reads the relevant entries.
+
+Notice that the plan contains no Key Lookup for `SalesOrder`. From this table, the query needs only `OrderDate` (the index key) and `SalesOrderId` (the clustered key, stored in every nonclustered index entry). For the `SalesOrder` part of the query, this narrow index is therefore already **covering**. In Section 8.4, we will achieve the same effect deliberately for `SalesOrderItem`.
 
 > [!IMPORTANT]
 > **An Index Seek does not necessarily retrieve only one row.**
@@ -1538,6 +1542,17 @@ Each new index introduced an access path that allowed the optimizer to choose a 
 > **Creating indexes does not change which rows a query should return. It changes how SQL Server can find and process those rows.**
 >
 > A useful index allows SQL Server to avoid unnecessary work, but it does not guarantee that every query will use it.
+
+**Think about it:** What if `SalesOrderItem` had been clustered on `(SalesOrderId, SalesOrderItemId)` instead of `SalesOrderItemId`?
+
+<details>
+<summary>Show answer</summary>
+
+All items of an order would then be stored next to each other in the clustered index. A single clustered index seek per order would return complete rows, so no nonclustered index on `SalesOrderId` (and no extra storage for included columns) would be needed for our query. This is a common design for order-line tables, which are usually read together with their parent order.
+
+The trade-off is a wider clustered key, which every nonclustered index on the table would carry, and the need for a separate nonclustered unique index or primary key if items are also looked up by `SalesOrderItemId` alone.
+
+</details>
 
 ### Are included columns always a good idea?
 

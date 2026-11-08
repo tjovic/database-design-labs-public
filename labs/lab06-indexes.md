@@ -536,6 +536,7 @@ USE IndexLab;
 GO
 
 DROP INDEX IF EXISTS IX_SalesOrder_Status_OrderDate     ON dbo.SalesOrder;
+DROP INDEX IF EXISTS IX_SalesOrder_Review_OrderDate     ON dbo.SalesOrder;
 DROP INDEX IF EXISTS IX_SalesOrder_Status               ON dbo.SalesOrder;
 DROP INDEX IF EXISTS IX_SalesOrder_CustomerId_OrderDate ON dbo.SalesOrder;
 DROP INDEX IF EXISTS IX_SalesOrder_OrderDate            ON dbo.SalesOrder;
@@ -1707,14 +1708,14 @@ ON dbo.SalesOrder (CustomerId, OrderDate);
 GO
 ```
 
-Now compare the following queries with Actual Execution Plan enabled.
+Now compare the following queries with Actual Execution Plan enabled. The examples use customer `501`, which has 1,000 orders in `IndexLab`. (Because of the way the data is generated, some customer numbers have no orders at all; customer `500` is one of them.)
 
 **Query A – Leading key only**
 
 ```sql
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
-WHERE CustomerId = 500;
+WHERE CustomerId = 501;
 GO
 ```
 
@@ -1725,7 +1726,7 @@ SQL Server can use the leading key `CustomerId` to locate the matching entries.
 ```sql
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
-WHERE CustomerId = 500
+WHERE CustomerId = 501
   AND OrderDate >= '20250101';
 GO
 ```
@@ -1745,35 +1746,40 @@ This query does not filter by the leading key, `CustomerId`.
 
 Therefore, SQL Server generally cannot use this composite index to directly seek to one continuous date range across all customers.
 
-Order dates in `IndexLab` cover 2021–2025, so this condition matches roughly **one fifth of the table** (about 2 million rows). The earlier `IX_SalesOrder_OrderDate` index can locate the date range, but it does not contain `CustomerId`, so using it would require about 2 million lookups. The composite index, on the other hand, contains every column this query needs (`CustomerId`, `OrderDate`, and the clustered key `SalesOrderId`) and is much narrower than the table. Expect SQL Server to **scan the composite index** (`Index Scan`) rather than seek in it.
+Order dates in `IndexLab` cover 2021–2025, so this condition matches roughly **one fifth of the table** (about 2 million rows). The earlier `IX_SalesOrder_OrderDate` index can locate the date range, but it does not contain `CustomerId`, so using it would require about 2 million lookups. The composite index, on the other hand, contains every column this query needs (`CustomerId`, `OrderDate`, and the clustered key `SalesOrderId`) and is much narrower than the table. SQL Server therefore **scans the composite index** (`Index Scan`) rather than seeking in it.
 
 ### Compare the execution plans
 
-For each query, inspect the access operator and its **Seek Predicates**.
+For each query, inspect the access operator, its **Seek Predicates**, and the logical reads.
 
-| Query | Predicate | Expected use of the composite index |
-|---|---|---|
-| A | `CustomerId = 500` | Seek using the leading key |
-| B | `CustomerId = 500 AND OrderDate >= ...` | Seek using both key columns |
-| C | `OrderDate >= ...` | No date-only seek; likely an `Index Scan` of the composite index |
+| Query | Predicate | Use of the composite index | Logical reads (reference) |
+|---|---|---|---:|
+| A | `CustomerId = 501` | `Index Seek` using the leading key | 6 |
+| B | `CustomerId = 501 AND OrderDate >= ...` | `Index Seek` using both key columns | 3 |
+| C | `OrderDate >= ...` | `Index Scan` of the whole composite index; `OrderDate` is checked as a predicate on every entry | 26,055 |
+
+Query C reads every page of the composite index, because the dates it needs are spread across all customers.
 
 > [!IMPORTANT]
 > **The order of columns in a composite index matters.**
 >
-> An index on `(CustomerId, OrderDate)` is not equivalent to an index on `(OrderDate, CustomerId)`.
+> An index on `(CustomerId, OrderDate)` is not equivalent to an index on `(OrderDate, CustomerId)`. Reordering conditions in the `WHERE` clause does not change the index's key order.
 >
-> Reordering conditions in the `WHERE` clause does not change the index's key order.
+> Two rules of thumb follow from how the keys are organized:
+>
+> - **Equality first, then range or sort.** Put columns compared with equality (`=`) first, and columns used for ranges (`>`, `<`, `BETWEEN`) or for sorting after them. Once the seek reaches a range condition, the key columns that follow can no longer narrow it down; they can only be checked as residual predicates.
+> - **The leftmost prefix.** An index on `(CustomerId, OrderDate)` also supports every search that an index on `(CustomerId)` alone would support. A separate single-column index on `CustomerId` is therefore usually redundant.
 
 ### Check your understanding
 
-**Would an index on `(OrderDate, CustomerId)` be equally efficient for finding all orders belonging to `CustomerId = 500`?**
+**Would an index on `(OrderDate, CustomerId)` be equally efficient for finding all orders belonging to `CustomerId = 501`?**
 
 <details>
 <summary>Show answer</summary>
 
 Not necessarily.
 
-With `OrderDate` as the leading key, the index is organized primarily by date. Orders for customer 500 may be spread across many different date ranges.
+With `OrderDate` as the leading key, the index is organized primarily by date. Orders for customer 501 may be spread across many different date ranges.
 
 An index on `(CustomerId, OrderDate)` is generally better suited for queries that filter by `CustomerId` alone.
 
@@ -1783,28 +1789,11 @@ The best column order depends on the queries the index needs to support.
 
 </details>
 
-## 10.2 Selectivity
+## 10.2 Selectivity and statistics
 
 When designing an index, an important consideration is **selectivity**.
 
-Selectivity describes how effectively a search condition reduces the number of rows that need to be processed.
-
-For example, imagine a table containing one million orders:
-
-| Status | Number of orders |
-|---|---:|
-| Completed | 900,000 |
-| Processing | 90,000 |
-| Review | 10,000 |
-
-If we search for `Status = 'Completed'`, the query matches **90% of the table**.
-
-However, searching for `Status = 'Review'` matches only **1% of the table**.
-
-The second condition is much more selective because it returns a smaller proportion of the rows.
-
-> [!NOTE]
-> These numbers are illustrative. We will now examine the actual distribution of values in our `SalesOrder` table.
+Selectivity describes how effectively a search condition reduces the number of rows that need to be processed. A condition that matches 3% of a table is much more selective than one that matches 80%.
 
 ### Examine the data distribution
 
@@ -1818,11 +1807,16 @@ ORDER BY NumberOfOrders DESC;
 GO
 ```
 
-Examine the results.
+In `IndexLab`, the result is:
 
-Which status occurs most frequently? Which is the rarest?
+| Status | Number of orders | Share of the table |
+|---|---:|---:|
+| `Completed` | 8,000,000 | 80% |
+| `Processing` | 1,000,000 | 10% |
+| `Cancelled` | 700,000 | 7% |
+| `Review` | 300,000 | 3% |
 
-The distribution matters because SQL Server estimates how many rows a query will return and uses that information when choosing an execution plan.
+The distribution matters because SQL Server estimates how many rows a query will return and uses that estimate when choosing an execution plan.
 
 ### Create an index on Status
 
@@ -1836,9 +1830,34 @@ GO
 
 The index organizes its entries by `Status`, allowing SQL Server to locate rows with a particular status.
 
-However, **having an index does not guarantee that SQL Server will use it for every status value**.
+However, **having an index does not guarantee that SQL Server will use it for every query on this column**.
 
-### Compare two queries
+### How does SQL Server know the distribution?
+
+When SQL Server creates an index, it also creates **statistics** on the index key. Statistics include a **histogram**: a summary of how values are distributed in the column. The optimizer uses it to estimate how many rows a condition will match, without counting them.
+
+You can display the histogram:
+
+```sql
+DBCC SHOW_STATISTICS ('dbo.SalesOrder', IX_SalesOrder_Status)
+WITH HISTOGRAM;
+GO
+```
+
+For `Status`, the histogram has one step per value:
+
+| `RANGE_HI_KEY` | `EQ_ROWS` |
+|---|---:|
+| `Cancelled` | 700,000 |
+| `Completed` | 8,000,000 |
+| `Processing` | 1,000,000 |
+| `Review` | 300,000 |
+
+`EQ_ROWS` is the estimated number of rows equal to that value. Here it matches the `GROUP BY` result exactly, because SQL Server read every row while building the index. Statistics created or updated later from a sample of the rows may be approximate.
+
+When you run the queries below with Actual Execution Plan enabled, compare **Estimated Number of Rows** with **Actual Number of Rows** for the access operator. Good estimates are the basis for good plan choices.
+
+### Covered queries: both values use the index
 
 Enable Actual Execution Plan and execute:
 
@@ -1860,22 +1879,53 @@ WHERE Status = 'Review';
 GO
 ```
 
-Both queries filter on the same indexed column. In `IndexLab`, the distribution query shows four status values: `Completed` (about 80% of orders), `Processing` (about 10%), `Cancelled` (about 7%), and `Review` (about 3%). Query A therefore asks for the most frequent value and Query B for the rarest one.
+Query A asks for the most frequent value and Query B for the rarest one. Both queries are covered by `IX_SalesOrder_Status`, because `SalesOrderId` is the clustered key and is already available in the nonclustered index. Both therefore use an `Index Seek`, even though Query A returns 80% of the table:
 
-These queries are covered by `IX_SalesOrder_Status` because `SalesOrderId` is the clustered key and is already available in the nonclustered index. Both queries may therefore use an Index Seek, even when one returns many rows. Compare the number of rows and logical reads; do not expect different operator types.
+| Query | Rows returned | Access operator | Logical reads (reference) |
+|---|---:|---|---:|
+| A – `Completed` | 8,000,000 | `Index Seek` on `IX_SalesOrder_Status` | 26,859 |
+| B – `Review` | 300,000 | `Index Seek` on `IX_SalesOrder_Status` | 897 |
 
-Compare their execution plans and `STATISTICS IO` results.
+The seek for `Completed` reads most of the index, but the index is still narrower than the table, so reading it is cheaper than scanning the clustered index.
 
-Pay attention to:
+### A query that is not covered: the tipping point
 
-- **Access operator:** Confirm that both queries use an `Index Seek` on `IX_SalesOrder_Status`.
-- **Actual Number of Rows:** How many rows does each query return?
-- **Logical reads:** How much page-access work does each query perform? Since both queries seek, the difference in work comes from the number of matching index entries.
+Now add one column that the index does not contain:
+
+**Query C – Review status, with `TotalAmount`**
+
+```sql
+SELECT SalesOrderId, Status, TotalAmount
+FROM dbo.SalesOrder
+WHERE Status = 'Review';
+GO
+```
+
+Although `Review` matches only 3% of the rows, SQL Server does **not** use `IX_SalesOrder_Status`. The reference plan shows a `Clustered Index Scan` with **57,266** logical reads: the whole table is read.
+
+Why? The index can find the 300,000 matching entries, but each of them would need a Key Lookup to fetch `TotalAmount`. To see what that would cost, force the index with a table hint:
+
+```sql
+-- For demonstration only: forces the use of IX_SalesOrder_Status
+SELECT SalesOrderId, Status, TotalAmount
+FROM dbo.SalesOrder WITH (INDEX (IX_SalesOrder_Status))
+WHERE Status = 'Review';
+GO
+```
+
+| Plan for Query C | Logical reads (reference) | Elapsed time (reference) |
+|---|---:|---:|
+| Chosen by the optimizer: `Clustered Index Scan` | 57,266 | 2.8 s |
+| Forced: `Index Seek` + 300,000 Key Lookups | 1,393,642 | 5.6 s |
+
+Each lookup navigates the clustered index from the root to a leaf page, so 300,000 lookups cost about **24 times** as many page accesses as reading the whole table once. The optimizer's choice is correct.
 
 > [!IMPORTANT]
-> **An index is often most beneficial when a query needs only a small portion of the table.**
+> **"Selective" is relative to the cost of the alternative.**
 >
-> When a query returns a large proportion of the rows, a scan may be more efficient, especially if additional columns must be retrieved from the table.
+> Without a covering index, an index stops paying off at a surprisingly small fraction of the table: in this example, even 3% of the rows was too many lookups. With a covering index, there are no lookups, and the index can be useful even for large result sets, as Query A showed.
+>
+> Index hints such as `WITH (INDEX (...))` are useful for experiments like this one. In real code, they prevent the optimizer from adapting when the data changes and should be used only in exceptional cases.
 
 ### Selectivity vs. number of distinct values
 
@@ -1892,22 +1942,25 @@ The important distinction is:
 - **Cardinality:** how many distinct values a column contains (in this context).
 - **Selectivity:** how narrowly a particular search condition filters the rows.
 
+> [!NOTE]
+> SQL Server documentation and execution plans also use the term *cardinality estimation*, which means something different: the optimizer's estimate of **how many rows** an operator will return.
+
 ### Check your understanding
 
-**Why might an index on `Status` be useful for `Status = 'Review'`, even though the column contains only a few distinct values?**
+**Why did SQL Server use `IX_SalesOrder_Status` for Query B but not for Query C, even though both search for `Status = 'Review'`?**
 
 <details>
 <summary>Show answer</summary>
 
-Because `Review` may occur in only a small percentage of the table.
+Query B needs only `SalesOrderId` and `Status`, which are both in the index, so the index covers it.
 
-An index allows SQL Server to locate the matching entries without examining every row.
+Query C also needs `TotalAmount`. Using the index would require 300,000 Key Lookups, which cost far more page accesses than scanning the whole table once.
 
-The usefulness of an index depends not only on the number of distinct values but also on their distribution and the columns required by the query.
+The usefulness of an index depends not only on the number of distinct values but also on their distribution and on the columns required by the query.
 
 </details>
 
-## 10.3 Included columns and index width
+## 10.3 Key columns, included columns, and index width
 
 In Section 8.4, we created a covering index on `SalesOrderItem`:
 
@@ -1918,6 +1971,15 @@ INCLUDE (ProductId, Quantity, UnitPrice);
 ```
 
 This allowed SQL Server to retrieve all the required columns directly from the nonclustered index, eliminating thousands of additional clustered index accesses.
+
+### Key column or included column?
+
+When designing an index for a query, decide for each column where it belongs:
+
+- A column belongs in the **key** if the query **filters, joins, or sorts** by it. Only key columns determine the order of the index, so only they can be used to seek or to avoid a sort. (Remember from Section 7.2 that a key column helps only when the condition compares the column directly, without applying a function to it.)
+- A column belongs in **`INCLUDE`** if the query only **returns** it or **calculates** with it. Included columns are stored only at the leaf level, so they do not widen the upper levels of the tree and do not change the order of the index.
+
+In our index, `SalesOrderId` is used to join, so it is the key. `ProductId`, `Quantity`, and `UnitPrice` are only read once the matching entries have been found, so they are included.
 
 However, **adding more columns to an index is not always beneficial**.
 
@@ -1971,6 +2033,70 @@ A covering index can improve a query by providing all required columns without a
 However, wider index entries require more storage pages and can increase the work needed for data modifications.
 
 The index may improve frequently executed queries while increasing storage and maintenance costs for the overall workload.
+
+</details>
+
+## 10.4 Filtered indexes
+
+Suppose an application frequently displays the queue of orders waiting for review, oldest first:
+
+```sql
+SELECT SalesOrderId, OrderDate
+FROM dbo.SalesOrder
+WHERE Status = 'Review'
+ORDER BY OrderDate;
+GO
+```
+
+Run it with Actual Execution Plan enabled. `IX_SalesOrder_Status` does not help: it can find the 300,000 `Review` entries, but it does not contain `OrderDate`, so it would need a Key Lookup for every row. The reference plan therefore uses a `Clustered Index Scan` (57,266 logical reads) followed by a `Sort`.
+
+An ordinary index on `(Status, OrderDate)` would solve this, but it would contain an entry for all 10 million orders, although the query only ever needs the 3% that are in review.
+
+A **filtered index** contains only the rows that satisfy a `WHERE` condition:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrder_Review_OrderDate
+ON dbo.SalesOrder (OrderDate)
+WHERE Status = 'Review';
+GO
+```
+
+Run the query again and compare:
+
+| | Before | After `IX_SalesOrder_Review_OrderDate` |
+|---|---|---|
+| Access operator | `Clustered Index Scan` + `Sort` | `Index Scan` of the filtered index, no `Sort` |
+| Logical reads (reference) | 57,266 | **635** |
+
+The plan now reads the filtered index from beginning to end. This `Index Scan` is not a problem: the index contains **only** the rows the query needs, already ordered by `OrderDate`, and `SalesOrderId` is available as the clustered key.
+
+The filtered index is also very small. Compare its size with the other indexes on `SalesOrder` in the reference database:
+
+| Index | Rows | Pages | Size |
+|---|---:|---:|---:|
+| `PK_SalesOrder` (clustered, the table itself) | 10,000,000 | 57,266 | 447 MB |
+| `IX_SalesOrder_Status` | 10,000,000 | 33,576 | 262 MB |
+| `IX_SalesOrder_Review_OrderDate` (filtered) | 300,000 | 635 | 4 MB |
+
+Because it contains only `Review` rows, the filtered index is cheaper to store and to maintain: inserting a `Completed` order does not touch it at all.
+
+> [!NOTE]
+> **Limitations of filtered indexes**
+>
+> - The optimizer uses a filtered index only when it can prove that the query's condition matches the filter. A query with `WHERE Status = 'Review'` qualifies. A query with `WHERE Status = @Status` usually does not, because the same plan must work for every possible parameter value.
+> - The filter must be a simple comparison on columns of the table (for example `=`, `<>`, `>`, `IN`, `IS NULL`, combined with `AND`).
+> - Creating a filtered index requires certain session settings, such as `QUOTED_IDENTIFIER ON`. SSMS uses the required settings by default.
+
+### Check your understanding
+
+**When is a filtered index a better choice than an ordinary index on the same columns?**
+
+<details>
+<summary>Show answer</summary>
+
+When important queries always target the same small, well-defined subset of rows, such as orders in review, active records, or rows where a column is not `NULL`.
+
+The filtered index contains only that subset, so it is smaller, cheaper to maintain, and faster to read than an index over the whole table. It is not useful for queries whose conditions vary or cannot be matched to the filter.
 
 </details>
 
@@ -2209,11 +2335,11 @@ The lab created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)
 SELECT * FROM dbo.SalesOrder WHERE OrderDate >= '20250101';
 
 -- B
-SELECT * FROM dbo.SalesOrder WHERE CustomerId = 500 ORDER BY OrderDate;
+SELECT * FROM dbo.SalesOrder WHERE CustomerId = 501 ORDER BY OrderDate;
 
 -- C
 SELECT * FROM dbo.SalesOrder
-WHERE CustomerId = 500
+WHERE CustomerId = 501
   AND OrderDate >= '20250101'
   AND OrderDate <  '20250201';
 ```
@@ -2267,7 +2393,7 @@ ORDER BY OrderDate;
 
 Before creating anything, consider:
 
-1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from Section 10.2 and `IX_SalesOrder_Status_OrderDate` if you completed Exercise 1?
+1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from Section 10.2, the filtered index `IX_SalesOrder_Review_OrderDate` from Section 10.4, and `IX_SalesOrder_Status_OrderDate` if you completed Exercise 1?
 2. Can an existing index support both the filter and the requested sort order?
 3. Is it better to create a new index, replace an overlapping index, or do nothing?
 
@@ -2276,7 +2402,14 @@ Before creating anything, consider:
 
 If you completed Exercise 1, `IX_SalesOrder_Status_OrderDate` already covers this query. With `Status` fixed by the equality condition, SQL Server can read the relevant `OrderDate DESC` range backward to satisfy `ORDER BY OrderDate` in ascending order. No new index is needed for this exercise.
 
-If you skipped Exercise 1, `IX_SalesOrder_Status` supports the filter, but not ordering by `OrderDate` within the same `Status`. An index on `(Status, OrderDate)` can support both. It overlaps with the status-only index, so consider **replacing** the earlier index instead of maintaining both. In a real system, inspect the entire workload before making this change.
+If you created the filtered index in Section 10.4, `IX_SalesOrder_Review_OrderDate` also supports this query completely, and it is the smallest of these indexes.
+
+`IX_SalesOrder_Status` alone does not help: it does not contain `OrderDate`, so the optimizer prefers a `Clustered Index Scan` followed by a `Sort` (see Section 10.4). Without the other indexes, there are two reasonable designs:
+
+- An index on `(Status, OrderDate)`. Following the leftmost-prefix rule from Section 10.1, it also supports every search on `Status` alone, so it should **replace** `IX_SalesOrder_Status` rather than be added next to it.
+- A filtered index on `(OrderDate) WHERE Status = 'Review'`, if the application queries this status far more often than the others.
+
+In a real system, inspect the entire workload before choosing.
 
 </details>
 
@@ -2292,6 +2425,8 @@ If you skipped Exercise 1, `IX_SalesOrder_Status` supports the filter, but not o
 - A primary key is a constraint enforced by a unique index; it does not replace all other indexes.
 - `Index Seek`, `Index Scan`, `Hash Match`, and `Nested Loops` are access/processing choices, not labels for inherently good or bad plans.
 - Composite key order, selectivity, and included columns determine which access patterns an index supports.
+- Statistics tell the optimizer how values are distributed; without a covering index, even a small fraction of the table can be too many lookups.
+- A filtered index covers only a well-defined subset of rows and can be much smaller than an ordinary index.
 - Indexes cost space and maintenance as well as providing potential read benefits.
 - Always validate an index against the **actual workload** using plans and I/O measurements.
 

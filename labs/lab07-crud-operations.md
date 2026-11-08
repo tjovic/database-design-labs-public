@@ -9,11 +9,11 @@ You will apply these concepts to implement **Create, Read, Update, and Delete (C
 Rather than introducing new T-SQL syntax, the focus is on **combining existing knowledge to solve practical database problems**. You will implement CRUD operations, compare different ways of organizing stored procedures, and handle situations involving missing records, business rules, and referential integrity.
 
 > [!IMPORTANT]
-> **Midterm exam preparation**
+> **This lab is mostly about stored procedures.**
 >
-> This lab also serves as a practical review of the topics covered so far. Many of the exercises combine concepts from several previous labs.
+> Almost every example and exercise is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT`, and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
 >
-> Try to solve the exercises independently before looking at the solutions. This will help you identify which topics you may need to review before the midterm exam.
+> If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Try to write each procedure yourself before looking at the solution.
 
 > [!NOTE]
 > **This lab works on the real `AdventureWorksENG` data.**

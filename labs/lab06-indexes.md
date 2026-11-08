@@ -526,6 +526,31 @@ The `IndexLab` reference database contains approximately **10 million** rows in 
 > [!IMPORTANT]
 > Complete the steps **in order**, using the database in its prepared initial state. Later sections create indexes that change the execution plan. If you already created these indexes in a previous attempt, restore the prepared lab state before repeating the *before indexes* measurement.
 
+<details>
+<summary>Show script: restore IndexLab to its prepared initial state</summary>
+
+The script removes every index and primary key that this lab creates (Sections 8 and 10 and the exercises). Nonclustered indexes are dropped before the clustered primary keys.
+
+```sql
+USE IndexLab;
+GO
+
+DROP INDEX IF EXISTS IX_SalesOrder_Status_OrderDate     ON dbo.SalesOrder;
+DROP INDEX IF EXISTS IX_SalesOrder_Status               ON dbo.SalesOrder;
+DROP INDEX IF EXISTS IX_SalesOrder_CustomerId_OrderDate ON dbo.SalesOrder;
+DROP INDEX IF EXISTS IX_SalesOrder_OrderDate            ON dbo.SalesOrder;
+DROP INDEX IF EXISTS IX_SalesOrderItem_SalesOrderId     ON dbo.SalesOrderItem;
+GO
+
+ALTER TABLE dbo.SalesOrder     DROP CONSTRAINT IF EXISTS PK_SalesOrder;
+ALTER TABLE dbo.SalesOrderItem DROP CONSTRAINT IF EXISTS PK_SalesOrderItem;
+GO
+```
+
+Dropping a clustered primary key turns the table back into a heap, but for 40 million rows this takes a while. Re-running the [IndexLab setup script](setup/index-lab-data-setup.md) (about two minutes on the reference computer) is an equally good option.
+
+</details>
+
 ## 6.1 Prepare SSMS and collect useful measurements
 
 Open a new query window in SSMS and select the database:
@@ -550,11 +575,15 @@ Enable **Query → Include Actual Execution Plan**, or press `Ctrl + M` before e
 
 **Logical reads** count 8 KB pages read from the buffer pool (including pages previously cached); they are *not* the same thing as physical disk reads. A query can perform many logical reads even when physical reads are near zero. Conversely, timing can vary with buffer cache, CPU availability, concurrent activity, and the selected plan.
 
+`STATISTICS TIME` prints two kinds of blocks: *parse and compile time* and *SQL Server Execution Times*. Record the CPU and elapsed time from the **Execution Times** block that follows the query.
+
 > [!TIP]
 > Hover over an execution-plan operator for its tooltip. For more detailed properties, click the operator and press **F4** (or right-click → **Properties**). In the plan, pay attention to **the arrows between operators**: thicker arrows usually represent larger row flows.
 
 > [!NOTE]
 > Reference timings come from the original lab's measurements on one computer running SQL Server 2025 (build 17.0.1135.8), 31 GB RAM, with separate Express and Developer instances. Your own numbers may be very different. Record your results; do not try to reproduce the exact timings.
+
+Run each measured query **twice** and record the second execution. The first run may need to read pages from disk (physical and read-ahead reads); the second run usually finds them in the buffer pool, which makes the before/after comparisons fairer.
 
 ## 6.2 Run the baseline query before adding indexes
 
@@ -582,7 +611,7 @@ Read the SQL statement before you execute it:
 1. `WHERE so.OrderDate ...` restricts sales orders to **one day**.
 2. The first `JOIN` finds the order items belonging to those orders.
 3. The second `JOIN` obtains each product's `CategoryId`.
-4. `Quantity * UnitPrice` calculates the value of each line.
+4. `Quantity * UnitPrice` calculates the value of each line; the `CAST` makes the decimal result type explicit.
 5. `GROUP BY` calculates the totals for each category.
 6. `ORDER BY Revenue DESC` sorts the final category totals.
 

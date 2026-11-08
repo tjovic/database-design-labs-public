@@ -592,7 +592,10 @@ Here SQL Server accessed about 57,000 pages, which corresponds to roughly 57,000
 > [!NOTE]
 > Reference timings come from the original lab's measurements on one computer running SQL Server 2025 (build 17.0.1135.8), 31 GB RAM, with separate Express and Developer instances. Your own numbers may be very different. Record your results; do not try to reproduce the exact timings.
 
-Run each measured query **twice** and record the second execution. The first run may need to read pages from disk (physical and read-ahead reads); the second run usually finds them in the buffer pool, which makes the before/after comparisons fairer.
+Run each measured query **twice** and record the second execution. The first run may need to read pages from disk (physical and read-ahead reads); the second run usually finds them in the buffer pool, which makes the before/after comparisons fairer. The first run after creating an index can also report **more logical reads**, because SQL Server prefetches pages it expects to need.
+
+> [!NOTE]
+> SQL Server Express can use only about 1.4 GB of memory for its buffer pool, and `SalesOrderItem` alone occupies about 1.5 GB. As long as the plan scans `SalesOrderItem` (Sections 6–8.2), it cannot stay in memory, so every run shows read-ahead reads and similar timings. From Section 8.3 on, the plan reads only a small part of the table, and the second run is the representative one.
 
 ## 6.2 Run the baseline query before adding indexes
 
@@ -997,6 +1000,15 @@ This recommendation is based on the optimizer's view of a **particular query**, 
 
 SSMS displays only the first suggestion above the plan, together with an estimated *Impact* percentage. A plan can contain several suggestions; right-click the plan and choose **Show Execution Plan XML** to see all of them in the `<MissingIndexes>` element. The Impact value is the optimizer's estimate for this single query, not a measured improvement.
 
+Our baseline plan is a good example. In the reference plan, the XML contains **two** suggestions:
+
+| Suggested index | Estimated impact |
+|---|---:|
+| `SalesOrder (OrderDate) INCLUDE (SalesOrderId)` — shown above the plan | 10.7% |
+| `SalesOrderItem (SalesOrderId) INCLUDE (ProductId, Quantity, UnitPrice)` — visible only in the XML | 87.9% |
+
+The suggestion SSMS displays is the less important one. The hidden one addresses the main bottleneck, and it is exactly the covering index we will build step by step in Sections 8.3 and 8.4.
+
 > [!WARNING]
 > **Do not create suggested indexes yet.** We will add indexes deliberately in Section 8. After introducing a clustered primary key on `SalesOrderId`, its clustered key is already available as the row locator in the nonclustered `OrderDate` index. Explicit `INCLUDE (SalesOrderId)` is unnecessary in that design.
 
@@ -1346,7 +1358,7 @@ In our reference execution plan, this requires approximately **21,908 additional
 
 ### Inspect the additional data retrieval
 
-In the Actual Execution Plan, locate the additional `Clustered Index Seek` on `PK_SalesOrderItem`.
+In the Actual Execution Plan, locate the `Key Lookup (Clustered)` operator on `PK_SalesOrderItem`.
 
 Inspect its Properties and identify:
 
@@ -1356,7 +1368,7 @@ Inspect its Properties and identify:
 
 Notice that this operator is executed repeatedly, once for each matching order item in our reference plan.
 
-This operation is conceptually similar to a **Key Lookup**, where SQL Server uses the clustered key obtained from a nonclustered index to retrieve missing columns. Depending on the SQL Server and SSMS version, your plan may show this operator as `Key Lookup (Clustered)` instead of `Clustered Index Seek`; both describe the same kind of row retrieval.
+This is a **Key Lookup**: SQL Server uses the clustered key obtained from the nonclustered index to retrieve the missing columns from the clustered index. Internally, a Key Lookup is a clustered index seek marked as a lookup; text-based plan output, such as `SET STATISTICS PROFILE`, shows it as `Clustered Index Seek ... LOOKUP`.
 
 A small number of additional lookups may be inexpensive. However, thousands of repeated accesses can become a significant part of the query's total work.
 
@@ -1373,7 +1385,7 @@ GO
 
 The nonclustered index helps SQL Server find the matching order items, but it does not contain the three selected columns.
 
-Depending on the optimizer's choice, the execution plan may show an `Index Seek` followed by a `Key Lookup (Clustered)`.
+Depending on the optimizer's choice, the execution plan may show an `Index Seek` followed by a `Key Lookup (Clustered)`, just like the main query.
 
 Inspect the operators and compare the number of executions.
 
@@ -1401,13 +1413,15 @@ In the next section, we will modify the index so that these additional accesses 
 | Metric | After `IX_SalesOrder_OrderDate` only | After narrow `IX_SalesOrderItem_SalesOrderId` (no `INCLUDE`) |
 |---|---:|---:|
 | `SalesOrder` logical reads | 15 | 15 (unchanged) |
-| `SalesOrderItem` logical reads | 198,439 | **106,449** |
+| `SalesOrderItem` logical reads | 198,439 | **90,533** |
 | `SalesOrderItem` scan count | 1 | **5,477** (one seek per matching order) |
 | `Product` logical reads | 161 | 161 (unchanged) |
-| CPU time | 12.05 s | **0.28 s** |
-| Elapsed time | 13.1 s | **0.76 s** |
+| CPU time | 12.05 s | **0.20 s** |
+| Elapsed time | 13.1 s | **0.21 s** |
 
-This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats a 40-million-row `Hash Match` input by a wide margin, even with an additional clustered index access for each of the 21,908 matching rows. `SalesOrderItem`'s logical reads (106,449) are still far higher than they need to be, though: each lookup costs extra page accesses that a covering index can avoid entirely — the point of Section 8.4.
+This is already a dramatic speedup — Nested Loops with 5,477 cheap seeks beats a 40-million-row `Hash Match` input by a wide margin, even with an additional clustered index access for each of the 21,908 matching rows. `SalesOrderItem`'s logical reads (90,533) are still far higher than they need to be, though: each lookup costs extra page accesses that a covering index can avoid entirely — the point of Section 8.4.
+
+The values in the right column come from the second run after creating the index. The first run reported about 106,000 logical reads for `SalesOrderItem` and took about 0.8 s, because SQL Server prefetched pages into memory (see Section 6.1).
 
 </details>
 
@@ -1586,6 +1600,24 @@ There is no longer a need to access the clustered index to retrieve these values
 
 </details>
 
+<details>
+<summary>Show reference results from one computer</summary>
+
+| Metric | Narrow `IX_SalesOrderItem_SalesOrderId` | With `INCLUDE (ProductId, Quantity, UnitPrice)` |
+|---|---:|---:|
+| `SalesOrder` logical reads | 15 | 15 (unchanged) |
+| `SalesOrderItem` logical reads | 90,533 | **23,462** |
+| `SalesOrderItem` scan count | 5,477 | 5,477 (unchanged) |
+| `Product` logical reads | 161 | 161 (unchanged) |
+| CPU time | 0.20 s | **0.09 s** |
+| Elapsed time | 0.21 s | **0.10 s** |
+
+The 5,477 seeks remain, but the 21,908 Key Lookups are gone, and with them about three quarters of the logical reads on `SalesOrderItem`. What remains is roughly four page accesses per seek: navigating the index from the root to the leaf level, plus an occasional neighboring leaf page.
+
+As in Section 8.3, these are second-run values. The first run after creating the index reported about 52,000 logical reads and took about 0.4 s.
+
+</details>
+
 ---
 
 We have now seen how different indexes change the execution plan. In the next section, we will compare **logical reads, CPU time, and elapsed time** to measure how much performance actually improved.
@@ -1594,17 +1626,15 @@ We have now seen how different indexes change the execution plan. In the next se
 
 # 9. Performance comparison
 
-Throughout Section 8, the SQL query remained unchanged; only the available indexes changed. The following table brings together the reference measurements from all five stages, measured on the reference Express instance.
+Throughout Section 8, the SQL query remained unchanged; only the available indexes changed. The following table brings together the reference measurements from all five stages, measured on the reference Express instance. Stages 4 and 5 show second-run values (see Section 6.1).
 
 | Stage | `SalesOrder` logical reads | `SalesOrderItem` logical reads | CPU time | Elapsed time |
 |---|---:|---:|---:|---:|
 | 1. Before indexing (heaps) | 57,143 | 198,020 | 14.7 s | 18.1 s |
 | 2. Clustered primary keys | 57,266 | 198,439 | 13.25 s | 14.1 s |
 | 3. `IX_SalesOrder_OrderDate` | 15 | 198,439 | 12.05 s | 13.1 s |
-| 4. `IX_SalesOrderItem_SalesOrderId` (narrow) | 15 | 106,449 | 0.28 s | 0.76 s |
-| 5. The same index with `INCLUDE` | 15 | ~54,000 | — | ~0.5 s |
-
-<!-- TODO: stage 5 values are approximate values from an earlier demonstration run. Replace them with measured values, add a matching reference block to Section 8.4, and update the calculations below. -->
+| 4. `IX_SalesOrderItem_SalesOrderId` (narrow) | 15 | 90,533 | 0.20 s | 0.21 s |
+| 5. The same index with `INCLUDE` | 15 | 23,462 | 0.09 s | 0.10 s |
 
 `Product` required 161 logical reads in every stage, because its small clustered index was scanned each time.
 
@@ -1613,29 +1643,29 @@ Record your own measurements in the same table. Your times will differ, but the 
 ### Reading the table
 
 - **Stages 2 and 3 barely change the elapsed time.** As long as the 40-million-row `SalesOrderItem` table is scanned and joined with `Hash Match`, it dominates the cost of the query, even after `SalesOrder` drops to 15 logical reads.
-- **Stage 4 is the decisive step.** Replacing the large scan with 5,477 index seeks reduces elapsed time from about 13 seconds to under one second, even though `SalesOrderItem`'s logical reads are only roughly halved. Scanning 40 million rows and building and probing a hash table costs CPU time far beyond the page reads themselves.
-- **Stage 5 removes the remaining lookups.** The covering index eliminates the 21,908 additional clustered index accesses, which further reduces logical reads.
+- **Stage 4 is the decisive step.** Replacing the large scan with 5,477 index seeks reduces elapsed time from about 13 seconds to about 0.2 seconds, even though `SalesOrderItem`'s logical reads are only roughly halved. Scanning 40 million rows and building and probing a hash table costs CPU time far beyond the page reads themselves.
+- **Stage 5 removes the remaining lookups.** The covering index eliminates the 21,908 Key Lookups, which cuts `SalesOrderItem`'s logical reads by a further three quarters and halves the remaining time.
 
 ### Overall improvement
 
 Comparing the first and the last stage across the two large tables:
 
 ```math
-\mathrm{Logical\text{-}read\ reduction} = \frac{255{,}163 - 54{,}000}{255{,}163} \times 100 \approx 78.8\%
+\mathrm{Logical\text{-}read\ reduction} = \frac{255{,}163 - 23{,}477}{255{,}163} \times 100 \approx 90.8\%
 ```
 
 ```math
-\mathrm{Speedup} = \frac{18.1\ \mathrm{s}}{0.5\ \mathrm{s}} \approx 36
+\mathrm{Speedup} = \frac{18.1\ \mathrm{s}}{0.1\ \mathrm{s}} \approx 180
 ```
 
-Expressed as factors, the query performs about **4.7× fewer logical reads** but finishes about **36× faster**. The two numbers do not have to be proportional: logical reads count page accesses, while elapsed time also reflects CPU work (such as scanning rows and processing a large hash join), waiting, and caching.
+Expressed as factors, the query performs about **11× fewer logical reads** but finishes about **180× faster**. The two numbers do not have to be proportional: logical reads count page accesses, while elapsed time also reflects CPU work (such as scanning rows and processing a large hash join), waiting, and caching.
 
 > [!NOTE]
 > **Editions and parallel execution**
 >
 > On the reference computer, the same baseline query took about **1.3 seconds** on a Developer edition instance, which executed it in parallel, compared with about 18 seconds on Express. Developer edition has the same feature set as Enterprise edition, but it is licensed only for development and testing.
 >
-> Parallel execution distributes the work across several CPU workers, so total CPU time can exceed elapsed time. It can make an inefficient query finish faster, but it does not reduce the amount of data the query must process. Indexing reduces the work itself: after indexing, the query took about 0.17 seconds on the Developer instance as well.
+> Parallel execution distributes the work across several CPU workers, so total CPU time can exceed elapsed time. It can make an inefficient query finish faster, but it does not reduce the amount of data the query must process. Indexing reduces the work itself: after indexing, the query finishes in a fraction of a second on both editions.
 
 ### Final question
 

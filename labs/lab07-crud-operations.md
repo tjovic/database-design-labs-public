@@ -1715,7 +1715,7 @@ SELECT @IDCategory AS NewCategoryID, @Result AS InsertResult;
 SQL Server raises an error:
 
 ```text
-Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 10
+Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 11
 Cannot insert the value NULL into column 'Name', table 'AdventureWorksENG.dbo.Category';
 column does not allow nulls. INSERT fails.
 The statement has been terminated.
@@ -2724,55 +2724,57 @@ The appropriate design depends on the application's requirements, how the result
 
 # What You Should Know After This Lab
 
-```mermaid
-flowchart TD
-    CRUD[CRUD] --> C[Create -> INSERT]
-    CRUD --> R[Read -> SELECT]
-    CRUD --> U[Update -> UPDATE]
-    CRUD --> D[Delete -> DELETE]
-    R --> F["sometimes a function when used inside another query"]
-```
+The main idea of this lab: **"nothing was deleted" can mean four different things, and the caller must be able to tell them apart.**
+
+| Outcome | How it is detected | Return code used in this lab |
+|---|---|---:|
+| Success | Rows affected | `0` |
+| The row does not exist | Empty result set or `@@ROWCOUNT = 0` — not an error | `1` |
+| Rejected by a business rule | `IF EXISTS` check before the `DELETE` — not an error | `2` |
+| SQL Server error | `TRY/CATCH`, `ERROR_NUMBER()`, `ERROR_MESSAGE()` | `3` |
 
 ```text
 CRUD
     -> four categories of operations, not a fixed number of procedures
-```
 
-```text
 Separate procedures
     -> one clear purpose per procedure
 
 Combined procedure
-    -> one entry point; may use an @Action parameter or an ID-based decision
-    -> common groupings: Create+Update, or Create+Update+Delete
-    -> Read may be separate, a function, or part of a combined procedure
+    -> one entry point; an @Action parameter or an ID-based decision (Save pattern)
+    -> one shared parameter list fits no action exactly
+    -> a typo in @Action is not an error - check for the "unknown action" code
 ```
 
 ```text
-TRY/CATCH
-    -> handles many runtime SQL Server errors, including constraint violations
-    -> some errors cannot be caught (see Lab 0)
-    -> can live inside the procedure (consistent for every caller)
-       or at the caller (ERROR_PROCEDURE() still names where it failed)
-```
-
-```text
-Zero rows affected
-    -> not an error; check @@ROWCOUNT
-
-Business rule rejected
-    -> not an error; a pre-check returns a status code
-
-SQL Server rejected the statement
-    -> a real error; TRY/CATCH, ERROR_NUMBER(), ERROR_MESSAGE()
+Errors inside a procedure
+    -> an error such as 547 or 515 terminates the statement, not the procedure
+    -> without TRY/CATCH, the procedure continues: @@ROWCOUNT and RETURN
+       that follow report a misleading result (RowsDeleted = 0, RETURN 0)
+    -> with TRY at the caller, the procedure stops at the error
+    -> in CATCH, always RETURN your own code - otherwise SQL Server picks one (-6)
 ```
 
 ```text
 Function
     -> read-only, usable inside FROM / JOIN
+    -> no ORDER BY inside an inline TVF - the caller sorts
+    -> can return only rows: it cannot tell "does not exist" from "exists, but empty"
 
 Procedure
     -> can implement INSERT / UPDATE / DELETE
+    -> can report the outcome with a return code or OUTPUT parameters
+```
+
+```text
+Protection in layers
+    -> business rule: rejects the request first and explains why (RETURN 2)
+    -> constraint: protects the data even when the rule is missing or bypassed
+    -> TRY/CATCH: turns the constraint error into a code the caller can handle (RETURN 3)
+
+The database enforces only the rules it has been given
+    -> Category.Name has no UNIQUE constraint, so two Scooters are valid
+    -> some rules (e.g. "a product was ever sold") cannot be a constraint at all
 ```
 
 And remember:

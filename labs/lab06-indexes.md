@@ -2319,12 +2319,12 @@ Use the following checklist when evaluating a new index.
 | Step | Question | Why it matters |
 |---|---|---|
 | 1. Identify the query | Which queries are slow or frequently executed? | Focus on queries where optimization provides a meaningful benefit. |
-| 2. Examine search conditions | Which columns appear in `WHERE` and `JOIN` conditions? | These columns are potential candidates for index keys. |
-| 3. Choose key columns | Does the index have the appropriate leading key and column order? | Key order determines which search patterns the index can efficiently support. |
-| 4. Consider required columns | Which additional columns are returned, calculated, or aggregated? | Included columns may eliminate expensive additional lookups. |
-| 5. Evaluate selectivity | How many rows does the query need compared with the total table size? | A selective predicate may benefit from an index seek, while a scan can be cheaper for large result sets. |
-| 6. Check existing indexes | Does another index already support the query? | Avoid creating unnecessary or overlapping indexes. |
-| 7. Consider maintenance costs | How frequently are rows inserted, updated, or deleted? | Additional indexes require storage and increase data modification costs. |
+| 2. Examine search conditions | Which columns appear in `WHERE`, `JOIN`, `ORDER BY`, and `GROUP BY`? Do the conditions compare columns directly, without applying functions to them (Section 7.2)? | These columns are potential candidates for index keys, but only direct comparisons allow an index seek. |
+| 3. Choose key columns | Does the index have the appropriate leading key and column order? Are equality columns placed before range and sort columns (Section 10.1)? | Key order determines which search patterns the index can efficiently support. |
+| 4. Consider required columns | Which additional columns are returned, calculated, or aggregated? Which columns belong in the key and which in `INCLUDE` (Section 10.3)? | Included columns may eliminate expensive additional lookups. |
+| 5. Evaluate selectivity | How many rows does the query need compared with the total table size? Do the important queries always target the same small subset of rows? | A selective predicate may benefit from an index seek, while a scan can be cheaper for large result sets. A fixed small subset may call for a filtered index (Section 10.4). |
+| 6. Check existing indexes | Does another index already support the query, for example through its leftmost key columns (Section 10.1)? What do the Missing Index suggestions propose (Section 7.7)? | Avoid creating unnecessary or overlapping indexes. Missing Index suggestions are a starting point, not a finished design. |
+| 7. Consider maintenance costs | How frequently are rows inserted, updated, or deleted? Is the clustered key narrow, unique, and ever-increasing (Section 4.2)? Are foreign key columns used in joins indexed (Section 5)? | Additional indexes require storage and increase data modification costs. The clustered key is stored in every nonclustered index, and a `FOREIGN KEY` constraint does not create an index on its own. |
 | 8. Measure the result | Did logical reads, CPU time, or elapsed time improve? | Use actual execution plans and measurements to verify the benefit. |
 
 > [!IMPORTANT]
@@ -2334,14 +2334,7 @@ Use the following checklist when evaluating a new index.
 
 ### A practical approach
 
-When investigating a slow query, follow this process:
-
-1. **Analyze** the SQL statement and its Actual Execution Plan.
-2. **Identify** expensive operations and unnecessary data access.
-3. **Design** an index that supports the query's filtering, joining, or ordering requirements.
-4. **Test** the query again using the same SQL statement.
-5. **Compare** logical reads, CPU time, and elapsed time.
-6. **Evaluate** whether the performance improvement justifies the additional index.
+Index tuning is a cycle: **measure** the query and read its Actual Execution Plan, **change one thing** (add, modify, or remove one index), and **measure again** with the same SQL statement. Changing one thing at a time is what allows you to explain which change caused which effect. Section 8 followed exactly this cycle, one index at a time.
 
 Remember that an `Index Seek` is not automatically better than a `Scan`. The best execution strategy depends on the amount of data required and the available access paths.
 
@@ -2370,6 +2363,9 @@ ORDER BY OrderDate DESC;
 
 Design and create a nonclustered index that supports the filter and sort. Explain the key column order and any included columns. Re-run the query to verify your result.
 
+> [!TIP]
+> The query returns about one million rows. Displaying them in the SSMS results grid takes longer than executing the query itself, so before measuring, enable **Query → Query Options → Results → Grid → Discard results after execution**.
+
 <details>
 <summary>Show solution</summary>
 
@@ -2383,6 +2379,14 @@ GO
 `Status` is the leading key because of the equality filter. `OrderDate` follows it, so within one status the entries are already in date order and no `Sort` is needed. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
 
 Declaring `OrderDate DESC` matches the requested order, but it is not required: SQL Server can read an ascending index backward just as well (Exercise 4 relies on exactly this). The direction of a key column matters when `ORDER BY` mixes directions, for example `ORDER BY Status ASC, OrderDate DESC` without an equality filter on `Status`.
+
+Reference results:
+
+| | Before the index | With `IX_SalesOrder_Status_OrderDate` |
+|---|---|---|
+| Plan | `Clustered Index Scan` + `Sort` | `Index Seek`, no `Sort` |
+| Logical reads | 57,266 | 5,462 |
+| Elapsed time | about 4.9 s | about 0.5 s |
 
 </details>
 
@@ -2444,34 +2448,44 @@ The existing `IX_SalesOrderItem_SalesOrderId` index with `INCLUDE (ProductId, Qu
 
 ## Exercise 4 – Evaluate a Missing Index suggestion
 
-Run:
+Run the following query with Actual Execution Plan enabled:
 
 ```sql
 SELECT SalesOrderId, OrderDate
 FROM dbo.SalesOrder
-WHERE Status = 'Review'
+WHERE Status = 'Cancelled'
 ORDER BY OrderDate;
 ```
 
-Before creating anything, consider:
+If a Missing Index suggestion appears above the plan, look at it carefully before creating anything, and consider:
 
 1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from Section 10.2, the filtered index `IX_SalesOrder_Review_OrderDate` from Section 10.4, and `IX_SalesOrder_Status_OrderDate` if you completed Exercise 1?
 2. Can an existing index support both the filter and the requested sort order?
-3. Is it better to create a new index, replace an overlapping index, or do nothing?
+3. Does the suggested index support both of them?
+4. Is it better to create the suggested index, replace an overlapping index, or do nothing?
 
 <details>
 <summary>Show solution</summary>
 
-If you completed Exercise 1, `IX_SalesOrder_Status_OrderDate` already covers this query. With `Status` fixed by the equality condition, SQL Server can read the relevant `OrderDate DESC` range backward to satisfy `ORDER BY OrderDate` in ascending order. No new index is needed for this exercise.
+**The filtered index is not used.** `IX_SalesOrder_Review_OrderDate` contains only `Review` orders, so it cannot answer a query for `Cancelled` orders (see the limitations in Section 10.4).
 
-If you created the filtered index in Section 10.4, `IX_SalesOrder_Review_OrderDate` also supports this query completely, and it is the smallest of these indexes.
+**If you completed Exercise 1**, no suggestion appears. `IX_SalesOrder_Status_OrderDate` already covers the query: with `Status` fixed by the equality condition, SQL Server reads the `Cancelled` part of the index backward (`Index Seek` with `ORDERED BACKWARD` in the plan properties) and returns the rows in ascending date order without a `Sort`. The reference run needed 3,751 logical reads. No new index is needed.
 
-`IX_SalesOrder_Status` alone does not help: it does not contain `OrderDate`, so the optimizer prefers a `Clustered Index Scan` followed by a `Sort` (see Section 10.4). Without the other indexes, there are two reasonable designs:
+**If you skipped Exercise 1**, the reference plan uses a `Clustered Index Scan` followed by a `Sort` (57,266 logical reads), and SQL Server suggests an index similar to:
 
-- An index on `(Status, OrderDate)`. Following the leftmost-prefix rule from Section 10.1, it also supports every search on `Status` alone, so it should **replace** `IX_SalesOrder_Status` rather than be added next to it.
-- A filtered index on `(OrderDate) WHERE Status = 'Review'`, if the application queries this status far more often than the others.
+```sql
+-- Missing Index suggestion (estimated impact about 41%)
+CREATE NONCLUSTERED INDEX ...
+ON dbo.SalesOrder (Status)
+INCLUDE (OrderDate);
+```
 
-In a real system, inspect the entire workload before choosing.
+This suggestion has two weaknesses:
+
+- `OrderDate` is only an included column, so it does not determine the order of the index. The index would find the cancelled orders, but the `Sort` would remain. Missing Index suggestions do not take `ORDER BY` into account.
+- It is almost a duplicate of the existing `IX_SalesOrder_Status`, which has the same key.
+
+A better design is an index on `(Status, OrderDate)`. It supports both the filter and the sort, and, following the leftmost-prefix rule from Section 10.1, it also supports every search on `Status` alone. It should therefore **replace** `IX_SalesOrder_Status` rather than be added next to it. In a real system, inspect the entire workload before making this change.
 
 </details>
 

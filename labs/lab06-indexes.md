@@ -663,6 +663,7 @@ The following table introduces the most important operators you will encounter i
 |---|---|
 | `Table Scan` | Reads rows from a **heap** (a table without a clustered index). SQL Server examines the rows to find those matching the query conditions. If there is no suitable index, it may need to read the entire table. |
 | `Clustered Index Scan` | Reads data from the **leaf level of a clustered index**, where the actual table rows are stored. It may read many or all rows, even when the query needs only a small number of them. |
+| `Clustered Index Seek` | Uses the clustered index keys to navigate directly to specific rows or a range of rows. Because the leaf level contains complete rows, no additional lookup is needed. |
 | `Index Scan` | Reads entries from a **nonclustered index**. Because an index may contain fewer and narrower columns than the table, scanning it can require less work than scanning the complete table. |
 | `Index Seek` | Uses the **ordered index keys** to navigate directly to a specific value or range of values. This can avoid reading large parts of the index that are not relevant to the query. |
 | `RID Lookup` | Uses a **Row Identifier (RID)** obtained from a nonclustered index to retrieve additional columns from a heap row. It is needed when the index does not contain all the required data. |
@@ -693,7 +694,9 @@ WHERE so.OrderDate >= '20250601'
 
 This condition selects orders from **June 1, 2025**.
 
-Notice that we use a range rather than comparing the date with a single value. This also works correctly when `OrderDate` contains a time component.
+Notice that we use a range rather than comparing the date with a single value. `OrderDate` is of type `date` in `IndexLab`, but a half-open range (`>=` start, `<` next day) also works correctly for columns that contain a time component.
+
+Just as importantly, the condition compares the column directly with constants. A condition that applies a function to the column, such as `YEAR(so.OrderDate) = 2025` or `CAST(so.OrderDate AS varchar(10)) = ...`, usually prevents SQL Server from seeking in an index on `OrderDate`, because the index is ordered by the column values, not by the function results.
 
 ### Why does SQL Server scan the table?
 
@@ -904,6 +907,8 @@ A scan can read the required pages sequentially, while many individual seeks may
 
 When a large proportion of the table is needed, scanning it may require less total work.
 
+In our reference plan, the full scan of `Product` costs only **161** logical reads. The clustered index on 30,000 rows has two levels, so a separate seek for each of the 21,908 order items would cost about 21,908 × 2 ≈ **44,000** logical reads — more than 250 times as much.
+
 The optimizer compares the estimated costs of these alternatives.
 
 </details>
@@ -980,6 +985,8 @@ INCLUDE (SalesOrderId);
 ```
 
 This recommendation is based on the optimizer's view of a **particular query**, not on the complete database workload. It does not fully account for existing overlapping indexes, maintenance overhead, storage costs, or other queries.
+
+SSMS displays only the first suggestion above the plan, together with an estimated *Impact* percentage. A plan can contain several suggestions; right-click the plan and choose **Show Execution Plan XML** to see all of them in the `<MissingIndexes>` element. The Impact value is the optimizer's estimate for this single query, not a measured improvement.
 
 > [!WARNING]
 > **Do not create suggested indexes yet.** We will add indexes deliberately in Section 8. After introducing a clustered primary key on `SalesOrderId`, its clustered key is already available as the row locator in the nonclustered `OrderDate` index. Explicit `INCLUDE (SalesOrderId)` is unnecessary in that design.

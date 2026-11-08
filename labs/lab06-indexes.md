@@ -575,6 +575,14 @@ Enable **Query → Include Actual Execution Plan**, or press `Ctrl + M` before e
 
 **Logical reads** count 8 KB pages read from the buffer pool (including pages previously cached); they are *not* the same thing as physical disk reads. A query can perform many logical reads even when physical reads are near zero. Conversely, timing can vary with buffer cache, CPU availability, concurrent activity, and the selected plan.
 
+A simplified `STATISTICS IO` line looks like this:
+
+```text
+Table 'SalesOrder'. Scan count 1, logical reads 57000, physical reads 0, read-ahead reads 0.
+```
+
+Here SQL Server accessed about 57,000 pages, which corresponds to roughly 57,000 × 8 KB ≈ **445 MiB** processed through the buffer pool, even though nothing had to be read from disk. Recent SQL Server versions print additional counters on the same line, such as *page server reads* and *lob logical reads*; they are not relevant for this lab.
+
 `STATISTICS TIME` prints two kinds of blocks: *parse and compile time* and *SQL Server Execution Times*. Record the CPU and elapsed time from the **Execution Times** block that follows the query.
 
 > [!TIP]
@@ -1583,388 +1591,50 @@ We have now seen how different indexes change the execution plan. In the next se
 
 ---
 
-# 9. Performance comparison and analysis
+# 9. Performance comparison
 
-In Section 8, we gradually introduced indexes and observed how each change affected the execution plan.
+Throughout Section 8, the SQL query remained unchanged; only the available indexes changed. The following table brings together the reference measurements from all five stages, measured on the reference Express instance.
 
-We started with expensive scans of millions of rows and ended with a more efficient execution strategy using targeted index seeks and a covering index.
+| Stage | `SalesOrder` logical reads | `SalesOrderItem` logical reads | CPU time | Elapsed time |
+|---|---:|---:|---:|---:|
+| 1. Before indexing (heaps) | 57,143 | 198,020 | 14.7 s | 18.1 s |
+| 2. Clustered primary keys | 57,266 | 198,439 | 13.25 s | 14.1 s |
+| 3. `IX_SalesOrder_OrderDate` | 15 | 198,439 | 12.05 s | 13.1 s |
+| 4. `IX_SalesOrderItem_SalesOrderId` (narrow) | 15 | 106,449 | 0.28 s | 0.76 s |
+| 5. The same index with `INCLUDE` | 15 | ~54,000 | — | ~0.5 s |
 
-However, **a better-looking execution plan does not automatically mean a faster query**. We need to measure the actual performance to understand how much work SQL Server performs.
+<!-- TODO: stage 5 values are approximate values from an earlier demonstration run. Replace them with measured values, add a matching reference block to Section 8.4, and update the calculations below. -->
 
-In this section, we will compare three important metrics:
+`Product` required 161 logical reads in every stage, because its small clustered index was scanned each time.
 
-- **Logical reads** – how many page accesses SQL Server performs through the buffer pool.
-- **CPU time** – how much processor time is spent executing the query.
-- **Elapsed time** – how much time passes from the beginning to the end of query execution.
+Record your own measurements in the same table. Your times will differ, but the pattern should be the same.
 
-By comparing these measurements before and after indexing, we can evaluate the actual benefits of our indexes.
+### Reading the table
 
-> [!IMPORTANT]
-> **The goal of indexing is not simply to replace Scans with Seeks.**
->
-> The goal is to reduce unnecessary work and improve query performance.
+- **Stages 2 and 3 barely change the elapsed time.** As long as the 40-million-row `SalesOrderItem` table is scanned and joined with `Hash Match`, it dominates the cost of the query, even after `SalesOrder` drops to 15 logical reads.
+- **Stage 4 is the decisive step.** Replacing the large scan with 5,477 index seeks reduces elapsed time from about 13 seconds to under one second, even though `SalesOrderItem`'s logical reads are only roughly halved. Scanning 40 million rows and building and probing a hash table costs CPU time far beyond the page reads themselves.
+- **Stage 5 removes the remaining lookups.** The covering index eliminates the 21,908 additional clustered index accesses, which further reduces logical reads.
 
-## 9.1 Understanding performance metrics
+### Overall improvement
 
-In Section 6.1, we enabled two SQL Server options:
-
-```sql
-SET STATISTICS IO ON;
-SET STATISTICS TIME ON;
-```
-
-These commands provide information about the work SQL Server performs when executing a query.
-
-Let's examine the most important measurements before comparing our results.
-
-### Logical reads
-
-A **logical read** occurs when SQL Server accesses a data or index page through the buffer pool.
-
-As we learned in Lab 05, SQL Server stores data in **8 KB pages**.
-
-For example, consider this simplified `STATISTICS IO` output:
-
-```text
-Table 'SalesOrder'.
-Scan count 1, logical reads 57000,
-physical reads 0, read-ahead reads 0.
-```
-
-This means SQL Server performed approximately **57,000 logical page reads** while accessing `SalesOrder`.
-
-Since each page is 8 KB, this represents approximately:
-
-**57,000 logical reads × 8 KB ≈ 445 MiB**
-
-However, this does not necessarily mean that SQL Server transferred 445 MiB from disk.
-
-The pages may already be cached in memory.
-
-> [!IMPORTANT]
-> **Logical reads are not the same as physical disk reads.**
->
-> Logical reads measure page accesses through the buffer pool, including pages already cached in memory.
->
-> A query can perform many logical reads even when physical disk reads are zero.
-
-### Physical reads and read-ahead reads
-
-The `STATISTICS IO` output may also include:
-
-| Metric | Meaning |
-|---|---|
-| `physical reads` | Pages read from storage because they were not already available in the buffer pool. |
-| `read-ahead reads` | Pages SQL Server reads into memory in advance because it expects to need them. |
-
-For this lab, we will focus primarily on **logical reads**, because they help us understand how much page-access work different execution plans perform.
-
-### CPU time and elapsed time
-
-`STATISTICS TIME` provides two important measurements.
-
-A simplified example:
-
-```text
-SQL Server Execution Times:
-   CPU time = 1200 ms,
-   elapsed time = 1500 ms.
-```
-
-| Metric | Meaning |
-|---|---|
-| CPU time | Total processor time consumed while executing the query. |
-| Elapsed time | Total wall-clock time taken to execute the query, including time spent waiting. |
-
-In this example, the query used approximately 1.2 seconds of CPU time and finished after 1.5 seconds.
-
-These values are not always similar.
-
-For example, a query may spend time waiting for I/O operations, locks, or other resources. In a parallel execution plan, CPU time can also exceed elapsed time because multiple workers execute simultaneously.
-
-### Why do we need all three measurements?
-
-Each metric tells us something different:
-
-- **Logical reads** help us understand the amount of page-access work.
-- **CPU time** helps us understand processor usage.
-- **Elapsed time** tells us how long the query actually took.
-
-A query can become faster without reducing all three measurements by the same percentage.
-
-For example, a different execution plan may reduce elapsed time through parallel execution while still processing a large amount of data.
-
-> [!TIP]
-> When comparing execution plans, do not look only at elapsed time.
->
-> Compare logical reads, CPU time, and elapsed time together. Also remember that caching, concurrent activity, and execution settings can affect the results.
-
-### Check your understanding
-
-**A query reports 50,000 logical reads but zero physical reads. Does this mean SQL Server did not access any data pages?**
-
-<details>
-<summary>Show answer</summary>
-
-No.
-
-SQL Server accessed data or index pages approximately 50,000 times through the buffer pool.
-
-The zero physical reads indicate that no demand page reads from storage were reported. The required pages may already have been cached in memory.
-
-Logical reads measure page accesses, not necessarily physical disk operations.
-
-</details>
-
-## 9.2 Comparing performance before and after indexing
-
-We have now seen how indexes changed the execution plan. Let's measure how much these changes improved query performance.
-
-The following approximate results summarize the original lab demonstration on **SQL Server Express**. They are representative measurements from demonstration runs, rather than exact copies of every measurement in Sections 7 and 8. For example, the detailed baseline in Section 7 reports 18.1 seconds; the rounded comparison below uses approximately 17 seconds. Use measurements from your own runs when calculating your improvement.
-
-The same SQL query was executed before and after creating the indexes.
-
-### Reference measurements
-
-| Metric | Before indexing | After indexing |
-|---|---:|---:|
-| `SalesOrder` logical reads | ~57,000 | ~15 |
-| `SalesOrderItem` logical reads | ~198,000 | ~54,000 |
-| Total logical reads (two large tables) | ~255,000 | ~54,000 |
-| Elapsed time | ~17 s | ~0.5 s |
-
-These are approximate reference measurements. Your results may differ depending on hardware, caching, SQL Server configuration, and other factors.
-
-### How much did logical I/O decrease?
-
-Before indexing, SQL Server performed approximately **255,000 logical reads** across the two large tables.
-
-After indexing, this decreased to approximately **54,000 logical reads**.
-
-We can calculate the reduction:
+Comparing the first and the last stage across the two large tables:
 
 ```math
-\mathrm{Reduction} = \frac{255{,}000 - 54{,}000}{255{,}000} \times 100
+\mathrm{Logical\text{-}read\ reduction} = \frac{255{,}163 - 54{,}000}{255{,}163} \times 100 \approx 78.8\%
 ```
 
 ```math
-\boxed{\mathrm{Logical\text{-}read\ reduction} \approx 78.8\%}
+\mathrm{Speedup} = \frac{18.1\ \mathrm{s}}{0.5\ \mathrm{s}} \approx 36
 ```
 
+Expressed as factors, the query performs about **4.7× fewer logical reads** but finishes about **36× faster**. The two numbers do not have to be proportional: logical reads count page accesses, while elapsed time also reflects CPU work (such as scanning rows and processing a large hash join), waiting, and caching.
 
-This means the optimized query performs approximately **79% fewer logical page accesses** across these two tables.
-
-Notice that the reduction is not identical for both tables:
-
-- `SalesOrder` logical reads decreased from approximately 57,000 to only 15.
-- `SalesOrderItem` logical reads decreased from approximately 198,000 to 54,000.
-
-Although the large scans have disappeared, repeated index seeks still require page accesses.
-
-**An Index Seek is efficient, but it is not free.**
-
-### How much faster is the query?
-
-The original execution took approximately **17 seconds**.
-
-After indexing, the same query completed in approximately **0.5 seconds**.
-
-We can calculate the speedup:
-
-```math
-\mathrm{Speedup} = \frac{\mathrm{Before\ elapsed\ time}}{\mathrm{After\ elapsed\ time}}
-```
-
-```math
-\mathrm{Speedup} = \frac{17}{0.5} = 34
-```
-
-
-The query completed approximately **34 times faster** in this reference test.
-
-This is a significant improvement, even though the SQL statement and the number of matching rows remained unchanged.
-
-### Why did elapsed time improve more than logical reads?
-
-Logical reads decreased by approximately 79%, while elapsed time improved by a factor of about 34.
-
-To compare like with like, express both changes as factors: 255,000 / 54,000 ≈ **4.7× fewer logical reads**, compared with **34× shorter elapsed time**.
-
-These measurements describe different aspects of query execution.
-
-The optimized plan avoids scanning millions of unrelated rows and uses more targeted access paths. This can reduce CPU processing, memory work, and other execution costs in addition to page accesses.
-
-However, elapsed time is also affected by caching, waiting, parallelism, and system load.
-
-Therefore, **the reduction in logical reads and the reduction in elapsed time do not have to be proportional**.
-
-### Check your understanding
-
-**Why does the optimized query still perform approximately 54,000 logical reads on `SalesOrderItem`, even though it no longer scans all 40 million rows?**
-
-<details>
-<summary>Show answer</summary>
-
-The optimized plan uses repeated index seeks to find the order items belonging to the selected orders.
-
-Each seek requires accessing index pages, including navigation and leaf pages.
-
-Although these operations are much more targeted than scanning the entire table, their logical reads accumulate across thousands of seeks.
-
-Therefore, eliminating a large scan does not mean eliminating all page-access work.
-
-</details>
-
-## 9.3 SQL Server editions and parallel execution
-
-So far, we have focused on how indexes improve query performance by reducing unnecessary data access.
-
-However, **the same query can perform differently depending on the SQL Server edition, configuration, and available hardware**.
-
-In the original lab demonstration, the same database and query were tested on SQL Server Express and Developer editions running on the same computer.
-
-### Reference measurements
-
-| Metric | SQL Server Express | Developer / Enterprise |
-|---|---:|---:|
-| Execution before indexing | Serial | Parallel |
-| Elapsed time before indexing | ~17 s | ~1.3 s |
-| Elapsed time after indexing | ~0.5 s | ~0.17 s |
-| Speedup from indexing | ~34× | ~8× |
-
-These values are reference measurements from a particular test environment. They are not guaranteed results for every SQL Server installation.
-
-### What is parallel execution?
-
-SQL Server can sometimes divide the work of a query among multiple CPU workers.
-
-There are two common execution approaches:
-
-- **Serial execution:** the query uses a single worker for its execution.
-- **Parallel execution:** parts of the query are processed by multiple workers simultaneously.
-
-For example, when scanning a large table, a parallel plan may allow several workers to process different portions of the data.
-
-This can reduce the elapsed time needed to complete the query.
-
-However, **parallel execution does not necessarily reduce the total amount of work performed**. It may simply distribute the work across multiple CPU workers.
-
-### Why was the difference larger before indexing?
-
-Before indexing, the query had to process very large inputs, including approximately 40 million order items.
-
-In the reference Developer/Enterprise test, parallel execution helped distribute this work across multiple CPU workers.
-
-As a result, the query completed much faster than in the reference Express test, even before creating the indexes.
-
-After indexing, both editions benefited from more efficient access paths. The query needed to process far less unnecessary data, so the difference in elapsed time between the two environments became smaller.
-
-### CPU time vs. elapsed time
-
-Remember the distinction from Section 9.1:
-
-- **CPU time** measures the processor time consumed by the query.
-- **Elapsed time** measures how long the query takes to finish.
-
-In a parallel plan, several workers can consume CPU time simultaneously.
-
-For example, a query might consume 4 seconds of total CPU time but finish in 1.5 seconds of elapsed time.
-
-This is possible because multiple workers perform parts of the work concurrently.
-
-> [!IMPORTANT]
-> **Parallel execution can make an inefficient query finish faster, but it does not automatically make the query more efficient.**
+> [!NOTE]
+> **Editions and parallel execution**
 >
-> Good indexing reduces unnecessary data access. Parallel execution can distribute the remaining work across multiple CPU workers.
-
-### Check your understanding
-
-**Why did the reference Developer/Enterprise instance execute the query much faster than Express before indexing, even though both processed the same data?**
-
-<details>
-<summary>Show answer</summary>
-
-The reference Developer/Enterprise instance used a parallel execution plan, allowing multiple CPU workers to process parts of the query simultaneously.
-
-The Express instance used a serial plan in this test.
-
-Parallelism reduced elapsed time, but the query still had to process large amounts of data.
-
-After indexing, both instances benefited from more efficient access paths, reducing unnecessary work.
-
-</details>
-
-## 9.4 Performance analysis exercise
-
-We have now completed the indexing demonstration and examined how the execution plan and query performance changed.
-
-In this exercise, you will use the **five execution plans** from Sections 7 and 8, together with your `STATISTICS IO` and `STATISTICS TIME` results.
-
-Your goal is to explain not only **which plan is faster, but why**.
-
-### Part 1 – Analyze the execution plans
-
-Review the five stages of our demonstration:
-
-1. Before indexing.
-2. After creating clustered primary keys.
-3. After creating the `OrderDate` index.
-4. After creating the `SalesOrderId` index.
-5. After adding the `INCLUDE` columns.
-
-Answer the following questions:
-
-1. Why did creating clustered primary keys not eliminate the large scans?
-2. Which index first allowed SQL Server to avoid scanning the entire `SalesOrder` table?
-3. Which index eliminated the large `SalesOrderItem` scan?
-4. Why did the narrow `SalesOrderId` index introduce additional clustered index accesses?
-5. What changed after adding `INCLUDE (ProductId, Quantity, UnitPrice)`?
-6. Why did the `Product` scan remain in the optimized plan?
-7. Why did the join strategy change from `Hash Match` to `Nested Loops`?
-8. Why is an `Index Seek` not always better than an `Index Scan` or `Table Scan`?
-
-<details>
-<summary>Show discussion points</summary>
-
-1. The clustered keys did not directly support filtering by `OrderDate` or locating order items by `SalesOrderId`.
-2. `IX_SalesOrder_OrderDate` enabled efficient access to the requested date range.
-3. `IX_SalesOrderItem_SalesOrderId` enabled SQL Server to locate order items using the join key.
-4. The narrow index did not contain `ProductId`, `Quantity`, and `UnitPrice`, so SQL Server needed additional clustered index accesses.
-5. The index became covering for the order-item portion of the query, eliminating the additional clustered row fetches.
-6. Scanning the relatively small `Product` table could still be cheaper than performing many individual seeks.
-7. The new index made repeated seeks on the inner input efficient, making `Nested Loops` attractive.
-8. A seek may still process many rows or require repeated lookups. A scan can be more efficient when a large proportion of the data is needed.
-
-</details>
-
-### Part 2 – Analyze the performance measurements
-
-Use the results you recorded with `STATISTICS IO` and `STATISTICS TIME`.
-
-Answer the following questions:
-
-1. How much did the logical reads decrease for `SalesOrder`?
-2. How much did the logical reads decrease for `SalesOrderItem`?
-3. What was the overall percentage reduction in logical reads across these two tables?
-4. How many times faster was the query after indexing?
-5. Why did elapsed time improve by a different percentage than logical reads?
-6. Why can the same query have different execution times on SQL Server Express and Developer editions?
-
-<details>
-<summary>Show reference answers</summary>
-
-Using the approximate reference measurements from Section 9.2:
-
-1. `SalesOrder`: from 57,000 to 15 logical reads — approximately **99.97% reduction**.
-2. `SalesOrderItem`: from 198,000 to 54,000 logical reads — approximately **72.7% reduction**.
-3. Combined logical reads decreased from approximately 255,000 to 54,000 — approximately **78.8% reduction** (about 4.7× fewer).
-4. Elapsed time decreased from approximately 17 seconds to 0.5 seconds — approximately **34× speedup**.
-5. Logical reads measure page accesses, while elapsed time also depends on CPU processing, waiting, caching, and execution strategy.
-6. Different editions and configurations may use different execution plans, resource limits, and degrees of parallelism.
-
-Your own results may differ from these reference values.
-
-</details>
+> On the reference computer, the same baseline query took about **1.3 seconds** on a Developer edition instance, which executed it in parallel, compared with about 18 seconds on Express. Developer edition has the same feature set as Enterprise edition, but it is licensed only for development and testing.
+>
+> Parallel execution distributes the work across several CPU workers, so total CPU time can exceed elapsed time. It can make an inefficient query finish faster, but it does not reduce the amount of data the query must process. Indexing reduces the work itself: after indexing, the query took about 0.17 seconds on the Developer instance as well.
 
 ### Final question
 
@@ -1984,7 +1654,6 @@ The execution plan and performance measurements confirmed the improvement.
 </details>
 
 ---
-
 
 # 10. Index design principles
 

@@ -26,7 +26,7 @@ By the end of this lab, you should be able to:
 - explain selectivity, index maintenance, and the cost of additional indexes;
 
 > [!NOTE]
-> **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database using the lab's preparation scripts before starting the SQL exercises below. This lab assumes the reference data and table names from those scripts.
+> **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database as described in [Lab 05, Section 2](lab05-physical-storage.md#2-create-the-indexlab-database), using the [IndexLab setup script](setup/index-lab-data-setup.md), before starting the SQL exercises below. This lab assumes the reference data and table names from that script.
 
 ---
 
@@ -120,7 +120,7 @@ An index may consist of a single page; it does not always need three levels. The
 
 ![Balanced and unbalanced trees](../images/lab06/tree-balanced-vs-unbalanced.svg)
 
-For a B+ tree, **all leaves are at the same depth**. Therefore, finding any key requires traversing approximately the same number of levels. Because each internal page can direct the search to many child pages, even a large index can have relatively few levels.
+For a B+ tree, **all leaves are at the same depth**. Therefore, finding any key requires traversing the same number of levels. Because each internal page can direct the search to many child pages, even a large index can have relatively few levels.
 
 > [!NOTE]
 > “All leaves are at the same depth” describes the B+ tree property illustrated here, not every possible definition of a balanced tree.
@@ -223,6 +223,7 @@ However, knowing that a row has a physical location is not the same as knowing *
 Suppose we want to find one member:
 
 ```sql
+-- Illustrative example (Member is not part of IndexLab)
 SELECT *
 FROM dbo.Member
 WHERE MemberID = 61;
@@ -475,7 +476,7 @@ In our practical demo, we will create clustered primary keys and then add nonclu
 
 For example, a nonclustered index on `SalesOrder(OrderDate)` can already make its clustered key `SalesOrderId` available. We do not need to explicitly `INCLUDE (SalesOrderId)` when `SalesOrderId` is the clustered key.
 
-## Check your understanding
+### Check your understanding
 
 1. Where does a B+ tree search start?
 2. Why are leaf pages linked?
@@ -584,7 +585,7 @@ Read the SQL statement before you execute it:
 
 This query is useful because it combines **filtering, joining, calculation, aggregation, and sorting**. Different plan operators can be linked directly to parts of the SQL statement.
 
-In the reference Express instance, the baseline execution took approximately **15–17 seconds**. Do not focus on the time alone — Section 7 explains how to read the plan behind this number.
+In the reference Express instance, the baseline execution took approximately **18 seconds** (see the reference table at the beginning of Section 7). Do not focus on the time alone — Section 7 explains how to read the plan behind this number.
 
 ---
 
@@ -951,10 +952,10 @@ This recommendation is based on the optimizer's view of a **particular query**, 
 > [!WARNING]
 > **Do not create suggested indexes yet.** We will add indexes deliberately in Section 8. After introducing a clustered primary key on `SalesOrderId`, its clustered key is already available as the row locator in the nonclustered `OrderDate` index. Explicit `INCLUDE (SalesOrderId)` is unnecessary in that design.
 
-## Check your understanding
+### Check your understanding
 
 1. What is the difference between **rows read**, **rows returned**, and **logical reads**?
-2. Why can scanning 10 million orders return only 5,477 relevant orders?
+2. Why does SQL Server examine 10 million orders even though only 5,477 of them are relevant?
 3. Why is `SalesOrderItem` the main bottleneck, despite having a join predicate?
 4. Why might `Hash Match` be a reasonable join strategy before adding indexes?
 5. Why is a scan of `Product` not necessarily a problem?
@@ -1196,7 +1197,7 @@ In the next section, we will create an index on `SalesOrderItem(SalesOrderId)` t
 
 The new index is created on `SalesOrder(OrderDate)`, so it helps SQL Server find orders matching the requested date range.
 
-However, `SalesOrderItem` is a separate table. Its rows are not organized by `SalesOrderId` in a suitable nonclustered index yet.
+However, `SalesOrderItem` is a separate table, and it does not yet have an index with `SalesOrderId` as its key.
 
 SQL Server still needs to scan the large order-item table to find the matching items.
 
@@ -1303,7 +1304,7 @@ Inspect its Properties and identify:
 
 Notice that this operator is executed repeatedly, once for each matching order item in our reference plan.
 
-This operation is conceptually similar to a **Key Lookup**, where SQL Server uses the clustered key obtained from a nonclustered index to retrieve missing columns.
+This operation is conceptually similar to a **Key Lookup**, where SQL Server uses the clustered key obtained from a nonclustered index to retrieve missing columns. Depending on the SQL Server and SSMS version, your plan may show this operator as `Key Lookup (Clustered)` instead of `Clustered Index Seek`; both describe the same kind of row retrieval.
 
 A small number of additional lookups may be inexpensive. However, thousands of repeated accesses can become a significant part of the query's total work.
 
@@ -1675,7 +1676,7 @@ The same SQL query was executed before and after creating the indexes.
 |---|---:|---:|
 | `SalesOrder` logical reads | ~57,000 | ~15 |
 | `SalesOrderItem` logical reads | ~198,000 | ~54,000 |
-| Total logical reads (two large tables) | ~255,000 | ~54,015 |
+| Total logical reads (two large tables) | ~255,000 | ~54,000 |
 | Elapsed time | ~17 s | ~0.5 s |
 
 These are approximate reference measurements. Your results may differ depending on hardware, caching, SQL Server configuration, and other factors.
@@ -1684,12 +1685,12 @@ These are approximate reference measurements. Your results may differ depending 
 
 Before indexing, SQL Server performed approximately **255,000 logical reads** across the two large tables.
 
-After indexing, this decreased to approximately **54,015 logical reads**.
+After indexing, this decreased to approximately **54,000 logical reads**.
 
 We can calculate the reduction:
 
 ```math
-\mathrm{Reduction} = \frac{255{,}000 - 54{,}015}{255{,}000} \times 100
+\mathrm{Reduction} = \frac{255{,}000 - 54{,}000}{255{,}000} \times 100
 ```
 
 ```math
@@ -1732,6 +1733,8 @@ This is a significant improvement, even though the SQL statement and the number 
 ### Why did elapsed time improve more than logical reads?
 
 Logical reads decreased by approximately 79%, while elapsed time improved by a factor of about 34.
+
+To compare like with like, express both changes as factors: 255,000 / 54,000 ≈ **4.7× fewer logical reads**, compared with **34× shorter elapsed time**.
 
 These measurements describe different aspects of query execution.
 
@@ -1900,7 +1903,7 @@ Using the approximate reference measurements from Section 9.2:
 
 1. `SalesOrder`: from 57,000 to 15 logical reads — approximately **99.97% reduction**.
 2. `SalesOrderItem`: from 198,000 to 54,000 logical reads — approximately **72.7% reduction**.
-3. Combined logical reads decreased from approximately 255,000 to 54,015 — approximately **78.8% reduction**.
+3. Combined logical reads decreased from approximately 255,000 to 54,000 — approximately **78.8% reduction** (about 4.7× fewer).
 4. Elapsed time decreased from approximately 17 seconds to 0.5 seconds — approximately **34× speedup**.
 5. Logical reads measure page accesses, while elapsed time also depends on CPU processing, waiting, caching, and execution strategy.
 6. Different editions and configurations may use different execution plans, resource limits, and degrees of parallelism.
@@ -2019,7 +2022,7 @@ This query does not filter by the leading key, `CustomerId`.
 
 Therefore, SQL Server generally cannot use this composite index to directly seek to one continuous date range across all customers.
 
-It may scan the index or choose another available index, such as `IX_SalesOrder_OrderDate`, which we created earlier.
+Order dates in `IndexLab` cover 2021–2025, so this condition matches roughly **one fifth of the table** (about 2 million rows). The earlier `IX_SalesOrder_OrderDate` index can locate the date range, but it does not contain `CustomerId`, so using it would require about 2 million lookups. The composite index, on the other hand, contains every column this query needs (`CustomerId`, `OrderDate`, and the clustered key `SalesOrderId`) and is much narrower than the table. Expect SQL Server to **scan the composite index** (`Index Scan`) rather than seek in it.
 
 ### Compare the execution plans
 
@@ -2029,7 +2032,7 @@ For each query, inspect the access operator and its **Seek Predicates**.
 |---|---|---|
 | A | `CustomerId = 500` | Seek using the leading key |
 | B | `CustomerId = 500 AND OrderDate >= ...` | Seek using both key columns |
-| C | `OrderDate >= ...` | No efficient date-only seek using this composite index |
+| C | `OrderDate >= ...` | No date-only seek; likely an `Index Scan` of the composite index |
 
 > [!IMPORTANT]
 > **The order of columns in a composite index matters.**

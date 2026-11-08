@@ -115,7 +115,7 @@ A tree is a hierarchy of nodes connected by links. Database rowstore indexes use
 - **Root:** the entry point to the tree.
 - **Internal (intermediate) nodes:** contain separator keys and links to child pages.
 - **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
-- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. SQL Server itself counts differently: `sys.dm_db_index_physical_stats` reports `index_depth` as the **number of levels** (for example, 3 for root + intermediate + leaf), and its `index_level` column numbers levels **from the leaf upward**, so the leaf level is 0 and the root has the highest number. In this lab's diagrams, we number levels from the root downward.
+- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. SQL Server itself counts differently: `sys.dm_db_index_physical_stats` reports `index_depth` as the **number of levels** (for example, 3 for root + intermediate + leaf), and its `index_level` column numbers levels **from the leaf upward**, so the leaf level is 0 and the root has the highest number. You saw the same convention in Lab 05, where `DBCC IND` reported `IndexLevel = 0` for leaf pages and the highest value for the root page. In this lab's diagrams, we number levels from the root downward.
 
 An index may consist of a single page; it does not always need three levels. The search examples in Sections 3 and 4 use three levels (root, intermediate, leaf) so that navigation is visible.
 
@@ -253,14 +253,6 @@ The index provides an ordered search structure, while the actual data rows remai
 
 ## 3.2 A nonclustered index on a heap
 
-In the previous section, we saw that a heap stores rows without organizing them by a clustered key.
-
-If we want to find a particular member using `MemberID`, SQL Server may have to scan many data pages.
-
-**Can we make searching faster without reorganizing the actual table?**
-
-Yes. We can create a **nonclustered index** on `MemberID`.
-
 A nonclustered index is a separate structure that organizes index entries by their key values. In a heap table, each index entry also contains a **RID (Row Identifier)** that identifies the corresponding data row.
 
 This gives us two separate structures:
@@ -305,9 +297,7 @@ The orange arrows illustrate how the RID values in the index refer to rows store
 
 **5. Empty spaces**
 
-Some index pages contain empty slots.
-These are conceptual representations of available page capacity. They help us understand that new keys may be inserted into existing pages.
-Real SQL Server index pages have an 8 KB layout, and their capacity depends on the size of the stored records.
+As explained in Section 2.3, empty slots illustrate free space available for new entries; they are not SQL Server's literal page layout.
 
 ### Finding MemberID = 61
 
@@ -441,6 +431,8 @@ Only **one page at each index level** is needed along the search path, followed 
 
 > [!NOTE]
 > This is a simplified comparison for finding **one matching row**. The page capacities are assumptions, not fixed SQL Server values. Logical page accesses are not the same as physical disk I/O; many pages may already be in memory. A range query returning many rows may favor a scan, and an index does not guarantee a particular execution plan or speedup.
+>
+> In practice, an index page with a small key such as an `int` can hold several hundred entries, so even three levels can address hundreds of millions of rows.
 
 **Check your understanding:** Why does adding millions of index entries not necessarily add many new levels to a B+ tree?
 

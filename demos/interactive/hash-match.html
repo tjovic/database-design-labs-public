@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hash Match join, step by step</title>
+<style>
+:root{--bg:#ffffff;--surface:#f4f5f7;--text:#1e293b;--muted:#64748b;--faint:#94a3b8;--border:#d8e1ec;
+--accent-bg:#e6f1fb;--accent:#185fa5;--ok-bg:#eaf3de;--ok:#3b6d11;--no-bg:#fcebeb;--no:#a32d2d}
+@media (prefers-color-scheme: dark){:root{--bg:#1c1c1e;--surface:#2a2a2d;--text:#e8e8ea;--muted:#a1a1aa;--faint:#71717a;--border:#3f3f46;
+--accent-bg:#0c447c;--accent:#b5d4f4;--ok-bg:#27500a;--ok:#c0dd97;--no-bg:#791f1f;--no:#f7c1c1}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:16px;line-height:1.5}
+main{max-width:880px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+.intro{color:var(--muted);margin:0 0 20px}
+.lbl{font-size:14px;color:var(--muted);margin:18px 0 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-family:Consolas,"Courier New",monospace;font-size:16px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface)}
+.chip.cur{border:2px solid var(--accent);background:var(--accent-bg);color:var(--accent)}
+.chip.done{color:var(--faint)}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip.no{background:var(--no-bg);color:var(--no);border-color:var(--no)}
+.buckets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.bucket{border:1px solid var(--border);border-radius:8px;padding:10px;min-height:76px}
+.bucket.hit{border:2px solid var(--accent)}
+.bucket .name{font-size:13px;color:var(--muted);margin-bottom:6px}
+.empty{font-size:13px;color:var(--faint)}
+.msg{margin:20px 0 12px;padding:12px 14px;background:var(--surface);border-radius:8px;min-height:52px;font-size:17px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 16px}
+.stat{background:var(--surface);border-radius:8px;padding:10px 14px}
+.stat .k{font-size:13px;color:var(--muted)}.stat .v{font-size:24px;font-weight:600}
+button{font:inherit;font-size:15px;padding:8px 16px;border-radius:8px;border:1px solid var(--muted);background:transparent;color:var(--text);cursor:pointer}
+button:hover{background:var(--surface)}
+.hint{font-size:13px;color:var(--faint);margin-top:12px}
+@media (max-width:600px){.buckets{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Hash Match join, step by step</h1>
+<p class="intro">A scaled-down version of the Lab 06 query: <code>SalesOrder</code> joined with <code>SalesOrderItem</code> on <code>SalesOrderId</code>. The hash function here is simply <code>id mod 4</code>; SQL Server uses a more complex one, but the principle is the same.</p>
+
+<p class="lbl">Build input · SalesOrder (5 orders; 5,477 in Lab 06)</p>
+<div class="row" id="build"></div>
+
+<p class="lbl">Hash table in memory · hash(id) = id mod 4</p>
+<div class="buckets" id="buckets"></div>
+
+<p class="lbl">Probe input · SalesOrderItem.SalesOrderId (8 items; 40,000,000 in Lab 06)</p>
+<div class="row" id="probe"></div>
+
+<div class="msg" id="msg"></div>
+
+<div class="stats">
+<div class="stat"><div class="k">Hashes computed</div><div class="v" id="cH">0</div></div>
+<div class="stat"><div class="k">Comparisons in buckets</div><div class="v" id="cC">0</div></div>
+<div class="stat"><div class="k">Joined rows</div><div class="v" id="cM">0</div></div>
+</div>
+
+<div class="row"><button id="next">Next step</button><button id="reset">Start over</button></div>
+<p class="hint">Keyboard: Space or → for the next step, R to start over.</p>
+</main>
+<script>
+const B=[101,206,310,415,517],P=[206,333,517,120,101,999,415,288];
+let st;
+const $=id=>document.getElementById(id);
+function init(){st={phase:'build',i:-1,bk:[[],[],[],[]],h:0,c:0,m:0,res:{},hit:-1};render('Click "Next step" to start the build phase.')}
+function render(t){
+ $('build').innerHTML=B.map((v,k)=>`<span class="chip ${st.phase==='build'&&k===st.i?'cur':(st.phase!=='build'||k<st.i)?'done':''}">${v}</span>`).join('');
+ $('buckets').innerHTML=st.bk.map((b,k)=>`<div class="bucket ${k===st.hit?'hit':''}"><div class="name">bucket ${k}</div><div class="row">${b.map(v=>`<span class="chip">${v}</span>`).join('')||'<span class="empty">empty</span>'}</div></div>`).join('');
+ $('probe').innerHTML=P.map((v,k)=>{let c='';if(st.phase==='probe'&&k===st.i)c='cur';else if(st.res[k]!==undefined)c=st.res[k]?'ok':'no';return `<span class="chip ${c}">${v}</span>`}).join('');
+ $('msg').textContent=t;$('cH').textContent=st.h;$('cC').textContent=st.c;$('cM').textContent=st.m;
+}
+function step(){
+ if(st.phase==='build'){
+  st.i++;
+  if(st.i<B.length){const v=B[st.i],h=v%4;st.bk[h].push(v);st.h++;st.hit=h;render(`Build: order ${v} → hash = ${v} mod 4 = ${h} → store it in bucket ${h}.`);return}
+  st.phase='probe';st.i=-1;st.hit=-1;render('The build phase is finished: all 5 orders are in the hash table. Now the probe phase starts.');return}
+ if(st.phase==='probe'){
+  st.i++;
+  if(st.i<P.length){const v=P[st.i],h=v%4,b=st.bk[h];st.h++;st.c+=b.length;st.hit=h;const f=b.includes(v);st.res[st.i]=f;if(f)st.m++;
+   let t=`Probe: item with SalesOrderId ${v} → hash = ${h} → look only in bucket ${h}. `;
+   t+=b.length===0?'The bucket is empty: no match, and no comparison needed.':(f?`Compare with ${b.join(', ')} → order ${v} found: output a joined row.`:`Compare with ${b.join(', ')} → same hash, different key (a collision): no match.`);
+   render(t);return}
+  st.phase='end';st.hit=-1;render(`Done: ${st.h} hashes, only ${st.c} comparisons, and ${st.m} joined rows. Comparing every item with every order would need 8 × 5 = 40 comparisons.`);return}
+ init();
+}
+$('next').onclick=step;$('reset').onclick=init;
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();step()}else if(e.key==='r'||e.key==='R')init()});
+init();
+</script>
+</body>
+</html>

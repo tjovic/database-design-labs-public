@@ -320,7 +320,7 @@ Older hard disk drives traditionally used 512-byte sectors. Modern storage devic
 Two important concepts are:
 
 - **Logical sector:** The smallest addressable unit exposed by the storage device to the operating system.
-- **Physical sector:** The physical sector granularity reported by the device.
+- **Physical sector:** The unit in which the device actually reads and writes data internally, as reported by the device.
 
 Modern storage devices commonly use the following configurations:
 
@@ -511,7 +511,7 @@ The following illustration shows how database files, extents, and pages relate t
 
 A SQL Server data file is divided into pages of **8,192 bytes**.
 
-Each page has an identifier within its database file, allowing SQL Server to locate it.
+Each page is identified by its **file number** and its **page number** within that file, for example `1:121840` (file 1, page 121840). Pages are numbered from 0, so page 121840 starts at byte offset 121840 × 8,192 in the file. You will see these numbers in Section 11.
 
 A single page may contain many table rows. Larger tables require many pages, potentially distributed across different parts of the database file.
 

@@ -1118,6 +1118,8 @@ Although SQL Server performed 161 logical reads, it did not need to load additio
 
 The required pages were already available in memory.
 
+If this is your first query on `Product`, you may see about 159 read-ahead reads instead: SQL Server had to load the pages from storage first. Run the query again, and the read-ahead reads disappear while the logical reads stay at 161.
+
 > [!NOTE]
 > Physical and read-ahead read counts may differ between executions because the buffer pool contents change over time.
 >
@@ -1158,7 +1160,7 @@ However, the number of pages accessed also depends on **how SQL Server locates t
 
 A query that scans an entire table may access hundreds or thousands of pages, while a query using a suitable index may need only a few.
 
-We will investigate this in Sections 14 and 15 and explore index optimization in greater detail in Lab 06.
+We will investigate this in Section 14 (and in the deep-dive Section 15) and explore index optimization in greater detail in Lab 06.
 
 ## 8.5 Compare two queries
 

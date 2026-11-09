@@ -666,6 +666,15 @@ This is a simplified redrawing of the actual plan measured on one computer (the 
 
 Execution plans are often explained by reading **from right to left**, beginning with operators that access tables or indexes. This is a useful convention, but follow the **data-flow arrows** when tracing individual branches: a plan is a tree of operations, not simply a linear list.
 
+**What makes this plan expensive?**
+
+<details>
+<summary>Show answer</summary>
+
+`SalesOrderItem` reads 40,000,000 rows and `SalesOrder` reads 10,000,000 rows to produce only 21,908 joined rows. The red operators mark the expensive scans in this specific plan; a scan is not inherently bad.
+
+</details>
+
 ## 7.1 Learn the essential plan operators
 
 An execution plan consists of **operators**, each representing an operation performed by SQL Server.

@@ -1544,7 +1544,10 @@ GO
 DBCC TRACEON(3604);
 GO
 
-DBCC PAGE('IndexLab', 1, 113736, 3)
+-- Replace <PageFID> and <PagePID> with the values DBCC IND returned
+-- for the Category data page (PageType = 1).
+-- Reference database: PageFID = 1, PagePID = 113736
+DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
 WITH TABLERESULTS;
 GO
 ```
@@ -1552,8 +1555,8 @@ GO
 | Argument | Purpose |
 |---|---|
 | `'IndexLab'` | Database name |
-| `1` | File ID (`PageFID`) |
-| `113736` | Page ID (`PagePID`) |
+| `<PageFID>` | File ID (`PageFID`) from `DBCC IND` |
+| `<PagePID>` | Page ID (`PagePID`) from `DBCC IND` |
 | `3` | Detailed output including interpreted records |
 | `WITH TABLERESULTS` | Return diagnostic output in a tabular format |
 
@@ -1990,7 +1993,10 @@ From `DBCC IND`, we identified the root page:
 Let's inspect it:
 
 ```sql
-DBCC PAGE('IndexLab', 1, 121840, 3)
+-- Replace <PageFID> and <PagePID> with the values DBCC IND returned
+-- for the Product root page (PageType = 2, highest IndexLevel).
+-- Reference database: PageFID = 1, PagePID = 121840
+DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
 WITH TABLERESULTS;
 GO
 ```
@@ -2325,7 +2331,10 @@ From `DBCC IND`, we identified the root page:
 Inspect the page:
 
 ```sql
-DBCC PAGE('IndexLab', 1, 130848, 3)
+-- Replace <PageFID> and <PagePID> with the values DBCC IND returned
+-- for the Customer root page (PageType = 2, IndexLevel = 2).
+-- Reference database: PageFID = 1, PagePID = 130848
+DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
 WITH TABLERESULTS;
 GO
 ```
@@ -2357,11 +2366,17 @@ Notice that the root page contains only two small navigation records, yet it pro
 Let's inspect both intermediate pages:
 
 ```sql
-DBCC PAGE('IndexLab', 1, 130200, 3)
+-- Replace the page IDs with the two child pages listed in your root page output
+-- (ChildPageId), or with the IndexLevel = 1 pages returned by DBCC IND.
+-- Reference database: pages 130200 and 130849 in file 1
+
+-- First intermediate page
+DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
 WITH TABLERESULTS;
 GO
 
-DBCC PAGE('IndexLab', 1, 130849, 3)
+-- Second intermediate page
+DBCC PAGE('IndexLab', <PageFID>, <PagePID>, 3)
 WITH TABLERESULTS;
 GO
 ```

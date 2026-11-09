@@ -9,17 +9,33 @@
 
 By the end of this lab, you should be able to:
 
-- explain how SQL Server stores databases in files,
-- distinguish disk sectors, NTFS clusters, SQL Server extents, and pages,
-- explain the roles of `.mdf`, `.ndf`, and `.ldf` files,
-- describe the structure of an 8 KB SQL Server data page,
-- explain why row width influences page count and query cost,
-- distinguish logical reads from physical reads and explain the buffer pool,
-- inspect table pages using `DBCC IND` and `DBCC PAGE`,
-- interpret simple page-count and I/O measurements,
+- explain how SQL Server stores databases in files;
+- explain the roles of `.mdf`, `.ndf`, and `.ldf` files;
+- describe the structure of an 8 KB SQL Server data page;
+- explain why row width influences page count and query cost;
+- distinguish logical reads from physical reads and explain the buffer pool;
+- inspect table pages using `DBCC IND` and `DBCC PAGE`;
+- interpret simple page-count and I/O measurements;
 - explain why indexes can reduce the amount of data SQL Server must read.
 
+If you read the deep-dive sections, you will also be able to distinguish disk sectors, NTFS clusters, SQL Server extents, and pages.
+
 This lab involves relatively little coding. Its goal is to build a **mental model** of where data lives and how SQL Server accesses it. You will use this model in **Lab 06 – Indexes**.
+
+## How to read this lab
+
+This lab contains more than you need to know. Each section is marked with one of three levels:
+
+| Level | What it means for you | Sections |
+|---|---|---|
+| 🟢 **Core** | Understand it; Lab 06 builds on it. | 1, 2, 3, 5, 6, 7, 8, 16 |
+| 🛠️ **Hands-on** | Do it in the lab, but you do not need to memorize the commands or every detail of their output. | 10, 11, 12, 14 |
+| 🔍 **Deep dive** | Optional, for those who want to know more. You can skip it without missing anything needed later. | 4, 9, 13, 15 |
+
+Some core sections also contain short collapsible deep-dive parts.
+
+> [!IMPORTANT]
+> **If you only have time for the core sections, you will still have everything you need for Lab 06.** The one idea to take away: SQL Server stores and reads all data in **8 KB pages**, and the number of pages a query has to process largely determines how much work it does.
 
 > [!NOTE]
 > **Demo Database – IndexLab**
@@ -35,6 +51,8 @@ This lab involves relatively little coding. Its goal is to build a **mental mode
 ---
 
 # 1. From logical data to physical storage
+
+🟢 **Core** · You need this for Lab 06.
 
 Until now, we have mainly worked with SQL Server at the **logical level**: tables, views, triggers, stored procedures, and functions.
 
@@ -87,6 +105,8 @@ In Lab 06, we will use this knowledge to understand how indexes can reduce unnec
 
 # 2. Create the IndexLab database
 
+🟢 **Core** · You need this for Lab 06.
+
 We will use the same generated database in Labs 05 and 06.
 
 Run the [IndexLab setup script](setup/index-lab-data-setup.md) in SSMS. It creates the following tables:
@@ -122,6 +142,8 @@ Our question is not merely *how many rows exist?* It is **how are those rows sto
 ---
 
 # 3. Database files
+
+🟢 **Core** · You need this for Lab 06.
 
 A SQL Server database consists of one or more operating-system files. The usual extensions are:
 
@@ -259,6 +281,11 @@ Notice that `SalesOrderItem` contains four times as many rows as `SalesOrder` an
 ---
 
 # 4. From the storage device to SQL Server
+
+> [!TIP]
+> 🔍 **Deep dive – optional.** This section explains how SQL Server's pages relate to disk sectors and file-system clusters. You do not need it for Lab 06.
+>
+> **If you skip it, remember:** below SQL Server, the disk and the operating system use their own storage units, but SQL Server always reads and writes data in 8 KB pages.
 
 SQL Server stores data in database files, but these files ultimately reside on storage devices managed by the operating system.
 
@@ -459,6 +486,8 @@ Before that, let's take a closer look at how SQL Server organizes its database f
 
 # 5. Files, extents, and pages
 
+🟢 **Core** · You need this for Lab 06.
+
 SQL Server stores database data inside data files (`.mdf` and `.ndf`). These files are organized into fixed-size **8 KB pages**.
 
 A page is the fundamental unit SQL Server uses to store and access database data. Pages can contain table rows, index entries, or internal metadata.
@@ -499,6 +528,11 @@ $$
 
 SQL Server uses extents to manage the allocation of storage space.
 
+For this lab, the important concept is that **extents help SQL Server manage storage allocation**, while pages contain the actual database structures.
+
+<details>
+<summary>🔍 Deep dive – uniform and mixed extents</summary>
+
 There are two types of extents:
 
 | Extent type | Description |
@@ -508,10 +542,9 @@ There are two types of extents:
 
 Modern SQL Server versions normally use uniform extents for new allocations, although mixed extents are still supported.
 
-For this lab, the important concept is that **extents help SQL Server manage storage allocation**, while pages contain the actual database structures.
+An extent and a 64 KB NTFS cluster (Section 4) may have the same size, but they belong to different layers. An extent is a SQL Server allocation concept, while an NTFS cluster is a file-system allocation unit.
 
-> [!NOTE]
-> An extent and a 64 KB NTFS cluster may have the same size, but they belong to different layers. An extent is a SQL Server allocation concept, while an NTFS cluster is a file-system allocation unit.
+</details>
 
 ## 5.3 Example – How many pages fit into a database file?
 
@@ -578,6 +611,8 @@ In the following sections, we will examine what a data page contains and why the
 
 # 6. Inside a data page
 
+🟢 **Core** · You need this for Lab 06.
+
 We have learned that SQL Server organizes database data into **8 KB pages (8,192 bytes)**.
 
 But what is actually stored inside a data page?
@@ -638,7 +673,7 @@ This can include information about the record format, null bitmap, and variable-
 > [!NOTE]
 > The physical size of a record depends on its column definitions and stored values. Two rows in the same table may occupy different amounts of space.
 
-We will examine real record sizes in Section 13 using the `Category` table.
+Section 13 (deep dive) examines real record sizes using the `Category` table.
 
 ## 6.3 The slot array
 
@@ -743,6 +778,8 @@ Later, in Sections 12 and 13, we will inspect a real SQL Server data page and co
 ---
 
 # 7. Why pages matter
+
+🟢 **Core** · You need this for Lab 06.
 
 We have learned that SQL Server stores data in 8 KB pages and that the number of rows fitting into a page depends on their physical size.
 
@@ -922,6 +959,8 @@ A query returning one row can still perform thousands of logical reads.
 
 # 8. Buffer pool, logical reads, and physical reads
 
+🟢 **Core** · You need this for Lab 06.
+
 In Section 7, we learned that the number of database pages can significantly affect the amount of work required to execute a query.
 
 But does accessing 1,000 pages mean that SQL Server must perform 1,000 physical disk reads?
@@ -981,7 +1020,8 @@ SQL Server distinguishes between several types of page reads.
 | **Physical read** | A page read from storage on demand because it was not already available in memory. |
 | **Read-ahead read** | A page read from storage in advance because SQL Server expects to need it soon. |
 
-### How read-ahead works
+<details>
+<summary>🔍 Deep dive – how read-ahead works</summary>
 
 When SQL Server scans a large table, it may predict which pages will be needed next.
 
@@ -992,6 +1032,8 @@ This allows SQL Server to overlap storage activity with query processing, reduci
 For example, imagine a query scanning a table containing thousands of pages.
 
 While SQL Server processes the current pages, the read-ahead mechanism may already be loading additional pages that the query will need shortly.
+
+</details>
 
 > [!IMPORTANT]
 > Read-ahead reads also involve physical storage access. However, `SET STATISTICS IO` reports them separately from on-demand `physical reads`.
@@ -1213,6 +1255,11 @@ The number of logical reads depends on the available indexes and the execution p
 
 # 9. Page types
 
+> [!TIP]
+> 🔍 **Deep dive – optional.** This section introduces the kinds of pages SQL Server uses. You do not need it for Lab 06.
+>
+> **If you skip it, remember:** data pages (`PageType = 1`) hold table rows, index pages (`PageType = 2`) help SQL Server navigate an index, and IAM pages (`PageType = 10`) track allocated space. Section 11 repeats the codes you need.
+
 SQL Server uses different types of **8 KB pages**, depending on what information they store.
 
 Some pages contain actual table rows, others help navigate indexes, and some are used to manage storage allocation.
@@ -1256,6 +1303,8 @@ In the following sections, we will use `DBCC IND` to identify these page types i
 ---
 
 # 10. Inspecting physical pages
+
+🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
 
 So far, we have learned how SQL Server organizes data into pages and how different page types serve different purposes.
 
@@ -1303,6 +1352,8 @@ In **Section 12**, we will use `DBCC PAGE` to inspect their contents.
 ---
 
 # 11. DBCC IND – Which pages belong to a table?
+
+🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
 
 When we execute SQL queries, we work with logical objects such as tables and rows. However, SQL Server physically stores these rows in **8 KB pages** inside database files.
 
@@ -1363,7 +1414,7 @@ Remember that a database can contain multiple data files, so a page number alone
 
 ### PageType – What kind of page is this?
 
-As discussed in Section 9, SQL Server uses different page types for different purposes.
+SQL Server uses different page types for different purposes (Section 9 describes them in more detail).
 
 The most important values for this lab are:
 
@@ -1468,6 +1519,8 @@ In Section 12, we will use it to examine the internal structure of a data page, 
 ---
 
 # 12. DBCC PAGE – Look inside a data page
+
+🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
 
 In Section 11, we used `DBCC IND` to locate the pages associated with the `Category` table. Our reference database contains one data page for its 100 rows:
 
@@ -1640,6 +1693,11 @@ Do not assume that slot order always matches the order of rows returned by a que
 ---
 
 # 13. Practical example – How much space does a row occupy?
+
+> [!TIP]
+> 🔍 **Deep dive – optional.** This section measures how much space the rows of `Category` really occupy. You do not need it for Lab 06.
+>
+> **If you skip it, remember:** a row occupies more space on a page than its column values alone, because each record carries internal overhead and needs an entry in the slot array (Section 6).
 
 In the previous sections, we examined the physical pages belonging to the `Category` table and discovered that all **100 rows fit into a single 8 KB data page**.
 
@@ -1825,6 +1883,8 @@ It also explains why choosing appropriate data types and avoiding unnecessarily 
 ---
 
 # 14. Guided investigation – Product: From pages to query performance
+
+🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
 
 In the previous sections, we examined the `Category` table and discovered that all 100 rows fit into a single 8 KB data page.
 
@@ -2159,6 +2219,11 @@ This is why understanding physical storage is essential before studying indexes.
 ---
 
 # 15. Guided investigation – Customer: A three-level clustered index
+
+> [!TIP]
+> 🔍 **Deep dive – optional.** This investigation repeats the Product investigation on a larger table. You do not need it for Lab 06.
+>
+> **If you skip it, remember:** as a table grows, its clustered index gains levels. `Customer` (732 leaf pages) needs three levels, yet finding one customer still costs only **3** logical reads, compared with **736** for reading the whole table.
 
 In Section 14, we examined the `Product` table with 30,000 rows and discovered that its clustered index has two levels: a root page and 159 leaf pages.
 
@@ -2542,6 +2607,8 @@ This illustrates why hierarchical indexes are so effective for targeted lookups.
 
 # 16. From physical storage to query optimization
 
+🟢 **Core** · You need this for Lab 06.
+
 Throughout this lab, we have explored how SQL Server physically stores data and how the organization of database pages affects query performance.
 
 We started with a small table containing 100 rows and gradually examined larger tables with more complex storage structures.
@@ -2671,6 +2738,8 @@ Try each task before opening its solution. The exercises combine calculations an
 
 ## Exercise 1 – Page math
 
+🟢 **Core** · You need this for Lab 06.
+
 A table contains **2,000,000 rows** and fits **40 rows per page**.
 
 1. How many pages are required?
@@ -2689,6 +2758,8 @@ A table contains **2,000,000 rows** and fits **40 rows per page**.
 ---
 
 ## Exercise 2 – Logical versus physical reads
+
+🟢 **Core** · You need this for Lab 06.
 
 In SSMS, execute the following batch **once**. It runs the same query twice. Compare the two outputs in the **Messages** tab:
 
@@ -2728,6 +2799,8 @@ GO
 ---
 
 ## Exercise 3 – Investigate SalesOrder without listing every page
+
+🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
 
 `SalesOrder` is much larger than the tables we inspected with `DBCC IND`. Producing an individual row for every allocated page could overwhelm the SSMS result window.
 
@@ -2773,6 +2846,8 @@ GROUP BY i.name, i.index_id;
 
 ## Exercise 4 – Predict the effect of wider rows
 
+🟢 **Core** · You need this for Lab 06.
+
 A table contains **1,000,000 rows** and currently fits **16 rows per page**. After adding a populated variable-length column, it fits only **10 rows per page**.
 
 1. How many pages were needed before the change?
@@ -2794,17 +2869,23 @@ A table contains **1,000,000 rows** and currently fits **16 rows per page**. Aft
 
 # Key takeaways
 
+## The minimum you need for Lab 06
+
 - A SQL Server database is stored in **data and log files**.
-- **Logical sectors**, **physical sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
 - SQL Server pages are **8 KB**; eight consecutive pages form one **64 KB extent**.
 - A data page includes a header, records, free space, and a slot array.
 - Wider rows usually require more pages to store the same number of rows.
 - SQL Server uses the **buffer pool** to cache pages.
 - **Logical reads** count page accesses in memory; **physical reads** involve obtaining pages from storage. Read-ahead activity may be reported separately.
 - More pages processed generally mean more work, but **one page is not equivalent to one physical I/O operation**.
-- `DBCC IND` and `DBCC PAGE` are useful laboratory tools for examining page allocation and contents.
 - **A scan is not automatically bad**; its cost depends partly on how many pages must be processed.
 - Indexes provide alternative access paths that can reduce unnecessary page processing.
+
+## From the hands-on and deep-dive sections
+
+- `DBCC IND` and `DBCC PAGE` are useful laboratory tools for examining page allocation and contents.
+- **Logical sectors**, **physical sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
+- A clustered index gains levels as the table grows, but finding one row by its key still requires only a few page accesses.
 
 > **The key performance question is often not how many rows a query returns, but how many pages SQL Server has to examine to produce the result.**
 

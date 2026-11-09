@@ -1,63 +1,53 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1240" viewBox="0 0 2200 1240">
-  <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#71849a"/>
-    </marker>
-    <style>
-      text { font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif; }
-      .heading { fill:#172b45; font-size:34px; font-weight:750; letter-spacing:.2px; }
-      .subheading { fill:#64748b; font-size:21px; font-weight:450; }
-      .connector { stroke:#8192a7; stroke-width:3.5; fill:none; marker-end:url(#arrow); stroke-linecap:round; stroke-linejoin:round; }
-      .op { fill:#18314d; font-size:27px; font-weight:700; }
-      .detail { fill:#263d57; font-size:20px; font-weight:500; }
-      .metric { fill:#64748b; font-size:19px; font-weight:600; }
-      .note { fill:#405670; font-size:20px; font-weight:550; }
-    </style>
-  </defs>
-  <rect x="42" y="28" width="2116" height="112" rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-  <rect x="42" y="28" width="9" height="112" rx="4" fill="#4778a8"/>
-  <text x="76" y="73" class="heading">EXECUTION PLAN · AFTER SalesOrderId INDEX (WITH INCLUDE)</text>
-  <text x="76" y="111" class="subheading">Actual execution plan · data flows from right to left</text>
-  <path d="M 337 692 H 275" class="connector"/>
-  <path d="M 650 692 H 587" class="connector"/>
-  <path d="M 959 692 H 894" class="connector"/>
-  <path d="M 955 352 H 927 Q 910 352 910 369 V 675 Q 910 692 894 692" class="connector"/>
-  <path d="M 1263 692 H 1203" class="connector"/>
-  <path d="M 1710 472 C 1648 472 1648 645 1523 645" class="connector"/>
-  <path d="M 1710 1052 C 1648 1052 1648 739 1523 739" class="connector"/>
-  <rect x="60" y="610" width="215" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4"/>
-  <text x="75" y="653" class="op">Sort</text>
-  <text x="75" y="706" class="detail">Revenue DESC</text>
-  <text x="75" y="753" class="metric">100 rows</text>
-  <rect x="337" y="610" width="250" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
-  <text x="352" y="653" class="op">Hash Match</text>
-  <text x="352" y="706" class="detail">Aggregate · CategoryId</text>
-  <text x="352" y="753" class="metric">100 groups</text>
-  <rect x="650" y="610" width="244" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
-  <text x="665" y="653" class="op">Hash Match</text>
-  <text x="665" y="706" class="detail">Join Product</text>
-  <text x="665" y="753" class="metric">21,908 rows</text>
-  <rect x="959" y="610" width="244" height="164" rx="13" fill="#e6edf6" stroke="#7d94b4" stroke-width="2.4"/>
-  <text x="974" y="653" class="op">Compute Scalar</text>
-  <text x="974" y="706" class="detail">Quantity × UnitPrice</text>
-  <text x="974" y="753" class="metric">21,908 rows</text>
-  <rect x="955" y="270" width="294" height="164" rx="13" fill="#edf0f4" stroke="#92a3b4" stroke-width="2.4"/>
-  <text x="970" y="313" class="op">Clustered Index Scan</text>
-  <text x="970" y="366" class="detail">Product · PK_Product</text>
-  <text x="970" y="413" class="metric">30,000 rows</text>
-  <rect x="1263" y="610" width="260" height="164" rx="13" fill="#fff0db" stroke="#d69b47" stroke-width="2.4"/>
-  <text x="1278" y="653" class="op">Nested Loops</text>
-  <text x="1278" y="706" class="detail">Join orders + items</text>
-  <text x="1278" y="753" class="metric">21,908 rows</text>
-  <rect x="1710" y="390" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4"/>
-  <text x="1725" y="433" class="op">Index Seek · SalesOrder</text>
-  <text x="1725" y="486" class="detail">IX_SalesOrder_OrderDate</text>
-  <text x="1725" y="533" class="metric">5,477 rows</text>
-  <rect x="1710" y="970" width="420" height="164" rx="13" fill="#e5f3ec" stroke="#70aa89" stroke-width="2.4"/>
-  <text x="1725" y="1013" class="op">Index Seek · SalesOrderItem</text>
-  <text x="1725" y="1066" class="detail">IX_SalesOrderItem_SalesOrderId</text>
-  <text x="1725" y="1113" class="metric">21,908 rows</text>
-  <rect x="56" y="1160" width="2080" height="58" rx="12" fill="#ffffff" stroke="#dbe4ee" stroke-width="1.5"/>
-  <text x="75" y="1199" class="note">WITH INCLUDE: required item columns are in the index; no additional clustered index access is needed.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="390" viewBox="0 0 1600 390" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTowNjA3ZTE1NC0yZGQyLTQxYmQtODE3NC1hOGRjMmYyZjQ3NDAAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaHE157UaUZ4LGR18I2wIMXIAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo5ZDdhYWMzOC0zNjBkLTQ2YTItODM2NC04ZDZlNTZkNGVhYzNscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoVUAFP1DxAISz9DD7LciQBAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg7qI3ewp8uPwimwKp2xsfaj0AM3fPPS/RajTwGsRVkxWkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaIUvkzk04i6vuVzGZs33D2kAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCAMvPYIGTVL/VSpjVZXvLdn+Z4fj7P7fHxIq+i3owf6o2RuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiYZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjA2MDdlMTU0LTJkZDItNDFiZC04MTc0LWE4ZGMyZjJmNDc0MC9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjYxY2E1YmU5LWFlNTctNDBhOC04NTFiLTgwOGI1NDZkMTFkY3JjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDuojd7Cny4/CKbAqnbGx9qPQAzd889L9FqNPAaxFWTFaJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgg4ys4ffsCfS1QaVrBI/f9DQGjgk/Ob9plfHEvNgsJGlCiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggffXiDdKvFTOfVuOOeieMpq6NxFTSDUKpbLO8T/BlBdd0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQHqXcwnNZpJlITRIYSkB7g07Q4ikUSBCyL2aVSK5JjFlsjo+ewvaUIgxjw/JUp2ODvD2YA3cuXAnoDCBRrcEr2Y=</c2pa:manifest></metadata>
+<defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L12 6L0 12Z" fill="#68839d"/></marker>
+<style>text{font-family:Arial,Helvetica,sans-serif}.head{font-size:22px;font-weight:700;fill:#243b51}.detail{font-size:17px;fill:#43576b}.number{font-size:19px;font-weight:700;fill:#304c64}</style></defs>
+<rect width="1600" height="390" fill="#fff"/>
+<path d="M1290 97 C1267.5 97, 1267.5 70, 1249 70" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M1290 292 C1267.5 292, 1267.5 110, 1249 110" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M1020 85 C985.0 85, 985.0 85, 954 85" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M750 85 C735.0 85, 735.0 70, 724 70" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M750 295 C735.0 295, 735.0 110, 724 110" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M500 85 C482.5 85, 482.5 85, 469 85" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<path d="M245 85 C225.0 85, 225.0 85, 209 85" stroke="#8096aa" stroke-width="2.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="20" y="20" width="185" height="130" rx="12" fill="#e8eff7" stroke="#7692b1" stroke-width="2"/>
+<text x="36" y="52" class="head">Sort</text>
+<text x="36" y="78" class="detail">ORDER BY</text>
+<text x="36" y="102" class="detail">Revenue DESC</text>
+<text x="36" y="126" class="number">Output: 100 rows</text>
+<rect x="245" y="20" width="220" height="130" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="261" y="52" class="head">Hash Match</text>
+<text x="261" y="78" class="detail">Aggregate</text>
+<text x="261" y="102" class="detail">GROUP BY CategoryId</text>
+<text x="261" y="126" class="number">Output: 100 rows</text>
+<rect x="500" y="20" width="220" height="130" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="516" y="52" class="head">Hash Match</text>
+<text x="516" y="78" class="detail">Inner Join</text>
+<text x="516" y="102" class="detail">ProductId</text>
+<text x="516" y="126" class="number">Output: 21,908 rows</text>
+<rect x="750" y="37" width="200" height="95" rx="12" fill="#e8eff7" stroke="#7692b1" stroke-width="2"/>
+<text x="766" y="69" class="head">Compute Scalar</text>
+<text x="766" y="95" class="detail">Quantity × UnitPrice</text>
+<text x="766" y="119" class="detail">per row</text>
+<rect x="1020" y="20" width="225" height="130" rx="12" fill="#fef1dc" stroke="#d4a05c" stroke-width="2"/>
+<text x="1036" y="52" class="head">Nested Loops</text>
+<text x="1036" y="78" class="detail">Inner Join</text>
+<text x="1036" y="102" class="detail">SalesOrderId</text>
+<text x="1036" y="126" class="number">Output: 21,908 rows</text>
+<rect x="1290" y="20" width="290" height="155" rx="12" fill="#e4f1e9" stroke="#7baa90" stroke-width="2"/>
+<text x="1306" y="52" class="head">Index Seek</text>
+<text x="1306" y="78" class="detail">dbo.SalesOrder</text>
+<text x="1306" y="102" class="detail">IX_SalesOrder_OrderDate</text>
+<text x="1306" y="126" class="number">Output: 5,477 rows</text>
+<text x="1306" y="152" class="detail">Executions: 1</text>
+<rect x="1290" y="215" width="290" height="155" rx="12" fill="#e4f1e9" stroke="#7baa90" stroke-width="2"/>
+<text x="1306" y="247" class="head">Index Seek</text>
+<text x="1306" y="273" class="detail">dbo.SalesOrderItem</text>
+<text x="1306" y="297" class="detail">IX_SalesOrderItem_SalesOrderId</text>
+<text x="1306" y="321" class="number">Output: 21,908 rows</text>
+<text x="1306" y="347" class="detail">Executions: 5,477</text>
+<rect x="750" y="230" width="280" height="130" rx="12" fill="#e4f1e9" stroke="#7baa90" stroke-width="2"/>
+<text x="766" y="262" class="head">Clustered Index Scan</text>
+<text x="766" y="288" class="detail">dbo.Product · PK_Product</text>
+<text x="766" y="312" class="number">Output: 30,000 rows</text>
+<text x="766" y="338" class="detail">Rows read: 30,000</text>
 </svg>

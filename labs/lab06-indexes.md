@@ -698,6 +698,9 @@ The following table introduces the most important operators you will encounter i
 | `Compute Scalar` | Defines a **calculated expression**, such as multiplication, addition, or data type conversion. For example, it may calculate `Quantity * UnitPrice` for each order item. |
 | `Sort` | Arranges rows according to one or more columns or expressions. It is commonly used for `ORDER BY`, but may also be needed by other operations that require sorted input. |
 
+> [!TIP]
+> **Optional: see the join operators step by step.** Two interactive demos use a scaled-down version of our query: [Hash Match join](https://tjovic.github.io/database-design-labs-public/demos/interactive/hash-match.html) and [Nested Loops join](https://tjovic.github.io/database-design-labs-public/demos/interactive/nested-loops.html). They open in the browser and are not required for this lab.
+
 > [!IMPORTANT]
 > **An Index Seek is not always better than a Scan.**
 >
@@ -1526,6 +1529,9 @@ is covering for the `SalesOrderItem` portion of the main query.
 > **Covering is a property of an index relative to a query.**
 >
 > The same index may cover one query but not another query that requires additional columns.
+
+> [!TIP]
+> **Optional: see Key Lookups step by step.** The [Key Lookup demo](https://tjovic.github.io/database-design-labs-public/demos/interactive/key-lookup.html) shows the same join with the narrow index from Section 8.3 and with the covering index from this section, and counts the page reads for both. It is not required for this lab.
 
 ### What about the clustered key?
 

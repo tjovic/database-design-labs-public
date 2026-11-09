@@ -2077,7 +2077,7 @@ flowchart TD
 
 Instead of examining all 159 leaf pages, SQL Server can navigate directly to the relevant page.
 
-This is the basic idea behind a **B-tree index**, which we will study in Lab 06.
+This is the basic idea behind a **B+ tree index**, which we will study in Lab 06.
 
 ### Verify the execution plan
 
@@ -2654,7 +2654,7 @@ Imagine that an application needs to retrieve a small number of orders belonging
 ```sql
 SELECT *
 FROM dbo.SalesOrder
-WHERE CustomerId = 50000;
+WHERE CustomerId = 501;
 ```
 
 Although the query may return only a small number of rows, SQL Server still needs to **find those rows among millions of records**.
@@ -2741,7 +2741,7 @@ In the next lab, we will use the same `IndexLab` database to create indexes, exa
 The goal is not simply to create indexes, but to understand **when and why they improve query performance**.
 
 > [!TIP]
-> Keep your `IndexLab` database. We will continue using its large tables in Lab 06 to investigate query optimization under more realistic conditions.
+> You will continue using `IndexLab` in Lab 06. If you have changed its tables in the meantime, Section 2 explains how to recreate it.
 
 ---
 
@@ -2801,7 +2801,7 @@ GO
 2. Did the physical-read count change?
 3. Why might both executions report zero physical reads?
 4. Can you conclude that the query accessed zero pages if `physical reads = 0`?
-5. Compare `logical reads` with the **159 data pages** you counted for `Product` in Guided investigation 2 (Section 14). Are the two numbers the same? If not, why not?
+5. Compare `logical reads` with the **159 data pages** you counted for `Product` in Section 14. Are the two numbers the same? If not, why not?
 
 > [!NOTE]
 > Pages may have been cached before you started this exercise. Do not expect the first query to show a nonzero physical-read count. **Do not clear the SQL Server buffer pool** just to force a difference on a shared classroom server.
@@ -2856,9 +2856,9 @@ GROUP BY i.name, i.index_id;
 <details>
 <summary>Show solution</summary>
 
-1. Results depend on the generated database.
-2. Divide `RowCount` by `InRowDataPages`, provided the latter is nonzero. This is an average, not the exact occupancy of each page.
-3. Different row sizes and storage layouts lead to different page densities.
+1. In the reference database: `RowCount` = 10,000,000 and `InRowDataPages` = 57,143. Because the data is generated deterministically, you should see the same values.
+2. 10,000,000 / 57,143 ≈ **175 rows per page**. This is an average, not the exact occupancy of each page.
+3. For comparison: `Product` has about 189 rows per page (30,000 / 159) and `Customer` about 137 (100,000 / 732). `Category` has 100 rows on its only page, but that page is only about 35% full (Section 12). Different row sizes and storage layouts lead to different page densities.
 4. The system view returns summary counts without producing a huge row-by-row list of page identifiers. On SQL Server 2022 and later, this view requires `VIEW DATABASE PERFORMANCE STATE` and `VIEW SECURITY DEFINITION` on the database. Earlier SQL Server versions require `VIEW DATABASE STATE` and `VIEW DEFINITION`.
 
 </details>

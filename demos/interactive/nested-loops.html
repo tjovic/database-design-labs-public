@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested Loops join, step by step</title>
+<style>
+:root{--bg:#ffffff;--surface:#f4f5f7;--text:#1e293b;--muted:#64748b;--faint:#94a3b8;--border:#d8e1ec;
+--accent-bg:#e6f1fb;--accent:#185fa5;--ok-bg:#eaf3de;--ok:#3b6d11;--no-bg:#fcebeb;--no:#a32d2d}
+@media (prefers-color-scheme: dark){:root{--bg:#1c1c1e;--surface:#2a2a2d;--text:#e8e8ea;--muted:#a1a1aa;--faint:#71717a;--border:#3f3f46;
+--accent-bg:#0c447c;--accent:#b5d4f4;--ok-bg:#27500a;--ok:#c0dd97;--no-bg:#791f1f;--no:#f7c1c1}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:16px;line-height:1.5}
+main{max-width:880px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+.intro{color:var(--muted);margin:0 0 16px}
+.lbl{font-size:14px;color:var(--muted);margin:18px 0 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{font-family:Consolas,"Courier New",monospace;font-size:16px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface)}
+.chip.cur{border:2px solid var(--accent);background:var(--accent-bg);color:var(--accent)}
+.chip.done{color:var(--faint)}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip.no{background:var(--no-bg);color:var(--no);border-color:var(--no)}
+.chip.skip{opacity:.45}
+.mode button.on{border:2px solid var(--accent);background:var(--accent-bg);color:var(--accent)}
+.note{font-size:13px;color:var(--faint);margin-left:4px}
+.msg{margin:20px 0 12px;padding:12px 14px;background:var(--surface);border-radius:8px;min-height:52px;font-size:17px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 16px}
+.stat{background:var(--surface);border-radius:8px;padding:10px 14px}
+.stat .k{font-size:13px;color:var(--muted)}.stat .v{font-size:24px;font-weight:600}
+button{font:inherit;font-size:15px;padding:8px 16px;border-radius:8px;border:1px solid var(--muted);background:transparent;color:var(--text);cursor:pointer}
+button:hover{background:var(--surface)}
+.hint{font-size:13px;color:var(--faint);margin-top:12px}
+@media (max-width:600px){.stats{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Nested Loops join, step by step</h1>
+<p class="intro">The same data as the Hash Match demo. For each order (the <b>outer</b> input), Nested Loops looks for matching items in the <b>inner</b> input. How much work that takes depends entirely on whether the inner input has a suitable index.</p>
+
+<div class="row mode"><button id="mA">Without an index</button><button id="mB">With an index on SalesOrderId</button></div>
+
+<p class="lbl">Outer input · SalesOrder (5 orders; 5,477 in Lab 06)</p>
+<div class="row" id="outer"></div>
+
+<p class="lbl" id="innerLbl"></p>
+<div class="row" id="inner"></div>
+
+<div class="msg" id="msg"></div>
+
+<div class="stats">
+<div class="stat"><div class="k">Inner executions</div><div class="v" id="cE">0</div></div>
+<div class="stat"><div class="k">Inner rows examined</div><div class="v" id="cR">0</div></div>
+<div class="stat"><div class="k">Joined rows</div><div class="v" id="cM">0</div></div>
+</div>
+
+<div class="row"><button id="next">Next step</button><button id="reset">Start over</button></div>
+<p class="hint">Keyboard: Space or → for the next step, R to start over, 1 / 2 to switch the variant.</p>
+</main>
+<script>
+const O=[101,206,310,415,517];
+const HEAP=[206,333,517,120,101,999,415,288];
+const IDX=[...HEAP].sort((a,b)=>a-b);
+let mode='A',st;
+const $=id=>document.getElementById(id);
+function init(){st={i:-1,e:0,r:0,m:0,mark:{},end:false};
+ $('mA').className=mode==='A'?'on':'';$('mB').className=mode==='B'?'on':'';
+ $('innerLbl').textContent=mode==='A'
+  ?'Inner input · SalesOrderItem stored as a heap, in no particular order (40,000,000 rows in Lab 06)'
+  :'Inner input · index IX_SalesOrderItem_SalesOrderId, leaf level sorted by SalesOrderId';
+ render(mode==='A'?'Without an index: for each order, SQL Server must read the whole inner input. Click "Next step".'
+                  :'With an index: for each order, SQL Server seeks directly to the matching entries. Click "Next step".')}
+function render(t){
+ $('outer').innerHTML=O.map((v,k)=>`<span class="chip ${k===st.i&&!st.end?'cur':k<st.i||st.end?'done':''}">${v}</span>`).join('');
+ const list=mode==='A'?HEAP:IDX;
+ $('inner').innerHTML=list.map((v,k)=>{const m=st.mark[k];return `<span class="chip ${m||(st.i>=0&&!st.end&&mode==='B'?'skip':'')}">${v}</span>`}).join('');
+ $('msg').textContent=t;$('cE').textContent=st.e;$('cR').textContent=st.r;$('cM').textContent=st.m;
+}
+function step(){
+ if(st.end){init();return}
+ st.i++;st.mark={};
+ if(st.i>=O.length){st.end=true;
+  const big=mode==='A'
+   ?'In Lab 06, that would be 5,477 × 40,000,000 ≈ 219 billion rows examined, which is why the optimizer chose Hash Match instead.'
+   :'In Lab 06, the same pattern meant 5,477 seeks and about 21,908 matching items instead of reading 40,000,000 rows.';
+  render(`Done: ${st.e} inner executions, ${st.r} inner rows examined, ${st.m} joined rows. ${big}`);return}
+ const o=O[st.i];st.e++;
+ if(mode==='A'){
+  let hits=[];HEAP.forEach((v,k)=>{st.r++;if(v===o){st.mark[k]='ok';st.m++;hits.push(v)}else st.mark[k]='no'});
+  render(`Order ${o}: scan all ${HEAP.length} items and compare each SalesOrderId with ${o}. `+(hits.length?`${hits.length} match.`:'No match, but every row still had to be read.'));
+ }else{
+  let k=IDX.findIndex(v=>v>=o),hits=0,ex=0;
+  while(k>=0&&k<IDX.length){ex++;st.r++;if(IDX[k]===o){st.mark[k]='ok';st.m++;hits++;k++}else{st.mark[k]='no';break}}
+  render(`Order ${o}: navigate the index tree straight to ${o} (an Index Seek), then read entries while they still equal ${o}. `+
+   (hits?`${hits} match; the next entry ends the range.`:`The first entry found is already larger than ${o}: no match.`)+` Only ${ex} entr${ex===1?'y':'ies'} examined; the rest are never touched.`);
+ }
+}
+function setMode(m){mode=m;init()}
+$('mA').onclick=()=>setMode('A');$('mB').onclick=()=>setMode('B');
+$('next').onclick=step;$('reset').onclick=init;
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();step()}else if(e.key==='r'||e.key==='R')init();else if(e.key==='1')setMode('A');else if(e.key==='2')setMode('B')});
+init();
+</script>
+</body>
+</html>

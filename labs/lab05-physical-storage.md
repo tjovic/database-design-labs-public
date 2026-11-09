@@ -1619,7 +1619,7 @@ $$
 The occupied portion of the page is approximately:
 
 $$
-\frac{2888}{8192} \times 100 \approx 35.3 \text{ % }
+\frac{2888}{8192} \times 100 \approx 35.3\%
 $$
 
 This is **physical page occupancy**, including internal structures, not just user data. The page still has substantial room for additional records, subject to SQL Server's insertion and storage rules.
@@ -1642,7 +1642,7 @@ Slot 99 Offset 0xa65  Length 27
 
 For example, `0x60` is hexadecimal for 96, so the record referenced by slot 0 starts immediately after the page header. Its length is 25 bytes.
 
-The different record lengths are not an error. The `Category` table contains a variable-length `varchar(50)` column, so records can occupy different amounts of space. We will investigate the actual row sizes in Section 13.
+The different record lengths are not an error. The `Category` table contains a variable-length `varchar(50)` column, so records can occupy different amounts of space. Section 13 (deep dive) investigates the actual row sizes.
 
 > [!NOTE]
 > A slot number is not a permanent row identifier. The physical position of a record and its slot assignment can change as SQL Server modifies pages.

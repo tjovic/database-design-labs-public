@@ -2192,6 +2192,7 @@ Notice that:
 - The index entries remain logically ordered by key.
 - Separator keys and child pointers have been updated.
 - The tree now has an additional level.
+- The new rows in the heap were simply stored wherever a heap page had free space; only the index had to be reorganized.
 
 This illustrates how a B+ tree maintains its balanced structure even as new entries are inserted.
 
@@ -2214,10 +2215,7 @@ The same basic B+ tree principles apply:
 
 The key difference is that **clustered index leaf pages contain complete data rows**, not just nonclustered index entries.
 
-This means that splitting a clustered index leaf page involves redistributing actual table rows.
-
-> [!NOTE]
-> This diagram splits pages at a different point than the one in Section 11.1, so the same three inserts produce a tree with three levels instead of four. Where a page is split is an implementation detail; what both trees have in common is that all leaves stay at the same depth and the keys stay ordered.
+This means that splitting a clustered index leaf page involves redistributing actual table rows. The diagram uses the same inserts and the same splits as Section 11.1, so the tree above the leaf level is identical. At the leaf level, each split created a new data page and moved existing rows into it: row 61 moved twice, and row 79 moved once.
 
 ### Ascending and random keys
 

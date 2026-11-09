@@ -1,182 +1,146 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTplYjEwMDkxOS0wMTc4LTQ0NjYtYTcyZS0yMTk1YTk5Njc2YmMAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaORKjDwRFHnodSWhe40ymYEAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo0NmE3MzRmYS03NzQwLTRjNzktODk5Yy1lYjNmYjA0OTMwZTJscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNogWG+H1Ag2j2GqOpNlJCZ3gAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggxyueOGpR3VU2ZIoZvzuGj5nh1cmQPDV7VoK8/KwVEh6kZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaIdEWSp52WodayTU3xh+4bkAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCB38IAqYAEyWESkiwnalxQTyUzIcUtzF0n85ctw4VfVbGRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBjAZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmViMTAwOTE5LTAxNzgtNDQ2Ni1hNzJlLTIxOTVhOTk2NzZiYy9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmNiYWNlZWRjLWRlYjUtNGU0Yi1iOTdlLTZiYjdlMWRhMDcwYnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDHK544alHdVTZkihm/O4aPmeHVyZA8NXtWgrz8rBUSHqJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgg7pAo2cmrXJsNTcVk/63N+pgry7GryIFS1HR6+P6uo2OiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggONKVOsr1gMMlkd96xDSFxuiZJ3c0Ya0K2r8CdyZFG6R0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQP4WWUV9wdu34y8Niq9sU3gHocl4NyI3yK7tLK93sQdqbf+edpgpokolNOhlyx5uUno4vDM5K3o9yjJiECGsuyo=</c2pa:manifest></metadata>
-<title id="title">Clustered index — inserting 58, 60 and 75</title>
-<desc id="desc">The clustered B+ tree after inserting MemberID values 58, 60 and 75. Three leaf page splits occur, and the first split also causes the intermediate page to split. The root gains separator key 61.</desc>
-<defs>
- <marker id="treeArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#94A3B8"/></marker>
- <marker id="leafArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#3B82F6"/></marker>
- <style>
- text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
- .title{font-size:31px;font-weight:700}.subtitle{font-size:17px;fill:#64748B}
- .section{font-size:15px;font-weight:700;letter-spacing:1px;fill:#526176}
- .page{font-size:12px;font-weight:700;fill:#64748B}
- .key{font-size:17px;font-weight:700;text-anchor:middle;dominant-baseline:middle}
- .head{font-size:9px;font-weight:700;fill:#64748B}
- .val{font-size:11px;font-weight:600}
- .edge{fill:none;stroke:#AAB7C6;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#treeArrow)}
- .leaf{fill:none;stroke:#3B82F6;stroke-width:2.2;stroke-linecap:round;marker-end:url(#leafArrow)}
- .new{fill:#FFF0D9;stroke:#EA580C;stroke-width:2}
- .newtxt{fill:#C2410C;font-weight:800}
- .note{font-size:14px;fill:#475569}
- </style>
-</defs>
-<rect width="1600" height="900" fill="#FFFFFF"/>
-<text class="title" x="42" y="48">Clustered index — INSERT and page splits</text>
-<text class="subtitle" x="42" y="76">Final B+ tree after inserting MemberID 58, 60 and 75 · simplified teaching model</text>
-
-<rect x="1130" y="22" width="425" height="74" rx="10" fill="#F8FAFC" stroke="#CBD5E1"/>
-<text x="1152" y="47" font-size="12" font-weight="700" letter-spacing="1" fill="#0F766E">INSERT STATEMENT</text>
-<text x="1152" y="74" font-size="17" font-family="monospace" font-weight="700">58 · 60 · 75</text>
-
-<text class="section" x="42" y="130">ROOT · PAGE 200</text>
-<text class="section" x="42" y="280">INTERMEDIATE LEVEL</text>
-<text class="section" x="42" y="430">LEAF LEVEL · DATA PAGES</text>
-
-<!-- Tree connections -->
-<g class="edge">
- <!-- Root child ranges: less than 43; from 43 to 60; 61 or greater -->
- <path d="M740 213 C675 240 430 245 350 300"/>
- <path d="M800 213 C800 250 800 260 800 300"/>
- <path d="M860 213 C960 240 1250 245 1370 300"/>
- <!-- Page 201: [11,19], [27] -->
- <path d="M310 367 C260 405 160 420 110 450"/>
- <path d="M390 367 C360 405 330 420 310 450"/>
- <!-- Page 202: [43], [56,58], [60] -->
- <path d="M704 367 C660 405 560 420 510 450"/>
- <path d="M800 367 C780 405 740 420 710 450"/>
- <path d="M896 367 C900 405 910 420 910 450"/>
- <!-- Page 203: [61], [73,75], [79] -->
- <path d="M1274 367 C1230 405 1160 420 1110 450"/>
- <path d="M1370 367 C1360 405 1330 420 1310 450"/>
- <path d="M1466 367 C1480 405 1490 420 1488 450"/>
-</g>
-
-<!-- Root -->
-<text class="page" x="800" y="151" text-anchor="middle">INDEX PAGE 200</text>
-<g>
- <rect x="680" y="166" width="240" height="48" rx="5" fill="#EEF2FF" stroke="#334155" stroke-width="1.7"/>
- <g stroke="#334155" stroke-width="1.2"><line x1="740" y1="166" x2="740" y2="214"/><line x1="800" y1="166" x2="800" y2="214"/><line x1="860" y1="166" x2="860" y2="214"/></g>
- <circle cx="710" cy="190" r="4" fill="#334155"/><text class="key" x="770" y="190">43</text>
- <circle cx="830" cy="190" r="4" fill="#334155"/><text class="key" x="890" y="190">61</text>
-</g>
-
-<!-- Intermediate pages -->
-<text class="page" x="350" y="276" text-anchor="middle">INDEX PAGE 201</text>
-<g>
- <rect x="290" y="292" width="120" height="75" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.6"/>
- <line x1="330" y1="292" x2="330" y2="367" stroke="#334155" stroke-width="1.1"/><line x1="370" y1="292" x2="370" y2="367" stroke="#334155" stroke-width="1.1"/>
- <circle cx="310" cy="329" r="4" fill="#334155"/><text class="key" x="350" y="329">27</text><circle cx="390" cy="329" r="4" fill="#334155"/>
-</g>
-
-<text class="page" x="800" y="276" text-anchor="middle">INDEX PAGE 202</text>
-<g>
- <rect x="680" y="292" width="240" height="75" rx="5" fill="#ECFDF5" stroke="#0F766E" stroke-width="2"/>
- <g stroke="#0F766E" stroke-width="1.1"><line x1="728" y1="292" x2="728" y2="367"/><line x1="776" y1="292" x2="776" y2="367"/><line x1="824" y1="292" x2="824" y2="367"/><line x1="872" y1="292" x2="872" y2="367"/></g>
- <circle cx="704" cy="329" r="4" fill="#334155"/><text class="key" x="752" y="329">56</text><circle cx="800" cy="329" r="4" fill="#334155"/><text class="key" x="848" y="329">60</text><circle cx="896" cy="329" r="4" fill="#334155"/>
-</g>
-<text class="page" x="1370" y="276" text-anchor="middle">NEW INDEX PAGE 203</text>
-<g>
- <rect x="1250" y="292" width="240" height="75" rx="5" fill="#ECFDF5" stroke="#0F766E" stroke-width="2"/>
- <g stroke="#0F766E" stroke-width="1.1"><line x1="1298" y1="292" x2="1298" y2="367"/><line x1="1346" y1="292" x2="1346" y2="367"/><line x1="1394" y1="292" x2="1394" y2="367"/><line x1="1442" y1="292" x2="1442" y2="367"/></g>
- <circle cx="1274" cy="329" r="4" fill="#334155"/><text class="key" x="1322" y="329">73</text><circle cx="1370" cy="329" r="4" fill="#334155"/><text class="key" x="1418" y="329">79</text><circle cx="1466" cy="329" r="4" fill="#334155"/>
-</g>
-
-<!-- Leaf pages: 9 columns of compact cards -->
-<!-- helper cards manually drawn -->
-<g>
- <!-- page 101 -->
- <rect x="42" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.4"/>
- <path d="M49 450H171Q178 450 178 457V477H42V457Q42 450 49 450Z" fill="#F1F5F9"/>
- <text class="page" x="110" y="468" text-anchor="middle">DATA 101</text>
- <text class="head" x="52" y="495">ID</text><text class="head" x="83" y="495">FIRST</text><text class="head" x="130" y="495">LAST</text>
- <line x1="42" y1="502" x2="178" y2="502" stroke="#D8E1EC"/>
- <text class="val" x="52" y="523">11</text><text class="val" x="83" y="523">Oliver</text><text class="val" x="130" y="523">Brooks</text>
- <text class="val" x="52" y="547">19</text><text class="val" x="83" y="547">Emma</text><text class="val" x="130" y="547">Reed</text>
- <!-- page 102 -->
- <rect x="242" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.4"/>
- <path d="M249 450H371Q378 450 378 457V477H242V457Q242 450 249 450Z" fill="#F1F5F9"/>
- <text class="page" x="310" y="468" text-anchor="middle">DATA 102</text>
- <text class="head" x="252" y="495">ID</text><text class="head" x="283" y="495">FIRST</text><text class="head" x="330" y="495">LAST</text>
- <line x1="242" y1="502" x2="378" y2="502" stroke="#D8E1EC"/>
- <text class="val" x="252" y="523">27</text><text class="val" x="283" y="523">Noah</text><text class="val" x="330" y="523">Carter</text>
- <!-- page 103 -->
- <rect x="442" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.4"/>
- <path d="M449 450H571Q578 450 578 457V477H442V457Q442 450 449 450Z" fill="#F1F5F9"/>
- <text class="page" x="510" y="468" text-anchor="middle">DATA 103</text>
- <text class="head" x="452" y="495">ID</text><text class="head" x="483" y="495">FIRST</text><text class="head" x="530" y="495">LAST</text>
- <line x1="442" y1="502" x2="578" y2="502" stroke="#D8E1EC"/>
- <text class="val" x="452" y="523">43</text><text class="val" x="483" y="523">Ava</text><text class="val" x="530" y="523">Collins</text>
- <!-- page 104 -->
- <rect x="642" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
- <path d="M649 450H771Q778 450 778 457V477H642V457Q642 450 649 450Z" fill="#E6F4F1"/>
- <text x="710" y="468" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">DATA 104</text>
- <text class="head" x="652" y="495">ID</text><text class="head" x="683" y="495">FIRST</text><text class="head" x="730" y="495">LAST</text>
- <line x1="642" y1="502" x2="778" y2="502" stroke="#C7DDD8"/>
- <text class="val" x="652" y="523">56</text><text class="val" x="683" y="523">Mia</text><text class="val" x="730" y="523">Parker</text>
- <rect x="648" y="531" width="124" height="25" rx="4" class="new"/>
- <text class="val newtxt" x="652" y="548">58</text><text class="val newtxt" x="683" y="548">Daniel</text><text class="val newtxt" x="730" y="548">Hayes</text>
- <!-- page 107 -->
- <rect x="842" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
- <path d="M849 450H971Q978 450 978 457V477H842V457Q842 450 849 450Z" fill="#E6F4F1"/>
- <text x="910" y="468" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">NEW DATA 107</text>
- <text class="head" x="852" y="495">ID</text><text class="head" x="883" y="495">FIRST</text><text class="head" x="930" y="495">LAST</text>
- <line x1="842" y1="502" x2="978" y2="502" stroke="#C7DDD8"/>
- <rect x="848" y="507" width="124" height="25" rx="4" class="new"/>
- <text class="val newtxt" x="852" y="524">60</text><text class="val newtxt" x="883" y="524">Ryan</text><text class="val newtxt" x="930" y="524">Mitchell</text>
- <!-- page 106 -->
- <rect x="1042" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
- <path d="M1049 450H1171Q1178 450 1178 457V477H1042V457Q1042 450 1049 450Z" fill="#E6F4F1"/>
- <text x="1110" y="468" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">NEW DATA 106</text>
- <text class="head" x="1052" y="495">ID</text><text class="head" x="1083" y="495">FIRST</text><text class="head" x="1130" y="495">LAST</text>
- <line x1="1042" y1="502" x2="1178" y2="502" stroke="#C7DDD8"/>
- <text class="val" x="1052" y="523">61</text><text class="val" x="1083" y="523">Sofia</text><text class="val" x="1130" y="523">Ford</text>
- <!-- page 105 -->
- <rect x="1242" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.4"/>
- <path d="M1249 450H1371Q1378 450 1378 457V477H1242V457Q1242 450 1249 450Z" fill="#F1F5F9"/>
- <text class="page" x="1310" y="468" text-anchor="middle">DATA 105</text>
- <text class="head" x="1252" y="495">ID</text><text class="head" x="1283" y="495">FIRST</text><text class="head" x="1330" y="495">LAST</text>
- <line x1="1242" y1="502" x2="1378" y2="502" stroke="#D8E1EC"/>
- <text class="val" x="1252" y="523">73</text><text class="val" x="1283" y="523">Liam</text><text class="val" x="1330" y="523">Foster</text>
- <rect x="1248" y="531" width="124" height="25" rx="4" class="new"/>
- <text class="val newtxt" x="1252" y="548">75</text><text class="val newtxt" x="1283" y="548">Olivia</text><text class="val newtxt" x="1330" y="548">Bennett</text>
- <!-- page 108 -->
- <rect x="1420" y="450" width="136" height="150" rx="7" fill="#FFFFFF" stroke="#0F766E" stroke-width="2"/>
- <path d="M1427 450H1549Q1556 450 1556 457V477H1420V457Q1420 450 1427 450Z" fill="#E6F4F1"/>
- <text x="1488" y="468" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">NEW DATA 108</text>
- <text class="head" x="1430" y="495">ID</text><text class="head" x="1461" y="495">FIRST</text><text class="head" x="1508" y="495">LAST</text>
- <line x1="1420" y1="502" x2="1556" y2="502" stroke="#C7DDD8"/>
- <text class="val" x="1430" y="523">79</text><text class="val" x="1461" y="523">Chloe</text><text class="val" x="1508" y="523">Bush</text>
-</g>
-
-<!-- Leaf chain, routed behind cards / visible between -->
-<g class="leaf">
- <path d="M178 578 C200 578 220 578 242 578"/>
- <path d="M378 578 C400 578 420 578 442 578"/>
- <path d="M578 578 C600 578 620 578 642 578"/>
- <path d="M778 578 C800 578 820 578 842 578"/>
- <path d="M978 578 C1000 578 1020 578 1042 578"/>
- <path d="M1178 578 C1200 578 1220 578 1242 578"/>
- <path d="M1378 578 C1390 578 1400 578 1420 578"/>
-</g>
-
-<!-- Split annotations -->
-<rect x="42" y="630" width="480" height="80" rx="10" fill="#FFF7ED" stroke="#FDBA74"/>
-<text x="62" y="657" font-size="15" font-weight="700" fill="#C2410C">INSERT 58 · LEAF + INTERMEDIATE SPLIT</text>
-<text class="note" x="62" y="682">[56, 61] → [56, 58] + [61]</text>
-<text class="note" x="62" y="701">Parent overflows; separator 61 moves up to the root.</text>
-
-<rect x="560" y="630" width="480" height="80" rx="10" fill="#FFF7ED" stroke="#FDBA74"/>
-<text x="580" y="657" font-size="15" font-weight="700" fill="#C2410C">INSERT 60 · LEAF SPLIT</text>
-<text class="note" x="580" y="682">[56, 58, 60] → [56, 58] + [60]</text>
-<text class="note" x="580" y="701">Parent page 202 receives separator 60.</text>
-
-<rect x="1078" y="630" width="478" height="80" rx="10" fill="#FFF7ED" stroke="#FDBA74"/>
-<text x="1098" y="657" font-size="15" font-weight="700" fill="#C2410C">INSERT 75 · LEAF SPLIT</text>
-<text class="note" x="1098" y="682">[73, 79] → [73, 75] + [79]</text>
-<text class="note" x="1098" y="701">Parent page 203 stores separator 79.</text>
-
-<!-- Footer -->
-<rect x="42" y="750" width="1514" height="110" rx="12" fill="#F8FAFC" stroke="#D8E1EC"/>
-<text x="64" y="781" font-size="16" font-weight="700">Result</text>
-<text class="note" x="64" y="809">Three leaf splits and one intermediate split. The root gains 61 without splitting; its separators are 43 and 61.</text>
-<text x="64" y="837" font-size="13" fill="#64748B">Simplified model: at most 2 keys per internal page and 2 rows per leaf page. IDs and capacities are illustrative, not SQL Server page layouts.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="720" viewBox="0 0 1800 720" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTowMDI0MzYyZC1iMzg5LTQ0YWItYjZlYy0xOTlhMWI4MjZjZTUAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaOQJl/cZpZY4jK2WzrFn/Z8AAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDoyYTc5MDBhYy0wNmUzLTQwMmEtYTY4OS0wOTM2MGU0OTEzZTlscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoajkrrxEuVoZpyesjdrmAIAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg7OYeNetToI1WRFNNs84ck9WFQUNDWRAWPlqkhbtWwKekZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaDOWIUNwdzUQGmTVjqrvS94AAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCABuJV0DU/OB+kQZiYdLE0EFrF5vN4PaloKY5rfHGZHRWRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiYZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjAwMjQzNjJkLWIzODktNDRhYi1iNmVjLTE5OWExYjgyNmNlNS9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmFjOTZiZDFjLTI3MDYtNGE3Ni04MTQwLTY3ZTI0NjNhNzdiY3JjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDs5h4161OgjVZEU02zzhyT1YVBQ0NZEBY+WqSFu1bAp6JjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggWAcJ0nqCIdr2UCvox2p/JUaHtcqP+HKrfJdjsNnG/7KiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggu08ZuitE6Q5XwS8WrXchp5dJjgx2Z3yqxAdPXSm9mSx0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQLnlVGaZFNx/h2pqBejiDgAjXcm+9xnM8hK2EQ3IpP9lm+5Fm0k96mDZE5u/MOO+RcNXWQur2JfAx91gkF/miNg=</c2pa:manifest></metadata>
+<defs><style>
+text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
+.title{font-size:36px;font-weight:700}.sub{font-size:20px;fill:#64748B}
+.lvl{font-size:20px;font-weight:700;fill:#334155}
+.code{font-family:Consolas,'Courier New',monospace;font-size:17px;font-weight:700}
+</style>
+<marker id="ag" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L12 6L0 12Z" fill="#94A3B8"/></marker>
+<marker id="ab" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 5L0 10Z" fill="#3B82F6"/></marker>
+<marker id="ao" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L14 7L0 14Z" fill="#EA580C"/></marker></defs>
+<rect width="1800" height="720" fill="#fff"/>
+<text class="title" x="48" y="60">Clustered index — after the inserts and page splits</text>
+<text class="sub" x="48" y="96">Index on MemberID · New rows: 58, 60, 75 · Leaf level = data pages with complete rows · The tree now has 4 levels</text>
+<text class="lvl" x="48" y="190">ROOT</text>
+<text class="lvl" x="48" y="290">INTERMEDIATE</text>
+<text class="lvl" x="48" y="390">INTERMEDIATE</text>
+<text class="lvl" x="48" y="530">LEAF LEVEL</text><text x="48" y="556" font-size="17" fill="#64748B">data pages</text>
+<rect x="906.0" y="160" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="918.0" cy="183.0" r="4.5" fill="#334155"/>
+<rect x="930.0" y="160" width="52" height="46" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="956.0" y="192" text-anchor="middle" font-size="24" font-weight="700" style="fill:#C2410C">58</text>
+<rect x="982.0" y="160" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="994.0" cy="183.0" r="4.5" fill="#334155"/>
+<rect x="1006.0" y="160" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1058.0" y="160" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="514.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="526.0" cy="283.0" r="4.5" fill="#334155"/>
+<rect x="538.0" y="260" width="52" height="46" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="564.0" y="292" text-anchor="middle" font-size="24" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="590.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="602.0" cy="283.0" r="4.5" fill="#334155"/>
+<rect x="614.0" y="260" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="666.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="1298.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1310.0" cy="283.0" r="4.5" fill="#334155"/>
+<rect x="1322.0" y="260" width="52" height="46" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1348.0" y="292" text-anchor="middle" font-size="24" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="1374.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1386.0" cy="283.0" r="4.5" fill="#334155"/>
+<rect x="1398.0" y="260" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1450.0" y="260" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="318.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="330.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="342.0" y="360" width="52" height="46" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="368.0" y="392" text-anchor="middle" font-size="24" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="394.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="406.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="418.0" y="360" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="470.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="710.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="722.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="734.0" y="360" width="52" height="46" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="760.0" y="392" text-anchor="middle" font-size="24" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="786.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="798.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="810.0" y="360" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="862.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="1102.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1114.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="1126.0" y="360" width="52" height="46" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1152.0" y="392" text-anchor="middle" font-size="24" font-weight="700" style="fill:#C2410C">60</text>
+<rect x="1178.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1190.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="1202.0" y="360" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1254.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="1494.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1506.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="1518.0" y="360" width="52" height="46" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1544.0" y="392" text-anchor="middle" font-size="24" font-weight="700" style="fill:#C2410C">75</text>
+<rect x="1570.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1582.0" cy="383.0" r="4.5" fill="#334155"/>
+<rect x="1594.0" y="360" width="52" height="46" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1646.0" y="360" width="24" height="46" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<path d="M918.0 183.0 L602.0 257" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M994.0 183.0 L1386.0 257" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M526.0 283.0 L406.0 357" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M602.0 283.0 L798.0 357" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1310.0 283.0 L1190.0 357" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1386.0 283.0 L1582.0 357" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M330.0 383.0 L308.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M406.0 383.0 L504.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M722.0 383.0 L700.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M798.0 383.0 L896.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1114.0 383.0 L1092.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1190.0 383.0 L1288.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1506.0 383.0 L1484.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1582.0 383.0 L1680.0 467" stroke="#94A3B8" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<rect x="220" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M228 470 H388 Q396 470 396 478 V504 H220 V478 Q220 470 228 470Z" fill="#DDEFE3"/>
+<text x="308.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">DATA PAGE</text>
+<text x="232" y="534" font-size="16" font-weight="700" style="fill:#1E293B">11</text><text x="262" y="534" font-size="15">Oliver Brooks</text>
+<text x="232" y="570" font-size="16" font-weight="700" style="fill:#1E293B">19</text><text x="262" y="570" font-size="15">Emma Reed</text>
+<path d="M397 487 L415 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="416" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M424 470 H584 Q592 470 592 478 V504 H416 V478 Q416 470 424 470Z" fill="#DDEFE3"/>
+<text x="504.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">DATA PAGE</text>
+<text x="428" y="534" font-size="16" font-weight="700" style="fill:#1E293B">27</text><text x="458" y="534" font-size="15">Noah Carter</text>
+<rect x="424" y="550" width="160" height="28" rx="5" fill="#fff" stroke="#CFE3D6" stroke-dasharray="5 4"/>
+<text x="504.0" y="569" text-anchor="middle" font-size="13" fill="#94A3B8">available space</text>
+<path d="M593 487 L611 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="612" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M620 470 H780 Q788 470 788 478 V504 H612 V478 Q612 470 620 470Z" fill="#DDEFE3"/>
+<text x="700.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">DATA PAGE</text>
+<text x="624" y="534" font-size="16" font-weight="700" style="fill:#1E293B">43</text><text x="654" y="534" font-size="15">Ava Collins</text>
+<rect x="620" y="550" width="160" height="28" rx="5" fill="#fff" stroke="#CFE3D6" stroke-dasharray="5 4"/>
+<text x="700.0" y="569" text-anchor="middle" font-size="13" fill="#94A3B8">available space</text>
+<path d="M789 487 L807 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="808" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M816 470 H976 Q984 470 984 478 V504 H808 V478 Q808 470 816 470Z" fill="#DDEFE3"/>
+<text x="896.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">DATA PAGE</text>
+<text x="820" y="534" font-size="16" font-weight="700" style="fill:#1E293B">56</text><text x="850" y="534" font-size="15">Mia Parker</text>
+<rect x="816" y="550" width="160" height="28" rx="5" fill="#fff" stroke="#CFE3D6" stroke-dasharray="5 4"/>
+<text x="896.0" y="569" text-anchor="middle" font-size="13" fill="#94A3B8">available space</text>
+<path d="M985 487 L1003 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="1004" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#0F766E" stroke-width="2.6"/>
+<path d="M1012 470 H1172 Q1180 470 1180 478 V504 H1004 V478 Q1004 470 1012 470Z" fill="#B9E0C7"/>
+<text x="1092.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">NEW DATA PAGE</text>
+<rect x="1009" y="512" width="166" height="32" rx="5" fill="#FFF0D7" stroke="#EA580C" stroke-width="2"/>
+<text x="1016" y="534" font-size="16" font-weight="700" style="fill:#C2410C">58</text><text x="1046" y="534" font-size="15">Daniel Hayes</text>
+<rect x="1012" y="550" width="160" height="28" rx="5" fill="#fff" stroke="#CFE3D6" stroke-dasharray="5 4"/>
+<text x="1092.0" y="569" text-anchor="middle" font-size="13" fill="#94A3B8">available space</text>
+<path d="M1181 487 L1199 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="1200" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#0F766E" stroke-width="2.6"/>
+<path d="M1208 470 H1368 Q1376 470 1376 478 V504 H1200 V478 Q1200 470 1208 470Z" fill="#B9E0C7"/>
+<text x="1288.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">NEW DATA PAGE</text>
+<rect x="1205" y="512" width="166" height="32" rx="5" fill="#FFF0D7" stroke="#EA580C" stroke-width="2"/>
+<text x="1212" y="534" font-size="16" font-weight="700" style="fill:#C2410C">60</text><text x="1242" y="534" font-size="15">Ryan Mitchell</text>
+<text x="1212" y="570" font-size="16" font-weight="700" style="fill:#1E293B">61</text><text x="1242" y="570" font-size="15">Sofia Ford</text>
+<path d="M1377 487 L1395 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="1396" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M1404 470 H1564 Q1572 470 1572 478 V504 H1396 V478 Q1396 470 1404 470Z" fill="#DDEFE3"/>
+<text x="1484.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">DATA PAGE</text>
+<text x="1408" y="534" font-size="16" font-weight="700" style="fill:#1E293B">73</text><text x="1438" y="534" font-size="15">Liam Foster</text>
+<rect x="1404" y="550" width="160" height="28" rx="5" fill="#fff" stroke="#CFE3D6" stroke-dasharray="5 4"/>
+<text x="1484.0" y="569" text-anchor="middle" font-size="13" fill="#94A3B8">available space</text>
+<path d="M1573 487 L1591 487" stroke="#3B82F6" stroke-width="2.2" fill="none" marker-end="url(#ab)"/>
+<rect x="1592" y="470" width="176" height="120" rx="8" fill="#F4FAF6" stroke="#0F766E" stroke-width="2.6"/>
+<path d="M1600 470 H1760 Q1768 470 1768 478 V504 H1592 V478 Q1592 470 1600 470Z" fill="#B9E0C7"/>
+<text x="1680.0" y="493" text-anchor="middle" font-size="15" font-weight="700" fill="#2E6744">NEW DATA PAGE</text>
+<rect x="1597" y="512" width="166" height="32" rx="5" fill="#FFF0D7" stroke="#EA580C" stroke-width="2"/>
+<text x="1604" y="534" font-size="16" font-weight="700" style="fill:#C2410C">75</text><text x="1634" y="534" font-size="15">Olivia Bennett</text>
+<text x="1604" y="570" font-size="16" font-weight="700" style="fill:#1E293B">79</text><text x="1634" y="570" font-size="15">Chloe Bush</text>
+<text x="406" y="460" text-anchor="middle" font-size="15" fill="#3B82F6">next leaf page</text>
+<text x="900.0" y="640" text-anchor="middle" font-size="19" font-weight="600" fill="#64748B">Each split created a new data page and moved existing rows into it:</text>
+<text x="900.0" y="670" text-anchor="middle" font-size="19" font-weight="600" fill="#64748B">row 61 moved twice (with 58, then with 60), and row 79 moved with 75.</text>
 </svg>

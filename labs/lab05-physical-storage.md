@@ -418,11 +418,7 @@ The two units belong to different layers:
 
 We have now encountered several storage units: sectors, clusters, and SQL Server pages.
 
-The following illustration shows how these layers relate to each other.
-
-![Storage layers](../images/lab05/storage-layers.svg)
-
-Each layer has its own responsibilities.
+The illustration at the beginning of Section 5 shows how these layers relate to each other. Each layer has its own responsibilities.
 
 | Layer | Unit | Example size | Purpose |
 |---|---|---|---|
@@ -487,6 +483,14 @@ Before that, let's take a closer look at how SQL Server organizes its database f
 # 5. Files, extents, and pages
 
 🟢 **Core** · You need this for Lab 06.
+
+### The big picture
+
+![Storage layers](../images/lab05/storage-layers.svg)
+
+The operating system stores the database file on disk using its own units (sectors and clusters). SQL Server does not work with those units: it sees the file as a sequence of **8 KB pages**, grouped into **64 KB extents**, and stores rows inside the pages. Everything in the rest of this lab — and in Lab 06 — happens at the level of pages.
+
+Section 4 (deep dive) explains the operating-system layers in more detail.
 
 SQL Server stores database data inside data files (`.mdf` and `.ndf`). These files are organized into fixed-size **8 KB pages**.
 

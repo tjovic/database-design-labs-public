@@ -1,377 +1,214 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1400" height="1990" viewBox="0 0 1400 1990" role="img" aria-labelledby="title desc">
-<title id="title">B+ tree insertion – four stages in two rows</title>
-<desc id="desc">Initial B+ tree, insert 58, insert 60, insert 75. Two-column layout for improved readability.</desc>
-<defs>
-  <marker id="arrowTree" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#39434D"/></marker>
-  <marker id="arrowLeaf" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 Z" fill="#3976B8"/></marker>
-  <style>
-    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #202832; }
-    .panel { fill:#FFFFFF; stroke:#D8DEE5; stroke-width:1.6; }
-    .stage-title { font-size:25px; font-weight:700; letter-spacing:.2px; }
-    .stage-sub { font-size:15px; fill:#64707D; }
-    .stage-num { font-size:17px; font-weight:700; fill:#FFFFFF; text-anchor:middle; dominant-baseline:middle; }
-    .level-label { font-size:11px; font-weight:700; letter-spacing:1.1px; fill:#7B8794; }
-    .key { font-size:18px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
-    .leaf-key { font-size:15px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
-    .tree-edge { fill:none; stroke:#39434D; stroke-width:1.8; stroke-linecap:round; marker-end:url(#arrowTree); }
-    .leaf-edge { fill:none; stroke:#3976B8; stroke-width:2.2; stroke-linecap:round; marker-end:url(#arrowLeaf); }
-    .note-head { font-size:20px; font-weight:700; letter-spacing:.25px; }
-    .note { font-size:18px; fill:#34404B; }
-    .node-outline { stroke-width:1.6; }
-    .slot-divider { stroke:#89939D; stroke-width:1.1; }
-  </style>
-</defs>
-<style>
-    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #202832; }
-    .panel { fill:#FFFFFF; stroke:#D8DEE5; stroke-width:1.6; }
-    .stage-title { font-size:25px; font-weight:700; letter-spacing:.2px; }
-    .stage-sub { font-size:15px; fill:#64707D; }
-    .stage-num { font-size:17px; font-weight:700; fill:#FFFFFF; text-anchor:middle; dominant-baseline:middle; }
-    .level-label { font-size:11px; font-weight:700; letter-spacing:1.1px; fill:#7B8794; }
-    .key { font-size:18px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
-    .leaf-key { font-size:15px; font-weight:650; text-anchor:middle; dominant-baseline:middle; }
-    .tree-edge { fill:none; stroke:#39434D; stroke-width:1.8; stroke-linecap:round; marker-end:url(#arrowTree); }
-    .leaf-edge { fill:none; stroke:#3976B8; stroke-width:2.2; stroke-linecap:round; marker-end:url(#arrowLeaf); }
-    .note-head { font-size:20px; font-weight:700; letter-spacing:.25px; }
-    .note { font-size:18px; fill:#34404B; }
-    .node-outline { stroke-width:1.6; }
-    .slot-divider { stroke:#89939D; stroke-width:1.1; }
-  </style>
-<rect width="1400" height="1990" fill="#FFFFFF"/>
-<defs><g id="full-diagram">
-<rect width="100%" height="100%" fill="#FFFFFF"/>
-<rect class="panel" x="15" y="18" width="630" height="864" rx="15"/>
-<rect x="16" y="19" width="628" height="6" rx="3" fill="#4779A8"/>
-<circle cx="54" cy="66" r="19" fill="#4779A8"/>
-<text class="stage-num" x="54" y="67">01</text>
-<text class="stage-title" x="85" y="63">Initial state</text>
-<text class="stage-sub" x="85" y="90">3 levels</text>
-<text class="level-label" x="39" y="157">ROOT</text>
-<text class="level-label" x="39" y="296">INTERMEDIATE</text>
-<text class="level-label" x="39" y="468">LEAF LEVEL</text>
-<path class="tree-edge" d="M 144.75 380 L 83.00 473"/>
-<path class="tree-edge" d="M 144.75 380 L 206.50 473"/>
-<path class="tree-edge" d="M 453.50 380 L 330.00 473"/>
-<path class="tree-edge" d="M 453.50 380 L 453.50 473"/>
-<path class="tree-edge" d="M 453.50 380 L 577.00 473"/>
-<path class="tree-edge" d="M 299.12 242 L 144.75 323"/>
-<path class="tree-edge" d="M 299.12 242 L 453.50 323"/>
-<g><rect x="97.75" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="144.75" y1="326" x2="144.75" y2="380"/>
-<text class="key" x="121.25" y="354.00">27</text>
-</g>
-<g><rect x="406.50" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="453.50" y1="326" x2="453.50" y2="380"/>
-<text class="key" x="430.00" y="354.00">56</text>
-<text class="key" x="477.00" y="354.00">73</text>
-</g>
-<g><rect x="252.12" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
-<line class="slot-divider" x1="299.12" y1="188" x2="299.12" y2="242"/>
-<text class="key" x="275.62" y="216.00">43</text>
-</g>
-<path class="leaf-edge" d="M 121.00 504.00 L 167.50 504.00"/>
-<path class="leaf-edge" d="M 244.50 504.00 L 291.00 504.00"/>
-<path class="leaf-edge" d="M 368.00 504.00 L 414.50 504.00"/>
-<path class="leaf-edge" d="M 491.50 504.00 L 538.00 504.00"/>
-<g><rect x="47.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="83.00" y1="476" x2="83.00" y2="532"/>
-<text class="key" x="65.00" y="505.00">11</text>
-<text class="key" x="101.00" y="505.00">19</text>
-</g>
-<g><rect x="170.50" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="206.50" y1="476" x2="206.50" y2="532"/>
-<text class="key" x="188.50" y="505.00">27</text>
-</g>
-<g><rect x="294.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="330.00" y1="476" x2="330.00" y2="532"/>
-<text class="key" x="312.00" y="505.00">43</text>
-</g>
-<g><rect x="417.50" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="453.50" y1="476" x2="453.50" y2="532"/>
-<text class="key" x="435.50" y="505.00">56</text>
-<text class="key" x="471.50" y="505.00">61</text>
-</g>
-<g><rect x="541.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="577.00" y1="476" x2="577.00" y2="532"/>
-<text class="key" x="559.00" y="505.00">73</text>
-<text class="key" x="595.00" y="505.00">79</text>
-</g>
-<rect x="33" y="590" width="594" height="260" rx="12" fill="#F1F6FB" stroke="#D6E2ED" stroke-width="1.3"/>
-<rect x="33" y="590" width="5" height="260" rx="2.5" fill="#4779A8"/>
-<text class="note-head" x="55" y="624">STRUCTURAL CHANGES</text>
-<circle cx="58" cy="655" r="4" fill="#4779A8"/>
-<text class="note" x="71" y="660">5 leaf pages</text>
-<circle cx="58" cy="698" r="4" fill="#4779A8"/>
-<text class="note" x="71" y="703">8 index pages in total</text>
-<circle cx="58" cy="741" r="4" fill="#4779A8"/>
-<text class="note" x="71" y="746">Root key: 43</text>
-
-<rect class="panel" x="665" y="18" width="630" height="864" rx="15"/>
-<rect x="666" y="19" width="628" height="6" rx="3" fill="#C45A52"/>
-<circle cx="704" cy="66" r="19" fill="#C45A52"/>
-<text class="stage-num" x="704" y="67">02</text>
-<text class="stage-title" x="735" y="63">INSERT 58</text>
-<text class="stage-sub" x="735" y="90">Leaf and parent split · still 3 levels</text>
-<text class="level-label" x="689" y="157">ROOT</text>
-<text class="level-label" x="689" y="296">INTERMEDIATE</text>
-<text class="level-label" x="689" y="468">LEAF LEVEL</text>
-<path class="tree-edge" d="M 782.40 380 L 733.00 473"/>
-<path class="tree-edge" d="M 782.40 380 L 831.80 473"/>
-<path class="tree-edge" d="M 980.00 380 L 930.60 473"/>
-<path class="tree-edge" d="M 980.00 380 L 1029.40 473"/>
-<path class="tree-edge" d="M 1177.60 380 L 1128.20 473"/>
-<path class="tree-edge" d="M 1177.60 380 L 1227.00 473"/>
-<path class="tree-edge" d="M 980.00 242 L 782.40 323"/>
-<path class="tree-edge" d="M 980.00 242 L 980.00 323"/>
-<path class="tree-edge" d="M 980.00 242 L 1177.60 323"/>
-<g><rect x="735.40" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="782.40" y1="326" x2="782.40" y2="380"/>
-<text class="key" x="758.90" y="354.00">27</text>
-</g>
-<g><rect x="933.00" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="980.00" y1="326" x2="980.00" y2="380"/>
-<text class="key" x="956.50" y="354.00">56</text>
-</g>
-<g><rect x="1130.60" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="1177.60" y1="326" x2="1177.60" y2="380"/>
-<text class="key" x="1154.10" y="354.00">73</text>
-</g>
-<g><rect x="933.00" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
-<line class="slot-divider" x1="980.00" y1="188" x2="980.00" y2="242"/>
-<text class="key" x="956.50" y="216.00">43</text>
-<text class="key" x="1003.50" y="216.00">58</text>
-</g>
-<path class="leaf-edge" d="M 771.00 504.00 L 792.80 504.00"/>
-<path class="leaf-edge" d="M 869.80 504.00 L 891.60 504.00"/>
-<path class="leaf-edge" d="M 968.60 504.00 L 990.40 504.00"/>
-<path class="leaf-edge" d="M 1067.40 504.00 L 1089.20 504.00"/>
-<path class="leaf-edge" d="M 1166.20 504.00 L 1188.00 504.00"/>
-<g><rect x="697.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="733.00" y1="476" x2="733.00" y2="532"/>
-<text class="key" x="715.00" y="505.00">11</text>
-<text class="key" x="751.00" y="505.00">19</text>
-</g>
-<g><rect x="795.80" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="831.80" y1="476" x2="831.80" y2="532"/>
-<text class="key" x="813.80" y="505.00">27</text>
-</g>
-<g><rect x="894.60" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="930.60" y1="476" x2="930.60" y2="532"/>
-<text class="key" x="912.60" y="505.00">43</text>
-</g>
-<g><rect x="993.40" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1029.40" y1="476" x2="1029.40" y2="532"/>
-<text class="key" x="1011.40" y="505.00">56</text>
-</g>
-<g><rect x="1092.20" y="476" width="72" height="56" rx="4" fill="#FCEBE9" stroke="#C45A52" class="node-outline"/>
-<line class="slot-divider" x1="1128.20" y1="476" x2="1128.20" y2="532"/>
-<text class="key" x="1110.20" y="505.00">58</text>
-<text class="key" x="1146.20" y="505.00">61</text>
-</g>
-<g><rect x="1191.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1227.00" y1="476" x2="1227.00" y2="532"/>
-<text class="key" x="1209.00" y="505.00">73</text>
-<text class="key" x="1245.00" y="505.00">79</text>
-</g>
-<rect x="683" y="590" width="594" height="260" rx="12" fill="#FCF2F1" stroke="#EED9D7" stroke-width="1.3"/>
-<rect x="683" y="590" width="5" height="260" rx="2.5" fill="#C45A52"/>
-<text class="note-head" x="705" y="624">STRUCTURAL CHANGES</text>
-<circle cx="708" cy="655" r="4" fill="#C45A52"/>
-<text class="note" x="721" y="660">Leaf [56, 61] splits into [56] and [58, 61]</text>
-<circle cx="708" cy="698" r="4" fill="#C45A52"/>
-<text class="note" x="721" y="703">Parent [56, 73] splits; separator 58 moves up</text>
-<circle cx="708" cy="741" r="4" fill="#C45A52"/>
-<text class="note" x="721" y="746">Root now contains [43, 58]</text>
-
-<rect class="panel" x="1315" y="18" width="630" height="864" rx="15"/>
-<rect x="1316" y="19" width="628" height="6" rx="3" fill="#4D8B59"/>
-<circle cx="1354" cy="66" r="19" fill="#4D8B59"/>
-<text class="stage-num" x="1354" y="67">03</text>
-<text class="stage-title" x="1385" y="63">INSERT 60</text>
-<text class="stage-sub" x="1385" y="90">Another leaf split · still 3 levels</text>
-<text class="level-label" x="1339" y="157">ROOT</text>
-<text class="level-label" x="1339" y="296">INTERMEDIATE</text>
-<text class="level-label" x="1339" y="468">LEAF LEVEL</text>
-<path class="tree-edge" d="M 1424.17 380 L 1383.00 473"/>
-<path class="tree-edge" d="M 1424.17 380 L 1465.33 473"/>
-<path class="tree-edge" d="M 1588.83 380 L 1547.67 473"/>
-<path class="tree-edge" d="M 1588.83 380 L 1630.00 473"/>
-<path class="tree-edge" d="M 1794.67 380 L 1712.33 473"/>
-<path class="tree-edge" d="M 1794.67 380 L 1794.67 473"/>
-<path class="tree-edge" d="M 1794.67 380 L 1877.00 473"/>
-<path class="tree-edge" d="M 1609.42 242 L 1424.17 323"/>
-<path class="tree-edge" d="M 1609.42 242 L 1588.83 323"/>
-<path class="tree-edge" d="M 1609.42 242 L 1794.67 323"/>
-<g><rect x="1377.17" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="1424.17" y1="326" x2="1424.17" y2="380"/>
-<text class="key" x="1400.67" y="354.00">27</text>
-</g>
-<g><rect x="1541.83" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="1588.83" y1="326" x2="1588.83" y2="380"/>
-<text class="key" x="1565.33" y="354.00">56</text>
-</g>
-<g><rect x="1747.67" y="326" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="1794.67" y1="326" x2="1794.67" y2="380"/>
-<text class="key" x="1771.17" y="354.00">60</text>
-<text class="key" x="1818.17" y="354.00">73</text>
-</g>
-<g><rect x="1562.42" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
-<line class="slot-divider" x1="1609.42" y1="188" x2="1609.42" y2="242"/>
-<text class="key" x="1585.92" y="216.00">43</text>
-<text class="key" x="1632.92" y="216.00">58</text>
-</g>
-<path class="leaf-edge" d="M 1421.00 504.00 L 1426.33 504.00"/>
-<path class="leaf-edge" d="M 1503.33 504.00 L 1508.67 504.00"/>
-<path class="leaf-edge" d="M 1585.67 504.00 L 1591.00 504.00"/>
-<path class="leaf-edge" d="M 1668.00 504.00 L 1673.33 504.00"/>
-<path class="leaf-edge" d="M 1750.33 504.00 L 1755.67 504.00"/>
-<path class="leaf-edge" d="M 1832.67 504.00 L 1838.00 504.00"/>
-<g><rect x="1347.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1383.00" y1="476" x2="1383.00" y2="532"/>
-<text class="key" x="1365.00" y="505.00">11</text>
-<text class="key" x="1401.00" y="505.00">19</text>
-</g>
-<g><rect x="1429.33" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1465.33" y1="476" x2="1465.33" y2="532"/>
-<text class="key" x="1447.33" y="505.00">27</text>
-</g>
-<g><rect x="1511.67" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1547.67" y1="476" x2="1547.67" y2="532"/>
-<text class="key" x="1529.67" y="505.00">43</text>
-</g>
-<g><rect x="1594.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1630.00" y1="476" x2="1630.00" y2="532"/>
-<text class="key" x="1612.00" y="505.00">56</text>
-</g>
-<g><rect x="1676.33" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1712.33" y1="476" x2="1712.33" y2="532"/>
-<text class="key" x="1694.33" y="505.00">58</text>
-</g>
-<g><rect x="1758.67" y="476" width="72" height="56" rx="4" fill="#EAF4E9" stroke="#4D8B59" class="node-outline"/>
-<line class="slot-divider" x1="1794.67" y1="476" x2="1794.67" y2="532"/>
-<text class="key" x="1776.67" y="505.00">60</text>
-<text class="key" x="1812.67" y="505.00">61</text>
-</g>
-<g><rect x="1841.00" y="476" width="72" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="1877.00" y1="476" x2="1877.00" y2="532"/>
-<text class="key" x="1859.00" y="505.00">73</text>
-<text class="key" x="1895.00" y="505.00">79</text>
-</g>
-<rect x="1333" y="590" width="594" height="260" rx="12" fill="#F1F7F0" stroke="#D8E8D6" stroke-width="1.3"/>
-<rect x="1333" y="590" width="5" height="260" rx="2.5" fill="#4D8B59"/>
-<text class="note-head" x="1355" y="624">STRUCTURAL CHANGES</text>
-<circle cx="1358" cy="655" r="4" fill="#4D8B59"/>
-<text class="note" x="1371" y="660">Leaf [58, 61] splits into [58] and [60, 61]</text>
-<circle cx="1358" cy="698" r="4" fill="#4D8B59"/>
-<text class="note" x="1371" y="703">Separator 60 is added to the right parent</text>
-<circle cx="1358" cy="741" r="4" fill="#4D8B59"/>
-<text class="note" x="1371" y="746">Right parent now contains [60, 73]</text>
-
-<rect class="panel" x="1965" y="18" width="630" height="864" rx="15"/>
-<rect x="1966" y="19" width="628" height="6" rx="3" fill="#8057A6"/>
-<circle cx="2004" cy="66" r="19" fill="#8057A6"/>
-<text class="stage-num" x="2004" y="67">04</text>
-<text class="stage-title" x="2035" y="63">INSERT 75</text>
-<text class="stage-sub" x="2035" y="90">Root split · tree grows to 4 levels</text>
-<text class="level-label" x="1989" y="157">ROOT</text>
-<text class="level-label" x="1989" y="258">INTERMEDIATE</text>
-<text class="level-label" x="1989" y="370">INTERMEDIATE</text>
-<text class="level-label" x="1989" y="468">LEAF LEVEL</text>
-<path class="tree-edge" d="M 2280.00 242 L 2136.79 273"/>
-<path class="tree-edge" d="M 2280.00 242 L 2423.21 273"/>
-<path class="tree-edge" d="M 2136.79 330 L 2065.18 385"/>
-<path class="tree-edge" d="M 2136.79 330 L 2208.39 385"/>
-<path class="tree-edge" d="M 2423.21 330 L 2351.61 385"/>
-<path class="tree-edge" d="M 2423.21 330 L 2494.82 385"/>
-<path class="tree-edge" d="M 2065.18 442 L 2029.38 473"/>
-<path class="tree-edge" d="M 2065.18 442 L 2100.98 473"/>
-<path class="tree-edge" d="M 2208.39 442 L 2172.59 473"/>
-<path class="tree-edge" d="M 2208.39 442 L 2244.20 473"/>
-<path class="tree-edge" d="M 2351.61 442 L 2315.80 473"/>
-<path class="tree-edge" d="M 2351.61 442 L 2387.41 473"/>
-<path class="tree-edge" d="M 2494.82 442 L 2459.02 473"/>
-<path class="tree-edge" d="M 2494.82 442 L 2530.62 473"/>
-<g><rect x="2018.18" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2065.18" y1="388" x2="2065.18" y2="442"/>
-<text class="key" x="2041.68" y="416.00">27</text>
-</g>
-<g><rect x="2161.39" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2208.39" y1="388" x2="2208.39" y2="442"/>
-<text class="key" x="2184.89" y="416.00">56</text>
-</g>
-<g><rect x="2304.61" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2351.61" y1="388" x2="2351.61" y2="442"/>
-<text class="key" x="2328.11" y="416.00">60</text>
-</g>
-<g><rect x="2447.82" y="388" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2494.82" y1="388" x2="2494.82" y2="442"/>
-<text class="key" x="2471.32" y="416.00">75</text>
-</g>
-<g><rect x="2089.79" y="276" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2136.79" y1="276" x2="2136.79" y2="330"/>
-<text class="key" x="2113.29" y="304.00">43</text>
-</g>
-<g><rect x="2376.21" y="276" width="94" height="54" rx="4" fill="#EDF4FA" stroke="#7296B7" class="node-outline"/>
-<line class="slot-divider" x1="2423.21" y1="276" x2="2423.21" y2="330"/>
-<text class="key" x="2399.71" y="304.00">73</text>
-</g>
-<g><rect x="2233.00" y="188" width="94" height="54" rx="4" fill="#FFF3D4" stroke="#B58A35" class="node-outline"/>
-<line class="slot-divider" x1="2280.00" y1="188" x2="2280.00" y2="242"/>
-<text class="key" x="2256.50" y="216.00">58</text>
-</g>
-<path class="leaf-edge" d="M 2063.75 504.00 L 2065.61 504.00"/>
-<path class="leaf-edge" d="M 2135.36 504.00 L 2137.21 504.00"/>
-<path class="leaf-edge" d="M 2206.96 504.00 L 2208.82 504.00"/>
-<path class="leaf-edge" d="M 2278.57 504.00 L 2280.43 504.00"/>
-<path class="leaf-edge" d="M 2350.18 504.00 L 2352.04 504.00"/>
-<path class="leaf-edge" d="M 2421.79 504.00 L 2423.64 504.00"/>
-<path class="leaf-edge" d="M 2493.39 504.00 L 2495.25 504.00"/>
-<g><rect x="1997.00" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2029.38" y1="476" x2="2029.38" y2="532"/>
-<text class="key" x="2013.19" y="505.00">11</text>
-<text class="key" x="2045.56" y="505.00">19</text>
-</g>
-<g><rect x="2068.61" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2100.98" y1="476" x2="2100.98" y2="532"/>
-<text class="key" x="2084.79" y="505.00">27</text>
-</g>
-<g><rect x="2140.21" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2172.59" y1="476" x2="2172.59" y2="532"/>
-<text class="key" x="2156.40" y="505.00">43</text>
-</g>
-<g><rect x="2211.82" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2244.20" y1="476" x2="2244.20" y2="532"/>
-<text class="key" x="2228.01" y="505.00">56</text>
-</g>
-<g><rect x="2283.43" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2315.80" y1="476" x2="2315.80" y2="532"/>
-<text class="key" x="2299.62" y="505.00">58</text>
-</g>
-<g><rect x="2355.04" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2387.41" y1="476" x2="2387.41" y2="532"/>
-<text class="key" x="2371.22" y="505.00">60</text>
-<text class="key" x="2403.60" y="505.00">61</text>
-</g>
-<g><rect x="2426.64" y="476" width="64.75" height="56" rx="4" fill="#EEF5E9" stroke="#83A06F" class="node-outline"/>
-<line class="slot-divider" x1="2459.02" y1="476" x2="2459.02" y2="532"/>
-<text class="key" x="2442.83" y="505.00">73</text>
-</g>
-<g><rect x="2498.25" y="476" width="64.75" height="56" rx="4" fill="#F3ECF9" stroke="#8057A6" class="node-outline"/>
-<line class="slot-divider" x1="2530.62" y1="476" x2="2530.62" y2="532"/>
-<text class="key" x="2514.44" y="505.00">75</text>
-<text class="key" x="2546.81" y="505.00">79</text>
-</g>
-<rect x="1983" y="590" width="594" height="260" rx="12" fill="#F6F2FA" stroke="#E4D9EF" stroke-width="1.3"/>
-<rect x="1983" y="590" width="5" height="260" rx="2.5" fill="#8057A6"/>
-<text class="note-head" x="2005" y="624">STRUCTURAL CHANGES</text>
-<circle cx="2008" cy="655" r="4" fill="#8057A6"/>
-<text class="note" x="2021" y="660">Leaf [73, 79] splits into [73] and [75, 79]</text>
-<circle cx="2008" cy="698" r="4" fill="#8057A6"/>
-<text class="note" x="2021" y="703">Parent [60, 73] splits; separator 73 moves up</text>
-<circle cx="2008" cy="741" r="4" fill="#8057A6"/>
-<text class="note" x="2021" y="746">Root [43, 58] splits</text>
-<circle cx="2008" cy="784" r="4" fill="#8057A6"/>
-<text class="note" x="2021" y="789">A new root [58] creates level 4</text>
-</g></defs>
-<svg x="20" y="70" width="660" height="900" viewBox="0 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="700" y="70" width="660" height="900" viewBox="650 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="20" y="1015" width="660" height="900" viewBox="1300 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg><svg x="700" y="1015" width="660" height="900" viewBox="1950 0 660 900" overflow="hidden"><use href="#full-diagram"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1250" viewBox="0 0 1600 1250" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTpmMzI2Y2Q0OS1mNGJmLTQ0NzMtYThlNS1mMTVlOWY1YWFiMzUAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaPX5oS7mlX5OMnXX1N7d8ZcAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDpkZWIzZTg4My0yY2RjLTRjOGYtYjNiMi0wZjMxNmFhYTcxMDlscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoZzaPGzaCrKuoCv3gLqKuTQAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg9KakCPQb1l0Cy2bLiK6Hts6/knJoQOpFHXFCWuWnjNKkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaDHywlcklA38KpP+vhs67mgAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCCEr2pHbxo56+QJVDpP/M5eo2ho4baCUyI+GsB5OOxUI2RuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiaZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmYzMjZjZDQ5LWY0YmYtNDQ3My1hOGU1LWYxNWU5ZjVhYWIzNS9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjhkZmIxNmY4LTlmYmYtNDU0ZS05YzE1LWE5ZjQ1ZjI4MmJjZXJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCD0pqQI9BvWXQLLZsuIroe2zr+ScmhA6kUdcUJa5aeM0qJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggis1EywYhd6nNPsg8oORlih9DbJfrEWkTm49TuRpi4diiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggDJpF0g26F5SnTykERJjLPDnSUmwRBl6Hw7il65p+MnN0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQMDeNxpG/KFIHgI1htV3s1vMj21HerPbvtiDXbxNOEBZnrScJ49AW/vYpPeGjxVxXHJnJ7BG23eTpZS/nPO+5jk=</c2pa:manifest></metadata>
+<defs><style>text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}</style><marker id="ag" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 5L0 10Z" fill="#94A3B8"/></marker></defs>
+<rect width="1600" height="1250" fill="#fff"/>
+<text x="48" y="60" font-size="36" font-weight="700">Inserting 58, 60 and 75 into a B+ tree</text>
+<text x="48" y="96" font-size="20" fill="#64748B">Simplified model: each page holds at most two keys · Orange = pages changed in this step</text>
+<rect x="48" y="130" width="736" height="530" rx="14" fill="#fff" stroke="#D8E1EC" stroke-width="2"/>
+<circle cx="86" cy="174" r="20" fill="#526176"/>
+<text x="86" y="181" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">1</text>
+<text x="120" y="176" font-size="26" font-weight="700">Initial state</text>
+<text x="120" y="206" font-size="18" fill="#64748B">3 levels</text>
+<path d="M366.0 295.0 L236.0 424.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M406.0 295.0 L536.0 424.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M216.0 467.5 L176.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M256.0 467.5 L296.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M500.0 467.5 L416.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M536.0 467.5 L536.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M572.0 467.5 L656.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<rect x="346.0" y="255.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="366.0" y="282.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="386.0" y="255.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="196.0" y="427.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="216.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="236.0" y="427.5" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="496.0" y="427.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="516.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="536.0" y="427.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="556.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="136.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="156.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">11</text>
+<rect x="176.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="196.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">19</text>
+<rect x="256.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="276.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="296.0" y="600.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="376.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="396.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="416.0" y="600.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="496.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="516.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="536.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="556.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">61</text>
+<rect x="616.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="636.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="656.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="676.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">79</text>
+<rect x="816" y="130" width="736" height="530" rx="14" fill="#fff" stroke="#D8E1EC" stroke-width="2"/>
+<circle cx="854" cy="174" r="20" fill="#EA580C"/>
+<text x="854" y="181" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">2</text>
+<text x="888" y="176" font-size="26" font-weight="700">Insert 58</text>
+<text x="888" y="206" font-size="18" fill="#64748B">Leaf and parent split · still 3 levels</text>
+<path d="M1148.0 295.0 L944.0 424.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1184.0 295.0 L1184.0 424.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1220.0 295.0 L1424.0 424.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M924.0 467.5 L884.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M964.0 467.5 L1004.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1164.0 467.5 L1124.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1204.0 467.5 L1244.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1404.0 467.5 L1364.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1444.0 467.5 L1484.0 597.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<rect x="1144.0" y="255.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1164.0" y="282.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="1184.0" y="255.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1204.0" y="282.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">58</text>
+<rect x="904.0" y="427.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="924.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="944.0" y="427.5" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1144.0" y="427.5" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1164.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="1184.0" y="427.5" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="1384.0" y="427.5" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1404.0" y="454.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="1424.0" y="427.5" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="844.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="864.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">11</text>
+<rect x="884.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="904.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">19</text>
+<rect x="964.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="984.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="1004.0" y="600.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1084.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1104.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="1124.0" y="600.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1204.0" y="600.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1224.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="1244.0" y="600.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="1324.0" y="600.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1344.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">58</text>
+<rect x="1364.0" y="600.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1384.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">61</text>
+<rect x="1444.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1464.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="1484.0" y="600.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1504.0" y="627.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">79</text>
+<rect x="48" y="690" width="736" height="530" rx="14" fill="#fff" stroke="#D8E1EC" stroke-width="2"/>
+<circle cx="86" cy="734" r="20" fill="#EA580C"/>
+<text x="86" y="741" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">3</text>
+<text x="120" y="736" font-size="26" font-weight="700">Insert 60</text>
+<text x="120" y="766" font-size="18" fill="#64748B">One leaf split · still 3 levels</text>
+<path d="M345.7777777777778 855.0 L159.33333333333334 984.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M381.7777777777778 855.0 L364.6666666666667 984.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M417.7777777777778 855.0 L621.3333333333334 984.5" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M139.33333333333334 1027.5 L108.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M179.33333333333334 1027.5 L210.66666666666669 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M344.6666666666667 1027.5 L313.33333333333337 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M384.6666666666667 1027.5 L416.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M585.3333333333334 1027.5 L518.6666666666667 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M621.3333333333334 1027.5 L621.3333333333334 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M657.3333333333334 1027.5 L724.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<rect x="341.7777777777778" y="815.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="361.7777777777778" y="842.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="381.7777777777778" y="815.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="401.7777777777778" y="842.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">58</text>
+<rect x="119.33333333333334" y="987.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="139.33333333333334" y="1014.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="159.33333333333334" y="987.5" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="324.6666666666667" y="987.5" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="344.6666666666667" y="1014.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="364.6666666666667" y="987.5" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="581.3333333333334" y="987.5" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="601.3333333333334" y="1014.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">60</text>
+<rect x="621.3333333333334" y="987.5" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="641.3333333333334" y="1014.5" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="68.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="88.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">11</text>
+<rect x="108.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="128.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">19</text>
+<rect x="170.66666666666669" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="190.66666666666669" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="210.66666666666669" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="273.33333333333337" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="293.33333333333337" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="313.33333333333337" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="376.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="396.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="416.0" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="478.66666666666674" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="498.66666666666674" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">58</text>
+<rect x="518.6666666666667" y="1160.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="581.3333333333334" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="601.3333333333334" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">60</text>
+<rect x="621.3333333333334" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="641.3333333333334" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">61</text>
+<rect x="684.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="704.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="724.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="744.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">79</text>
+<rect x="816" y="690" width="736" height="530" rx="14" fill="#fff" stroke="#D8E1EC" stroke-width="2"/>
+<circle cx="854" cy="734" r="20" fill="#EA580C"/>
+<text x="854" y="741" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">4</text>
+<text x="888" y="736" font-size="26" font-weight="700">Insert 75</text>
+<text x="888" y="766" font-size="18" fill="#64748B">Splits reach the root · tree grows to 4 levels</text>
+<path d="M1164.0 855.0 L1008.0 927.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1204.0 855.0 L1360.0 927.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M988.0 970.0 L920.0 1042.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1028.0 970.0 L1096.0 1042.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1340.0 970.0 L1272.0 1042.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1380.0 970.0 L1448.0 1042.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M900.0 1085.0 L876.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M940.0 1085.0 L964.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1076.0 1085.0 L1052.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1116.0 1085.0 L1140.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1252.0 1085.0 L1228.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1292.0 1085.0 L1316.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1428.0 1085.0 L1404.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<path d="M1468.0 1085.0 L1492.0 1157.0" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#ag)"/>
+<rect x="1144.0" y="815.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1164.0" y="842.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">58</text>
+<rect x="1184.0" y="815.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="968.0" y="930.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="988.0" y="957.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="1008.0" y="930.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="1320.0" y="930.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1340.0" y="957.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="1360.0" y="930.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="880.0" y="1045.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="900.0" y="1072.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="920.0" y="1045.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1056.0" y="1045.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1076.0" y="1072.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="1096.0" y="1045.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1232.0" y="1045.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1252.0" y="1072.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">60</text>
+<rect x="1272.0" y="1045.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="1408.0" y="1045.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1428.0" y="1072.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">75</text>
+<rect x="1448.0" y="1045.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="836.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="856.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">11</text>
+<rect x="876.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="896.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">19</text>
+<rect x="924.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="944.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">27</text>
+<rect x="964.0" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1012.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1032.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">43</text>
+<rect x="1052.0" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1100.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1120.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">56</text>
+<rect x="1140.0" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1188.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1208.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">58</text>
+<rect x="1228.0" y="1160.0" width="40" height="40" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="1276.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1296.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">60</text>
+<rect x="1316.0" y="1160.0" width="40" height="40" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text x="1336.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">61</text>
+<rect x="1364.0" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1384.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">73</text>
+<rect x="1404.0" y="1160.0" width="40" height="40" fill="#FCE9CC" stroke="#E49A3A" stroke-width="2.4"/>
+<rect x="1452.0" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1472.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#C2410C">75</text>
+<rect x="1492.0" y="1160.0" width="40" height="40" fill="#FFF0D7" stroke="#E49A3A" stroke-width="2.4"/>
+<text x="1512.0" y="1187.0" text-anchor="middle" font-size="20" font-weight="700" style="fill:#1E293B">79</text>
 </svg>

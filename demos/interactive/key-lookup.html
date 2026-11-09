@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Lookup, step by step</title>
+<style>
+:root{--bg:#ffffff;--surface:#f4f5f7;--text:#1e293b;--muted:#64748b;--faint:#94a3b8;--border:#d8e1ec;
+--accent-bg:#e6f1fb;--accent:#185fa5;--ok-bg:#eaf3de;--ok:#3b6d11;--no-bg:#fcebeb;--no:#a32d2d;--hot-bg:#faeeda;--hot:#854f0b}
+@media (prefers-color-scheme: dark){:root{--bg:#1c1c1e;--surface:#2a2a2d;--text:#e8e8ea;--muted:#a1a1aa;--faint:#71717a;--border:#3f3f46;
+--accent-bg:#0c447c;--accent:#b5d4f4;--ok-bg:#27500a;--ok:#c0dd97;--no-bg:#791f1f;--no:#f7c1c1;--hot-bg:#633806;--hot:#fac775}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:16px;line-height:1.5}
+main{max-width:920px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+.intro{color:var(--muted);margin:0 0 16px}
+.lbl{font-size:14px;color:var(--muted);margin:18px 0 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mono{font-family:Consolas,"Courier New",monospace}
+.chip{font-family:Consolas,"Courier New",monospace;font-size:15px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface)}
+.chip.cur{border:2px solid var(--accent);background:var(--accent-bg);color:var(--accent)}
+.chip.done{color:var(--faint)}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip.no{background:var(--no-bg);color:var(--no);border-color:var(--no)}
+.chip.hot{border:2px solid var(--hot);background:var(--hot-bg);color:var(--hot)}
+.chip .x{color:var(--muted);font-size:13px}
+.mode button.on{border:2px solid var(--accent);background:var(--accent-bg);color:var(--accent)}
+.pages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.page{border:1px solid var(--border);border-radius:8px;padding:8px}
+.page.hit{border:2px solid var(--hot)}
+.page .name{font-size:13px;color:var(--muted);margin-bottom:4px}
+.rec{font-family:Consolas,"Courier New",monospace;font-size:14px;padding:3px 6px;border-radius:6px}
+.rec .d{display:block;color:var(--muted);font-size:13px}
+.rec.hit .d{color:var(--hot)}
+.rec.hit{background:var(--hot-bg);color:var(--hot)}
+.dim{opacity:.4}
+.msg{margin:20px 0 12px;padding:12px 14px;background:var(--surface);border-radius:8px;min-height:52px;font-size:17px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 16px}
+.stat{background:var(--surface);border-radius:8px;padding:10px 14px}
+.stat .k{font-size:13px;color:var(--muted)}.stat .v{font-size:24px;font-weight:600}
+button{font:inherit;font-size:15px;padding:8px 16px;border-radius:8px;border:1px solid var(--muted);background:transparent;color:var(--text);cursor:pointer}
+button:hover{background:var(--surface)}
+.hint{font-size:13px;color:var(--faint);margin-top:12px}
+@media (max-width:700px){.pages,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<main>
+<h1>Key Lookup, step by step</h1>
+<p class="intro">The same data as the Hash Match and Nested Loops demos. For each order, SQL Server seeks in the nonclustered index <span class="mono">IX_SalesOrderItem_SalesOrderId</span>. The query also needs <span class="mono">ProductId</span>, <span class="mono">Quantity</span>, and <span class="mono">UnitPrice</span>. Where do they come from?</p>
+
+<div class="row mode"><button id="mA">Narrow index (Section 8.3)</button><button id="mB">Index with INCLUDE (Section 8.4)</button></div>
+
+<p class="lbl">Outer input · SalesOrder (5 orders; 5,477 in Lab 06)</p>
+<div class="row" id="outer"></div>
+
+<p class="lbl" id="ncLbl"></p>
+<div class="row" id="nc"></div>
+
+<p class="lbl" id="ciLbl">Clustered index PK_SalesOrderItem · leaf pages contain complete rows, sorted by SalesOrderItemId</p>
+<div class="pages" id="ci"></div>
+
+<div class="msg" id="msg"></div>
+
+<div class="stats">
+<div class="stat"><div class="k">Index seeks</div><div class="v" id="cS">0</div></div>
+<div class="stat"><div class="k">Key Lookups</div><div class="v" id="cL">0</div></div>
+<div class="stat"><div class="k">Page reads</div><div class="v" id="cP">0</div></div>
+<div class="stat"><div class="k">Joined rows</div><div class="v" id="cM">0</div></div>
+</div>
+
+<div class="row"><button id="next">Next step</button><button id="reset">Start over</button></div>
+<p class="hint">Keyboard: Space or → for the next step, R to start over, 1 / 2 to switch the variant. Page reads assume two levels per index: one root page and one leaf page.</p>
+</main>
+<script>
+const O=[101,206,310,415,517];
+const ITEMS=[{id:1,so:206,p:12,q:3,u:'4.50'},{id:2,so:333,p:7,q:1,u:'19.90'},{id:3,so:517,p:3,q:2,u:'8.00'},{id:4,so:120,p:12,q:5,u:'4.50'},
+ {id:5,so:101,p:9,q:1,u:'32.00'},{id:6,so:999,p:7,q:4,u:'19.90'},{id:7,so:415,p:5,q:2,u:'11.25'},{id:8,so:288,p:3,q:6,u:'8.00'}];
+const NC=[...ITEMS].sort((a,b)=>a.so-b.so);
+let mode='A',st,plan;
+const $=id=>document.getElementById(id);
+function buildPlan(){plan=[];O.forEach(o=>{const hits=NC.filter(e=>e.so===o);plan.push({t:'seek',o,hits});if(mode==='A')hits.forEach(h=>plan.push({t:'lookup',o,h}))})}
+function init(){buildPlan();st={k:-1,s:0,l:0,p:0,m:0,cur:null,end:false,doneNc:{}};
+ $('mA').className=mode==='A'?'on':'';$('mB').className=mode==='B'?'on':'';
+ $('ncLbl').textContent=mode==='A'
+  ?'Nonclustered index · key SalesOrderId → row locator (the clustered key SalesOrderItemId)'
+  :'Nonclustered index · key SalesOrderId → clustered key + INCLUDE (ProductId, Quantity, UnitPrice)';
+ render(mode==='A'?'Narrow index: the index finds the items, but it does not contain the columns the query needs. Click "Next step".'
+                  :'Index with INCLUDE: every index entry already carries ProductId, Quantity, and UnitPrice. Click "Next step".')}
+function render(t){
+ const c=st.cur;
+ $('outer').innerHTML=O.map(o=>{let cls='';if(st.end||O.indexOf(o)<O.indexOf(c?c.o:-1))cls='done';if(c&&!st.end&&c.o===o)cls='cur';return `<span class="chip ${cls}">${o}</span>`}).join('');
+ $('nc').innerHTML=NC.map(e=>{let cls='';
+  if(c&&!st.end&&c.o===e.so)cls=(c.t==='seek'?'ok':'');
+  if(c&&!st.end&&c.t==='lookup'&&c.h.id===e.id)cls='hot';
+  if(!cls&&st.doneNc[e.id])cls='done';
+  const inc=mode==='B'?` <span class="x">· P${e.p}, ${e.q} × ${e.u}</span>`:'';
+  return `<span class="chip ${cls}">${e.so} → item ${e.id}${inc}</span>`}).join('');
+ const lookingAt=c&&!st.end&&c.t==='lookup'?c.h.id:null;
+ $('ci').className='pages'+(mode==='B'?' dim':'');
+ $('ciLbl').textContent=mode==='B'?'Clustered index PK_SalesOrderItem · not needed for this query any more':'Clustered index PK_SalesOrderItem · leaf pages contain complete rows, sorted by SalesOrderItemId';
+ let html='';for(let pg=0;pg<4;pg++){const rows=ITEMS.slice(pg*2,pg*2+2);const hit=rows.some(r=>r.id===lookingAt);
+  html+=`<div class="page ${hit?'hit':''}"><div class="name">leaf page ${pg+1}</div>`+rows.map(r=>`<div class="rec ${r.id===lookingAt?'hit':''}">item ${r.id}<span class="d">P${r.p} · ${r.q} × ${r.u}</span></div>`).join('')+'</div>'}
+ $('ci').innerHTML=html;
+ $('msg').textContent=t;$('cS').textContent=st.s;$('cL').textContent=st.l;$('cP').textContent=st.p;$('cM').textContent=st.m;
+}
+function step(){
+ if(st.end){init();return}
+ st.k++;
+ if(st.k>=plan.length){st.end=true;st.cur=null;
+  const tail=mode==='A'
+   ?'In Lab 06, the narrow index needed 21,908 Key Lookups, and SalesOrderItem cost 90,533 logical reads.'
+   :'In Lab 06, INCLUDE removed all 21,908 Key Lookups, and SalesOrderItem dropped to 23,462 logical reads.';
+  render(`Done: ${st.s} index seeks, ${st.l} Key Lookups, ${st.p} page reads, ${st.m} joined rows. ${tail}`);return}
+ const a=plan[st.k];st.cur=a;
+ if(a.t==='seek'){st.s++;st.p+=2;a.hits.forEach(h=>st.doneNc[h.id]=1);
+  if(!a.hits.length){render(`Order ${a.o}: Index Seek in the nonclustered index (2 page reads). No entry for ${a.o}: nothing to look up.`);return}
+  if(mode==='B'){st.m+=a.hits.length;const h=a.hits[0];
+   render(`Order ${a.o}: Index Seek finds item ${h.id} (2 page reads). ProductId ${h.p}, Quantity ${h.q}, and UnitPrice ${h.u} are already in the index entry: the row is complete, no lookup.`);return}
+  render(`Order ${a.o}: Index Seek finds item ${a.hits.map(h=>h.id).join(', ')} (2 page reads). The entry has only SalesOrderId and the clustered key. ProductId, Quantity, and UnitPrice are missing.`);return}
+ st.l++;st.p+=2;st.m++;const h=a.h,pg=Math.floor((h.id-1)/2)+1;
+ render(`Key Lookup for item ${h.id}: use the clustered key to navigate PK_SalesOrderItem from the root to leaf page ${pg} (2 more page reads) and read ProductId ${h.p}, Quantity ${h.q}, UnitPrice ${h.u}.`);
+}
+function setMode(m){mode=m;init()}
+$('mA').onclick=()=>setMode('A');$('mB').onclick=()=>setMode('B');
+$('next').onclick=step;$('reset').onclick=init;
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();step()}else if(e.key==='r'||e.key==='R')init();else if(e.key==='1')setMode('A');else if(e.key==='2')setMode('B')});
+init();
+</script>
+</body>
+</html>

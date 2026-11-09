@@ -1759,7 +1759,14 @@ However, the index is **not globally sorted by `OrderDate`**. Dates are sorted o
 
 ### Create the composite index
 
-Execute:
+First, temporarily drop the `IX_SalesOrder_OrderDate` index from Section 8.2. Otherwise SQL Server can use it for Query C below, and the comparison would no longer show what the composite index can do on its own. We recreate it at the end of this section.
+
+```sql
+DROP INDEX IX_SalesOrder_OrderDate ON dbo.SalesOrder;
+GO
+```
+
+Then create the composite index:
 
 ```sql
 CREATE NONCLUSTERED INDEX IX_SalesOrder_CustomerId_OrderDate
@@ -1797,15 +1804,19 @@ SQL Server can use the equality condition on `CustomerId` and the range conditio
 ```sql
 SELECT SalesOrderId, CustomerId, OrderDate
 FROM dbo.SalesOrder
-WHERE OrderDate >= '20250101';
+WHERE OrderDate >= '20250101'
+  AND OrderDate <  '20250102';
 GO
 ```
 
 This query does not filter by the leading key, `CustomerId`.
 
-Therefore, SQL Server generally cannot use this composite index to directly seek to one continuous date range across all customers.
+The condition is very selective: one day, **5,477 orders**, about 0.05% of the table. Even so, SQL Server cannot seek in this composite index, because the orders from that day are not stored together. They are spread across the groups of all customers.
 
-Order dates in `IndexLab` cover 2021–2025, so this condition matches roughly **one fifth of the table** (about 2 million rows). The earlier `IX_SalesOrder_OrderDate` index can locate the date range, but it does not contain `CustomerId`, so using it would require about 2 million lookups. The composite index, on the other hand, contains every column this query needs (`CustomerId`, `OrderDate`, and the clustered key `SalesOrderId`) and is much narrower than the table. SQL Server therefore **scans the composite index** (`Index Scan`) rather than seeking in it.
+SQL Server therefore **scans the whole composite index** (`Index Scan`) and checks `OrderDate` on every entry. It still prefers the composite index to the clustered index, because the composite index contains every column this query needs (`CustomerId`, `OrderDate`, and the clustered key `SalesOrderId`) and is much narrower than the table.
+
+> [!NOTE]
+> With `IX_SalesOrder_OrderDate` in place, SQL Server would choose that index for Query C instead: an `Index Seek` on `OrderDate`, followed by 5,477 Key Lookups to retrieve `CustomerId` (16,797 logical reads in the reference database). This is why we dropped it before this comparison.
 
 ### Compare the execution plans
 
@@ -1815,9 +1826,9 @@ For each query, inspect the access operator, its **Seek Predicates**, and the lo
 |---|---|---|---:|
 | A | `CustomerId = 501` | `Index Seek` using the leading key | 6 |
 | B | `CustomerId = 501 AND OrderDate >= ...` | `Index Seek` using both key columns | 3 |
-| C | `OrderDate >= ...` | `Index Scan` of the whole composite index; `OrderDate` is checked as a predicate on every entry | 26,055 |
+| C | `OrderDate` within one day | `Index Scan` of the whole composite index; `OrderDate` is checked as a predicate on every entry | 26,055 |
 
-Query C reads every page of the composite index, because the dates it needs are spread across all customers.
+Query C reads every page of the composite index to return 5,477 rows, because the dates it needs are spread across all customers.
 
 > [!IMPORTANT]
 > **The order of columns in a composite index matters.**
@@ -1828,6 +1839,16 @@ Query C reads every page of the composite index, because the dates it needs are 
 >
 > - **Equality first, then range or sort.** Put columns compared with equality (`=`) first, and columns used for ranges (`>`, `<`, `BETWEEN`) or for sorting after them. Once the seek reaches a range condition, the key columns that follow can no longer narrow it down; they can only be checked as residual predicates.
 > - **The leftmost prefix.** An index on `(CustomerId, OrderDate)` also supports every search that an index on `(CustomerId)` alone would support. A separate single-column index on `CustomerId` is therefore usually redundant.
+
+### Recreate the `OrderDate` index
+
+Recreate the index we dropped at the beginning of this section, so that the main query from Section 8 keeps its plan:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_SalesOrder_OrderDate
+ON dbo.SalesOrder (OrderDate);
+GO
+```
 
 ### Check your understanding
 

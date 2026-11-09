@@ -115,7 +115,10 @@ A tree is a hierarchy of nodes connected by links. Database rowstore indexes use
 - **Root:** the entry point to the tree.
 - **Internal (intermediate) nodes:** contain separator keys and links to child pages.
 - **Leaf level:** the bottom level containing index entries (or full rows for clustered indexes).
-- **Tree depth:** the number of edges from the root to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3. SQL Server itself counts differently: `sys.dm_db_index_physical_stats` reports `index_depth` as the **number of levels** (for example, 3 for root + intermediate + leaf), and its `index_level` column numbers levels **from the leaf upward**, so the leaf level is 0 and the root has the highest number. You saw the same convention in Lab 05, where `DBCC IND` reported `IndexLevel = 0` for leaf pages and the highest value for the root page. In this lab's diagrams, we number levels from the root downward.
+- **Tree depth:** how many steps it takes to get from the root down to a leaf. In our diagrams, the root is at Level 0, so a leaf at Level 3 has a depth of 3.
+
+> [!NOTE]
+> SQL Server numbers the levels the other way round: the leaf level is 0 and the root has the highest number. You saw this in Lab 05, where `DBCC IND` reported `IndexLevel = 0` for leaf pages.
 
 An index may consist of a single page; it does not always need three levels. The search examples in Sections 3 and 4 use three levels (root, intermediate, leaf) so that navigation is visible.
 

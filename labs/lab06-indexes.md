@@ -894,6 +894,9 @@ In our reference plan, the join produces approximately **21,908 matching order i
 
 *Note: The build/probe description is simplified. The actual input roles depend on the execution plan.*
 
+> [!TIP]
+> **Optional: see Hash Match step by step.** The [Hash Match demo](https://tjovic.github.io/database-design-labs-public/demos/interactive/hash-match.html) walks through the build and probe phases on a scaled-down version of our query. It is not required for this lab.
+
 
 ## 7.5 Why scanning `Product` may be fine
 
@@ -1118,9 +1121,6 @@ SQL Server still examines approximately:
 - **40 million** rows from `SalesOrderItem`.
 
 The optimizer also continues to use `Hash Match` to join the large inputs.
-
-> [!TIP]
-> **Optional: see Hash Match step by step.** The [Hash Match demo](https://tjovic.github.io/database-design-labs-public/demos/interactive/hash-match.html) walks through the build and probe phases on a scaled-down version of our query. It is not required for this lab.
 
 ### Why didn't the clustered indexes solve the problem?
 

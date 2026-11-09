@@ -46,7 +46,7 @@ Some core sections also contain short collapsible deep-dive parts.
 >
 > The database will be created using the [IndexLab setup script](setup/index-lab-data-setup.md). 
 >
-> **Keep this database after completing the lab!** We will use it again in **Lab 06 – Indexes** to investigate query performance and demonstrate how indexes can reduce the number of pages SQL Server needs to read.
+> You will use this database again in **Lab 06 – Indexes** to investigate query performance and demonstrate how indexes can reduce the number of pages SQL Server needs to read.
 
 ---
 
@@ -117,7 +117,7 @@ Run the [IndexLab setup script](setup/index-lab-data-setup.md) in SSMS. It creat
 - `SalesOrder`
 - `SalesOrderItem`
 
-The two largest tables contain approximately **10,000,000 orders** and **40,000,000 order items**. Generation may take several minutes.
+The two largest tables contain approximately **10,000,000 orders** and **40,000,000 order items**. Generation took about two minutes on the reference computer; it may take longer on slower storage.
 
 ```sql
 USE IndexLab;
@@ -135,7 +135,7 @@ SELECT 'SalesOrderItem', COUNT(*) FROM dbo.SalesOrderItem;
 ```
 
 > [!TIP]
-> You only need to run the setup once. Do **not** recreate the database before Lab 06: we want to study indexing on the same data.
+> The data is generated deterministically, so running the setup script again recreates exactly the same rows. Lab 06 starts from the tables exactly as the script creates them. If you have created any indexes on `SalesOrder` or `SalesOrderItem` in the meantime, simply run the setup script again before Lab 06.
 
 Our question is not merely *how many rows exist?* It is **how are those rows stored, and what does SQL Server have to read to find them?**
 
@@ -201,7 +201,7 @@ In our example:
 
 #### Understanding the results
 
-When we created the `IndexLab` database, we specified the initial sizes of its files: **4096 MB for the data file** and **512 MB for the transaction log**.
+The setup script created the `IndexLab` files with initial sizes of **4096 MB for the data file** and **512 MB for the transaction log**.
 
 These values determine how much disk space SQL Server initially reserves for the database.
 
@@ -212,7 +212,8 @@ However, notice that approximately **half of the data file is still unallocated*
 >
 > Although the data file occupies 4 GB on disk, SQL Server has allocated only about 2 GB to database structures. The remaining space is available for future allocations without increasing the file size.
 
-#### Why is choosing the right file size important?
+<details>
+<summary>🔍 Deep dive – file sizes and autogrowth</summary>
 
 Choosing appropriate file sizes is an important part of **database capacity planning**.
 
@@ -221,10 +222,9 @@ Choosing appropriate file sizes is an important part of **database capacity plan
 
 SQL Server supports **autogrowth**, allowing database files to grow automatically when additional space is required.
 
-> [!NOTE]
-> Autogrowth is a useful safety mechanism, but it should not replace proper capacity planning.
->
-> Also, larger database files do not automatically make queries faster. The goal is to allocate sufficient space while avoiding unnecessary file growth.
+Autogrowth is a useful safety mechanism, but it should not replace proper capacity planning. Also, larger database files do not automatically make queries faster. The goal is to allocate sufficient space while avoiding unnecessary file growth.
+
+</details>
 
 ### Step 2 – Disk usage by table
 
@@ -252,7 +252,7 @@ For example, our database contains:
 | SalesOrder | 10,000,000 | 457,144 |
 | SalesOrderItem | 40,000,000 | 1,584,160 |
 
-Notice that `SalesOrderItem` contains four times as many rows as `SalesOrder` and occupies considerably more space.
+`SalesOrderItem` contains four times as many rows as `SalesOrder`, but it occupies only about 3.5 times as much space, because each order-item row is narrower than an order row. We will see why row width matters in Sections 6 and 7.
 
 > [!NOTE]
 > A table's storage requirements depend on the number of rows, the size of each row, and additional storage overhead.
@@ -274,7 +274,7 @@ Notice that `SalesOrderItem` contains four times as many rows as `SalesOrder` an
 2. It records the information required for transaction recovery. Write-ahead logging ensures relevant log records become durable before modified data pages are written to disk.
 3. No. Secondary data files are optional.
 4. SQL Server can reserve file space in advance. Space that has not yet been allocated internally remains available for future use.
-5. No. Storage requirements also depend on row size and additional overhead.
+5. No. Storage requirements also depend on row size and additional overhead. For example, `SalesOrderItem` has four times as many rows as `SalesOrder` but needs only about 3.5 times as much space.
 
 </details>
 

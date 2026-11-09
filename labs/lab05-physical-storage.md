@@ -906,10 +906,10 @@ Consider the following query:
 ```sql
 SELECT *
 FROM dbo.Customer
-WHERE LastName = 'ExampleSurname';
+WHERE LastName = 'LastName1503';
 ```
 
-Replace `ExampleSurname` with a value present in your database. The query may return only a small number of rows.
+The query returns only a small number of rows. In the reference database, it returns 10 rows but performs 736 logical reads — every page of the table.
 
 But does that mean SQL Server needs to examine only one page?
 
@@ -923,7 +923,7 @@ Therefore, we must distinguish:
 - **Rows examined:** The number of rows SQL Server processes while evaluating the query.
 - **Pages accessed:** The number of page accesses required during execution.
 
-A query returning one row can still perform thousands of logical reads.
+A query returning only a few rows can still read every page of the table.
 
 > [!NOTE]
 > The number of logical reads is not necessarily the number of distinct pages. SQL Server may access the same page more than once during query execution.

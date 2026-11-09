@@ -111,11 +111,11 @@ We will use the same generated database in Labs 05 and 06.
 
 Run the [IndexLab setup script](setup/index-lab-data-setup.md) in SSMS. It creates the following tables:
 
-- `Category`
-- `Product`
-- `Customer`
-- `SalesOrder`
-- `SalesOrderItem`
+![IndexLab tables: Customer, Product, and Category with clustered primary keys; SalesOrder and SalesOrderItem as heaps; one-to-many relationships Customer–SalesOrder, SalesOrder–SalesOrderItem, Product–SalesOrderItem, and Category–Product](../images/lab06/indexlab-er-diagram.svg)
+
+- `Customer`, `Product`, and `Category` have **clustered primary keys** (marked **PK**).
+- `SalesOrder` and `SalesOrderItem` are intentionally **heaps**: tables with no primary key and no indexes. Their key columns are shown with a dashed outline. Lab 06 explains what a heap is and adds the missing keys.
+- The dashed lines show the **logical one-to-many relationships**; **FK** marks the columns that refer to another table. The script does not create `FOREIGN KEY` constraints.
 
 The two largest tables contain approximately **10,000,000 orders** and **40,000,000 order items**. Generation took about two minutes on the reference computer; it may take longer on slower storage.
 

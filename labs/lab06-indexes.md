@@ -523,6 +523,14 @@ This is the main practical part of the lab. We will execute **the same SQL query
 
 The `IndexLab` reference database contains approximately **10 million** rows in `SalesOrder`, **40 million** rows in `SalesOrderItem`, and **30,000** products. These figures are large enough to make inefficient access paths visible.
 
+![IndexLab tables: Customer, Product, and Category with clustered primary keys; SalesOrder and SalesOrderItem as heaps; one-to-many relationships Customer–SalesOrder, SalesOrder–SalesOrderItem, Product–SalesOrderItem, and Category–Product](../images/lab06/indexlab-er-diagram.svg)
+
+In the initial state of the database:
+
+- `Customer`, `Product`, and `Category` have **clustered primary keys** (marked **PK**), created by the setup script.
+- `SalesOrder` and `SalesOrderItem` are intentionally **heaps**: they have no primary key and no indexes. Their key columns (dashed outline) become clustered primary keys in Section 8.1.
+- The dashed lines show the **logical one-to-many relationships**, and **FK** marks the columns that refer to another table. The setup script does not create `FOREIGN KEY` constraints, and even if it did, a foreign key does not create an index by itself (Section 5).
+
 > [!NOTE]
 > **Don't have `IndexLab` yet?** It is created in [Lab 05, Section 2 – Create the `IndexLab` database](lab05-physical-storage.md#2-create-the-indexlab-database) using the [IndexLab setup script](setup/index-lab-data-setup.md). This lab does not repeat that setup — it assumes the database already exists in its freshly generated state (heaps, no indexes beyond what the script creates).
 

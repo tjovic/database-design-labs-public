@@ -2177,7 +2177,7 @@ The following diagram illustrates the insertion of three new keys: `58`, `60`, a
 
 Follow the changes in the diagram:
 
-In this simplified model, each page holds at most two keys.
+In this simplified model, each page holds at most two keys. Pages changed in each step are highlighted in orange.
 
 1. **Initial state:** three levels, five leaf pages, and a root containing the key `43`.
 2. **Insert 58:** the key belongs in the full leaf page `[56, 61]`, so the leaf splits into `[56]` and `[58, 61]`, and the separator `58` must be added to the parent. The parent `[56, 73]` is also full, so it splits too, and `58` moves up into the root, which now contains `[43, 58]`. The tree still has three levels.

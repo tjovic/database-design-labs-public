@@ -296,7 +296,7 @@ Notice that the leaf pages are connected by horizontal pointers. These connectio
 
 At the bottom of the diagram, the data pages contain the actual member records.
 Unlike the index entries, the heap rows are not organized by `MemberID`.
-The orange arrows illustrate how the RID values in the index refer to rows stored in these pages.
+The orange arrow shows how the RID stored with entry `61` points to its row: heap page 4, slot 0. Every other leaf entry also has a RID; the diagram omits those arrows for clarity. The heap pages are the same as in Section 3.1.
 
 **5. Empty spaces**
 

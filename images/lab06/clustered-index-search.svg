@@ -1,178 +1,123 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-<title id="title">Clustered index B+ tree search for MemberID 61</title>
-<desc id="desc">A clustered index B+ tree. The search follows the right pointer from root page 200, then the middle pointer from intermediate page 202, and reaches data page 104 where the complete row for MemberID 61 is stored.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="705" viewBox="0 0 1600 705" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTozZTViNTQ3ZS03YmRiLTQzN2QtODNlOS1iNGU5YWEzZTY5MzEAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaK2t8VFt7nxPIGXi/x/E0D0AAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDplM2ZkNjAxYi0wNjlmLTRkOWQtYTMyZi05ODk5MmE1OGI3ZDlscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNousHBPyTtZzEBbU/AbotOrAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggLM/yUgny7yZmxm/IGOVAi/UEXv6VOBYg365QRP/RMmqkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaFb3B4sMvKd4tVUnlM8CLl4AAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCBLJhp9bXN+m+jX2B5W7kHN7ZsQuNe8bpWVGTatMYwAr2RuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiYZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjNlNWI1NDdlLTdiZGItNDM3ZC04M2U5LWI0ZTlhYTNlNjkzMS9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmJhNjc4YmZkLTZiNGItNDQ3ZC05YzVhLWY2MjQ2MTQ1YmZlNHJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCAsz/JSCfLvJmbGb8gY5UCL9QRe/pU4FiDfrlBE/9EyaqJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgghv7qrPK5vG+KN+PfT3Jn03Sw0KNBYtZPsr+1RAgE6kaiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggeb17vND7HBw6qe93Biw0g38QM1Ix8w6qwiAmG1qrYSR0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQOBHmNWZUHzd4D8EpIUvG0FXu/G29s/Dn8/fVyRPR1YMLHhJYirk80fLmKdVE0y1WYHWpaoWuCGDo/0lymgDOfY=</c2pa:manifest></metadata>
 <defs>
- <marker id="treeArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#64748B"/></marker>
- <marker id="searchArrow" markerWidth="7" markerHeight="7" refX="8" refY="6" orient="auto"><path d="M0 1.5 L9 6 L0 10.5 Z" fill="#0F766E"/></marker>
- <marker id="leafArrow" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#3B82F6"/></marker>
- <style>
- text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
- .title{font-size:31px;font-weight:700}
- .subtitle{font-size:17px;fill:#64748B}
- .section{font-size:16px;font-weight:700;letter-spacing:1px;fill:#526176}
- .page{font-size:13px;font-weight:700;fill:#64748B}
- .key{font-size:21px;font-weight:700;text-anchor:middle;dominant-baseline:middle}
- .cellhead{font-size:11px;font-weight:700;fill:#64748B}
- .cell{font-size:13px;font-weight:600}
- .small{font-size:12px;fill:#64748B}
- .note{font-size:15px;fill:#475569}
- .edge{fill:none;stroke:#AAB7C6;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#treeArrow)}
- .active{fill:none;stroke:#0F766E;stroke-width:3.1;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#searchArrow)}
- .leaf{fill:none;stroke:#3B82F6;stroke-width:2.8;stroke-linecap:round;marker-end:url(#leafArrow)}
- </style>
+<style>
+text{font-family:Arial,Helvetica,sans-serif;fill:#1E293B}
+.title{font-size:36px;font-weight:700}.sub{font-size:20px;fill:#64748B}
+.lvl{font-size:22px;font-weight:700;fill:#334155}
+.key{font-size:26px;font-weight:700}
+.hp{font-size:17px;font-weight:700;fill:#526176}
+.row{font-size:19px}.slot{font-size:14px;fill:#94A3B8}
+.code{font-family:Consolas,'Courier New',monospace;font-size:22px;font-weight:700}
+</style>
+<marker id="ag" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L12 6L0 12Z" fill="#94A3B8"/></marker>
+<marker id="agr" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L14 7L0 14Z" fill="#0F766E"/></marker>
+<marker id="ab" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L12 6L0 12Z" fill="#3B82F6"/></marker>
+<marker id="ao" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L14 7L0 14Z" fill="#EA580C"/></marker>
 </defs>
-<rect width="1600" height="900" fill="#FFFFFF"/>
+<rect width="1600" height="705" fill="#fff"/>
+<text class="title" x="48" y="60">Clustered index — B+ tree search</text>
+<text class="sub" x="48" y="96">Index on MemberID · Leaf level = data pages containing complete rows · Simplified structure</text>
+<rect x="1180" y="24" width="380" height="104" rx="10" fill="#F8FAFC" stroke="#D8E1EC" stroke-width="1.5"/>
+<text x="1204" y="52" font-size="14" font-weight="700" letter-spacing="1" fill="#0F766E">SEARCH EXAMPLE</text>
+<text class="code" x="1204" y="84">SELECT * FROM Member</text>
+<text class="code" x="1204" y="112">WHERE MemberID = 61;</text>
+<text class="lvl" x="48" y="213">ROOT</text>
+<text class="lvl" x="48" y="343">INTERMEDIATE</text>
+<text class="lvl" x="48" y="530">LEAF LEVEL</text>
+<text x="48" y="556" font-size="17" fill="#64748B">data pages</text>
 
-<!-- Header -->
-<text class="title" x="42" y="52">Clustered index — B+ tree search</text>
-<text class="subtitle" x="42" y="82">Index on MemberID · Leaf level = data pages containing complete rows</text>
-<rect x="1110" y="24" width="445" height="82" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.4"/>
-<text x="1132" y="48" font-size="12" font-weight="700" letter-spacing="1" fill="#0F766E">SEARCH EXAMPLE</text>
-<text x="1132" y="73" font-size="17" font-family="monospace" font-weight="700">SELECT * FROM Member</text>
-<text x="1132" y="94" font-size="17" font-family="monospace" font-weight="700">WHERE MemberID = 61;</text>
-
-<text class="section" x="42" y="157">ROOT</text>
-<text class="section" x="42" y="330">INTERMEDIATE</text>
-<text class="section" x="42" y="505">LEAF LEVEL · CLUSTERED DATA PAGES</text>
-
-<!-- Normal navigation paths, subdued -->
-<g class="edge">
- <path d="M752 235 C690 270 565 286 520 345"/>
- <path d="M848 235 C910 270 1035 286 1080 345"/>
- <path d="M472 410 C420 455 300 462 240 520"/>
- <path d="M568 410 C575 455 520 465 520 520"/>
- <path d="M1000 410 C965 455 850 465 800 520"/>
- <path d="M1080 410 C1080 455 1080 475 1080 520"/>
- <path d="M1160 410 C1220 455 1320 465 1360 520"/>
-</g>
-
-<!-- Active search path -->
-<g class="active">
- <path d="M848 204 C900 258 1010 284 1080 345"/>
- <path d="M1080 382 C1080 430 1080 468 1080 520"/>
-</g>
-
-<!-- Root page -->
-<text class="page" x="800" y="143" text-anchor="middle">INDEX PAGE 200</text>
-<g>
- <rect x="728" y="164" width="144" height="72" rx="5" fill="#EEF2FF" stroke="#334155" stroke-width="1.8"/>
- <line x1="776" y1="164" x2="776" y2="236" stroke="#334155" stroke-width="1.3"/>
- <line x1="824" y1="164" x2="824" y2="236" stroke="#334155" stroke-width="1.3"/>
- <circle cx="752" cy="200" r="5" fill="#334155"/>
- <text class="key" x="800" y="200">43</text>
- <circle cx="848" cy="200" r="6" fill="#0F766E" stroke="#FFFFFF" stroke-width="1.5"/>
- <circle cx="848" cy="200" r="12" fill="none" stroke="#0F766E" stroke-width="2.5"/>
-</g>
-<rect x="900" y="245" width="110" height="30" rx="8" fill="#ECFDF5" stroke="#0F766E" stroke-width="1.2"/>
-<text x="955" y="265" text-anchor="middle" font-size="14" font-weight="700" fill="#0F766E">61 ≥ 43</text>
-
-<!-- Intermediate left -->
-<text class="page" x="520" y="316" text-anchor="middle">INDEX PAGE 201</text>
-<g>
- <rect x="448" y="338" width="144" height="72" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.8"/>
- <line x1="496" y1="338" x2="496" y2="410" stroke="#334155" stroke-width="1.3"/>
- <line x1="544" y1="338" x2="544" y2="410" stroke="#334155" stroke-width="1.3"/>
- <circle cx="472" cy="374" r="5" fill="#334155"/>
- <text class="key" x="520" y="374">27</text>
- <circle cx="568" cy="374" r="5" fill="#334155"/>
-</g>
-
-<!-- Intermediate right -->
-<text class="page" x="1080" y="316" text-anchor="middle">INDEX PAGE 202</text>
-<g>
- <rect x="984" y="338" width="192" height="72" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.8"/>
- <g stroke="#334155" stroke-width="1.3">
-  <line x1="1022.4" y1="338" x2="1022.4" y2="410"/>
-  <line x1="1060.8" y1="338" x2="1060.8" y2="410"/>
-  <line x1="1099.2" y1="338" x2="1099.2" y2="410"/>
-  <line x1="1137.6" y1="338" x2="1137.6" y2="410"/>
- </g>
- <circle cx="1003.2" cy="374" r="5" fill="#334155"/>
- <text class="key" x="1041.6" y="374">56</text>
- <circle cx="1080" cy="374" r="6" fill="#0F766E" stroke="#FFFFFF" stroke-width="1.5"/>
- <circle cx="1080" cy="374" r="12" fill="none" stroke="#0F766E" stroke-width="2.5"/>
- <text class="key" x="1118.4" y="374">73</text>
- <circle cx="1156.8" cy="374" r="5" fill="#334155"/>
-</g>
-<rect x="1194" y="388" width="150" height="30" rx="8" fill="#ECFDF5" stroke="#0F766E" stroke-width="1.2"/>
-<text x="1269" y="408" text-anchor="middle" font-size="14" font-weight="700" fill="#0F766E">56 ≤ 61 &lt; 73</text>
-
-<!-- Leaf page links -->
-<g class="leaf">
- <path d="M352 565 C370 565 390 565 408 565"/>
- <path d="M632 565 C650 565 670 565 688 565"/>
- <path d="M912 565 C930 565 950 565 968 565"/>
- <path d="M1192 565 C1210 565 1230 565 1248 565"/>
-</g>
-
-<!-- Data page 101 -->
-<g>
- <rect x="128" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
- <path d="M137 520 H343 Q352 520 352 529 V554 H128 V529 Q128 520 137 520Z" fill="#E1F1E8"/>
- <text class="page" x="240" y="543" text-anchor="middle">DATA PAGE 101</text>
- <text class="cellhead" x="142" y="576">MemberID</text><text class="cellhead" x="210" y="576">FirstName</text><text class="cellhead" x="282" y="576">LastName</text>
- <line x1="128" y1="585" x2="352" y2="585" stroke="#D8E1EC"/>
- <text class="cell" x="142" y="615">11</text><text class="cell" x="210" y="615">Oliver</text><text class="cell" x="282" y="615">Brooks</text>
- <line x1="138" y1="628" x2="342" y2="628" stroke="#E2E8F0"/>
- <text class="cell" x="142" y="654">19</text><text class="cell" x="210" y="654">Emma</text><text class="cell" x="282" y="654">Reed</text>
- <text class="small" x="240" y="688" text-anchor="middle">logical key order</text>
-</g>
-
-<!-- Data page 102 -->
-<g>
- <rect x="408" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
- <path d="M417 520 H623 Q632 520 632 529 V554 H408 V529 Q408 520 417 520Z" fill="#E1F1E8"/>
- <text class="page" x="520" y="543" text-anchor="middle">DATA PAGE 102</text>
- <text class="cellhead" x="422" y="576">MemberID</text><text class="cellhead" x="490" y="576">FirstName</text><text class="cellhead" x="562" y="576">LastName</text>
- <line x1="408" y1="585" x2="632" y2="585" stroke="#D8E1EC"/>
- <text class="cell" x="422" y="615">27</text><text class="cell" x="490" y="615">Noah</text><text class="cell" x="562" y="615">Carter</text>
- <line x1="418" y1="628" x2="622" y2="628" stroke="#E2E8F0"/>
- <text class="small" x="520" y="660" text-anchor="middle">available space</text>
-</g>
-
-<!-- Data page 103 -->
-<g>
- <rect x="688" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
- <path d="M697 520 H903 Q912 520 912 529 V554 H688 V529 Q688 520 697 520Z" fill="#E1F1E8"/>
- <text class="page" x="800" y="543" text-anchor="middle">DATA PAGE 103</text>
- <text class="cellhead" x="702" y="576">MemberID</text><text class="cellhead" x="770" y="576">FirstName</text><text class="cellhead" x="842" y="576">LastName</text>
- <line x1="688" y1="585" x2="912" y2="585" stroke="#D8E1EC"/>
- <text class="cell" x="702" y="615">43</text><text class="cell" x="770" y="615">Ava</text><text class="cell" x="842" y="615">Collins</text>
- <line x1="698" y1="628" x2="902" y2="628" stroke="#E2E8F0"/>
- <text class="small" x="800" y="660" text-anchor="middle">available space</text>
-</g>
-
-<!-- Data page 104 -->
-<g>
- <rect x="968" y="520" width="224" height="190" rx="9" fill="#EAF8EF" stroke="#0F766E" stroke-width="2.8"/>
- <path d="M977 520 H1183 Q1192 520 1192 529 V554 H968 V529 Q968 520 977 520Z" fill="#CFEBDD"/>
- <text x="1080" y="543" text-anchor="middle" font-size="13" font-weight="700" fill="#0F766E">DATA PAGE 104 · FOUND</text>
- <text class="cellhead" x="982" y="576">MemberID</text><text class="cellhead" x="1050" y="576">FirstName</text><text class="cellhead" x="1122" y="576">LastName</text>
- <line x1="968" y1="585" x2="1192" y2="585" stroke="#C7DDD8"/>
- <text class="cell" x="982" y="615">56</text><text class="cell" x="1050" y="615">Mia</text><text class="cell" x="1122" y="615">Parker</text>
- <rect x="976" y="628" width="208" height="34" rx="5" fill="#FFF0D9" stroke="#EA580C" stroke-width="2"/>
- <text x="982" y="651" font-size="14" font-weight="800" fill="#C2410C">61</text><text x="1050" y="651" font-size="14" font-weight="800" fill="#C2410C">Sofia</text><text x="1122" y="651" font-size="14" font-weight="800" fill="#C2410C">Ford</text>
- <rect x="1028" y="670" width="104" height="25" rx="8" fill="#FFF7ED" stroke="#EA580C"/>
- <text x="1080" y="687" text-anchor="middle" font-size="12" font-weight="700" fill="#C2410C">ROW FOUND</text>
-</g>
-
-<!-- Data page 105 -->
-<g>
- <rect x="1248" y="520" width="224" height="190" rx="9" fill="#F4FBF7" stroke="#74A58B" stroke-width="1.8"/>
- <path d="M1257 520 H1463 Q1472 520 1472 529 V554 H1248 V529 Q1248 520 1257 520Z" fill="#E1F1E8"/>
- <text class="page" x="1360" y="543" text-anchor="middle">DATA PAGE 105</text>
- <text class="cellhead" x="1262" y="576">MemberID</text><text class="cellhead" x="1330" y="576">FirstName</text><text class="cellhead" x="1402" y="576">LastName</text>
- <line x1="1248" y1="585" x2="1472" y2="585" stroke="#D8E1EC"/>
- <text class="cell" x="1262" y="615">73</text><text class="cell" x="1330" y="615">Liam</text><text class="cell" x="1402" y="615">Foster</text>
- <line x1="1258" y1="628" x2="1462" y2="628" stroke="#E2E8F0"/>
- <text class="cell" x="1262" y="654">79</text><text class="cell" x="1330" y="654">Chloe</text><text class="cell" x="1402" y="654">Bush</text>
-</g>
-
-<!-- Explanation panel -->
-<rect x="42" y="752" width="1513" height="112" rx="12" fill="#F8FAFC" stroke="#D8E1EC" stroke-width="1.4"/>
-<text x="66" y="782" font-size="17" font-weight="700" fill="#1E293B">Search path: MemberID = 61</text>
-<circle cx="75" cy="811" r="4.5" fill="#0F766E"/><text class="note" x="91" y="816">1. Root Page 200: 61 ≥ 43 → follow the right pointer.</text>
-<circle cx="575" cy="811" r="4.5" fill="#0F766E"/><text class="note" x="591" y="816">2. Page 202: 56 ≤ 61 &lt; 73 → follow the middle pointer.</text>
-<circle cx="1115" cy="811" r="4.5" fill="#EA580C"/><text class="note" x="1131" y="816">3. Page 104: row found.</text>
-<text x="66" y="846" font-size="13" fill="#64748B">No RID Lookup is needed: the clustered-index leaf page already contains the complete row. Leaf ordering is logical, not a physical disk guarantee.</text>
+<rect x="383.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="397.0" cy="335.0" r="5" fill="#334155"/>
+<rect x="411.0" y="310" width="60" height="50" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text class="key" x="441.0" y="344" text-anchor="middle" style="fill:#1E293B">27</text>
+<rect x="471.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="485.0" cy="335.0" r="5" fill="#334155"/>
+<rect x="499.0" y="310" width="60" height="50" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="559.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<rect x="1058.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1072.0" cy="335.0" r="5" fill="#334155"/>
+<rect x="1086.0" y="310" width="60" height="50" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text class="key" x="1116.0" y="344" text-anchor="middle" style="fill:#1E293B">56</text>
+<rect x="1146.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1160.0" cy="335.0" r="5" fill="#334155"/>
+<rect x="1174.0" y="310" width="60" height="50" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text class="key" x="1204.0" y="344" text-anchor="middle" style="fill:#1E293B">73</text>
+<rect x="1234.0" y="310" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="1248.0" cy="335.0" r="5" fill="#334155"/>
+<rect x="720.5" y="180" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="734.5" cy="205.0" r="5" fill="#334155"/>
+<rect x="748.5" y="180" width="60" height="50" fill="#FFFFFF" stroke="#526176" stroke-width="1.6"/>
+<text class="key" x="778.5" y="214" text-anchor="middle" style="fill:#1E293B">43</text>
+<rect x="808.5" y="180" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<circle cx="822.5" cy="205.0" r="5" fill="#334155"/>
+<rect x="836.5" y="180" width="60" height="50" fill="#EEF3FA" stroke="#526176" stroke-width="1.6"/>
+<rect x="896.5" y="180" width="28" height="50" fill="#F1F5F9" stroke="#526176" stroke-width="1.6"/>
+<path d="M734.5 205.0 L485.0 307" stroke="#94A3B8" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<path d="M822.5 205.0 L1160.0 306" stroke="#0F766E" stroke-width="5" fill="none" marker-end="url(#agr)"/>
+<path d="M397.0 335.0 L350.0 437" stroke="#94A3B8" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<path d="M485.0 335.0 L620.0 437" stroke="#94A3B8" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<path d="M1072.0 335.0 L890.0 437" stroke="#94A3B8" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<path d="M1160.0 335.0 L1160.0 436" stroke="#0F766E" stroke-width="5" fill="none" marker-end="url(#agr)"/>
+<path d="M1248.0 335.0 L1430.0 437" stroke="#94A3B8" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<circle cx="822.5" cy="205.0" r="10" fill="none" stroke="#0F766E" stroke-width="3"/>
+<circle cx="1160.0" cy="335.0" r="10" fill="none" stroke="#0F766E" stroke-width="3"/>
+<rect x="1030" y="226" width="110" height="34" rx="8" fill="#ECFDF5" stroke="#0F766E" stroke-width="1.5"/>
+<text x="1085.0" y="250" text-anchor="middle" font-size="19" font-weight="700" fill="#0F766E">61 ≥ 43</text>
+<rect x="1190" y="378" width="160" height="34" rx="8" fill="#ECFDF5" stroke="#0F766E" stroke-width="1.5"/>
+<text x="1270.0" y="402" text-anchor="middle" font-size="19" font-weight="700" fill="#0F766E">56 ≤ 61 &lt; 73</text>
+<rect x="230" y="440" width="240" height="190" rx="10" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M240 440 H460 Q470 440 470 450 V480 H230 V450 Q230 440 240 440Z" fill="#DDEFE3"/>
+<text x="350.0" y="467" text-anchor="middle" font-size="17" font-weight="700" fill="#2E6744">DATA PAGE 101</text>
+<text x="244" y="504" font-size="13" font-weight="700" fill="#64748B">ID</text><text x="284" y="504" font-size="13" font-weight="700" fill="#64748B">FirstName</text><text x="366" y="504" font-size="13" font-weight="700" fill="#64748B">LastName</text>
+<line x1="230" y1="516" x2="470" y2="516" stroke="#CFE3D6"/>
+<text x="244" y="547" font-size="18" font-weight="700" style="fill:#1E293B">11</text><text x="284" y="547" font-size="18">Oliver</text><text x="366" y="547" font-size="18">Brooks</text>
+<text x="244" y="581" font-size="18" font-weight="700" style="fill:#1E293B">19</text><text x="284" y="581" font-size="18">Emma</text><text x="366" y="581" font-size="18">Reed</text>
+<rect x="240" y="594" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="350.0" y="613" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<path d="M472 460 L497 460" stroke="#3B82F6" stroke-width="2.5" fill="none" marker-end="url(#ab)"/>
+<rect x="500" y="440" width="240" height="190" rx="10" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M510 440 H730 Q740 440 740 450 V480 H500 V450 Q500 440 510 440Z" fill="#DDEFE3"/>
+<text x="620.0" y="467" text-anchor="middle" font-size="17" font-weight="700" fill="#2E6744">DATA PAGE 102</text>
+<text x="514" y="504" font-size="13" font-weight="700" fill="#64748B">ID</text><text x="554" y="504" font-size="13" font-weight="700" fill="#64748B">FirstName</text><text x="636" y="504" font-size="13" font-weight="700" fill="#64748B">LastName</text>
+<line x1="500" y1="516" x2="740" y2="516" stroke="#CFE3D6"/>
+<text x="514" y="547" font-size="18" font-weight="700" style="fill:#1E293B">27</text><text x="554" y="547" font-size="18">Noah</text><text x="636" y="547" font-size="18">Carter</text>
+<rect x="510" y="560" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="620.0" y="579" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<rect x="510" y="594" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="620.0" y="613" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<path d="M742 460 L767 460" stroke="#3B82F6" stroke-width="2.5" fill="none" marker-end="url(#ab)"/>
+<rect x="770" y="440" width="240" height="190" rx="10" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M780 440 H1000 Q1010 440 1010 450 V480 H770 V450 Q770 440 780 440Z" fill="#DDEFE3"/>
+<text x="890.0" y="467" text-anchor="middle" font-size="17" font-weight="700" fill="#2E6744">DATA PAGE 103</text>
+<text x="784" y="504" font-size="13" font-weight="700" fill="#64748B">ID</text><text x="824" y="504" font-size="13" font-weight="700" fill="#64748B">FirstName</text><text x="906" y="504" font-size="13" font-weight="700" fill="#64748B">LastName</text>
+<line x1="770" y1="516" x2="1010" y2="516" stroke="#CFE3D6"/>
+<text x="784" y="547" font-size="18" font-weight="700" style="fill:#1E293B">43</text><text x="824" y="547" font-size="18">Ava</text><text x="906" y="547" font-size="18">Collins</text>
+<rect x="780" y="560" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="890.0" y="579" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<rect x="780" y="594" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="890.0" y="613" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<path d="M1012 460 L1037 460" stroke="#3B82F6" stroke-width="2.5" fill="none" marker-end="url(#ab)"/>
+<rect x="1040" y="440" width="240" height="190" rx="10" fill="#F4FAF6" stroke="#0F766E" stroke-width="3"/>
+<path d="M1050 440 H1270 Q1280 440 1280 450 V480 H1040 V450 Q1040 440 1050 440Z" fill="#DDEFE3"/>
+<text x="1160.0" y="467" text-anchor="middle" font-size="17" font-weight="700" fill="#2E6744">DATA PAGE 104</text>
+<text x="1054" y="504" font-size="13" font-weight="700" fill="#64748B">ID</text><text x="1094" y="504" font-size="13" font-weight="700" fill="#64748B">FirstName</text><text x="1176" y="504" font-size="13" font-weight="700" fill="#64748B">LastName</text>
+<line x1="1040" y1="516" x2="1280" y2="516" stroke="#CFE3D6"/>
+<text x="1054" y="547" font-size="18" font-weight="700" style="fill:#1E293B">56</text><text x="1094" y="547" font-size="18">Mia</text><text x="1176" y="547" font-size="18">Parker</text>
+<rect x="1046" y="558" width="228" height="32" rx="6" fill="#FFF0D7" stroke="#EA580C" stroke-width="2"/>
+<text x="1054" y="581" font-size="18" font-weight="700" style="fill:#C2410C">61</text><text x="1094" y="581" font-size="18">Sofia</text><text x="1176" y="581" font-size="18">Ford</text>
+<rect x="1050" y="594" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="1160.0" y="613" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<path d="M1282 460 L1307 460" stroke="#3B82F6" stroke-width="2.5" fill="none" marker-end="url(#ab)"/>
+<rect x="1310" y="440" width="240" height="190" rx="10" fill="#F4FAF6" stroke="#86B398" stroke-width="2"/>
+<path d="M1320 440 H1540 Q1550 440 1550 450 V480 H1310 V450 Q1310 440 1320 440Z" fill="#DDEFE3"/>
+<text x="1430.0" y="467" text-anchor="middle" font-size="17" font-weight="700" fill="#2E6744">DATA PAGE 105</text>
+<text x="1324" y="504" font-size="13" font-weight="700" fill="#64748B">ID</text><text x="1364" y="504" font-size="13" font-weight="700" fill="#64748B">FirstName</text><text x="1446" y="504" font-size="13" font-weight="700" fill="#64748B">LastName</text>
+<line x1="1310" y1="516" x2="1550" y2="516" stroke="#CFE3D6"/>
+<text x="1324" y="547" font-size="18" font-weight="700" style="fill:#1E293B">73</text><text x="1364" y="547" font-size="18">Liam</text><text x="1446" y="547" font-size="18">Foster</text>
+<text x="1324" y="581" font-size="18" font-weight="700" style="fill:#1E293B">79</text><text x="1364" y="581" font-size="18">Chloe</text><text x="1446" y="581" font-size="18">Bush</text>
+<rect x="1320" y="594" width="220" height="28" rx="6" fill="#FFFFFF" stroke="#CFE3D6" stroke-dasharray="6 5"/>
+<text x="1430.0" y="613" text-anchor="middle" font-size="14" fill="#94A3B8">available space</text>
+<text x="485.0" y="430" text-anchor="middle" font-size="15" fill="#3B82F6">next leaf page</text>
+<text x="1174.0" y="428" font-size="15" font-weight="700" fill="#C2410C">ROW FOUND</text>
+<text x="800" y="684" text-anchor="middle" font-size="19" font-weight="600" fill="#64748B">No RID Lookup is needed: the leaf page already contains the complete row.</text>
 </svg>

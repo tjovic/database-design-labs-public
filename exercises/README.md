@@ -38,11 +38,13 @@ These exercises use read-only procedures and require no test data setup. They in
 The function collection is in [Function Exercises](functions.md) and follows the learning goals in [Lab 04 – Functions](../labs/lab04-functions.md):
 
 1. **Scalar calculations** — accept input and return one value.
-2. **Data-reading functions** — calculate a value from existing rows.
-3. **Inline table-valued functions** — return a table from one query.
-4. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic.
+2. **Choosing a function type** — decide between a scalar function, an inline TVF, and a multi-statement TVF.
+3. **Data-reading functions** — calculate a value from existing rows and use it in a query.
+4. **Inline table-valued functions** — return a table from one query and join it with other tables.
+5. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic, and compare them with inline TVFs.
+6. **Real-world calculations** — a payroll calculation split into two functions, and an OIB checksum.
 
-The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
+The functions read existing tables and do not change their data. The multi-statement functions insert only into their local return tables.
 
 ### CRUD operations
 

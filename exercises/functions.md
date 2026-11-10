@@ -1,8 +1,8 @@
 # Function Exercises
 
-These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 7 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, an inline table-valued function (inline TVF), and a multi-statement table-valued function (MSTVF). Exercise 8 adds checksum validation using ISO 7064 MOD 11,10.
+These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 12 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, inline table-valued functions (inline TVFs), and multi-statement table-valued functions (MSTVFs). Exercise 13 adds checksum validation using ISO 7064 MOD 11,10.
 
-The functions read existing data and do not modify application tables. The MSTVF inserts rows only into its local return table. Exercises 1–6 and 8 create only function definitions. Exercise 7 also creates a separate example database and two tables through its setup script; use the cleanup section when finished.
+The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–11 and 13 create only function definitions. Exercise 12 also creates a separate example database and two tables through its setup script; use the cleanup section when finished.
 
 ## Exercise 1 — Classify a product price [BEGINNER]
 
@@ -61,7 +61,7 @@ GO
 
 Create a scalar function named `dbo.fn_Exercises_ShortName` that accepts `@Text nvarchar(max)` and returns `nvarchar(10)`. Return the original text when its length is at most 10 characters. For longer text, return its first 7 characters followed by `...`.
 
-Call the function with one short value and one value longer than 10 characters.
+Call the function with one short value and one value longer than 10 characters. Then use it to list every product's name next to its shortened name.
 
 <details>
 <summary>Hint</summary>
@@ -92,59 +92,67 @@ SELECT
     dbo.fn_Exercises_ShortName(N'Bike') AS ShortName,
     dbo.fn_Exercises_ShortName(N'Mountain-200 Black') AS LongName;
 GO
+
+SELECT
+    Name,
+    dbo.fn_Exercises_ShortName(Name) AS ShortName
+FROM dbo.Product;
+GO
 ```
 
 </details>
 
-## Exercise 3 — Find a customer's latest invoice date [INTERMEDIATE]
+## Exercise 3 — Choose the right function type [BEGINNER]
 
-Create a scalar function named `dbo.fn_Exercises_LatestInvoiceDate` that accepts `@IDCustomer int` and returns the most recent `InvoiceDate` from `dbo.Invoice` for that customer. Return `NULL` if the customer has no invoices.
+For each requirement, decide which function type is the best fit: a scalar function, an inline TVF, or a multi-statement TVF.
 
-Use the function in a query for customer `1`.
+1. Given a customer ID, return the date of that customer's latest invoice.
+2. Given two dates, return all invoices between those dates.
+3. Build and return a table using several procedural steps.
+4. Given a string, return the first seven characters followed by `...` when the string has more than ten characters.
+
+Then explain **why** you chose each function type.
 
 <details>
 <summary>Hint</summary>
 
-Select the latest matching date with `TOP (1)` and sort `InvoiceDate` in descending order.
+First ask whether the result is one value or a table. If it is a table, ask whether one `SELECT` is enough to produce it.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_LatestInvoiceDate
-(
-    @IDCustomer int
-)
-RETURNS datetime
-AS
-BEGIN
-    DECLARE @LatestInvoiceDate datetime;
+1. **Scalar function** – the requirement returns one date.
+2. **Inline TVF** – the requirement returns a table and can naturally be expressed using one `SELECT`.
+3. **Multi-statement TVF** – multiple procedural steps are explicitly required.
+4. **Scalar function** – the requirement returns one string value.
 
-    SELECT TOP (1)
-        @LatestInvoiceDate = InvoiceDate
-    FROM dbo.Invoice
-    WHERE CustomerID = @IDCustomer
-    ORDER BY InvoiceDate DESC, IDInvoice DESC;
+The decision process is:
 
-    RETURN @LatestInvoiceDate;
-END;
-GO
+```text
+One value?
+    -> Scalar function
 
-SELECT dbo.fn_Exercises_LatestInvoiceDate(1) AS LatestInvoiceDate;
-GO
+Table?
+    -> One SELECT is enough?
+        -> Inline TVF
+    -> Multiple statements are genuinely required?
+        -> Multi-statement TVF
 ```
+
+Requirements 1, 2 and 4 are solved in Exercises 5, 7 and 2.
 
 </details>
 
-## Exercise 4 — Calculate quantity sold for one product [INTERMEDIATE]
+## Exercise 4 — Total quantity sold per product [INTERMEDIATE]
 
-Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`.
+Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`. If the product has never been sold, return `0` rather than `NULL`.
 
-If no invoice items match the supplied product ID, return `0` rather than `NULL`.
+Use the function:
 
-Use the function in a query for product `782`.
+1. on its own, for product `782`;
+2. in a query that lists every product's name, color, and total quantity sold, sorted from the highest quantity sold to the lowest.
 
 <details>
 <summary>Hint</summary>
@@ -174,24 +182,191 @@ BEGIN
     RETURN COALESCE(@QuantitySold, 0);
 END;
 GO
-```
 
-```sql
+-- 1. One product
+SELECT dbo.fn_Exercises_ProductQuantitySold(782) AS QuantitySold;
+GO
+
+-- 2. All products
 SELECT
-    p.*,
-    dbo.fn_Exercises_ProductQuantitySold(782) AS QuantitySold
-FROM dbo.Product AS p
-WHERE p.IDProduct = 782;
+    Name,
+    Color,
+    dbo.fn_Exercises_ProductQuantitySold(IDProduct) AS QuantitySold
+FROM dbo.Product
+ORDER BY QuantitySold DESC;
 GO
 ```
 
-The query returns the product row together with the total quantity recorded for that product in `InvoiceItem`.
+Products that were never sold appear at the end with `0`.
 
-Scalar functions are convenient for one value. Consider how repeatedly calling a scalar function for many rows can affect query performance; compare it with a set-based aggregate query.
+Scalar functions are convenient for one value. The second query calls the function once per product; compare it with a set-based query that joins `Product` to `InvoiceItem` and groups the rows.
 
 </details>
 
-## Exercise 5 — Return a customer's invoices [INTERMEDIATE]
+## Exercise 5 — Latest invoice date per customer [INTERMEDIATE]
+
+Create a scalar function named `dbo.fn_Exercises_LatestInvoiceDate` that accepts `@IDCustomer int` and returns the date of that customer's most recent invoice. Return `NULL` if the customer has no invoices.
+
+Use the function:
+
+1. on its own, for customer `1`;
+2. in a query that lists every customer's ID, first name, last name, and latest invoice date.
+
+Finally, consider what could happen if `Customer` contained 100,000 rows.
+
+<details>
+<summary>Hint</summary>
+
+`MAX(InvoiceDate)` returns the latest date, and `NULL` when there are no matching rows. Use the same data type as the `InvoiceDate` column for the return value.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_LatestInvoiceDate
+(
+    @IDCustomer int
+)
+RETURNS datetime
+AS
+BEGIN
+    DECLARE @LatestInvoiceDate datetime;
+
+    SELECT @LatestInvoiceDate = MAX(InvoiceDate)
+    FROM dbo.Invoice
+    WHERE CustomerID = @IDCustomer;
+
+    RETURN @LatestInvoiceDate;
+END;
+GO
+
+-- 1. One customer
+SELECT dbo.fn_Exercises_LatestInvoiceDate(1) AS LatestInvoiceDate;
+GO
+
+-- 2. All customers
+SELECT
+    IDCustomer,
+    FirstName,
+    LastName,
+    dbo.fn_Exercises_LatestInvoiceDate(IDCustomer) AS LatestInvoiceDate
+FROM dbo.Customer;
+GO
+```
+
+The function is evaluated for every customer row. On a large table this can become expensive, although modern SQL Server versions may inline some scalar functions.
+
+</details>
+
+## Exercise 6 — Customers by last-name prefix [INTERMEDIATE]
+
+Create an inline TVF named `dbo.fn_Exercises_CustomersByLastNamePrefix` that accepts `@Prefix nvarchar(50)` and returns `IDCustomer`, `FirstName`, and `LastName` of customers whose last name begins with the supplied prefix.
+
+Test the function using `'Zhu'`.
+
+Then use the function together with `Invoice` to display each customer's first name, last name, invoice ID, invoice date, and invoice number. Customers returned by the function must remain visible even if they have no invoice.
+
+<details>
+<summary>Hint</summary>
+
+Build the pattern with `@Prefix + '%'` and use `LIKE`. Use the function in the `FROM` clause and join `Invoice` with a `LEFT JOIN`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_CustomersByLastNamePrefix
+(
+    @Prefix nvarchar(50)
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        IDCustomer,
+        FirstName,
+        LastName
+    FROM dbo.Customer
+    WHERE LastName LIKE @Prefix + '%'
+);
+GO
+
+SELECT *
+FROM dbo.fn_Exercises_CustomersByLastNamePrefix('Zhu');
+GO
+
+SELECT
+    c.FirstName,
+    c.LastName,
+    i.IDInvoice,
+    i.InvoiceDate,
+    i.InvoiceNumber
+FROM dbo.fn_Exercises_CustomersByLastNamePrefix('Zhu') AS c
+LEFT JOIN dbo.Invoice AS i
+    ON i.CustomerID = c.IDCustomer
+ORDER BY
+    c.LastName,
+    c.FirstName,
+    i.InvoiceDate;
+GO
+```
+
+</details>
+
+## Exercise 7 — Invoices between two dates [INTERMEDIATE]
+
+Create an inline TVF named `dbo.fn_Exercises_InvoicesBetween` with two parameters, `@DateFrom date` and `@DateTo date`. Return the invoice number, invoice date, and the customer's first and last name for every invoice issued from `@DateFrom` to `@DateTo`, including both days.
+
+Test it using a date range that exists in the database, for example from `2004-06-01` to `2004-06-03`.
+
+<details>
+<summary>Hint</summary>
+
+`InvoiceDate` can contain a time component. To include the whole last day, compare with the day after `@DateTo` using `<` and `DATEADD`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_InvoicesBetween
+(
+    @DateFrom date,
+    @DateTo date
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        i.InvoiceNumber,
+        i.InvoiceDate,
+        c.FirstName,
+        c.LastName
+    FROM dbo.Invoice AS i
+    INNER JOIN dbo.Customer AS c
+        ON c.IDCustomer = i.CustomerID
+    WHERE i.InvoiceDate >= @DateFrom
+      AND i.InvoiceDate < DATEADD(day, 1, @DateTo)
+);
+GO
+
+SELECT *
+FROM dbo.fn_Exercises_InvoicesBetween('20040601', '20040603');
+GO
+```
+
+The exclusive upper boundary includes the entire final day even if `InvoiceDate` contains a time component. This example assumes an end date earlier than `9999-12-31`.
+
+</details>
+
+## Exercise 8 — Return a customer's invoices [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_CustomerInvoices` with these input parameters:
 
@@ -261,7 +436,136 @@ The sample selects a customer with an invoice and uses a date range covering the
 
 </details>
 
-## Exercise 6 — Filter products by quantity sold [ADVANCED]
+## Exercise 9 — Filter products by price [INTERMEDIATE]
+
+Create an MSTVF named `dbo.fn_Exercises_ProductsFilter` that accepts `@MinPrice money` and returns a table with the columns `Name nvarchar(50)` and `PriceWithoutVAT money`:
+
+- if `@MinPrice` is `NULL`, return all products;
+- otherwise, return only products where `PriceWithoutVAT > @MinPrice`.
+
+Test both cases:
+
+```sql
+SELECT *
+FROM dbo.fn_Exercises_ProductsFilter(NULL);
+
+SELECT *
+FROM dbo.fn_Exercises_ProductsFilter(3000);
+```
+
+<details>
+<summary>Hint</summary>
+
+Declare the return table in the `RETURNS @Result TABLE (...)` header. Use `IF / ELSE` with one `INSERT INTO @Result ... SELECT` in each branch, and end the function with `RETURN;`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_ProductsFilter
+(
+    @MinPrice money
+)
+RETURNS @Result TABLE
+(
+    Name            nvarchar(50),
+    PriceWithoutVAT money
+)
+AS
+BEGIN
+    IF @MinPrice IS NULL
+    BEGIN
+        INSERT INTO @Result (Name, PriceWithoutVAT)
+        SELECT Name, PriceWithoutVAT
+        FROM dbo.Product;
+    END
+    ELSE
+    BEGIN
+        INSERT INTO @Result (Name, PriceWithoutVAT)
+        SELECT Name, PriceWithoutVAT
+        FROM dbo.Product
+        WHERE PriceWithoutVAT > @MinPrice;
+    END;
+
+    RETURN;
+END;
+GO
+
+SELECT *
+FROM dbo.fn_Exercises_ProductsFilter(NULL);
+GO
+
+SELECT *
+FROM dbo.fn_Exercises_ProductsFilter(3000);
+GO
+```
+
+</details>
+
+## Exercise 10 — Inline vs multi-statement [INTERMEDIATE]
+
+Rewrite `dbo.fn_Exercises_InvoicesBetween` from Exercise 7 as a multi-statement TVF named `dbo.fn_Exercises_InvoicesBetween_Multi`.
+
+Compare the two versions:
+
+1. Which version contains less code?
+2. Which version is easier to read?
+3. Does this problem actually require multiple statements?
+4. Which version would you choose?
+
+<details>
+<summary>Hint</summary>
+
+The return table needs one column for each value the inline version returns. Its body is a single `INSERT INTO @Result ... SELECT` with the same query.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_InvoicesBetween_Multi
+(
+    @DateFrom date,
+    @DateTo date
+)
+RETURNS @Result TABLE
+(
+    InvoiceNumber nvarchar(50),
+    InvoiceDate   datetime,
+    FirstName     nvarchar(50),
+    LastName      nvarchar(50)
+)
+AS
+BEGIN
+    INSERT INTO @Result (InvoiceNumber, InvoiceDate, FirstName, LastName)
+    SELECT
+        i.InvoiceNumber,
+        i.InvoiceDate,
+        c.FirstName,
+        c.LastName
+    FROM dbo.Invoice AS i
+    INNER JOIN dbo.Customer AS c
+        ON c.IDCustomer = i.CustomerID
+    WHERE i.InvoiceDate >= @DateFrom
+      AND i.InvoiceDate < DATEADD(day, 1, @DateTo);
+
+    RETURN;
+END;
+GO
+
+SELECT *
+FROM dbo.fn_Exercises_InvoicesBetween_Multi('20040601', '20040603');
+GO
+```
+
+Both functions return the same rows. The **inline TVF** is the better choice here: the result can already be expressed using one `SELECT`, so the multi-statement version adds code without adding useful behaviour.
+
+</details>
+
+## Exercise 11 — Filter products by quantity sold [ADVANCED]
 
 Create an MSTVF named `dbo.fn_Exercises_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
 
@@ -356,7 +660,7 @@ The `NULL` call includes every product. The second call returns products with at
 
 </details>
 
-## Exercise 7 — Extended net salary calculation [ADVANCED]
+## Exercise 12 — Extended net salary calculation [ADVANCED]
 
 Extend the simplified payroll example from Section 3 of [Lab 04](../labs/lab04-functions.md). This is a real-world-inspired calculation split into two scalar functions: one calculates a personal allowance, and the other uses that result to calculate net salary.
 
@@ -660,7 +964,7 @@ USE AdventureWorksENG;
 GO
 ```
 
-## Exercise 8 — Validate an OIB checksum [ADVANCED]
+## Exercise 13 — Validate an OIB checksum [ADVANCED]
 
 An OIB is a Croatian personal identification number containing 11 digits. Its last digit checks the preceding ten using **ISO 7064 MOD 11,10**. This is a different checksum algorithm from Luhn.
 
@@ -821,22 +1125,26 @@ Algorithm source: [OIB checksum procedure — REGOS](https://regos.hr/app/upload
 
 ## Cleanup
 
-The functions do not change table data. Select `AdventureWorksENG` and remove the definitions for Exercises 1–6 and 8:
+The functions do not change table data. Select `AdventureWorksENG` and remove the definitions for Exercises 1–11 and 13:
 
 ```sql
 USE AdventureWorksENG;
 GO
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_PriceBand;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductQuantitySold;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_LatestInvoiceDate;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomersByLastNamePrefix;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_InvoicesBetween;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomerInvoices;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsFilter;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_InvoicesBetween_Multi;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsByQuantitySold;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_IsValidOIB;
 GO
 ```
 
-For Exercise 7, run the following only if you created `PayrollLab`. Drop the main function before its helper. Keep the payroll tables for later practice.
+For Exercise 12, run the following only if you created `PayrollLab`. Drop the main function before its helper. Keep the payroll tables for later practice.
 
 ```sql
 USE PayrollLab;
@@ -848,7 +1156,7 @@ USE AdventureWorksENG;
 GO
 ```
 
-The optional `fn_NetSalarySimple` belongs to the lab and is removed by its cleanup section.
+The `fn_NetSalarySimple` function from Lab 04 also lives in `PayrollLab`. This exercise does not need it, so you can leave it in place.
 
 ## References
 

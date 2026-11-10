@@ -42,9 +42,17 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 > Additional labs will be added as the course progresses.
 
-For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, complex parameters, transactions, physical storage, indexes).
+For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, physical storage, indexes).
 
 Lab 8 also has two optional, self-contained live demos — a SQL-injection attack against a running login form, and a REST API that posts JSON into a stored procedure — see [demos/README.md](demos/README.md).
+
+---
+
+## Exams
+
+What to expect on each midterm, with points per task type and where to practice:
+
+- Midterm Exam 1 – [English](exams/midterm-1.md) · [Hrvatski](exams/midterm-1.hr.md)
 
 ---
 

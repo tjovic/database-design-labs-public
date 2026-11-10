@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **triggers**, **stored procedures**, **functions**, **CRUD operations**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -43,6 +43,18 @@ The function collection is in [Function Exercises](functions.md) and follows the
 4. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic.
 
 The functions read existing tables and do not change their data. The multi-statement function inserts only into its local return table. Scalar function examples include both data-based calculations and simple text transformation.
+
+### CRUD operations
+
+The CRUD collection is in [CRUD Operation Exercises](crud-operations.md) and follows the learning goals in [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md):
+
+1. **One procedure per operation** — separate insert, read, update, and delete procedures, with `@@ROWCOUNT` to detect a missing row.
+2. **Reading through a function** — an inline table-valued function that can be joined in a larger query.
+3. **Combined procedures** — a save procedure for insert and update, a debugging exercise on a missing `BEGIN ... END`, and one procedure with an action parameter.
+4. **Error handling** — catching a constraint violation outside and inside a procedure, and translating it into a return value.
+5. **Related tables** — deleting a parent together with its child rows, and inserting a child row while finding or creating its parents, both in one transaction.
+
+Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exercises use three small tables of their own (`Exercise_Student`, `Exercise_Course`, `Exercise_Enrollment`). The setup recreates them with the original data, so the exercises can be repeated, and the cleanup removes them together with every procedure and function created.
 
 ### Complex Parameters
 
@@ -134,6 +146,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Stored Procedure Exercises](procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
 - [Function Exercises](functions.md)
+- [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md)
+- [CRUD Operation Exercises](crud-operations.md)
 - [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md)
 - [Complex Parameters Exercises](complex-parameters.md)
 - [Lab 9 – Transactions](../labs/lab09-transactions.md)

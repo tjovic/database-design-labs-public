@@ -11,7 +11,7 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 > [!IMPORTANT]
 > **This lab is mostly about stored procedures.**
 >
-> Almost every example and exercise is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT`, and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
+> Almost every example is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT`, and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
 >
 > If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Try to write each procedure yourself before looking at the solution.
 
@@ -470,13 +470,11 @@ Separate procedures are also not the only possible design. Section 5 explores ho
 
 ---
 
-# Section 3 – Practice: CRUD for `State` and `City`
+# Section 3 – CRUD for `State` and `City`
 
 In Section 2, we implemented CRUD operations for the `Category` table using separate stored procedures.
 
-Now it is your turn.
-
-In the following exercises, you will create stored procedures for the `State` and `City` tables.
+In this section, we apply the same pattern to the `State` and `City` tables.
 
 These tables are connected through a foreign key:
 
@@ -498,49 +496,22 @@ erDiagram
 
 The `City.StateID` column is nullable, meaning that a city can exist without being assigned to a state.
 
-You will start with simple `INSERT` and `SELECT` operations, then implement a `DELETE` procedure that checks a business rule before removing data.
+We start with simple `INSERT` and `SELECT` operations, then implement a `DELETE` procedure that checks a business rule before removing data.
 
-Section 2.6 ended with a question: can a row count tell the caller **why** nothing was deleted? Exercise 4 answers it. Instead of a row count, the procedure returns a **return code** — a number that says which of several outcomes occurred.
+Section 2.6 ended with a question: can a row count tell the caller **why** nothing was deleted? Section 3.4 answers it. Instead of a row count, the procedure returns a **return code** — a number that says which of several outcomes occurred.
 
 > [!NOTE]
-> Use the patterns from Section 2 as a reference. The required T-SQL concepts, including `OUTPUT`, `SCOPE_IDENTITY()`, `IF`, and `RETURN`, were introduced in previous labs.
+> The procedures follow the patterns from Section 2. The required T-SQL concepts, including `OUTPUT`, `SCOPE_IDENTITY()`, `IF`, and `RETURN`, were introduced in previous labs.
 
-## Exercise 1 – Insert a state [BEGINNER]
+## 3.1 Create – Insert a state
 
-Create a stored procedure named `dbo.usp_InsertState` that inserts a new state into the `State` table.
+The shop is expanding to Slovenia. The procedure `dbo.usp_InsertState`:
 
-**Requirements:**
+- accepts the state name through `@Name`;
+- inserts the new state;
+- returns its generated ID through the `OUTPUT` parameter `@NewStateID`.
 
-- Accept `@Name nvarchar(50)` as an input parameter.
-- Accept `@NewStateID int OUTPUT` as an output parameter.
-- Insert the new state.
-- Return its generated ID through `@NewStateID`.
-
-The shop is expanding to Slovenia. Test your procedure using:
-
-```sql
-DECLARE @NewID int;
-
-EXEC dbo.usp_InsertState
-    @Name = N'Slovenia',
-    @NewStateID = @NewID OUTPUT;
-
-SELECT @NewID AS NewStateID;
-```
-
-Verify that the new state exists in the `State` table.
-
-Run the test only once. Like `Category.Name`, `State.Name` is not unique, so a second run inserts a second `Slovenia`. On a freshly created database, `Slovenia` receives `IDState = 4`.
-
-<details>
-<summary>Hint</summary>
-
-Use the same `INSERT`, `SCOPE_IDENTITY()`, and `OUTPUT` pattern as `usp_InsertCategory` in Section 2.
-
-</details>
-
-<details>
-<summary>Solution</summary>
+It uses the same `INSERT`, `SCOPE_IDENTITY()`, and `OUTPUT` pattern as `usp_InsertCategory` in Section 2.1.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertState
@@ -558,36 +529,37 @@ END;
 GO
 ```
 
-</details>
+Insert `Slovenia`:
 
-## Exercise 2 – Insert cities [BEGINNER]
+```sql
+DECLARE @NewID int;
 
-Create a stored procedure named `dbo.usp_InsertCity` that inserts a new city into the `City` table.
+EXEC dbo.usp_InsertState
+    @Name = N'Slovenia',
+    @NewStateID = @NewID OUTPUT;
 
-**Requirements:**
+SELECT @NewID AS NewStateID;
+```
 
-- Accept `@Name nvarchar(50)` as an input parameter.
-- Accept `@StateID int` as an input parameter.
-- Accept `@NewCityID int OUTPUT` as an output parameter.
-- Insert the city and associate it with the specified state.
-- Return the generated city ID.
+Verify that the new state exists:
 
-Use your procedure to insert the first two Slovenian cities into the state created in Exercise 1:
+```sql
+SELECT IDState, Name
+FROM State
+WHERE Name = N'Slovenia';
+```
 
-- `Ljubljana`
-- `Maribor`
+Run the insert only once. Like `Category.Name`, `State.Name` is not unique, so a second run inserts a second `Slovenia`. On a freshly created database, `Slovenia` receives `IDState = 4`.
 
-<details>
-<summary>Hint</summary>
+## 3.2 Create – Insert cities
 
-The caller already knows the state's ID, so the procedure does not need to search for the state by name.
+The procedure `dbo.usp_InsertCity`:
 
-Insert the supplied `@StateID` directly into `City.StateID`.
+- accepts the city name through `@Name` and the state's ID through `@StateID`;
+- inserts the city and associates it with that state;
+- returns the generated city ID through `@NewCityID`.
 
-</details>
-
-<details>
-<summary>Solution</summary>
+The caller already knows the state's ID, so the procedure does not need to search for the state by name. It inserts the supplied `@StateID` directly into `City.StateID`.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCity
@@ -606,7 +578,7 @@ END;
 GO
 ```
 
-Test the procedure:
+Insert the first two Slovenian cities, `Ljubljana` and `Maribor`:
 
 ```sql
 DECLARE @StateID int;
@@ -634,8 +606,6 @@ WHERE StateID = @StateID;
 ```
 
 On a freshly created database, `Ljubljana` receives `IDCity = 14` and `Maribor` `IDCity = 15`.
-
-</details>
 
 ### Predict, then try
 
@@ -667,37 +637,15 @@ The two calls look almost the same, but they end in two different outcomes from 
 
 A foreign key checks only values that are present. Because `City.StateID` is nullable, `NULL` simply means "no state", and the database accepts it.
 
-This also matters for your test data: if `@StateID` were `NULL` because Exercise 1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and Exercise 3 would return no cities for Slovenia.
+This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 3.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and Section 3.3 would return no cities for Slovenia.
 
 </details>
 
-## Exercise 3 – Read cities by state [BEGINNER]
+## 3.3 Read – Retrieve cities by state
 
-Create a stored procedure named `dbo.usp_GetCitiesByState`.
+The procedure `dbo.usp_GetCitiesByState` accepts `@IDState` and returns `IDCity` and `Name` for all cities of that state, sorted alphabetically by name.
 
-**Requirements:**
-
-- Accept `@IDState int` as an input parameter.
-- Return `IDCity` and `Name` for all cities belonging to the specified state.
-- Sort the results alphabetically by city name.
-
-Test the procedure twice: once against the real state `Croatia` (`IDState = 1`), and once against the state you created in Exercise 1.
-
-**Expected result for Croatia:** five real cities — `Osijek`, `Pula`, `Rijeka`, `Split`, `Zagreb`.
-
-**Expected result for Slovenia:** two rows containing `Ljubljana` and `Maribor`, assuming the test data was inserted once.
-
-<details>
-<summary>Hint</summary>
-
-Use `SELECT` with a `WHERE` condition on `City.StateID`.
-
-A `JOIN` is not required because the procedure already receives the state's ID.
-
-</details>
-
-<details>
-<summary>Solution</summary>
+A `JOIN` is not required because the procedure already receives the state's ID; a `WHERE` condition on `City.StateID` is enough.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
@@ -716,7 +664,7 @@ END;
 GO
 ```
 
-Test the procedure against the real state `Croatia`:
+First, read the cities of the real state `Croatia` (`IDState = 1`):
 
 ```sql
 EXEC dbo.usp_GetCitiesByState
@@ -733,7 +681,7 @@ Expected result:
 | 5 | Split |
 | 1 | Zagreb |
 
-Then test it against the state created in Exercise 1:
+Then read the cities of `Slovenia`:
 
 ```sql
 DECLARE @StateID int;
@@ -753,11 +701,9 @@ Expected result:
 | 14 | Ljubljana |
 | 15 | Maribor |
 
-The IDs assume a freshly created database and that each test was run once.
+The IDs assume a freshly created database and that each insert was run once.
 
-</details>
-
-## Exercise 4 – Delete a city with a business rule [ADVANCED]
+## 3.4 Delete – Remove a city with a business rule
 
 A city may have customers associated with it through `Customer.CityID`.
 
@@ -765,82 +711,13 @@ Suppose our application has the following business rule:
 
 **A city cannot be deleted if it has at least one customer.**
 
-Create a stored procedure named `dbo.usp_DeleteCity` that implements this rule.
-
-**Requirements:**
-
-- Accept `@IDCity int` as an input parameter.
-- Check whether the city exists.
-- Check whether any customers belong to the city.
-- Delete the city only when it exists and has no customers.
-- Use `RETURN` to report the result.
-
-Use the following return codes:
+The procedure `dbo.usp_DeleteCity` implements this rule. It checks whether the city exists and whether any customers belong to it, and deletes the city only when it exists and has no customers. Instead of a row count, it reports the result with `RETURN`:
 
 | Return code | Meaning |
 |---:|---|
 | `0` | City deleted successfully |
 | `1` | City does not exist |
 | `2` | City has customers; deletion rejected |
-
-### Test your procedure
-
-Test all three situations.
-
-**Test 1 – Delete an existing city without customers**
-
-Delete `Ljubljana`.
-
-Expected return code: `0`.
-
-**Test 2 – Delete the same city again**
-
-Try deleting `Ljubljana` using the same ID.
-
-Expected return code: `1`.
-
-**Test 3 – Attempt to delete a city with customers**
-
-No test data is needed here: every real city in `AdventureWorksENG` already has customers. `Zagreb` (`IDCity = 1`) has 1492 of them.
-
-Try deleting `Zagreb`.
-
-Expected return code: `2`.
-
-Verify that `Zagreb` and its customers still exist — a rejected deletion changes nothing.
-
-<details>
-<summary>Hint</summary>
-
-Use `IF NOT EXISTS` to check whether the city exists.
-
-Then use `IF EXISTS` to check for related customers:
-
-```sql
-IF EXISTS (
-    SELECT 1
-    FROM Customer
-    WHERE CityID = @IDCity
-)
-    RETURN 2;
-```
-
-Only execute the `DELETE` when both checks allow it.
-
-To read the return code when testing, capture it in a variable:
-
-```sql
-DECLARE @Result int;
-
-EXEC @Result = dbo.usp_DeleteCity @IDCity = 1;
-
-SELECT @Result AS ReturnCode;
-```
-
-</details>
-
-<details>
-<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteCity
@@ -871,7 +748,15 @@ END;
 GO
 ```
 
-Test the procedure:
+### Test the procedure
+
+We test all three outcomes:
+
+1. Delete `Ljubljana`, which exists and has no customers yet.
+2. Delete `Ljubljana` again, using the same ID.
+3. Delete `Zagreb` (`IDCity = 1`). No test data is needed here: every real city in `AdventureWorksENG` already has customers, and `Zagreb` has 1492 of them.
+
+The return code is captured with `EXEC @Result = ...`:
 
 ```sql
 DECLARE @City1 int, @Result int;
@@ -938,8 +823,6 @@ The statement has been terminated.
 So the check in `usp_DeleteCity` does not protect the data — the foreign key already does that. What it adds is a **clear answer**: instead of an error, the caller receives return code `2`, which says exactly why the city was not deleted.
 
 In terms of Section 1, the procedure turns outcome *SQL Server error* into outcome *rejected by a business rule*.
-
-</details>
 
 ## Check your understanding
 
@@ -1544,19 +1427,17 @@ However, they have different characteristics.
 >
 > Combined procedures can be useful when operations are closely related, such as Create and Update in a Save procedure.
 
-## 5.5 Exercise – Create, Update, and Delete combined \[ADVANCED\]
+## 5.5 Create, Update, and Delete combined
 
-Create a stored procedure named `dbo.usp_ManageCategory` that combines three operations:
+The procedure `dbo.usp_ManageCategory` combines three operations on `Category`:
 
 - `INSERT`
 - `UPDATE`
 - `DELETE`
 
-The Read operations will remain in the separate procedures created in Section 2.
+The Read operations remain in the separate procedures created in Section 2.
 
-### Requirements
-
-Create the procedure with these parameters:
+It uses the same `@Action` approach as `usp_ManageSubcategory` in Section 5.3, with these parameters:
 
 ```sql
 @Action     nvarchar(10),
@@ -1564,7 +1445,7 @@ Create the procedure with these parameters:
 @Name       nvarchar(50) = NULL
 ```
 
-Implement the following behavior:
+Each action reports its outcome with a return code:
 
 | Action | Behavior | Return code |
 | --- | --- | --- |
@@ -1573,31 +1454,7 @@ Implement the following behavior:
 | `DELETE` | Delete a category without subcategories | `0` deleted, `1` not found, `2` has subcategories |
 | Other | Unknown action | `99` |
 
-### Test your procedure
-
-1. Insert a new category named `Gift Cards`.
-2. Capture its generated ID.
-3. Update its name to `Gift Vouchers`.
-4. Delete the category.
-5. Try deleting the same category again.
-
-Expected return codes: `0`, `0`, `0`, `1`.
-
-<details>
-<summary>Hint</summary>
-
-Use `IF @Action = ...` to select the operation.
-
-For `INSERT`, use `SCOPE_IDENTITY()` to return the generated ID.
-
-For `UPDATE`, use `@@ROWCOUNT` to detect whether a row was updated.
-
-For `DELETE`, check whether the category exists and whether it has any subcategories before deleting it.
-
-</details>
-
-<details>
-<summary>Solution</summary>
+`INSERT` uses `SCOPE_IDENTITY()` to return the generated ID. `UPDATE` uses `@@ROWCOUNT` to detect whether a row was updated. `DELETE` checks whether the category exists and whether it has any subcategories before deleting it.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ManageCategory
@@ -1656,7 +1513,9 @@ END;
 GO
 ```
 
-Test the procedure:
+### Test the procedure
+
+The test inserts a new category named `Gift Cards`, captures its generated ID, renames it to `Gift Vouchers`, deletes it, and then tries to delete it again:
 
 ```sql
 DECLARE @IDCategory int = NULL;
@@ -1693,7 +1552,7 @@ EXEC @Result = dbo.usp_ManageCategory
 SELECT @Result AS DeleteAgainResult;
 ```
 
-</details>
+Expected return codes: `0`, `0`, `0`, `1`.
 
 ### Predict, then try
 
@@ -2113,7 +1972,7 @@ Customer cannot be deleted because invoices exist.
 
 ### When a business rule matches a database constraint
 
-`Invoice.CustomerID` is a required foreign key, so SQL Server would reject deleting a customer with invoices even without this check. Section 3 (Exercise 4) showed the same situation for cities: the check does not protect the data — the foreign key already does. It turns a database error into a **specific business result** the caller can act on.
+`Invoice.CustomerID` is a required foreign key, so SQL Server would reject deleting a customer with invoices even without this check. Section 3.4 showed the same situation for cities: the check does not protect the data — the foreign key already does. It turns a database error into a **specific business result** the caller can act on.
 
 ### Rules that no constraint can express
 
@@ -2205,9 +2064,9 @@ If category names must be unique, that is a rule the database *can* guarantee �
 
 ---
 
-# Section 8 – Final Exercise: Get and Delete Without Breaking the Rules
+# Section 8 – Putting It Together: Get and Delete Without Breaking the Rules
 
-In this final section, you will combine the concepts covered throughout the lab:
+This final section combines the concepts covered throughout the lab:
 
 - Implementing CRUD operations using stored procedures and functions.
 - Choosing between separate and combined procedures.
@@ -2215,7 +2074,7 @@ In this final section, you will combine the concepts covered throughout the lab:
 - Using `RETURN` codes to report operation results.
 - Handling SQL Server errors with `TRY/CATCH`.
 
-You will implement two scenarios using different approaches.
+We implement two scenarios using different approaches.
 
 Both scenarios focus on **Read and Delete** operations, but the same principles apply to other CRUD operations.
 
@@ -2223,96 +2082,16 @@ Both scenarios focus on **Read and Delete** operations, but the same principles 
 
 An application needs to retrieve customer information and delete customers who no longer have invoices.
 
-Implement two database objects:
+We implement two database objects:
 
 | Object | Purpose |
 |---|---|
 | `dbo.fn_GetCustomer` | Retrieve a customer by ID |
 | `dbo.usp_DeleteCustomer` | Delete a customer if they have no invoices |
 
-### Task 1 – Create a function
+### The function
 
-Create an inline table-valued function named `dbo.fn_GetCustomer`.
-
-**Requirements:**
-
-- Accept `@IDCustomer int`.
-- Return the customer with the specified ID.
-- Include `IDCustomer`, `FirstName`, `LastName`, `Email`, `PhoneNumber`, and `CityID`.
-- Return an empty result set if the customer does not exist.
-
-### Task 2 – Create a delete procedure
-
-Create a stored procedure named `dbo.usp_DeleteCustomer`.
-
-**Requirements:**
-
-- Accept `@IDCustomer int`.
-- Check whether the customer exists.
-- Check whether the customer has invoices.
-- Delete the customer only if no invoices exist.
-- Use `TRY/CATCH` to handle SQL Server errors.
-- Return an integer status code.
-
-Use the following return codes:
-
-| Return code | Meaning |
-|---:|---|
-| `0` | Customer deleted successfully |
-| `1` | Customer does not exist |
-| `2` | Customer has invoices; deletion rejected |
-| `3` | SQL Server error occurred |
-
-### The customers we will use
-
-No test data is needed. `AdventureWorksENG` already contains both cases — 19119 customers have invoices and 853 do not:
-
-| IDCustomer | Name | Invoices | Role in this exercise |
-|---:|---|---:|---|
-| 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
-| 16 | Lili Alameda | 0 | Deletion must **succeed** |
-
-### Test your implementation
-
-Your implementation should produce the following results:
-
-| Test | Expected result |
-|---|---|
-| Get customer `1` (Gustavo Achong) | One row |
-| Get customer `999999` | Zero rows |
-| Delete customer `16` (no invoices) | Return `0` |
-| Delete customer `1` (7 invoices) | Return `2` |
-| Delete customer `16` again | Return `1` |
-
-Also verify that Gustavo Achong and his seven invoices still exist after the rejected deletion.
-
-<details>
-<summary>Hints</summary>
-
-For the function, follow the inline TVF pattern from Section 4.
-
-For the delete procedure:
-
-1. Check whether the customer exists.
-2. Check whether any invoices reference the customer.
-3. Execute `DELETE` inside `TRY/CATCH`.
-4. Return the appropriate status code.
-
-The invoice check can use:
-
-```sql
-IF EXISTS (
-    SELECT 1
-    FROM Invoice
-    WHERE CustomerID = @IDCustomer
-)
-    RETURN 2;
-```
-
-</details>
-
-<details>
-<summary>Solution</summary>
+`dbo.fn_GetCustomer` is an inline table-valued function, following the pattern from Section 4. It accepts `@IDCustomer` and returns `IDCustomer`, `FirstName`, `LastName`, `Email`, `PhoneNumber`, and `CityID` of that customer — or an empty result set if the customer does not exist.
 
 ```sql
 CREATE OR ALTER FUNCTION dbo.fn_GetCustomer
@@ -2335,6 +2114,25 @@ RETURN
 );
 GO
 
+```
+
+### The delete procedure
+
+`dbo.usp_DeleteCustomer` accepts `@IDCustomer` and:
+
+1. checks whether the customer exists;
+2. checks whether any invoices reference the customer;
+3. executes the `DELETE` inside `TRY/CATCH`;
+4. returns a status code.
+
+| Return code | Meaning |
+|---:|---|
+| `0` | Customer deleted successfully |
+| `1` | Customer does not exist |
+| `2` | Customer has invoices; deletion rejected |
+| `3` | SQL Server error occurred |
+
+```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteCustomer
     @IDCustomer int
 AS
@@ -2371,7 +2169,16 @@ END;
 GO
 ```
 
-Test the implementation:
+### The customers we will use
+
+No test data is needed. `AdventureWorksENG` already contains both cases — 19119 customers have invoices and 853 do not:
+
+| IDCustomer | Name | Invoices | Role in this scenario |
+|---:|---|---:|---|
+| 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
+| 16 | Lili Alameda | 0 | Deletion must **succeed** |
+
+### Test the implementation
 
 ```sql
 DECLARE @Result int;
@@ -2407,17 +2214,27 @@ SELECT IDCustomer, FirstName, LastName FROM Customer WHERE IDCustomer = 1;
 SELECT COUNT(*) AS AchongInvoices FROM Invoice WHERE CustomerID = 1;
 ```
 
+Expected results:
+
+| Test | Expected result |
+|---|---|
+| Get customer `1` (Gustavo Achong) | One row |
+| Get customer `999999` | Zero rows |
+| Delete customer `16` (no invoices) | Return `0` |
+| Delete customer `1` (7 invoices) | Return `2` |
+| Delete customer `16` again | Return `1` |
+
 Reading customer `1` returns the real record:
 
 | IDCustomer | FirstName | LastName | Email | PhoneNumber | CityID |
 |---:|---|---|---|---|---:|
 | 1 | Gustavo | Achong | gustavo0@adventure-works.com | 398-555-0132 | 9 |
 
-</details>
+Gustavo Achong and his seven invoices still exist after the rejected deletion.
 
 ### Test the safety net
 
-Return code `3` never appeared in your tests. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
+Return code `3` never appeared in the tests above. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
 
 To see it work, temporarily disable the business rule. In `usp_DeleteCustomer`, comment out the invoice check, then run `CREATE OR ALTER` again:
 
@@ -2471,34 +2288,17 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 
 An application needs to retrieve product information and delete products that have never been sold.
 
-This time, implement both operations using **one stored procedure**.
-
-Create `dbo.usp_ManageProduct` with the following parameters:
+This time, both operations are implemented in **one stored procedure**, `dbo.usp_ManageProduct`, using the `@Action` pattern from Section 5:
 
 ```sql
 @Action    nvarchar(10),
 @IDProduct int
 ```
 
-The procedure must support two actions.
+The procedure supports two actions:
 
-### GET
-
-When `@Action = N'GET'`:
-
-- Retrieve the product identified by `@IDProduct`.
-- Return `IDProduct`, `Name`, `ProductNumber`, `Color`, `PriceWithoutVAT`, and `SubcategoryID`.
-- Return code `1` if the product does not exist.
-
-### DELETE
-
-When `@Action = N'DELETE'`:
-
-- Check whether the product exists.
-- Check whether the product appears in `InvoiceItem`.
-- Delete the product only if it has never been sold.
-- Use `TRY/CATCH` to handle SQL Server errors.
-- Return the appropriate status code.
+- **`GET`** retrieves the product identified by `@IDProduct` and returns `IDProduct`, `Name`, `ProductNumber`, `Color`, `PriceWithoutVAT`, and `SubcategoryID`. It returns code `1` if the product does not exist.
+- **`DELETE`** checks whether the product exists and whether it appears in `InvoiceItem`, and deletes it only if it has never been sold. The `DELETE` runs inside `TRY/CATCH`, and `@@ROWCOUNT` is checked immediately after it.
 
 | Return code | Meaning |
 |---:|---|
@@ -2509,49 +2309,6 @@ When `@Action = N'DELETE'`:
 | `99` | Unknown action |
 
 Return code `1` applies to both actions: as in Section 5.3, `GET` tells the caller when the product does not exist.
-
-### The products we will use
-
-Again, no test data is needed. Of the 504 real products, 266 have been sold at least once and 238 never have:
-
-| IDProduct | Name | Times sold | Role in this exercise |
-|---:|---|---:|---|
-| 707 | Sport-100 Helmet, Red | 3083 | Deletion must be **rejected** |
-| 680 | HL Road Frame - Black, 58 | 0 | Deletion must **succeed** |
-
-### Test your implementation
-
-| Test | Expected result |
-|---|---|
-| GET product `707` | One row, return `0` |
-| GET product `999999` | Zero rows, return `1` |
-| DELETE product `680` (never sold) | Return `0` |
-| DELETE product `707` (sold 3083 times) | Return `2` |
-| DELETE product `680` again | Return `1` |
-| Unknown action | Return `99` |
-
-<details>
-<summary>Hints</summary>
-
-Use the `@Action` pattern from Section 5.
-
-For the DELETE operation, check whether the product has appeared on an invoice:
-
-```sql
-IF EXISTS (
-    SELECT 1
-    FROM InvoiceItem
-    WHERE ProductID = @IDProduct
-)
-    RETURN 2;
-```
-
-Remember to check `@@ROWCOUNT` immediately after `DELETE`.
-
-</details>
-
-<details>
-<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ManageProduct
@@ -2614,7 +2371,16 @@ END;
 GO
 ```
 
-Test the procedure:
+### The products we will use
+
+Again, no test data is needed. Of the 504 real products, 266 have been sold at least once and 238 never have:
+
+| IDProduct | Name | Times sold | Role in this scenario |
+|---:|---|---:|---|
+| 707 | Sport-100 Helmet, Red | 3083 | Deletion must be **rejected** |
+| 680 | HL Road Frame - Black, 58 | 0 | Deletion must **succeed** |
+
+### Test the implementation
 
 ```sql
 DECLARE @Result int;
@@ -2666,13 +2432,22 @@ SELECT IDProduct, Name FROM Product WHERE IDProduct = 707;
 SELECT COUNT(*) AS HelmetInvoiceItems FROM InvoiceItem WHERE ProductID = 707;
 ```
 
+Expected results:
+
+| Test | Expected result |
+|---|---|
+| GET product `707` | One row, return `0` |
+| GET product `999999` | Zero rows, return `1` |
+| DELETE product `680` (never sold) | Return `0` |
+| DELETE product `707` (sold 3083 times) | Return `2` |
+| DELETE product `680` again | Return `1` |
+| Unknown action | Return `99` |
+
 The `GET` action returns the real product:
 
 | IDProduct | Name | ProductNumber | Color | PriceWithoutVAT | SubcategoryID |
 |---:|---|---|---|---:|---:|
 | 707 | Sport-100 Helmet, Red | HL-U509-R | Crvena | 34.9900 | 31 |
-
-</details>
 
 ## 8.3 Compare the two approaches
 
@@ -2692,7 +2467,7 @@ The appropriate design depends on the application's requirements, how the result
 
 ## Final questions
 
-1. Which approach did you find easier to implement: separate objects or one combined procedure?
+1. Which approach would you find easier to maintain: separate objects or one combined procedure?
 2. Why can `fn_GetCustomer` be used in a `JOIN`, while `usp_ManageProduct` cannot?
 3. Why do both DELETE procedures check related records before attempting deletion?
 4. Why do the procedures still use `TRY/CATCH` after checking business rules?
@@ -2785,4 +2560,4 @@ And remember:
 
 ## Additional practice
 
-More CRUD exercises, covering separate and combined procedures, reading through a function, error handling, and operations on related tables, are available in [CRUD Operation Exercises](../exercises/lab07-crud-operations.md).
+Exercises for this lab are in [CRUD Operation Exercises](../exercises/lab07-crud-operations.md). They cover separate and combined procedures, reading through a function, error handling, and operations on related tables.

@@ -1,15 +1,15 @@
 # Index Exercises
 
-These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md) and use `AdventureWorksENG` — the same database the midterm is written against — instead of `IndexLab`.
+These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md). **Part A** (Exercises 1–6) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 7–10) uses the lab's large `IndexLab` database.
 
-`AdventureWorksENG` is much smaller than `IndexLab` (hundreds to low tens-of-thousands of rows per table here, versus tens of millions there). That has one consequence worth stating up front:
+For Part A, note that `AdventureWorksENG` is much smaller than `IndexLab` (hundreds to low tens-of-thousands of rows per table here, versus tens of millions there). That has one consequence worth stating up front:
 
 > [!IMPORTANT]
 > On a table this size, SQL Server sometimes chooses a plain scan even where a "correct" index exists — and that can be the right choice (Lab 06, Section 7.1). Exercise 4 below produces exactly that outcome for real. The point of these exercises is not to force a dramatic `Scan → Seek` flip like the `IndexLab` demo. It is to practice **designing** the right index for a given query, and correctly **reasoning** about execution plans, column order, and coverage — skills that transfer regardless of table size.
 
-Every number quoted in this file (`logical reads`, row counts, which color is rarest, ...) was measured directly against this course's `AdventureWorksENG` — the same fixed dataset you have. Every exercise therefore uses literal values instead of looking an ID up first; you do not need a `DECLARE` block to reproduce any of this.
+Every number quoted in Part A (`logical reads`, row counts, which color is rarest, ...) was measured directly against this course's `AdventureWorksENG` — the same fixed dataset you have. Every exercise therefore uses literal values instead of looking an ID up first; you do not need a `DECLARE` block to reproduce any of this.
 
-Each exercise creates one real, physical index on an existing `AdventureWorksENG` table — unlike the trigger/procedure/function exercises, these are not new, isolated objects. Use the naming convention below and run the cleanup section when you are done, so you don't accumulate leftover indexes across study sessions.
+Each Part A exercise creates one real, physical index on an existing `AdventureWorksENG` table — unlike the trigger/procedure/function exercises, these are not new, isolated objects. Use the naming convention below and run the cleanup section when you are done, so you don't accumulate leftover indexes across study sessions.
 
 ## Setup
 
@@ -40,6 +40,8 @@ The number right after `logical reads` is what several exercises below ask you t
 All indexes created here use the prefix `IX_Exercises_` so they are easy to find and remove.
 
 ---
+
+# Part A – `AdventureWorksENG`
 
 ## Exercise 1 — What `INCLUDE` actually buys you [BEGINNER]
 
@@ -444,6 +446,165 @@ ORDER BY Cnt DESC;
 
 ---
 
+# Part B – `IndexLab`
+
+Exercises 7–10 use the large `IndexLab` database from [Lab 06](../labs/lab06-indexes.md) instead of `AdventureWorksENG`. On a table with ten million rows, the effect of an index is easy to see in the execution plan and in `logical reads`.
+
+> [!IMPORTANT]
+> Do these exercises after Lab 06, in the same `IndexLab` database. They rely on the indexes the lab creates: `IX_SalesOrder_CustomerId_OrderDate`, `IX_SalesOrder_Status`, `IX_SalesOrder_Review_OrderDate`, and `IX_SalesOrderItem_SalesOrderId`.
+
+Keep **Actual Execution Plan** enabled, and start with:
+
+```sql
+USE IndexLab;
+GO
+```
+
+## Exercise 7 — Index for a filtered, sorted query [INTERMEDIATE]
+
+Run this query before creating a new index:
+
+```sql
+SELECT
+    SalesOrderId,
+    CustomerId,
+    OrderDate,
+    TotalAmount
+FROM dbo.SalesOrder
+WHERE Status = 'Processing'
+ORDER BY OrderDate DESC;
+```
+
+Design and create a nonclustered index that supports the filter and sort. Explain the key column order and any included columns. Re-run the query to verify your result.
+
+> [!TIP]
+> The query returns about one million rows. Displaying them in the SSMS results grid takes longer than executing the query itself, so before measuring, enable **Query → Query Options → Results → Grid → Discard results after execution**.
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Exercises_SalesOrder_Status_OrderDate
+ON dbo.SalesOrder (Status, OrderDate DESC)
+INCLUDE (CustomerId, TotalAmount);
+GO
+```
+
+`Status` is the leading key because of the equality filter. `OrderDate` follows it, so within one status the entries are already in date order and no `Sort` is needed. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
+
+Declaring `OrderDate DESC` matches the requested order, but it is not required: SQL Server can read an ascending index backward just as well (Exercise 10 relies on exactly this). The direction of a key column matters when `ORDER BY` mixes directions, for example `ORDER BY Status ASC, OrderDate DESC` without an equality filter on `Status`.
+
+Reference results:
+
+| | Before the index | With `IX_Exercises_SalesOrder_Status_OrderDate` |
+|---|---|---|
+| Plan | `Clustered Index Scan` + `Sort` | `Index Seek`, no `Sort` |
+| Logical reads | 57,266 | 5,462 |
+| Elapsed time | about 4.9 s | about 0.5 s |
+
+</details>
+
+---
+
+## Exercise 8 — Composite index column order [INTERMEDIATE]
+
+Lab 06 created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)`. For each query below, predict whether the index supports a seek on both key columns, a seek on the leading column, or no efficient seek on the search condition. Verify your prediction in the plan.
+
+```sql
+-- A
+SELECT * FROM dbo.SalesOrder WHERE OrderDate >= '20250101';
+
+-- B
+SELECT * FROM dbo.SalesOrder WHERE CustomerId = 501 ORDER BY OrderDate;
+
+-- C
+SELECT * FROM dbo.SalesOrder
+WHERE CustomerId = 501
+  AND OrderDate >= '20250101'
+  AND OrderDate <  '20250201';
+```
+
+<details>
+<summary>Solution</summary>
+
+- **A:** no efficient seek on `OrderDate` alone using this index because the first key (`CustomerId`) is missing.
+- **B:** seek on `CustomerId`; rows for that customer are then in `OrderDate` order, potentially avoiding `Sort`.
+- **C:** seek using the equality on `CustomerId` and the range on `OrderDate`.
+
+Check the **Object** property to identify which index SQL Server actually used. For Query A, the separate `IX_SalesOrder_OrderDate` index could locate the date range, but the condition matches roughly one fifth of the table (about 2 million rows) and `SELECT *` would require a lookup for each of them. Expect a `Clustered Index Scan` instead. Neither outcome means that the composite index supports an efficient seek on `OrderDate` alone.
+
+For Queries B and C, `SELECT *` requires a Key Lookup for every matching order. An actual plan may vary due to these lookup costs.
+
+</details>
+
+---
+
+## Exercise 9 — Covering index design [BEGINNER]
+
+Write and analyze a query that returns `ProductId`, `Quantity`, and `UnitPrice` for one `SalesOrderId`:
+
+```sql
+SELECT ProductId, Quantity, UnitPrice
+FROM dbo.SalesOrderItem
+WHERE SalesOrderId = 12345;
+```
+
+Confirm whether it needs a Key Lookup.
+
+<details>
+<summary>Solution</summary>
+
+The existing `IX_SalesOrderItem_SalesOrderId` index with `INCLUDE (ProductId, Quantity, UnitPrice)` covers the query. The engine should generally be able to use it without an extra Key Lookup.
+
+</details>
+
+---
+
+## Exercise 10 — Evaluate a Missing Index suggestion [ADVANCED]
+
+Run the following query with Actual Execution Plan enabled:
+
+```sql
+SELECT SalesOrderId, OrderDate
+FROM dbo.SalesOrder
+WHERE Status = 'Cancelled'
+ORDER BY OrderDate;
+```
+
+If a Missing Index suggestion appears above the plan, look at it carefully before creating anything, and consider:
+
+1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from [Section 10.2](../labs/lab06-indexes.md#102-selectivity-and-statistics), the filtered index `IX_SalesOrder_Review_OrderDate` from [Section 10.4](../labs/lab06-indexes.md#104-filtered-indexes), and `IX_Exercises_SalesOrder_Status_OrderDate` if you completed Exercise 7?
+2. Can an existing index support both the filter and the requested sort order?
+3. Does the suggested index support both of them?
+4. Is it better to create the suggested index, replace an overlapping index, or do nothing?
+
+<details>
+<summary>Solution</summary>
+
+**The filtered index is not used.** `IX_SalesOrder_Review_OrderDate` contains only `Review` orders, so it cannot answer a query for `Cancelled` orders (see the limitations in [Section 10.4](../labs/lab06-indexes.md#104-filtered-indexes)).
+
+**If you completed Exercise 7**, no suggestion appears. `IX_Exercises_SalesOrder_Status_OrderDate` already covers the query: with `Status` fixed by the equality condition, SQL Server reads the `Cancelled` part of the index backward (`Index Seek` with `ORDERED BACKWARD` in the plan properties) and returns the rows in ascending date order without a `Sort`. The reference run needed 3,751 logical reads. No new index is needed.
+
+**If you skipped Exercise 7**, the reference plan uses a `Clustered Index Scan` followed by a `Sort` (57,266 logical reads), and SQL Server suggests an index similar to:
+
+```sql
+-- Missing Index suggestion (estimated impact about 41%)
+CREATE NONCLUSTERED INDEX ...
+ON dbo.SalesOrder (Status)
+INCLUDE (OrderDate);
+```
+
+This suggestion has two weaknesses:
+
+- `OrderDate` is only an included column, so it does not determine the order of the index. The index would find the cancelled orders, but the `Sort` would remain. Missing Index suggestions do not take `ORDER BY` into account.
+- It is almost a duplicate of the existing `IX_SalesOrder_Status`, which has the same key.
+
+A better design is an index on `(Status, OrderDate)`. It supports both the filter and the sort, and, following the leftmost-prefix rule from [Section 10.1](../labs/lab06-indexes.md#101-composite-indexes-and-column-order), it also supports every search on `Status` alone. It should therefore **replace** `IX_SalesOrder_Status` rather than be added next to it. In a real system, inspect the entire workload before making this change.
+
+</details>
+
+---
+
 # Cleanup
 
 ```sql
@@ -456,6 +617,17 @@ GO
 ```
 
 If you created the index suggested in Exercise 5, drop it the same way using the name you gave it.
+
+For Part B, remove the index created in Exercise 7 from `IndexLab`. The indexes created by Lab 06 itself stay in place:
+
+```sql
+USE IndexLab;
+GO
+DROP INDEX IF EXISTS IX_Exercises_SalesOrder_Status_OrderDate ON dbo.SalesOrder;
+GO
+USE AdventureWorksENG;
+GO
+```
 
 > [!TIP]
 > Run this cleanup before your next study session, or before the exam. Leftover indexes from earlier practice can change execution plans in ways that make a later exercise behave differently than described here.

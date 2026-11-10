@@ -4,11 +4,29 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **triggers**, **stored procedures**, **functions**, **CRUD operations**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **T-SQL essentials**, **views**, **triggers**, **stored procedures**, **functions**, **CRUD operations**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
 Exercises are grouped by topic and arranged from introductory concepts to more involved applications. The current topics are:
+
+### T-SQL essentials
+
+The T-SQL collection is in [T-SQL Essentials Exercises](tsql-essentials.md) and follows the learning goals in [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md):
+
+1. **Variables** — load values from a table and recognize the no-row and multi-row traps.
+2. **Table variables and control flow** — fill a table variable and use `IF / ELSE`, `WHILE`, and `CASE`.
+3. **Identity values** — capture `SCOPE_IDENTITY()` and use it for a related insert.
+4. **Row counts and errors** — use `@@ROWCOUNT` and a basic `TRY/CATCH` block.
+
+### Views
+
+The View collection is in [View Exercises](views.md) and follows the learning goals in [Lab 01 – Views](../labs/lab01-views.md):
+
+1. **View fundamentals** — create, change, and query Views, and hide a `JOIN` inside a View.
+2. **System Views** — read table and column metadata from `sys.tables` and `sys.columns`.
+3. **Modifying data through Views** — insert, update, and delete through a simple View, and recognize the restrictions of a `JOIN` View.
+4. **View options** — use `WITH CHECK OPTION` and `WITH SCHEMABINDING`.
 
 ### Triggers
 
@@ -20,7 +38,7 @@ The trigger collection is in [Trigger Exercises](triggers.md) and follows the le
 4. **Business rules** — validate related values and decide when a trigger is an appropriate tool.
 5. **Review and debugging** — inspect trigger behavior, identify common mistakes, and explain side effects.
 
-Each exercise names the relevant tables or objects, describes the expected behavior, and explains how to test and clean up safely.
+Part A logs changes to `City` in a simple log table; Part B audits `Product` changes. Each exercise names the relevant tables or objects, describes the expected behavior, and explains how to test and clean up safely.
 
 ### Stored procedures
 
@@ -28,10 +46,12 @@ The procedure collection is in [Stored Procedure Exercises](procedures.md) and f
 
 1. **Procedure fundamentals** — create, alter, execute, and remove a procedure.
 2. **Input parameters** — filter results using values supplied by the caller.
-3. **Returning information** — return result sets and use `OUTPUT` parameters.
-4. **Status values** — use `RETURN` to report a simple outcome to the caller.
+3. **Returning information** — return result sets and use `OUTPUT` parameters, including finding a missing `OUTPUT` keyword.
+4. **Changing data** — insert a row and its missing parent row, using `SCOPE_IDENTITY()`.
+5. **Status values** — use `RETURN` to report a simple outcome to the caller.
+6. **Reusing a procedure** — call a validation procedure for every row in a `WHILE` loop.
 
-These exercises use read-only procedures and require no test data setup. They include direct result queries, input parameters, output values, and return status codes.
+The exercises need no test data setup. Exercise 6 inserts a state and two cities, which the cleanup section removes; all other procedures only read data.
 
 ### Functions
 
@@ -65,9 +85,11 @@ The complex parameters collection is in [Complex Parameters Exercises](complex-p
 1. **Delimited strings** — accept a comma-separated list, split it with `STRING_SPLIT`, and use it in an `IN` clause or `JOIN`.
 2. **XML shredding** — use `.nodes()` and `.value()` to turn XML into rows.
 3. **Building XML** — use `FOR XML PATH` with dotted aliases to create nested XML structures from queries.
-4. **Choosing the right method** — reason about when to use delimited strings versus XML versus later methods (TVPs, JSON).
+4. **Table-Valued Parameters** — define a table type and pass typed rows to a procedure.
+5. **JSON** — use `OPENJSON` to insert rows from a JSON document.
+6. **Choosing the right method** — reason about when to use delimited strings, XML, TVPs, or JSON.
 
-These exercises range from direct SQL rewrites of Lab 08's core patterns to design scenarios where students must justify their method choice. They include building manual string splitters to understand why built-in functions matter, nested XML processing, and trade-off analysis across all five methods.
+These exercises range from direct SQL rewrites of Lab 08's core patterns to design scenarios where students must justify their method choice. They include building manual string splitters to understand why built-in functions matter, nested XML processing, finding or creating related records, and trade-off analysis across all five methods.
 
 ### Transactions
 
@@ -112,8 +134,9 @@ The index collection is in [Index Exercises](indexes.md) and follows the learnin
 4. **Selectivity** — judge when a low-cardinality column is still a good index candidate, including covering a `GROUP BY` column.
 5. **Evaluating suggestions** — decide whether a "Missing Index" recommendation is worth creating, given indexes that already exist.
 6. **The same pattern, a different table** — repeat Exercise 1's staged `INCLUDE` walkthrough on `Invoice` instead of `Product`, then connect the result back to Exercise 5's missing-index suggestion.
+7. **Large-table practice (Exercises 7–10)** — design an index for a filtered, sorted query, and revisit column order, covering, and Missing Index suggestions on `IndexLab`.
 
-Unlike Lab 06, which uses the large generated `IndexLab` database to make performance differences obvious, these exercises intentionally use `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Each exercise creates one real index on an existing table (see the database safety note below) rather than an isolated new object.
+Part A (Exercises 1–6) intentionally uses `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Part B (Exercises 7–10) continues in Lab 06's large `IndexLab` database, where performance differences are obvious, and relies on the indexes the lab creates. Each exercise creates at most one real index on an existing table (see the database safety note below) rather than an isolated new object.
 
 ## Difficulty labels
 
@@ -136,12 +159,16 @@ Difficulty describes the reasoning and SQL work expected. It does not indicate t
 
 ## Database safety note
 
-The inspected `AdventureWorksENG` database already contains four enabled triggers on `dbo.City` and a populated `dbo.ActivityLog` table. Do not assume these are temporary exercise objects. An exercise must not drop, replace, disable, or clear existing objects or data as part of setup or cleanup. Prefer isolated test objects or a dedicated database; if an exercise must use an existing object, document a safe, reversible procedure that preserves its original state.
+Start the exercises with a fresh `AdventureWorksENG`, so objects left over from a lab (for example, triggers on `dbo.City`) do not interfere. An exercise must not drop, replace, disable, or clear existing objects or data as part of setup or cleanup. Prefer isolated test objects or a dedicated database; if an exercise must use an existing object, document a safe, reversible procedure that preserves its original state.
 
 The index exercises are a deliberate, narrow exception to "prefer isolated test objects": by nature, an index exercise creates a real physical index on an existing table. Each one uses the `IX_Exercises_` naming prefix and is listed in that file's cleanup section — never leave one of these indexes in place after finishing, since it can change the execution plan observed by a later, unrelated exercise or lab.
 
 ## References
 
+- [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md)
+- [T-SQL Essentials Exercises](tsql-essentials.md)
+- [Lab 01 – Views](../labs/lab01-views.md)
+- [View Exercises](views.md)
 - [Lab 02 – Triggers](../labs/lab02-triggers.md)
 - [Trigger Exercises](triggers.md)
 - [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md)

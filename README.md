@@ -42,7 +42,7 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 > Additional labs will be added as the course progresses.
 
-For extra practice beyond each lab's built-in exercises, see the [Exercise Collection](exercises/README.md) (triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, physical storage, indexes).
+Practice exercises for the labs are collected in the [Exercise Collection](exercises/README.md) (T-SQL essentials, views, triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, physical storage, indexes).
 
 Lab 8 also has two optional, self-contained live demos — a SQL-injection attack against a running login form, and a REST API that posts JSON into a stored procedure — see [demos/README.md](demos/README.md).
 
@@ -106,7 +106,7 @@ For each lab:
 2. read the explanation;
 3. run the SQL examples in SSMS;
 4. answer the **Check your understanding** questions;
-5. complete the exercises before opening the solutions.
+5. practise with the lab's exercises in the [Exercise Collection](exercises/README.md), trying each one before opening its solution.
 
 Some examples intentionally produce SQL Server errors. These are part of the learning process and demonstrate database rules and behavior.
 

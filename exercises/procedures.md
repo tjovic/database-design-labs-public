@@ -1,8 +1,8 @@
 # Stored Procedure Exercises
 
-These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, an `OUTPUT` parameter, and a `RETURN` status code.
+These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, a `RETURN` status code, and reusing one procedure from another script.
 
-All exercises are read-only: the procedures run `SELECT` statements and do not change table data. The only database objects they create are the procedures listed here. Use the cleanup section to remove those procedure definitions when finished.
+Exercise 6 inserts a state and two cities; all other exercises only read table data. The cleanup section removes the procedures and the rows inserted by Exercise 6.
 
 ## Exercise 1 — List categories [BEGINNER]
 
@@ -137,7 +137,68 @@ GO
 
 </details>
 
-## Exercise 4 — Return invoices and a match count [INTERMEDIATE]
+## Exercise 4 — Find the bug [BEGINNER]
+
+Create this procedure:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetProductColor
+    @IDProduct int,
+    @Color     nvarchar(15) OUTPUT
+AS
+BEGIN
+    SET @Color = NULL;
+
+    SELECT @Color = Color
+    FROM dbo.Product
+    WHERE IDProduct = @IDProduct;
+END;
+GO
+```
+
+A developer calls it like this:
+
+```sql
+DECLARE @Color nvarchar(15);
+
+EXEC dbo.usp_Exercises_GetProductColor
+    @IDProduct = 742,
+    @Color     = @Color;
+
+SELECT @Color AS ProductColor;
+```
+
+The procedure executes, but `@Color` does not contain the value set by the procedure.
+
+1. What is wrong with the call?
+2. Where must `OUTPUT` appear?
+3. Correct the call.
+
+<details>
+<summary>Hint</summary>
+
+Compare the parameter in the procedure header with the same parameter in the `EXEC` statement.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+The caller forgot the `OUTPUT` keyword. It must appear both in the procedure declaration and in the call when the caller wants to receive the value the procedure sets. Without it, the procedure works on its own copy of the value and the caller's variable stays `NULL`.
+
+```sql
+DECLARE @Color nvarchar(15);
+
+EXEC dbo.usp_Exercises_GetProductColor
+    @IDProduct = 742,
+    @Color     = @Color OUTPUT;
+
+SELECT @Color AS ProductColor;
+```
+
+</details>
+
+## Exercise 5 — Return invoices and a match count [INTERMEDIATE]
 
 Create `dbo.usp_Exercises_CustomerInvoices` with these parameters:
 
@@ -219,7 +280,90 @@ The result set contains that customer's invoices in the selected date interval. 
 
 </details>
 
-## Exercise 5 — Return a product, price, and status [ADVANCED]
+## Exercise 6 — Insert a city and its state [INTERMEDIATE]
+
+Create a procedure named `dbo.usp_Exercises_InsertCityInState` that accepts `@StateName` and `@CityName`.
+
+The procedure must:
+
+1. find the state by name and store its ID in a variable;
+2. insert the state if it does not exist, and use `SCOPE_IDENTITY()` to obtain its new ID;
+3. insert the city with the correct `StateID`.
+
+Test the procedure with two calls:
+
+```text
+State: Canada, City: Toronto
+State: Canada, City: Vancouver
+```
+
+Finally, verify that `Canada` exists only once in `State` and that both cities reference it.
+
+> [!NOTE]
+> This exercise assumes one user and at most one matching state before the first call. Repeating the two calls inserts the cities again: the procedure checks whether the state exists, but not whether the city exists.
+
+<details>
+<summary>Hint</summary>
+
+After `SELECT @StateID = IDState FROM dbo.State WHERE Name = @StateName`, the variable is still `NULL` when no state matches. Use `IF @StateID IS NULL` to decide whether to insert the state.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertCityInState
+    @StateName nvarchar(50),
+    @CityName  nvarchar(50)
+AS
+BEGIN
+    DECLARE @StateID int;
+
+    SELECT @StateID = IDState
+    FROM dbo.State
+    WHERE Name = @StateName;
+
+    IF @StateID IS NULL
+    BEGIN
+        INSERT INTO dbo.State (Name)
+        VALUES (@StateName);
+
+        SET @StateID = SCOPE_IDENTITY();
+    END;
+
+    INSERT INTO dbo.City (Name, StateID)
+    VALUES (@CityName, @StateID);
+END;
+GO
+
+EXEC dbo.usp_Exercises_InsertCityInState
+    @StateName = N'Canada',
+    @CityName  = N'Toronto';
+
+EXEC dbo.usp_Exercises_InsertCityInState
+    @StateName = N'Canada',
+    @CityName  = N'Vancouver';
+
+SELECT
+    s.Name AS State,
+    c.Name AS City
+FROM dbo.City AS c
+INNER JOIN dbo.State AS s
+    ON s.IDState = c.StateID
+WHERE s.Name = N'Canada';
+
+SELECT COUNT(*) AS CanadaRowCount
+FROM dbo.State
+WHERE Name = N'Canada';
+GO
+```
+
+The first call inserts `Canada` and `Toronto`. The second call finds `Canada` and inserts only `Vancouver`, so `CanadaRowCount` is `1`.
+
+</details>
+
+## Exercise 7 — Return a product, price, and status [ADVANCED]
 
 Create `dbo.usp_Exercises_GetProduct` with an input parameter `@IDProduct int` and an output parameter `@Price money OUTPUT`.
 
@@ -288,18 +432,147 @@ The call returns the product row, its price, and status `0`. The return code is 
 
 </details>
 
+## Exercise 8 — Validate all stored card numbers [ADVANCED]
+
+This exercise reuses `dbo.usp_ValidateCardNumber` from [Section 7 of Lab 03](../labs/lab03-stored-procedures.md#section-7--practical-example-validating-a-card-number), which checks one card number. If the procedure does not exist in your database, create it first by running the `CREATE OR ALTER PROCEDURE` statement from that section.
+
+Your task is to use this procedure to check **all existing card numbers** in `dbo.CreditCard`:
+
+1. Declare a table variable named `@Cards` with these columns:
+
+   | Column | Type | Purpose |
+   |---|---|---|
+   | `IDCreditCard` | `int PRIMARY KEY` | Identifies the card |
+   | `CardNumber` | `varchar(100)` | Number to check |
+   | `IsValid` | `bit NULL` | `NULL` = not processed, `0` = rejected, `1` = accepted |
+
+2. Copy `IDCreditCard` and `CardNumber` from `dbo.CreditCard` into `@Cards`. Leave `IsValid` as `NULL`.
+3. Use a `WHILE` loop to process rows whose `IsValid` is still `NULL`. In each iteration:
+   - select one unprocessed row;
+   - call `dbo.usp_ValidateCardNumber`;
+   - capture its `OUTPUT` value;
+   - update the corresponding row in `@Cards`.
+4. Display `IDCreditCard` and `IsValid` for every processed row.
+5. Display the number of rows for each validation result.
+
+> [!IMPORTANT]
+> Reuse the existing procedure. Do not copy the Luhn calculation into the loop. Store the results only in the table variable; do not modify `dbo.CreditCard`.
+
+> [!NOTE]
+> A result of `0` means that the number does not meet the rules of the procedure. It may have an incorrect checksum, contain non-digit characters, or be `NULL` or empty.
+
+Then answer:
+
+1. Why do we initially use `NULL` instead of `0` for `IsValid`?
+2. How many times is the validation procedure called?
+3. What would happen if we forgot to update the processed row?
+4. Does this script change the original `CreditCard` table?
+
+<details>
+<summary>Hint</summary>
+
+- `WHILE EXISTS (...)` can continue while unprocessed rows remain.
+- `SELECT TOP (1) ... ORDER BY IDCreditCard` selects one row at a time.
+- Use `IS NULL` to find unprocessed rows. A result of `0` means **processed and rejected**.
+- The caller must specify `OUTPUT` to receive the validation result.
+- Use `GROUP BY IsValid` and `COUNT(*)` for the summary.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+DECLARE @Cards TABLE
+(
+    IDCreditCard int PRIMARY KEY,
+    CardNumber   varchar(100),
+    IsValid      bit NULL
+);
+
+INSERT INTO @Cards (IDCreditCard, CardNumber)
+SELECT IDCreditCard, CardNumber
+FROM dbo.CreditCard;
+
+DECLARE @IDCreditCard int;
+DECLARE @CardNumber varchar(100);
+DECLARE @IsValid bit;
+
+WHILE EXISTS
+(
+    SELECT 1
+    FROM @Cards
+    WHERE IsValid IS NULL
+)
+BEGIN
+    -- Select one unprocessed card.
+    SELECT TOP (1)
+        @IDCreditCard = IDCreditCard,
+        @CardNumber = CardNumber
+    FROM @Cards
+    WHERE IsValid IS NULL
+    ORDER BY IDCreditCard;
+
+    -- Reuse the procedure from Lab 03, Section 7.
+    EXEC dbo.usp_ValidateCardNumber
+        @CardNumber = @CardNumber,
+        @IsValid = @IsValid OUTPUT;
+
+    -- Store the result and mark the row as processed.
+    UPDATE @Cards
+    SET IsValid = @IsValid
+    WHERE IDCreditCard = @IDCreditCard;
+END;
+
+-- Individual results.
+SELECT IDCreditCard, IsValid
+FROM @Cards
+ORDER BY IDCreditCard;
+
+-- Summary: 0 = rejected, 1 = accepted.
+SELECT
+    IsValid,
+    COUNT(*) AS CardCount
+FROM @Cards
+GROUP BY IsValid
+ORDER BY IsValid;
+GO
+```
+
+Run the complete script as **one batch**. The table variable and local variables must remain available throughout the loop and the final queries.
+
+1. `NULL` represents an unprocessed row. `0` represents a completed check with a rejected result.
+2. Once for each row copied from `CreditCard`.
+3. The row would remain unprocessed, so the loop would repeatedly select it and would never finish.
+4. No. The script reads the original table and updates only `@Cards`.
+
+This script calls a procedure once for each card. The additional reading in [Lab 04 – Functions](../labs/lab04-functions.md) shows how to move the checksum calculation into a scalar function and call it directly from a `SELECT` statement.
+
+</details>
+
 ## Cleanup
 
-The exercises do not add or change table data. When finished, remove only the procedure definitions created for this collection:
+Remove the procedures created for this collection. The last statements delete the cities and the state inserted by Exercise 6.
 
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ListCategories;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomersByLastName;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomerInvoices;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProduct;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ProductsByPriceRange;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProductColor;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomerInvoices;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_InsertCityInState;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProduct;
+GO
+
+DELETE FROM dbo.City
+WHERE StateID IN (SELECT IDState FROM dbo.State WHERE Name = N'Canada');
+
+DELETE FROM dbo.State
+WHERE Name = N'Canada';
 GO
 ```
+
+`dbo.usp_ValidateCardNumber` belongs to Lab 03, so this cleanup leaves it in place.
 
 ## References
 

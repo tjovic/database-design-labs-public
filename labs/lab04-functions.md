@@ -648,7 +648,7 @@ ORDER BY e.IDEmployee;
 The query supplies each employee's salary and the rate from the reference table. The function returns one calculated value for each result row. For employees with children or other dependents, this is a basic-allowance comparison rather than their extended calculation.
 
 > [!TIP]
-> [Exercise 7 in Function Exercises](../exercises/functions.md#exercise-7--extended-net-salary-calculation-advanced) extends this model with personal allowances, reduced pension contribution bases, and two tax brackets. Its main function calls a helper function.
+> [Exercise 12 in Function Exercises](../exercises/functions.md#exercise-12--extended-net-salary-calculation-advanced) extends this model with personal allowances, reduced pension contribution bases, and two tax brackets. Its main function calls a helper function.
 
 Keep `PayrollLab` for that exercise. Switch back before continuing this lab:
 

@@ -1,10 +1,10 @@
 # Physical Storage Exercises
 
-These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md) and use `AdventureWorksENG` — the same database the midterm is written against — instead of `IndexLab`.
+These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md). **Part A** (Exercises 1–4) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 5–8) contains page calculations and two exercises on the lab's `IndexLab` database.
 
-`AdventureWorksENG` is much smaller than `IndexLab`, which is exactly the point here: `State` has 3 rows, `Product` has 504, and `Customer` has 19,972. That range lets you see, on real tables of very different sizes, the same two questions Lab 05 asks about `Category`, `Product`, and `Customer`: how many pages does a table use, and what determines the physical order of rows on those pages?
+In Part A, `AdventureWorksENG` is much smaller than `IndexLab`, which is exactly the point: `State` has 3 rows, `Product` has 504, and `Customer` has 19,972. That range lets you see, on real tables of very different sizes, the same two questions Lab 05 asks about `Category`, `Product`, and `Customer`: how many pages does a table use, and what determines the physical order of rows on those pages?
 
-Every number quoted in this file (page counts, page IDs, record lengths, row IDs) was measured directly against this course's fixed `AdventureWorksENG` dataset. Your own page IDs will differ — page allocation is instance-specific — but row counts, record lengths, and which row comes before or after another should match, since those come from the data itself, not from allocation order.
+Every number quoted in Part A (page counts, page IDs, record lengths, row IDs) was measured directly against this course's fixed `AdventureWorksENG` dataset. Your own page IDs will differ — page allocation is instance-specific — but row counts, record lengths, and which row comes before or after another should match, since those come from the data itself, not from allocation order.
 
 > [!WARNING]
 > `DBCC IND` and `DBCC PAGE` are **undocumented diagnostic commands** (same note as Lab 05). Use them only for learning in this training database.
@@ -24,6 +24,8 @@ GO
 Run `DBCC TRACEON(3604)` again if you open a new query window — it only applies to the current session.
 
 ---
+
+# Part A – `AdventureWorksENG`
 
 ## Exercise 1 — The `State` table [BEGINNER]
 
@@ -208,6 +210,133 @@ Answer:
 
 ---
 
+# Part B – Page math and `IndexLab`
+
+Exercises 5 and 6 are calculations; you need no database for them. Exercises 7 and 8 use the large `IndexLab` database from [Lab 05](../labs/lab05-physical-storage.md) and only read from it.
+
+## Exercise 5 — Page math [BEGINNER]
+
+A table contains **2,000,000 rows** and fits **40 rows per page**.
+
+1. How many pages are required?
+2. If wider rows reduce capacity to **25 rows per page**, how many pages are now required?
+3. By what percentage does the number of pages increase?
+
+<details>
+<summary>Solution</summary>
+
+1. `2,000,000 / 40 = 50,000 pages`.
+2. `2,000,000 / 25 = 80,000 pages`.
+3. `(80,000 - 50,000) / 50,000 × 100 = 60%`.
+
+</details>
+
+---
+
+## Exercise 6 — Predict the effect of wider rows [BEGINNER]
+
+A table contains **1,000,000 rows** and currently fits **16 rows per page**. After adding a populated variable-length column, it fits only **10 rows per page**.
+
+1. How many pages were needed before the change?
+2. How many pages are needed afterward?
+3. What is the percentage increase?
+4. What happens to the page-access cost of a full scan, assuming similar execution conditions?
+
+<details>
+<summary>Solution</summary>
+
+1. `1,000,000 / 16 = 62,500 pages`.
+2. `1,000,000 / 10 = 100,000 pages`.
+3. `(100,000 - 62,500) / 62,500 × 100 = 60%`.
+4. A scan generally needs to process more pages, increasing logical I/O and potentially physical I/O. Elapsed time is not determined by page count alone.
+
+</details>
+
+---
+
+## Exercise 7 — Logical versus physical reads [BEGINNER]
+
+In SSMS, execute the following batch **once**. It runs the same query twice. Compare the two outputs in the **Messages** tab:
+
+```sql
+USE IndexLab;
+GO
+SET STATISTICS IO ON;
+GO
+SELECT * FROM dbo.Product;
+GO
+SELECT * FROM dbo.Product;
+GO
+SET STATISTICS IO OFF;
+GO
+```
+
+1. Record logical reads and physical reads for each execution.
+2. Did the physical-read count change?
+3. Why might both executions report zero physical reads?
+4. Can you conclude that the query accessed zero pages if `physical reads = 0`?
+5. Compare `logical reads` with the **159 data pages** you counted for `Product` in [Section 14 of Lab 05](../labs/lab05-physical-storage.md#14-guided-investigation--product-from-pages-to-query-performance). Are the two numbers the same? If not, why not?
+
+> [!NOTE]
+> Pages may have been cached before you started this exercise. Do not expect the first query to show a nonzero physical-read count. **Do not clear the SQL Server buffer pool** just to force a difference on a shared classroom server.
+
+<details>
+<summary>Solution</summary>
+
+1. Values depend on the server and cache state.
+2. They may differ: pages read from storage can remain cached for subsequent executions.
+3. Another query or an earlier operation may already have loaded the required pages into memory.
+4. No. Inspect **logical reads** to see page accesses in the buffer pool. Also consider `read-ahead reads` when studying storage activity.
+5. Not necessarily. Our reference query reported **161 logical reads**, while `DBCC IND` listed **159 leaf-level data pages**. Logical reads count page accesses during execution, not distinct allocated pages. Additional or repeated page accesses can occur, so these counts need not match. The counts alone do not identify which additional page accesses occurred.
+
+</details>
+
+---
+
+## Exercise 8 — Investigate `SalesOrder` without listing every page [INTERMEDIATE]
+
+`SalesOrder` is much larger than the `IndexLab` tables inspected with `DBCC IND` in Lab 05. Producing an individual row for every allocated page could overwhelm the SSMS result window.
+
+Instead, use the documented `sys.dm_db_partition_stats` view:
+
+```sql
+USE IndexLab;
+GO
+
+SELECT
+    i.name AS IndexName,
+    i.index_id,
+    SUM(ps.row_count) AS [RowCount],
+    SUM(ps.in_row_data_page_count) AS InRowDataPages,
+    SUM(ps.used_page_count) AS UsedPages
+FROM sys.dm_db_partition_stats AS ps
+JOIN sys.indexes AS i
+    ON i.object_id = ps.object_id
+   AND i.index_id = ps.index_id
+WHERE ps.object_id = OBJECT_ID('dbo.SalesOrder')
+  AND i.index_id IN (0, 1)
+GROUP BY i.name, i.index_id;
+```
+
+`row_count` is an approximate row count. `in_row_data_page_count` counts in-row data pages (leaf pages for a clustered index). `used_page_count` includes other pages allocated to that index or heap and can be higher.
+
+1. What are the reported row count and in-row data page count?
+2. Estimate the **average rows per in-row data page**.
+3. Compare the estimate with the `IndexLab` tables `Category`, `Product`, and `Customer` from Lab 05.
+4. Why is this query better suited to counting pages in a very large table than displaying `DBCC IND` output?
+
+<details>
+<summary>Solution</summary>
+
+1. In the reference database: `RowCount` = 10,000,000 and `InRowDataPages` = 57,143. Because the data is generated deterministically, you should see the same values.
+2. 10,000,000 / 57,143 ≈ **175 rows per page**. This is an average, not the exact occupancy of each page.
+3. For comparison: `Product` has about 189 rows per page (30,000 / 159) and `Customer` about 137 (100,000 / 732). `Category` has 100 rows on its only page, but that page is only about 35% full ([Lab 05, Section 12](../labs/lab05-physical-storage.md#12-dbcc-page--look-inside-a-data-page)). Different row sizes and storage layouts lead to different page densities.
+4. The system view returns summary counts without producing a huge row-by-row list of page identifiers. On SQL Server 2022 and later, this view requires `VIEW DATABASE PERFORMANCE STATE` and `VIEW SECURITY DEFINITION` on the database. Earlier SQL Server versions require `VIEW DATABASE STATE` and `VIEW DEFINITION`.
+
+</details>
+
+---
+
 # Key takeaways
 
 - A table's `PRIMARY KEY CLUSTERED` determines the physical row order on its data pages — not insertion order, not alphabetical order of a non-key column.
@@ -221,4 +350,4 @@ Answer:
 
 - [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
 - [Lab 05, Section 10 – Inspecting physical pages](../labs/lab05-physical-storage.md#10-inspecting-physical-pages)
-- [Lab 05, Section 17 – Large tables and the problem we need to solve](../labs/lab05-physical-storage.md#17-large-tables-and-the-problem-we-need-to-solve)
+- [Lab 05, Section 16 – From physical storage to query optimization](../labs/lab05-physical-storage.md#16-from-physical-storage-to-query-optimization)

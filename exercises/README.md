@@ -52,7 +52,7 @@ The CRUD collection is in [CRUD Operation Exercises](crud-operations.md) and fol
 2. **Reading through a function** — an inline table-valued function that can be joined in a larger query.
 3. **Combined procedures** — a save procedure for insert and update, a debugging exercise on a missing `BEGIN ... END`, and one procedure with an action parameter.
 4. **Error handling** — catching a constraint violation outside and inside a procedure, and translating it into a return value.
-5. **Related tables** — deleting a parent together with its child rows, and inserting a child row while finding or creating its parents, both in one transaction.
+5. **Related tables** — deleting a parent together with its child rows, and inserting a child row while finding or creating its parents. These exercises do not use transactions yet; they point out where Lab 9 will make the operations safer.
 
 Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exercises use three small tables of their own (`Exercise_Student`, `Exercise_Course`, `Exercise_Enrollment`). The setup recreates them with the original data, so the exercises can be repeated, and the cleanup removes them together with every procedure and function created.
 

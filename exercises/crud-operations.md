@@ -1,6 +1,6 @@
 # CRUD Operation Exercises
 
-These exercises build on [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md). They progress from one procedure per operation to combined procedures, error handling, and operations that must also handle rows in related tables.
+These exercises build on [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md). They progress from one procedure per operation to combined procedures, error handling, and operations that must also handle rows in related tables. They use only what Labs 03, 04 and 07 cover; transactions follow in Lab 9.
 
 The exercises do not touch existing `AdventureWorksENG` data. They use three small tables created in the setup below: `Exercise_Student`, `Exercise_Course`, and `Exercise_Enrollment`. Every object created here starts with `Exercise_`, `usp_Exercises_`, or `fn_Exercises_` and is removed in the cleanup section.
 
@@ -692,9 +692,7 @@ Behavior:
 | The student does not exist | Change nothing | `1` |
 | The student has enrollments and `@DeleteEnrollments = 0` | Change nothing | `2` |
 | Otherwise | Delete the student's enrollments (if any) and then the student | `0` |
-| An unexpected error occurs | Undo all changes | `-1` |
-
-The enrollments and the student must be deleted together: either both deletions succeed, or neither does.
+| An error occurs | Catch it | `-1` |
 
 Test the procedure in this order:
 
@@ -713,7 +711,7 @@ Check both "does not exist" and "has enrollments" with `IF NOT EXISTS` / `IF EXI
 <details>
 <summary>Hint 2</summary>
 
-Put the two `DELETE` statements in one transaction inside `BEGIN TRY`. In `BEGIN CATCH`, roll back if `@@TRANCOUNT > 0`.
+The order of the two `DELETE` statements matters. Which rows does the foreign key protect?
 
 </details>
 
@@ -728,7 +726,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_DeleteStudentWithEnrollments
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
     SET @DeletedEnrollments = 0;
 
@@ -740,8 +737,6 @@ BEGIN
         RETURN 2;   -- student has enrollments
 
     BEGIN TRY
-        BEGIN TRANSACTION;
-
         DELETE FROM dbo.Exercise_Enrollment
         WHERE StudentID = @IDStudent;
 
@@ -750,14 +745,9 @@ BEGIN
         DELETE FROM dbo.Exercise_Student
         WHERE IDStudent = @IDStudent;
 
-        COMMIT TRANSACTION;
         RETURN 0;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        SET @DeletedEnrollments = 0;
         RETURN -1;
     END CATCH;
 END;
@@ -786,11 +776,14 @@ SELECT * FROM dbo.Exercise_Enrollment WHERE StudentID = 1;      -- empty
 GO
 ```
 
-The checks run before the transaction, so the "does not exist" and "has enrollments" cases return without changing anything.
+The checks run before any `DELETE`, so the "does not exist" and "has enrollments" cases return without changing anything.
 
-The deletion order matters: enrollments first, then the student. Deleting the student first would violate `FK_Exercise_Enrollment_Student`. The transaction guarantees that a failure in the second `DELETE` also undoes the first one.
+The deletion order matters: enrollments first, then the student. Deleting the student first would violate `FK_Exercise_Enrollment_Student`.
 
 The `@DeleteEnrollments` flag makes deleting related rows an explicit decision of the caller. A procedure that always deleted them would make it too easy to remove a student's whole history by accident.
+
+> [!NOTE]
+> If the second `DELETE` failed, the first one would already have removed the enrollments: the student would remain, but without their enrollments. Making both deletions succeed or fail together requires a transaction, which [Lab 9 – Transactions](../labs/lab09-transactions.md) introduces.
 
 </details>
 
@@ -806,12 +799,12 @@ Create `dbo.usp_Exercises_EnrollStudent`, which enrolls a student in a course. T
 
 Behavior:
 
-1. If no student has `@StudentNumber`, insert a new student with `@FirstName` and `@LastName`. Otherwise use the existing student.
-2. If no course has `@CourseCode`, insert a new course with `@CourseName`. Otherwise use the existing course.
-3. If the student is already enrolled in the course, change nothing and `RETURN 2`.
-4. Otherwise insert the enrollment, return its ID through `@IDEnrollment`, and `RETURN 0`.
+1. If the student and the course both exist and the student is already enrolled in the course, change nothing and `RETURN 2`.
+2. If no student has `@StudentNumber`, insert a new student with `@FirstName` and `@LastName`. Otherwise use the existing student.
+3. If no course has `@CourseCode`, insert a new course with `@CourseName`. Otherwise use the existing course.
+4. Insert the enrollment, return its ID through `@IDEnrollment`, and `RETURN 0`.
 
-All inserts must succeed or fail together. On an unexpected error, undo everything and `RETURN -1`.
+If an error occurs, catch it and `RETURN -1`.
 
 Test the procedure:
 
@@ -824,14 +817,14 @@ After the tests, list all enrollments with the student and course names.
 <details>
 <summary>Hint 1</summary>
 
-Look up each ID into a variable. If the variable stays `NULL`, insert the row and set the variable with `SCOPE_IDENTITY()`.
+First look up both IDs into variables. If both are found, check for an existing enrollment before inserting anything.
 
 </details>
 
 <details>
 <summary>Hint 2</summary>
 
-Wrap the lookups and inserts in one transaction. If the enrollment already exists, roll back before returning `2` (or check it before inserting anything – but then think about what happens if the student or course had to be created first).
+If a variable is still `NULL` after the lookup, insert the missing row and set the variable with `SCOPE_IDENTITY()`.
 
 </details>
 
@@ -849,19 +842,26 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_EnrollStudent
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
     DECLARE @IDStudent int, @IDCourse int;
     SET @IDEnrollment = NULL;
 
+    -- 1. Look up the parents by their business keys
+    SELECT @IDStudent = IDStudent
+    FROM dbo.Exercise_Student
+    WHERE StudentNumber = @StudentNumber;
+
+    SELECT @IDCourse = IDCourse
+    FROM dbo.Exercise_Course
+    WHERE Code = @CourseCode;
+
+    -- 2. Already enrolled? Check before inserting anything.
+    IF EXISTS (SELECT 1 FROM dbo.Exercise_Enrollment
+               WHERE StudentID = @IDStudent AND CourseID = @IDCourse)
+        RETURN 2;
+
     BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1. Student: find or create
-        SELECT @IDStudent = IDStudent
-        FROM dbo.Exercise_Student
-        WHERE StudentNumber = @StudentNumber;
-
+        -- 3. Create the missing parents
         IF @IDStudent IS NULL
         BEGIN
             INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
@@ -869,11 +869,6 @@ BEGIN
 
             SET @IDStudent = SCOPE_IDENTITY();
         END;
-
-        -- 2. Course: find or create
-        SELECT @IDCourse = IDCourse
-        FROM dbo.Exercise_Course
-        WHERE Code = @CourseCode;
 
         IF @IDCourse IS NULL
         BEGIN
@@ -883,27 +878,14 @@ BEGIN
             SET @IDCourse = SCOPE_IDENTITY();
         END;
 
-        -- 3. Already enrolled?
-        IF EXISTS (SELECT 1 FROM dbo.Exercise_Enrollment
-                   WHERE StudentID = @IDStudent AND CourseID = @IDCourse)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            RETURN 2;
-        END;
-
         -- 4. Enrollment
         INSERT INTO dbo.Exercise_Enrollment (StudentID, CourseID)
         VALUES (@IDStudent, @IDCourse);
 
         SET @IDEnrollment = SCOPE_IDENTITY();
-
-        COMMIT TRANSACTION;
         RETURN 0;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
         SET @IDEnrollment = NULL;
         RETURN -1;
     END CATCH;
@@ -935,11 +917,14 @@ ORDER BY s.LastName, c.Code;
 GO
 ```
 
-Test 2 inserts three rows: a student, a course, and an enrollment. If the enrollment insert failed, the rollback would also remove the new student and course, so the database never contains a half-finished enrollment.
+Test 2 inserts three rows: a student, a course, and an enrollment. The parents are inserted first, because the enrollment's foreign keys need their IDs.
 
-In test 3, the student and course are found, so nothing is inserted before the duplicate check. The `ROLLBACK` before `RETURN 2` is still needed: the transaction is open, and returning from a procedure with an open transaction leaves it for the caller and raises error 266.
+The duplicate check runs before any `INSERT`. If either parent is missing, the student cannot already be enrolled: in that case one of the IDs is `NULL`, the `EXISTS` check finds nothing, and the procedure continues. Checking first means test 3 returns `2` without creating anything.
 
 The parent rows are looked up by their business keys (`StudentNumber`, `Code`). These are the values a user actually knows. The `UNIQUE` constraints on those columns guarantee that each lookup finds at most one row.
+
+> [!NOTE]
+> If the enrollment `INSERT` failed after a new student or course had been inserted, those parent rows would stay in the database. Undoing all three inserts together requires a transaction, which [Lab 9 – Transactions](../labs/lab09-transactions.md) introduces.
 
 </details>
 
@@ -973,7 +958,6 @@ GO
 - [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md)
 - [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
-- [Lab 09 – Transactions](../labs/lab09-transactions.md)
 - [TRY...CATCH (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql)
 - [SCOPE_IDENTITY (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/scope-identity-transact-sql)
 - [@@ROWCOUNT (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/rowcount-transact-sql)

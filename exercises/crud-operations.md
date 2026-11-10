@@ -121,8 +121,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertStudent
     @IDStudent     int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
     VALUES (@FirstName, @LastName, @StudentNumber);
 
@@ -134,8 +132,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetStudent
     @IDStudent int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT IDStudent, FirstName, LastName, StudentNumber
     FROM dbo.Exercise_Student
     WHERE IDStudent = @IDStudent;
@@ -149,8 +145,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_UpdateStudent
     @StudentNumber char(10)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     UPDATE dbo.Exercise_Student
     SET FirstName     = @FirstName,
         LastName      = @LastName,
@@ -168,8 +162,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_DeleteStudent
     @IDStudent int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     DELETE FROM dbo.Exercise_Student
     WHERE IDStudent = @IDStudent;
 
@@ -311,8 +303,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_SaveStudent
     @StudentNumber char(10)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @IDStudent IS NULL
     BEGIN
         INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
@@ -437,8 +427,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_MergeStudent
     @StudentNumber char(10)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF EXISTS (SELECT 1 FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
     BEGIN
         UPDATE dbo.Exercise_Student
@@ -513,8 +501,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ChangeStudent
     @StudentNumber char(10)     = NULL
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @Action = 'I'
     BEGIN
         INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
@@ -633,8 +619,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertStudentSafe
     @IDStudent     int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     BEGIN TRY
         INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
         VALUES (@FirstName, @LastName, @StudentNumber);
@@ -725,8 +709,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_DeleteStudentWithEnrollments
     @DeletedEnrollments int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SET @DeletedEnrollments = 0;
 
     IF NOT EXISTS (SELECT 1 FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
@@ -841,8 +823,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_EnrollStudent
     @IDEnrollment  int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @IDStudent int, @IDCourse int;
     SET @IDEnrollment = NULL;
 

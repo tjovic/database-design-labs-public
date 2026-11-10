@@ -79,8 +79,6 @@ ON dbo.Product
 AFTER INSERT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO dbo.Exercise_ProductTriggerAudit
     (
         ProductID,
@@ -154,8 +152,6 @@ ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF UPDATE(PriceWithoutVAT)
     BEGIN
         INSERT INTO dbo.Exercise_ProductTriggerAudit
@@ -234,8 +230,6 @@ ON dbo.Product
 AFTER DELETE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO dbo.Exercise_ProductTriggerAudit
     (
         ProductID,
@@ -312,8 +306,6 @@ ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF UPDATE(PriceWithoutVAT)
     BEGIN
         INSERT INTO dbo.Exercise_ProductTriggerAudit
@@ -384,8 +376,6 @@ ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF UPDATE(PriceWithoutVAT)
     BEGIN
         INSERT INTO dbo.Exercise_ProductTriggerAudit
@@ -442,8 +432,6 @@ ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF UPDATE(PriceWithoutVAT)
     BEGIN
         INSERT INTO dbo.Exercise_ProductTriggerAudit
@@ -504,8 +492,6 @@ ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF UPDATE(PriceWithoutVAT)
     BEGIN
         INSERT INTO dbo.Exercise_ProductTriggerAudit

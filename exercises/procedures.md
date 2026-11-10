@@ -24,8 +24,6 @@ The procedure body can contain the same `SELECT` you would run directly. Use `CR
 CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ListCategories
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCategory,
         Name
@@ -44,8 +42,6 @@ To change the sort direction, alter `ORDER BY Name ASC` to `ORDER BY Name DESC`,
 CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ListCategories
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCategory,
         Name
@@ -83,8 +79,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CustomersByLastName
     @LastNamePattern nvarchar(50)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCustomer,
         FirstName,
@@ -125,8 +119,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ProductsByPriceRange
     @MaximumPrice money
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDProduct,
         Name,
@@ -178,8 +170,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CustomerInvoices
     @InvoiceCount int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         i.IDInvoice,
         i.InvoiceNumber,
@@ -257,7 +247,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetProduct
     @Price money OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
     SET @Price = NULL;
 
     SELECT

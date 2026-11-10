@@ -2386,23 +2386,3 @@ END CATCH
 You do not need to memorize every detail. You should understand what
 each construct does and be able to recognize it when it appears in later
 labs.
-
-# Where to go next
-
-These building blocks will reappear throughout the course:
-
-- **Lab 2 – Triggers**: batches, variables, `IF / ELSE`, `CAST`
-    in messages, and `SET NOCOUNT ON`;
-- **Lab 3 – Stored Procedures**: batches, variables, control flow,
-    identity handling, type conversion, and `SET NOCOUNT ON`;
-- **Lab 4 – Functions**: variables, table variables, control flow, and
-    type handling;
-- **Lab 7 – CRUD Operations**: input parameters, control flow,
-    `@@ROWCOUNT`, and the basic `TRY/CATCH` block, applied to insert,
-    read, update, and delete operations;
-- **Lab 9 – T-SQL Programming**: `CONVERT`, `FORMAT`, and a deeper look
-    at `TRY/CATCH`, building on the `WHILE` and `CASE` patterns from
-    this lab.
-
-If any of these concepts becomes unclear later, return to this lab and
-run the examples again.

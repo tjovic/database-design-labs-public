@@ -2328,13 +2328,3 @@ And remember:
 
 > [!IMPORTANT]
 > A View is not just a saved SELECT. Its definition also determines what can be modified through it and which rules apply.
-
----
-
-# Where to go next
-
-In the next lab, **Triggers**, the database becomes active.
-
-A View responds when you query or modify it.
-
-A Trigger reacts automatically when data changes.

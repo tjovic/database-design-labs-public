@@ -2215,16 +2215,3 @@ GO
 5. `inserted` would contain all three new rows. The `EXISTS` query must check all of them, not assume a single row — the same rule established for every trigger in Lab 2.
 
 </details>
-
----
-
-# Where to go next
-
-In the next lab, we will move from database programming objects toward
-how SQL Server stores and accesses data.
-
-This prepares the ground for understanding:
-
--   how data is physically organised;
--   why some data access patterns are more expensive than others;
--   how indexes can improve query performance.

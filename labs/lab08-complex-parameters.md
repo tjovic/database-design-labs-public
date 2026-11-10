@@ -3087,11 +3087,3 @@ Use the decision flowchart in Section 7 as a guide. Consider TVPs for typed rela
 ## Additional practice
 
 More exercises on delimited strings, XML, and mixed scenarios are available in [Complex Parameters Exercises](../exercises/complex-parameters.md).
-
----
-
-# Where to Go Next
-
-You now have the complete collection-parameters toolkit — all five methods, their trade-offs, and when each one is the right choice.
-
-**In the next lab**, we will introduce transactions and error handling. We will build on the related-insert examples from this lab and learn how to ensure that either all related changes succeed or none are saved.

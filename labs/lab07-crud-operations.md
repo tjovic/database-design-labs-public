@@ -2786,11 +2786,3 @@ And remember:
 ## Additional practice
 
 More CRUD exercises, covering separate and combined procedures, reading through a function, error handling, and operations on related tables, are available in [CRUD Operation Exercises](../exercises/crud-operations.md).
-
----
-
-# Where to Go Next
-
-**Lab 8 – Complex Parameters** tackles one of the core problems in database design: how to pass a collection of values into a procedure in a single call. It starts with client-side query building and why it opens the door to SQL injection, then compares four safe methods: delimited strings, XML, Table-Valued Parameters, and JSON.
-
-**Lab 9 – Transactions** returns to a problem noted in this lab: a business-rule check followed by a `DELETE` is not automatically atomic. It covers `BEGIN`/`COMMIT`/`ROLLBACK TRANSACTION`, combining transactions with `TRY/CATCH` and `THROW`, and deciding whether a procedure or its caller owns the transaction.

@@ -2556,20 +2556,3 @@ And the most important rule:
 ## Additional practice
 
 More trigger exercises, including auditing, multi-row logic, and a debugging exercise, are available in [Trigger Exercises](../exercises/triggers.md).
-
----
-
-# Where to go next
-
-Triggers execute automatically.
-
-In the next lab, **Stored Procedures**, the model changes:
-
-- a stored procedure is called explicitly;
-- it can accept parameters;
-- it can contain procedural logic;
-- it can return data to the caller.
-
-Triggers react to events.
-
-Stored procedures are invoked on demand.

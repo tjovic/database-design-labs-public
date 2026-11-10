@@ -100,8 +100,9 @@ The transaction collection is in [Transaction Exercises](transactions.md) and fo
 3. **Caller-managed transactions** — a procedure with no transaction of its own, wrapped by a caller that commits on success and rolls back on a real constraint-violation error.
 4. **Procedure-managed transactions** — a procedure that owns its transaction across three related deletes.
 5. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
+6. **`TransactionsLab` practice (Exercises 6–11)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, extend it with a history record, and plan a transaction for a Lab 8 procedure.
 
-Unlike Lab 9, which uses its own dedicated `TransactionsLab` database with fictional bank accounts, these exercises apply the same concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows for safe, precise cleanup.
+Part A (Exercises 1–5) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows for safe, precise cleanup. Part B (Exercises 6–11) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
 
 ### Concurrency
 

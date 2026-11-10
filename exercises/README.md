@@ -4,7 +4,7 @@
 
 This collection provides focused SQL Server exercises that build on the course labs. Each exercise should give students a clear goal, a chance to reason through the problem before writing SQL, and a way to check their work.
 
-The collection currently covers **T-SQL essentials**, **views**, **triggers**, **stored procedures**, **functions**, **CRUD operations**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, and **indexes**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
+The collection currently covers **T-SQL essentials**, **views**, **triggers**, **stored procedures**, **functions**, **CRUD operations**, **complex parameters**, **transactions**, **concurrency**, **physical storage**, **indexes**, **advanced grouping**, and **window functions**. Exercises use `AdventureWorksENG` unless an exercise says otherwise.
 
 ## Organization
 
@@ -140,6 +140,27 @@ The index collection is in [Index Exercises](lab06-indexes.md) and follows the l
 
 Part A (Exercises 1–6) intentionally uses `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Part B (Exercises 7–10) continues in Lab 06's large `IndexLab` database, where performance differences are obvious, and relies on the indexes the lab creates. Each exercise creates at most one real index on an existing table (see the database safety note below) rather than an isolated new object.
 
+### Advanced grouping
+
+The grouping collection is in [Advanced Grouping Exercises](lab11-advanced-grouping.md) and follows the learning goals in [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md):
+
+1. **ROLLUP** — subtotals up a hierarchy, and why the column order matters.
+2. **CUBE** — subtotals for every combination of columns.
+3. **GROUPING SETS** — exactly the grouping levels you need, and rewriting `ROLLUP` as `GROUPING SETS`.
+4. **GROUPING()** — readable labels for subtotal and grand-total rows.
+
+All exercises are plain `SELECT` statements on `AdventureWorksENG`.
+
+### Window functions
+
+The window function collection is in [Window Function Exercises](lab12-window-functions.md) and follows the learning goals in [Lab 12 – Window Functions](../labs/lab12-window-functions.md):
+
+1. **Ranking functions** — `ROW_NUMBER`, `RANK`, and fixed-size buckets.
+2. **Aggregate window functions** — running totals and values that are constant per partition.
+3. **Analytical functions** — `LAG` and `LEAD` for differences between neighbouring rows.
+
+All exercises are plain `SELECT` statements on `AdventureWorksENG`, except one that creates and drops a small test table.
+
 ## Difficulty labels
 
 Every exercise uses one of these labels:
@@ -189,4 +210,8 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Physical Storage Exercises](lab05-physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)
 - [Index Exercises](lab06-indexes.md)
+- [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md)
+- [Advanced Grouping Exercises](lab11-advanced-grouping.md)
+- [Lab 12 – Window Functions](../labs/lab12-window-functions.md)
+- [Window Function Exercises](lab12-window-functions.md)
 - [Repository overview](../README.md)

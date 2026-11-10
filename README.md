@@ -42,7 +42,7 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 
 > Additional labs will be added as the course progresses.
 
-Practice exercises for the labs are collected in the [Exercise Collection](exercises/README.md) (T-SQL essentials, views, triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, physical storage, indexes).
+Practice exercises for the labs are collected in the [Exercise Collection](exercises/README.md) (T-SQL essentials, views, triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, concurrency, physical storage, indexes, advanced grouping, window functions).
 
 Lab 8 also has two optional, self-contained live demos — a SQL-injection attack against a running login form, and a REST API that posts JSON into a stored procedure — see [demos/README.md](demos/README.md).
 

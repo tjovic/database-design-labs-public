@@ -174,82 +174,6 @@ Adding `PARTITION BY p.Color` makes `RankInColor` restart at `1` for every new c
 
 </details>
 
-## Exercise 1 — Row number by (LastName, FirstName)
-
-List all customers ordered by `LastName` then `FirstName`. Add a row number based on the same ordering.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    c.IDCustomer, c.LastName, c.FirstName,
-    ROW_NUMBER() OVER (ORDER BY c.LastName, c.FirstName) AS RN
-FROM Customer c
-ORDER BY c.LastName, c.FirstName;
-```
-
-</details>
-
-## Exercise 2 — Per-city row number
-
-Same as Exercise 1, but the row number restarts for each city.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    ci.Name AS City, c.LastName, c.FirstName,
-    ROW_NUMBER() OVER (PARTITION BY ci.Name
-                       ORDER BY c.LastName, c.FirstName) AS RankInCity
-FROM Customer c
-JOIN City ci ON ci.IDCity = c.CityID
-ORDER BY ci.Name, c.LastName, c.FirstName;
-```
-
-`PARTITION BY` is the entire trick — everything else is identical to Exercise 1.
-
-</details>
-
-## Exercise 3 — Rank invoice items by quantity
-
-Rank invoice items with the highest quantity first. Ties should share a rank (use `RANK`).
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    ii.InvoiceID, ii.ProductID, ii.Quantity,
-    RANK() OVER (ORDER BY ii.Quantity DESC) AS QuantityRank
-FROM InvoiceItem ii
-ORDER BY QuantityRank, ii.InvoiceID, ii.ProductID;
-```
-
-</details>
-
-## Exercise 4 — Salesman 284's invoices, bucketed into groups of 3
-
-Order salesman 284's invoices by date then invoice number. The first 3 are group 1, the next 3 are group 2, and so on.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    i.IDInvoice, i.InvoiceNumber, i.InvoiceDate,
-    (ROW_NUMBER() OVER (ORDER BY i.InvoiceDate, i.InvoiceNumber) - 1) / 3 + 1
-      AS BucketOf3
-FROM Invoice i
-WHERE i.SalesmanID = 284
-ORDER BY i.InvoiceDate, i.InvoiceNumber;
-```
-
-`NTILE(n)` also looks tempting here, but it only works if you know `n` up front, and it distributes rows as evenly as possible across `n` buckets rather than making fixed-size buckets of 3. For "buckets of exactly 3 rows", the `ROW_NUMBER` plus integer-division trick is the direct tool.
-
-</details>
-
 ---
 
 # Section 3 – Aggregate Window Functions and Running Totals
@@ -316,67 +240,6 @@ RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 1. Without `ORDER BY`, the aggregate is computed across the whole window — every row sees the same value. With `ORDER BY`, it's computed from the start of the partition up to and including each row — a running total.
 2. A running total per calendar year, resetting every January 1st; each row shows the year-to-date total as of its own date.
 3. The value grows monotonically as you move down the ordered rows — each row is a snapshot of the total "so far", the same shape as adding numbers on a calculator without pressing equals.
-
-</details>
-
-## Exercise 5 — Running total of revenue per year
-
-Invoice items with a running total that resets every calendar year.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    i.InvoiceDate, ii.TotalPrice,
-    SUM(ii.TotalPrice) OVER
-    (
-        PARTITION BY YEAR(i.InvoiceDate)
-        ORDER BY i.InvoiceDate, i.IDInvoice, ii.ProductID
-    ) AS RunningRevenueThisYear
-FROM InvoiceItem ii
-JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
-ORDER BY i.InvoiceDate, i.IDInvoice, ii.ProductID;
-```
-
-</details>
-
-## Exercise 6 — Products with a count of same-color products
-
-Every product, with a count of how many products share its color.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    p.Name, p.Color, p.PriceWithoutVAT,
-    COUNT(*) OVER (PARTITION BY p.Color) AS ProductsInColor
-FROM Product p
-ORDER BY p.Color, p.Name;
-```
-
-No `ORDER BY` inside `OVER`, so `COUNT(*)` is computed across the whole partition — every product of a given color gets the same count. This is the "constant per partition" case from 3.1.
-
-</details>
-
-## Exercise 7 — Distance from the most expensive product
-
-For every product with a price greater than zero, show how much cheaper it is than the single most expensive product overall.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    p.Name, p.PriceWithoutVAT,
-    MAX(p.PriceWithoutVAT) OVER () - p.PriceWithoutVAT AS CheaperThanMaxBy
-FROM Product p
-WHERE p.PriceWithoutVAT > 0
-ORDER BY CheaperThanMaxBy;
-```
-
-The empty `OVER ()` computes the `MAX` across the whole result; every row's `CheaperThanMaxBy` is `(global max) - (this row's price)`. The most expensive product's own row shows `0`.
 
 </details>
 
@@ -485,71 +348,6 @@ ORDER BY p.PriceWithoutVAT;
 1. `NULL` — there is no previous row to reach back to. A third argument overrides this: `LAG(col, 1, 0)` returns `0` instead of `NULL` at the edge.
 2. "When does the next event happen after this one" — time until the next login, order, or state change; also gap detection, by filtering on an abnormally large difference between a row and its `LEAD`.
 3. The default frame with `ORDER BY` is `RANGE UNBOUNDED PRECEDING TO CURRENT ROW`, so "the last value in the window" is "the last value seen so far" — the current row. The fix is `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`.
-
-</details>
-
-## Exercise 8 — Delta from the previous product
-
-Products with a price greater than zero, cheapest first. Show how much more expensive each one is than the previous.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-SELECT
-    p.Name, p.PriceWithoutVAT,
-    p.PriceWithoutVAT - LAG(p.PriceWithoutVAT, 1) OVER (ORDER BY p.PriceWithoutVAT)
-      AS DeltaFromPrev
-FROM Product p
-WHERE p.PriceWithoutVAT > 0
-ORDER BY p.PriceWithoutVAT;
-```
-
-</details>
-
-## Exercise 9 — A train schedule with LEAD
-
-Create a small table and show, next to each station, how many minutes until the next station's departure.
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-DROP TABLE IF EXISTS dbo.Lab12TrainSchedule;
-GO
-
-CREATE TABLE dbo.Lab12TrainSchedule
-(
-    IDStation int IDENTITY(1, 1) PRIMARY KEY,
-    Station   nvarchar(50) NOT NULL,
-    Departure time         NOT NULL
-);
-GO
-
-INSERT INTO dbo.Lab12TrainSchedule (Station, Departure)
-VALUES
-    (N'Zagreb',    '11:00'),
-    (N'Dugo Selo', '11:35'),
-    (N'Kutina',    '13:15'),
-    (N'Novska',    '13:45');
-
-SELECT
-    s.IDStation, s.Station, s.Departure,
-    LEAD(s.Departure, 1) OVER (ORDER BY s.Departure) AS NextDeparture,
-    DATEDIFF(minute,
-             s.Departure,
-             LEAD(s.Departure, 1) OVER (ORDER BY s.Departure)) AS MinutesToNext
-FROM dbo.Lab12TrainSchedule s
-ORDER BY s.Departure;
-```
-
-The last row's `MinutesToNext` is `NULL` — there is no next station. This is the same shape you'd use for "how long is each concert set", "how long between website events", or "how long between server heartbeats" — any time-series diff.
-
-Clean up the table once you're done with this exercise:
-
-```sql
-DROP TABLE dbo.Lab12TrainSchedule;
-```
 
 </details>
 
@@ -676,9 +474,15 @@ Back to the opening comparison: `GROUP BY Color` loses every row but the aggrega
 
 ---
 
+## Additional practice
+
+Exercises for this lab are in [Window Function Exercises](../exercises/lab12-window-functions.md). They practise ranking functions, aggregate window functions and running totals, and `LAG` and `LEAD`.
+
+---
+
 # Additional Reading
 
-The following topics extend the lab. They are not required for the main exercises.
+The following topics extend the lab. They are not required for the exercises.
 
 ## A. Statistical Window Functions
 

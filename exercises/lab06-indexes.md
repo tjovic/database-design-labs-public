@@ -1,4 +1,4 @@
-# Index Exercises
+# Lab 06 – Index Exercises
 
 These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md). **Part A** (Exercises 1–6) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 7–10) uses the lab's large `IndexLab` database.
 

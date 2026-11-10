@@ -1,4 +1,4 @@
-# Complex Parameters Exercises
+# Lab 08 – Complex Parameters Exercises
 
 **Database:** `AdventureWorksENG`
 

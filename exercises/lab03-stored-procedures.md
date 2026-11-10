@@ -1,4 +1,4 @@
-# Stored Procedure Exercises
+# Lab 03 – Stored Procedure Exercises
 
 These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, a `RETURN` status code, and reusing one procedure from another script.
 

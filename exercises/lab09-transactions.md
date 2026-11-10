@@ -1,4 +1,4 @@
-# Transaction Exercises
+# Lab 09 – Transaction Exercises
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 

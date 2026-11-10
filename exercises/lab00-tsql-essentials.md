@@ -1,4 +1,4 @@
-# T-SQL Essentials Exercises
+# Lab 00 – T-SQL Essentials Exercises
 
 These exercises build on [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md) and use `AdventureWorksENG`. They practise variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH` — the building blocks used throughout the later labs.
 

@@ -2756,4 +2756,4 @@ Understanding how SQL Server organizes and accesses database pages provides the 
 
 ## Additional practice
 
-Exercises for this lab are in [Physical Storage Exercises](../exercises/physical-storage.md). Part A inspects pages in `AdventureWorksENG`; Part B contains page calculations and two exercises on `IndexLab`.
+Exercises for this lab are in [Physical Storage Exercises](../exercises/lab05-physical-storage.md). Part A inspects pages in `AdventureWorksENG`; Part B contains page calculations and two exercises on `IndexLab`.

@@ -1,4 +1,4 @@
-# Physical Storage Exercises
+# Lab 05 – Physical Storage Exercises
 
 These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md). **Part A** (Exercises 1–4) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 5–8) contains page calculations and two exercises on the lab's `IndexLab` database.
 

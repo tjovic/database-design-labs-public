@@ -1842,4 +1842,4 @@ And remember:
 
 ## Additional practice
 
-Exercises for this lab are in [View Exercises](../exercises/views.md). Part A practises creating and querying Views and system Views; Part B modifies data through Views and uses `WITH CHECK OPTION` and `WITH SCHEMABINDING`.
+Exercises for this lab are in [View Exercises](../exercises/lab01-views.md). Part A practises creating and querying Views and system Views; Part B modifies data through Views and uses `WITH CHECK OPTION` and `WITH SCHEMABINDING`.

@@ -1,4 +1,4 @@
-# Concurrency Exercises
+# Lab 10 – Concurrency Exercises
 
 **Database:** `AdventureWorksENG`
 

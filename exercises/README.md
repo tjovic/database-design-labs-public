@@ -12,7 +12,7 @@ Exercises are grouped by topic and arranged from introductory concepts to more i
 
 ### T-SQL essentials
 
-The T-SQL collection is in [T-SQL Essentials Exercises](tsql-essentials.md) and follows the learning goals in [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md):
+The T-SQL collection is in [T-SQL Essentials Exercises](lab00-tsql-essentials.md) and follows the learning goals in [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md):
 
 1. **Variables** — load values from a table and recognize the no-row and multi-row traps.
 2. **Table variables and control flow** — fill a table variable and use `IF / ELSE`, `WHILE`, and `CASE`.
@@ -21,7 +21,7 @@ The T-SQL collection is in [T-SQL Essentials Exercises](tsql-essentials.md) and 
 
 ### Views
 
-The View collection is in [View Exercises](views.md) and follows the learning goals in [Lab 01 – Views](../labs/lab01-views.md):
+The View collection is in [View Exercises](lab01-views.md) and follows the learning goals in [Lab 01 – Views](../labs/lab01-views.md):
 
 1. **View fundamentals** — create, change, and query Views, and hide a `JOIN` inside a View.
 2. **System Views** — read table and column metadata from `sys.tables` and `sys.columns`.
@@ -30,7 +30,7 @@ The View collection is in [View Exercises](views.md) and follows the learning go
 
 ### Triggers
 
-The trigger collection is in [Trigger Exercises](triggers.md) and follows the learning goals in [Lab 02 – Triggers](../labs/lab02-triggers.md):
+The trigger collection is in [Trigger Exercises](lab02-triggers.md) and follows the learning goals in [Lab 02 – Triggers](../labs/lab02-triggers.md):
 
 1. **Trigger fundamentals** — recognize DML events and create an `AFTER` trigger.
 2. **Auditing changes** — use `inserted` and `deleted` to record inserts, updates, or deletes.
@@ -42,7 +42,7 @@ Part A logs changes to `City` in a simple log table; Part B audits `Product` cha
 
 ### Stored procedures
 
-The procedure collection is in [Stored Procedure Exercises](procedures.md) and follows the learning goals in [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md):
+The procedure collection is in [Stored Procedure Exercises](lab03-stored-procedures.md) and follows the learning goals in [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md):
 
 1. **Procedure fundamentals** — create, alter, execute, and remove a procedure.
 2. **Input parameters** — filter results using values supplied by the caller.
@@ -55,7 +55,7 @@ The exercises need no test data setup. Exercise 6 inserts a state and two cities
 
 ### Functions
 
-The function collection is in [Function Exercises](functions.md) and follows the learning goals in [Lab 04 – Functions](../labs/lab04-functions.md):
+The function collection is in [Function Exercises](lab04-functions.md) and follows the learning goals in [Lab 04 – Functions](../labs/lab04-functions.md):
 
 1. **Scalar calculations** — accept input and return one value.
 2. **Choosing a function type** — decide between a scalar function, an inline TVF, and a multi-statement TVF.
@@ -68,7 +68,7 @@ The functions read existing tables and do not change their data. The multi-state
 
 ### CRUD operations
 
-The CRUD collection is in [CRUD Operation Exercises](crud-operations.md) and follows the learning goals in [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md):
+The CRUD collection is in [CRUD Operation Exercises](lab07-crud-operations.md) and follows the learning goals in [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md):
 
 1. **One procedure per operation** — separate insert, read, update, and delete procedures, with `@@ROWCOUNT` to detect a missing row.
 2. **Reading through a function** — an inline table-valued function that can be joined in a larger query.
@@ -80,7 +80,7 @@ Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exerci
 
 ### Complex Parameters
 
-The complex parameters collection is in [Complex Parameters Exercises](complex-parameters.md) and follows the learning goals in [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md):
+The complex parameters collection is in [Complex Parameters Exercises](lab08-complex-parameters.md) and follows the learning goals in [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md):
 
 1. **Delimited strings** — accept a comma-separated list, split it with `STRING_SPLIT`, and use it in an `IN` clause or `JOIN`.
 2. **XML shredding** — use `.nodes()` and `.value()` to turn XML into rows.
@@ -93,7 +93,7 @@ These exercises range from direct SQL rewrites of Lab 08's core patterns to desi
 
 ### Transactions
 
-The transaction collection is in [Transaction Exercises](transactions.md) and follows the learning goals in [Lab 9 – Transactions](../labs/lab09-transactions.md):
+The transaction collection is in [Transaction Exercises](lab09-transactions.md) and follows the learning goals in [Lab 9 – Transactions](../labs/lab09-transactions.md):
 
 1. **Commit or cancel** — confirm or undo a multi-row insert with an explicit transaction.
 2. **Savepoints in practice** — a staged exercise covering rollback-to-savepoint, a full rollback that reaches past the savepoint, an unused savepoint, and a cascading two-savepoint rollback.
@@ -106,7 +106,7 @@ Part A (Exercises 1–5) applies the concepts to real `AdventureWorksENG` data �
 
 ### Concurrency
 
-The concurrency collection is in [Concurrency Exercises](concurrency.md) and follows the learning goals in [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md):
+The concurrency collection is in [Concurrency Exercises](lab10-concurrency.md) and follows the learning goals in [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md):
 
 1. **Dirty read** — reproduce it under `READ UNCOMMITTED`, then prevent it with `READ COMMITTED`.
 2. **Non-repeatable read** — reproduce it under `READ COMMITTED`, then prevent it with `REPEATABLE READ`.
@@ -116,7 +116,7 @@ Like Lab 10, every exercise needs two SSMS query windows (Session A / Session B)
 
 ### Physical storage
 
-The physical storage collection is in [Physical Storage Exercises](physical-storage.md) and follows the learning goals in [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md):
+The physical storage collection is in [Physical Storage Exercises](lab05-physical-storage.md) and follows the learning goals in [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md):
 
 1. **A small clustered table** — use `DBCC IND`/`DBCC PAGE` to see how a `PRIMARY KEY CLUSTERED` determines physical row order, on a table of only 3 rows.
 2. **Page boundaries on a medium table** — identify data vs. root pages, and confirm that a clustered key's value stays consecutive across a page boundary.
@@ -127,7 +127,7 @@ Like the index exercises, these intentionally use `AdventureWorksENG` instead of
 
 ### Indexes
 
-The index collection is in [Index Exercises](indexes.md) and follows the learning goals in [Lab 06 – Indexes](../labs/lab06-indexes.md):
+The index collection is in [Index Exercises](lab06-indexes.md) and follows the learning goals in [Lab 06 – Indexes](../labs/lab06-indexes.md):
 
 1. **What `INCLUDE` actually buys you** — staged exercise measuring `STATISTICS IO` before and after: a filter-only index, why returning the clustering key is always free, proof that one more returned column reintroduces a `Key Lookup`, the `INCLUDE` fix, and why an included column also covers an extra filter predicate.
 2. **Composite index column order** — reason about which queries a multi-column index can and cannot seek on.
@@ -167,25 +167,25 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 ## References
 
 - [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md)
-- [T-SQL Essentials Exercises](tsql-essentials.md)
+- [T-SQL Essentials Exercises](lab00-tsql-essentials.md)
 - [Lab 01 – Views](../labs/lab01-views.md)
-- [View Exercises](views.md)
+- [View Exercises](lab01-views.md)
 - [Lab 02 – Triggers](../labs/lab02-triggers.md)
-- [Trigger Exercises](triggers.md)
+- [Trigger Exercises](lab02-triggers.md)
 - [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md)
-- [Stored Procedure Exercises](procedures.md)
+- [Stored Procedure Exercises](lab03-stored-procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
-- [Function Exercises](functions.md)
+- [Function Exercises](lab04-functions.md)
 - [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md)
-- [CRUD Operation Exercises](crud-operations.md)
+- [CRUD Operation Exercises](lab07-crud-operations.md)
 - [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md)
-- [Complex Parameters Exercises](complex-parameters.md)
+- [Complex Parameters Exercises](lab08-complex-parameters.md)
 - [Lab 9 – Transactions](../labs/lab09-transactions.md)
-- [Transaction Exercises](transactions.md)
+- [Transaction Exercises](lab09-transactions.md)
 - [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md)
-- [Concurrency Exercises](concurrency.md)
+- [Concurrency Exercises](lab10-concurrency.md)
 - [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md)
-- [Physical Storage Exercises](physical-storage.md)
+- [Physical Storage Exercises](lab05-physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)
-- [Index Exercises](indexes.md)
+- [Index Exercises](lab06-indexes.md)
 - [Repository overview](../README.md)

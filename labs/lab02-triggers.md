@@ -2347,4 +2347,4 @@ And the most important rule:
 
 ## Additional practice
 
-Exercises for this lab are in [Trigger Exercises](../exercises/triggers.md). They start with simple logging triggers on `City` and continue with auditing, multi-row logic, a business rule, and a debugging exercise on `Product`.
+Exercises for this lab are in [Trigger Exercises](../exercises/lab02-triggers.md). They start with simple logging triggers on `City` and continue with auditing, multi-row logic, a business rule, and a debugging exercise on `Product`.

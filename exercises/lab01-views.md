@@ -1,4 +1,4 @@
-# View Exercises
+# Lab 01 – View Exercises
 
 These exercises build on [Lab 01 – Views](../labs/lab01-views.md) and use `AdventureWorksENG`. **Part A** (Exercises 1–5) practises creating, changing, and querying Views and reading metadata from system Views. **Part B** (Exercises 6–9) modifies data through Views and uses `WITH CHECK OPTION` and `WITH SCHEMABINDING`.
 

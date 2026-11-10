@@ -1,4 +1,4 @@
-# CRUD Operation Exercises
+# Lab 07 – CRUD Operation Exercises
 
 These exercises build on [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md). They progress from one procedure per operation to combined procedures, error handling, and operations that must also handle rows in related tables. They use only what Labs 03, 04 and 07 cover; transactions follow in Lab 9.
 

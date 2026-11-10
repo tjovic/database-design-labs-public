@@ -1210,7 +1210,7 @@ XML remains useful when integrating with systems that already exchange XML docum
 However, it is not the only way to pass structured data to SQL Server.
 
 > [!TIP]
-> Additional practice: [Exercise 6 of the Complex Parameters Exercises](../exercises/complex-parameters.md#exercise-6--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
+> Additional practice: [Exercise 6 of the Complex Parameters Exercises](../exercises/lab08-complex-parameters.md#exercise-6--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
 
 In the next section, we will explore **Table-Valued Parameters (TVPs)**, which allow us to pass collections of typed rows directly to stored procedures without converting them into XML or delimited strings.
 
@@ -2513,4 +2513,4 @@ Use the decision flowchart in Section 7 as a guide. Consider TVPs for typed rela
 
 ## Additional practice
 
-Exercises for this lab are in [Complex Parameters Exercises](../exercises/complex-parameters.md), grouped by method: delimited strings, XML, `FOR XML PATH`, Table-Valued Parameters, and JSON.
+Exercises for this lab are in [Complex Parameters Exercises](../exercises/lab08-complex-parameters.md), grouped by method: delimited strings, XML, `FOR XML PATH`, Table-Valued Parameters, and JSON.

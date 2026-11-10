@@ -2409,4 +2409,4 @@ Remember that an `Index Seek` is not automatically better than a `Scan`. The bes
 
 ## Additional practice
 
-Exercises for this lab are in [Index Exercises](../exercises/indexes.md). Part A practises index design on `AdventureWorksENG`; Part B continues in `IndexLab` with the indexes created in this lab.
+Exercises for this lab are in [Index Exercises](../exercises/lab06-indexes.md). Part A practises index design on `AdventureWorksENG`; Part B continues in `IndexLab` with the indexes created in this lab.

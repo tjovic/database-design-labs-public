@@ -2785,4 +2785,4 @@ And remember:
 
 ## Additional practice
 
-More CRUD exercises, covering separate and combined procedures, reading through a function, error handling, and operations on related tables, are available in [CRUD Operation Exercises](../exercises/crud-operations.md).
+More CRUD exercises, covering separate and combined procedures, reading through a function, error handling, and operations on related tables, are available in [CRUD Operation Exercises](../exercises/lab07-crud-operations.md).

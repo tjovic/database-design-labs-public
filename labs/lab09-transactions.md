@@ -25,7 +25,7 @@ After completing this lab, you should be able to:
 - explain the ACID properties and, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep those promises after a crash.
 
 > [!NOTE]
-> **Suggested route for a 90-minute lab:** prioritize Sections 1–2 and 5–7, then try Exercises 6 and 9 of the [Transaction Exercises](../exercises/transactions.md). Sections 3–4, the caller-managed examples in Section 8, and the detailed recovery material in Section 9 are extensions for instructor demonstration or self-study. The full document is a reference, so students do not need to complete every example during one lab session.
+> **Suggested route for a 90-minute lab:** prioritize Sections 1–2 and 5–7, then try Exercises 6 and 9 of the [Transaction Exercises](../exercises/lab09-transactions.md). Sections 3–4, the caller-managed examples in Section 8, and the detailed recovery material in Section 9 are extensions for instructor demonstration or self-study. The full document is a reference, so students do not need to complete every example during one lab session.
 
 > [!NOTE]
 > **Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`.
@@ -1655,7 +1655,7 @@ Back to the opening question: a transfer that subtracts from one account and add
 
 ## Additional practice
 
-Exercises for this lab are in [Transaction Exercises](../exercises/transactions.md). Part A applies explicit transactions, savepoints, and caller-vs-procedure ownership to real `AdventureWorksENG` tables; Part B continues in `TransactionsLab` with the transfer procedure from Section 7.
+Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md). Part A applies explicit transactions, savepoints, and caller-vs-procedure ownership to real `AdventureWorksENG` tables; Part B continues in `TransactionsLab` with the transfer procedure from Section 7.
 
 ---
 

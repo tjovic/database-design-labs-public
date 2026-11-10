@@ -1,4 +1,4 @@
-# Trigger Exercises
+# Lab 02 – Trigger Exercises
 
 These exercises build on [Lab 02 – Triggers](../labs/lab02-triggers.md) and use DML `AFTER` triggers in `AdventureWorksENG`. They are in two parts:
 

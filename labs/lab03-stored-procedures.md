@@ -987,7 +987,7 @@ END;
 GO
 ```
 
-`SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does not hide query results or prevent `@@ROWCOUNT` from being updated. The [Stored Procedure Exercises](../exercises/procedures.md) use `@@ROWCOUNT` to return the number of rows a query found.
+`SET NOCOUNT ON` suppresses row-count messages such as `(5 rows affected)`. It does not hide query results or prevent `@@ROWCOUNT` from being updated. The [Stored Procedure Exercises](../exercises/lab03-stored-procedures.md) use `@@ROWCOUNT` to return the number of rows a query found.
 
 The condition `i.InvoiceDate < DATEADD(day, 1, @DateTo)` includes the entire final day, even when `InvoiceDate` contains a time component.
 
@@ -1435,7 +1435,7 @@ Also verify these cases:
 > A nonempty sequence containing only zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
 
 > [!TIP]
-> In [Exercise 8 of the Stored Procedure Exercises](../exercises/procedures.md#exercise-8--validate-all-stored-card-numbers-advanced), you can reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
+> In [Exercise 8 of the Stored Procedure Exercises](../exercises/lab03-stored-procedures.md#exercise-8--validate-all-stored-card-numbers-advanced), you can reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
 
 > [!TIP]
 > The additional reading in [Lab 4 – Functions](lab04-functions.md) shows how to move this Luhn calculation into a scalar function and reuse it from a procedure, a query, and a trigger.
@@ -1493,4 +1493,4 @@ It can also reduce **network round-trips** by allowing those statements to execu
 
 ## Additional practice
 
-Exercises for this lab are in [Stored Procedure Exercises](../exercises/procedures.md). They cover input parameters, `OUTPUT` parameters, return status codes, inserting related rows, and reusing the card-number validation procedure from Section 7.
+Exercises for this lab are in [Stored Procedure Exercises](../exercises/lab03-stored-procedures.md). They cover input parameters, `OUTPUT` parameters, return status codes, inserting related rows, and reusing the card-number validation procedure from Section 7.

@@ -1970,4 +1970,4 @@ labs.
 
 ## Additional practice
 
-Exercises for this lab are in [T-SQL Essentials Exercises](../exercises/tsql-essentials.md). They cover variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH`.
+Exercises for this lab are in [T-SQL Essentials Exercises](../exercises/lab00-tsql-essentials.md). They cover variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH`.

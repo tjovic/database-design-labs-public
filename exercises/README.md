@@ -111,8 +111,9 @@ The concurrency collection is in [Concurrency Exercises](lab10-concurrency.md) a
 1. **Dirty read** — reproduce it under `READ UNCOMMITTED`, then prevent it with `READ COMMITTED`.
 2. **Non-repeatable read** — reproduce it under `READ COMMITTED`, then prevent it with `REPEATABLE READ`.
 3. **Phantom read** — reproduce it under `REPEATABLE READ`, then prevent it with `SERIALIZABLE`.
+4. **`TransactionsLab` practice (Exercises 7–11)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT`.
 
-Like Lab 10, every exercise needs two SSMS query windows (Session A / Session B). Unlike Lab 10, which uses `TransactionsLab`'s fictional bank accounts, these exercises apply the same three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — cleaned up at the end, with the real `Croatia`/`Germany`/`Italy` rows never touched.
+Part A (Exercises 1–6) needs two SSMS query windows (Session A / Session B), like Lab 10, and applies the three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — cleaned up at the end, with the real `Croatia`/`Germany`/`Italy` rows never touched. Part B (Exercises 7–11) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
 
 ### Physical storage
 

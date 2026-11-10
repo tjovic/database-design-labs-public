@@ -769,89 +769,9 @@ ROLLBACK TRANSACTION;
 
 ---
 
-# Section 11 – Practice Exercises
+# Section 11 – Common Mistakes and Final Review
 
-Use your two SSMS windows for every exercise below. Reset `AccountID = 1`'s values (`AccountName = 'Account A'`, `Balance = 1000.00`) and `dbo.Branch` to its three seed rows between exercises if a previous one changed them.
-
-## Exercise 1 – Classify the Anomaly
-
-Read this transcript:
-
-```
-Session A: BEGIN TRAN; SELECT Balance FROM BankAccount WHERE AccountID = 1;  -- 1000.00
-Session B: UPDATE BankAccount SET Balance = 1500.00 WHERE AccountID = 1; COMMIT;
-Session A: SELECT Balance FROM BankAccount WHERE AccountID = 1;  -- 1500.00
-Session A: COMMIT;
-```
-
-Which of the three concurrency problems does this show? Which isolation level would have prevented it?
-
-<details>
-<summary>Show solution</summary>
-
-A non-repeatable read: Session A's `SELECT` returned two different values for the same row within one transaction. `REPEATABLE READ` (or stricter) would have blocked Session B's `UPDATE` until Session A finished.
-
-</details>
-
-## Exercise 2 – Predict the Blocking
-
-Session A runs `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRAN; SELECT * FROM dbo.Branch WHERE BranchName LIKE N'West%';` and does not commit. Predict the outcome of each of these, run in Session B, **before** you test it:
-
-1. `SELECT * FROM dbo.Branch WHERE BranchName = N'Central Osijek';`
-2. `INSERT INTO dbo.Branch (BranchName) VALUES (N'West Pazin');`
-3. `UPDATE dbo.Branch SET BranchName = N'Central Osijek 2' WHERE BranchName = N'Central Osijek';`
-
-<details>
-<summary>Show solution</summary>
-
-1. Succeeds immediately — outside the locked range.
-2. Blocks — falls inside the `West%` range Session A locked.
-3. Succeeds immediately — `Central Osijek` was never read by Session A's query, so it holds no lock there.
-
-Finish by rolling back Session A: `ROLLBACK TRANSACTION;`.
-
-</details>
-
-## Exercise 3 – Fix a Given Anomaly
-
-A reporting procedure must read the total balance across all accounts twice in one transaction (for a before/after comparison) and must not see a different total the second time, even if another session commits a transfer in between. Which isolation level is the minimum sufficient choice, and why not a stricter one?
-
-<details>
-<summary>Show solution</summary>
-
-`REPEATABLE READ`. The procedure only re-reads existing rows — it needs protection against a non-repeatable read, not against new rows appearing (no phantom risk, since it is not filtering a growing range). `SERIALIZABLE` would also work but costs more blocking for no extra benefit here.
-
-</details>
-
-## Exercise 4 – Trigger and Explain a Deadlock
-
-Reproduce Section 8.1's deadlock, but swap which account each session updates first (Session A starts with account 2, Session B starts with account 1). Confirm a deadlock still occurs, and explain in your own words why swapping the starting account did not fix it.
-
-<details>
-<summary>Show solution</summary>
-
-A deadlock still occurs. What matters is that the two sessions acquire the two locks in **opposite order relative to each other** — it does not matter which specific account each one starts with, only that A then wants what B holds and B then wants what A holds. The fix from 8.2 (always touch accounts in the same, e.g. ascending, ID order, in every transaction) is still required.
-
-</details>
-
-## Exercise 5 – READ_COMMITTED_SNAPSHOT, Costs and Benefits
-
-`READ_COMMITTED_SNAPSHOT` removes the blocking you saw in Section 2.2. List one scenario where you would turn it on, and one reason a team might deliberately choose not to.
-
-<details>
-<summary>Show solution</summary>
-
-Turn it on for a read-heavy application where long-running reports currently block, or get blocked by, ordinary transactional writes — the version-based reads stop that contention with no application code changes.
-
-A team might avoid it if `tempdb` is already a bottleneck (it must hold every row version) or if write-heavy workloads cannot absorb the extra cost of maintaining versions on every write.
-
-</details>
-
----
-
-# Section 12 – Common Mistakes and Final Review
-
-## 12.1 Common mistakes
+## 11.1 Common mistakes
 
 | Mistake | Why it matters | Better approach |
 |---|---|---|
@@ -862,7 +782,7 @@ A team might avoid it if `tempdb` is already a bottleneck (it must hold every ro
 | Treating a deadlock as a bug to silence | It is SQL Server protecting correctness, not a malfunction | Fix the access order; always retry the chosen victim |
 | Assuming MVCC removes all blocking | Writers still block writers | Expect write contention to remain under `READ_COMMITTED_SNAPSHOT` |
 
-## 12.2 Final questions
+## 11.2 Final questions
 
 1. Name the three concurrency problems in order of which isolation level first prevents each.
 2. What table explains every blocking moment demonstrated in Part C?
@@ -881,7 +801,7 @@ A team might avoid it if `tempdb` is already a bottleneck (it must hold every ro
 
 </details>
 
-## 12.3 Key takeaways
+## 11.3 Key takeaways
 
 - **Two sessions can interfere in three specific ways.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
 - **Isolation levels are a trade-off, not a ladder you climb for safety's sake.** Each stricter level prevents one more problem at the cost of more blocking.
@@ -895,9 +815,15 @@ Back to the opening question: two tellers looking at the same account at the sam
 
 ---
 
+## Additional practice
+
+Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurrency.md). Part A reproduces the three anomalies and their fixes on `AdventureWorksENG`; Part B continues in `TransactionsLab` with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
+
+---
+
 # Additional Reading
 
-The following topics extend the lab. They are not required for the main exercises.
+The following topics extend the lab. They are not required for the exercises.
 
 ## A. Lock Escalation Thresholds
 

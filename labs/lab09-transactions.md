@@ -2243,22 +2243,7 @@ Examples:
 
 The scope of this lab is transactional changes to ordinary SQL Server tables.
 
-## E. Optional Cleanup
-
-You can leave `TransactionsLab` in place — the next time you start the lab, rerunning the setup script in *Before you start* drops it and creates a fresh copy, so there's nothing to clean up between sessions.
-
-To remove it for good instead (e.g. at the end of the course), finish all open transactions first, then:
-
-```sql
-USE master;
-GO
-
-DROP DATABASE TransactionsLab;
-```
-
-The history table and its procedure are created in Exercise 5. Omit their drop statements if you did not complete that exercise.
-
-## F. References
+## E. References
 
 - [Database checkpoints](https://learn.microsoft.com/en-us/sql/relational-databases/logs/database-checkpoints-sql-server)
 - [Restore and recovery overview](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/restore-and-recovery-overview-sql-server)

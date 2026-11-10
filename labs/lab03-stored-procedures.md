@@ -1990,41 +1990,6 @@ The result set is appropriate for the product row, the output parameter returns 
 
 ---
 
-# Cleanup
-
-Remove the procedures and the standalone demonstration table created during the lab.
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_ListStates;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProduct;
-DROP PROCEDURE IF EXISTS dbo.usp_ProductsByPrice;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProductColor;
-DROP PROCEDURE IF EXISTS dbo.usp_CheckCustomerExists;
-DROP PROCEDURE IF EXISTS dbo.usp_ListCategories;
-DROP PROCEDURE IF EXISTS dbo.usp_CustomersByLastName;
-DROP PROCEDURE IF EXISTS dbo.usp_FindCustomersByLastName;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProductInfo;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCityInState;
-DROP PROCEDURE IF EXISTS dbo.usp_TransferMoney;
-DROP PROCEDURE IF EXISTS dbo.usp_GetLoyaltyDiscount;
-DROP PROCEDURE IF EXISTS dbo.usp_ValidateCardNumber;
-GO
-```
-
-Remove the standalone demonstration table:
-
-```sql
-DROP TABLE IF EXISTS dbo.BankAccount;
-GO
-```
-
-> [!IMPORTANT]
-> Exercise 3 adds rows to the existing `State` and `City` tables. Those rows are not deleted automatically: rows with the same names may already have existed before this lab.
->
-> To remove your test rows, first identify the exact IDs inserted during your run. Delete only those city rows, then delete the state only if you created it and no remaining rows reference it. Do not delete rows by name alone.
-
----
-
 # What You Should Know After This Lab
 
 The most important ideas are:

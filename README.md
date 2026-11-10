@@ -102,11 +102,11 @@ The exact order may change as new labs are added.
 
 For each lab:
 
-1. read the explanation;
-2. run the SQL examples in SSMS;
-3. answer the **Check your understanding** questions;
-4. complete the exercises before opening the solutions;
-5. run the cleanup section when provided.
+1. start with a fresh copy of the lab's database (see [About the database](#about-the-database));
+2. read the explanation;
+3. run the SQL examples in SSMS;
+4. answer the **Check your understanding** questions;
+5. complete the exercises before opening the solutions.
 
 Some examples intentionally produce SQL Server errors. These are part of the learning process and demonstrate database rules and behavior.
 
@@ -116,7 +116,7 @@ Some examples intentionally produce SQL Server errors. These are part of the lea
 
 Labs 00–04, 07, 08, 11, and 12 use `AdventureWorksENG`, a training database prepared for the course.
 
-The examples may create temporary Views, tables, triggers, stored procedures, functions, or test rows. Cleanup scripts are included so the database can be returned to its expected state after each lab.
+The examples create Views, tables, triggers, stored procedures, functions, and test rows, and the labs do not remove them at the end. Before each lab, drop `AdventureWorksENG` and recreate it from the backup, so every lab starts from the same, known state. Some labs contain short cleanup steps in the middle of the lab; run those, because later parts of the same lab depend on them.
 
 Labs 05–06 use a separate generated database, `IndexLab`, built specifically to demonstrate physical storage and indexing at a scale `AdventureWorksENG` cannot provide (10+ million rows in its largest tables). Run the [setup script](labs/setup/index-lab-data-setup.md) once before starting Lab 05; both labs then share that same database. Lab 07 returns to `AdventureWorksENG`.
 

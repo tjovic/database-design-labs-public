@@ -2512,31 +2512,6 @@ GO
 
 ---
 
-# Cleanup
-
-```sql
-DROP TRIGGER IF EXISTS dbo.trg_City_Insert;
-DROP TRIGGER IF EXISTS dbo.trg_City_LogInsert;
-DROP TRIGGER IF EXISTS dbo.trg_City_LogRename;
-DROP TRIGGER IF EXISTS dbo.trg_City_StateChange;
-DROP TRIGGER IF EXISTS dbo.trg_BadExample;
-DROP TRIGGER IF EXISTS dbo.trg_City_Delete;
-DROP TRIGGER IF EXISTS dbo.trg_City_All;
-GO
-```
-
-If `ActivityLog` was created only for this lab:
-
-```sql
-DROP TABLE IF EXISTS ActivityLog;
-DROP TABLE IF EXISTS SalaryRange;
-DROP TABLE IF EXISTS Employee;
-
-GO
-```
-
----
-
 # What you should know after this lab
 
 The most important patterns are:

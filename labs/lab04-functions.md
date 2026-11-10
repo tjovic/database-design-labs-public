@@ -783,7 +783,7 @@ scalar function.
 > Scalar functions are convenient and reusable, but always
 > consider how often the function may need to be evaluated.
 
-Keep this function for the performance discussion in Section 7. It will be removed in the final cleanup.
+Keep this function for the performance discussion in Section 7.
 
 ---
 
@@ -1891,42 +1891,6 @@ dbo.Product
 > [!WARNING]
 > `WITH ENCRYPTION` should not be treated as a substitute for proper security or source
 > control. Keep the original function definition in version control.
-
----
-
-# Cleanup
-
-Remove the functions created during the exercises:
-
-```sql
-DROP FUNCTION IF EXISTS dbo.fn_ProductSoldQuantity;
-DROP FUNCTION IF EXISTS dbo.fn_CustomersByLastNamePrefix;
-DROP FUNCTION IF EXISTS dbo.fn_ProductsFilter;
-DROP FUNCTION IF EXISTS dbo.fn_ShortName;
-DROP FUNCTION IF EXISTS dbo.fn_CustomerLatestPurchase;
-DROP FUNCTION IF EXISTS dbo.fn_InvoicesBetween;
-DROP FUNCTION IF EXISTS dbo.fn_InvoicesBetween_Multi;
-DROP FUNCTION IF EXISTS dbo.fn_ProductCount;
-GO
-```
-
-The payroll example uses a separate database. If you also completed the advanced payroll exercise, remove its main function before its helper:
-
-```sql
-USE PayrollLab;
-GO
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_NetSalary;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_PersonalAllowance;
-DROP FUNCTION IF EXISTS dbo.fn_NetSalarySimple;
-GO
-USE AdventureWorksENG;
-GO
-```
-
-Keep the fictional payroll tables for additional practice. No database is dropped by this cleanup.
-
-> [!TIP]
-> Keep cleanup targeted to objects created in this lab.
 
 ---
 

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1510" viewBox="0 0 1100 1510" role="img" aria-labelledby="svgTitle svgDesc">
-  <title id="svgTitle">Storage layers from device sectors to SQL Server rows</title>
-  <desc id="svgDesc">Conceptual diagram showing device logical and reported physical sectors, NTFS clusters, a database data file, SQL Server extents and pages, and rows stored inside a page.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1266" viewBox="0 0 1100 1266" role="img" aria-labelledby="svgTitle svgDesc" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTplOWM0NjBlYy1hOTJjLTQ4YzktYjNmOS0xNmQ2ZWNjZjJjY2MAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaKNvG++JyX+FG8ty9KjxLXgAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDplM2NjYTI2OC1kODNhLTQ0MWEtYmQyNC03NTk4ODg4NzM2MDhscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoBx5khVWtBiP9yqqsTUfe+QAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggQIe07j8zpfGL1+tCVT2+DeXXmzm/RRj4Y9TbP58FB7ikZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaHOeoAE1t69/AJokhSI5e58AAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCBJDs7ELjphNBwkcvmGq5zeXjp0o0Lt8K4wGns11CujzGRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBjIZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmU5YzQ2MGVjLWE5MmMtNDhjOS1iM2Y5LTE2ZDZlY2NmMmNjYy9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmI3YjFiNWJmLTQ3MTItNDFkMi1hYjNkLTU2NjY4ZDMxN2YyYnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCBAh7TuPzOl8YvX60JVPb4N5debOb9FGPhj1Ns/nwUHuKJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgg9y//CEPB4xZUjc0PDAF8pkvlbJ9MFw4CasjbWpPiHL6iY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggD6TRvRlKs2G8NPPIUu+DOpFSeZlF0Li4dLR209ygTsd0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQIVqNvI/gWWbK2COTnVvEmfikjhJ21YzuAxCaZIOSRNtZUSoEo5F9MYpOviVupP8/s9NjyrXUsTTrak+7Ngk1NA=</c2pa:manifest></metadata>
+  <title id="svgTitle">Storage layers from SQL Server rows to device sectors</title>
+  <desc id="svgDesc">A data page with header, rows, and slot array is one of the eight pages of an extent. Extents are stored in the database data file, file space is allocated in NTFS clusters, and clusters consist of device sectors.</desc>
   <defs>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
       <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
@@ -14,6 +14,10 @@
       .heading { font-size: 27px; font-weight: 700; fill: #172554; }
       .sub { font-size: 19px; fill: #475569; }
       .small { font-size: 16px; fill: #64748b; }
+      .lab { font-size: 17px; fill: #475569; font-style: italic; }
+      .lab { font-size: 17px; fill: #475569; font-style: italic; }
+      .lab { font-size: 17px; fill: #475569; font-style: italic; }
+      .lab { font-size: 17px; fill: #475569; font-style: italic; }
       .tiny { font-size: 14px; fill: #64748b; }
       .arrow { stroke: #64748b; stroke-width: 3; fill: none; marker-end: url(#arrow); }
       .device-box { fill: #eef2ff; stroke: #8b9be8; stroke-width: 2; }
@@ -21,106 +25,71 @@
       .sql-box { fill: #ecfdf5; stroke: #34a38a; stroke-width: 2; }
     </style>
   </defs>
-
-  <rect width="1100" height="1510" fill="#ffffff"/>
-
-  <!-- Operating-system / file-system area -->
-  <rect x="38" y="34" width="1024" height="730" rx="24" fill="#f8faff" stroke="#c7d2fe" stroke-width="2"/>
-  <rect x="66" y="54" width="400" height="42" rx="21" fill="#e0e7ff"/>
-  <text class="font group" x="266" y="82" text-anchor="middle" fill="#3730a3">OPERATING SYSTEM / NTFS</text>
-
-  <!-- Storage device -->
-  <rect x="98" y="120" width="904" height="220" rx="18" class="device-box" filter="url(#shadow)"/>
-  <text class="font heading" x="550" y="160" text-anchor="middle">STORAGE DEVICE</text>
-  <text class="font sub" x="550" y="190" text-anchor="middle">512e example</text>
-
-  <rect x="166" y="216" width="768" height="72" rx="10" fill="#ffffff" stroke="#818cf8" stroke-width="2"/>
-  <g class="font" text-anchor="middle" font-size="17" fill="#312e81">
-    <rect x="166" y="216" width="96" height="72" rx="8" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="262" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="358" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="454" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="550" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="646" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="742" y="216" width="96" height="72" fill="#c7d2fe" stroke="#818cf8"/>
-    <rect x="838" y="216" width="96" height="72" rx="8" fill="#c7d2fe" stroke="#818cf8"/>
-    <text x="214" y="258">512 B</text><text x="310" y="258">512 B</text>
-    <text x="406" y="258">512 B</text><text x="502" y="258">512 B</text>
-    <text x="598" y="258">512 B</text><text x="694" y="258">512 B</text>
-    <text x="790" y="258">512 B</text><text x="886" y="258">512 B</text>
-  </g>
-  <path d="M166 301 V311 H934 V301" stroke="#4f46e5" stroke-width="2.5" fill="none"/>
-  <text class="font sub" x="550" y="330" text-anchor="middle" fill="#3730a3">8 logical sectors = 1 reported physical sector (4 KB)</text>
-
-  <path class="arrow" d="M550 341 V380"/>
-
-  <!-- NTFS -->
-  <rect x="98" y="390" width="904" height="190" rx="18" class="ntfs-box" filter="url(#shadow)"/>
-  <text class="font heading" x="550" y="432" text-anchor="middle">NTFS FILE SYSTEM</text>
-  <text class="font sub" x="550" y="462" text-anchor="middle">Clusters are the file-system allocation units</text>
-  <g>
-    <rect x="228" y="490" width="278" height="60" rx="10" fill="#e2e8f0" stroke="#64748b" stroke-width="2"/>
-    <text class="font" x="367" y="528" text-anchor="middle" font-size="22" font-weight="700" fill="#334155">4 KB</text>
-    <text class="font" x="367" y="573" text-anchor="middle" font-size="17" fill="#334155">Cluster size example</text>
-
-    <rect x="594" y="490" width="278" height="60" rx="10" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
-    <text class="font" x="733" y="528" text-anchor="middle" font-size="22" font-weight="700" fill="#334155">64 KB</text>
-    <text class="font" x="733" y="573" text-anchor="middle" font-size="14" fill="#334155">Common recommendation for large data files</text>
-  </g>
-
-  <path class="arrow" d="M550 610 V620"/>
-
-  <!-- Database file -->
-  <rect x="200" y="626" width="700" height="112" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2.5" filter="url(#shadow)"/>
-  <g transform="translate(244 649)">
-    <path d="M0 0 H54 L74 20 V66 H0 Z" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
-    <path d="M54 0 V20 H74" fill="none" stroke="#475569" stroke-width="2"/>
-    <path d="M13 34 H60 M13 45 H60 M13 56 H48" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
-  </g>
-  <text class="font heading" x="630" y="674" text-anchor="middle">DATABASE DATA FILE</text>
-  <text class="font sub" x="630" y="706" text-anchor="middle">IndexLab.mdf  ·  optional .ndf files</text>
-
-  <!-- Conceptual boundary -->
-  <path d="M38 778 H350 M750 778 H1062" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="10 9"/>
-  <rect x="366" y="754" width="368" height="48" rx="24" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
-  <text class="font group" x="550" y="784" text-anchor="middle" fill="#475569">SQL SERVER INTERPRETS THE FILE</text>
-
-  <!-- SQL Server area -->
-  <rect x="38" y="824" width="1024" height="640" rx="24" fill="#f5fcf9" stroke="#a7f3d0" stroke-width="2"/>
-  <rect x="66" y="844" width="250" height="42" rx="21" fill="#d1fae5"/>
-  <text class="font group" x="191" y="872" text-anchor="middle" fill="#065f46">SQL SERVER</text>
-
-  <!-- Extent -->
-  <rect x="98" y="910" width="904" height="195" rx="18" class="sql-box" filter="url(#shadow)"/>
-  <text class="font heading" x="550" y="951" text-anchor="middle" fill="#065f46">EXTENT</text>
-  <text class="font sub" x="550" y="980" text-anchor="middle">64 KB allocation unit · 8 data pages</text>
+  <rect width="1100" height="1266" fill="#ffffff"/>
+  <rect x="38" y="30" width="1024" height="518" rx="24" fill="#f5fcf9" stroke="#a7f3d0" stroke-width="2"/>
+  <rect x="66" y="50" width="250" height="42" rx="21" fill="#d1fae5"/>
+  <text class="font group" x="191" y="78" text-anchor="middle" fill="#065f46">SQL SERVER</text>
+  <rect x="98" y="372" width="904" height="158" rx="18" class="sql-box" filter="url(#shadow)"/>
+  <path d="M300 322 L469 462 L559 462 L800 322 Z" fill="#d1fae5" opacity="0.55"/>
+  <path d="M300 322 L469 462 M800 322 L559 462" stroke="#059669" stroke-width="2" stroke-dasharray="7 6" fill="none"/>
+  <text class="font heading" x="128" y="412" fill="#065f46">EXTENT</text>
+  <text class="font sub" x="128" y="440">8 pages = 1 extent (64 KB)</text>
   <g class="font" text-anchor="middle" font-size="16" fill="#065f46">
-    <rect x="190" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="235" y="1040">Page 1</text>
-    <rect x="283" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="328" y="1040">Page 2</text>
-    <rect x="376" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="421" y="1040">Page 3</text>
-    <rect x="469" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="514" y="1040">Page 4</text>
-    <rect x="562" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="607" y="1040">Page 5</text>
-    <rect x="655" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="700" y="1040">Page 6</text>
-    <rect x="748" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="793" y="1040">Page 7</text>
-    <rect x="841" y="1002" width="90" height="64" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="886" y="1040">Page 8</text>
+    <rect x="190" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="235" y="497">Page 1</text>
+    <rect x="283" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="328" y="497">Page 2</text>
+    <rect x="376" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="421" y="497">Page 3</text>
+    <rect x="469" y="462" width="90" height="54" rx="7" fill="#6ee7b7" stroke="#059669" stroke-width="3"/><text x="514" y="497" font-weight="700">Page 4</text>
+    <rect x="562" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="607" y="497">Page 5</text>
+    <rect x="655" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="700" y="497">Page 6</text>
+    <rect x="748" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="793" y="497">Page 7</text>
+    <rect x="841" y="462" width="90" height="54" rx="7" fill="#bbf7d0" stroke="#10b981" stroke-width="1.5"/><text x="886" y="497">Page 8</text>
   </g>
-
-  <path class="arrow" d="M550 1106 V1140"/>
-
-  <!-- Page expanded to rows -->
-  <rect x="200" y="1150" width="700" height="240" rx="18" fill="#ffffff" stroke="#34a38a" stroke-width="2.5" filter="url(#shadow)"/>
-  <text class="font heading" x="550" y="1192" text-anchor="middle" fill="#065f46">DATA PAGE · 8 KB</text>
-  <rect x="275" y="1213" width="550" height="36" rx="6" fill="#d1fae5" stroke="#34a38a"/>
-  <text class="font" x="550" y="1237" text-anchor="middle" font-size="17" fill="#065f46">Page header</text>
-  <rect x="275" y="1258" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
-  <text class="font" x="550" y="1280" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
-  <rect x="275" y="1298" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
-  <text class="font" x="550" y="1320" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
-  <rect x="275" y="1338" width="550" height="33" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
-  <text class="font" x="550" y="1360" text-anchor="middle" font-size="17" fill="#065f46">Row</text>
-  <text class="font tiny" x="550" y="1417" text-anchor="middle">Rows are stored inside data pages</text>
-
-  <!-- Technical caveat -->
-  <rect x="98" y="1478" width="904" height="1" fill="#ffffff"/>
-  <text class="font small" x="550" y="1496" text-anchor="middle">Different layers use different units; this is not a one-to-one physical I/O mapping.</text>
+  <rect x="300" y="104" width="500" height="218" rx="18" fill="#ffffff" stroke="#059669" stroke-width="3" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="142" text-anchor="middle" fill="#065f46">DATA PAGE · 8 KB</text>
+  <rect x="340" y="158" width="420" height="28" rx="5" fill="#d1fae5" stroke="#34a38a"/>
+  <text class="font" x="550" y="178.0" text-anchor="middle" font-size="16" fill="#065f46">Page header</text>
+  <rect x="340" y="192" width="420" height="26" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="211.0" text-anchor="middle" font-size="16" fill="#065f46">Row</text>
+  <rect x="340" y="224" width="420" height="26" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="243.0" text-anchor="middle" font-size="16" fill="#065f46">Row</text>
+  <rect x="340" y="256" width="420" height="26" rx="5" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text class="font" x="550" y="275.0" text-anchor="middle" font-size="16" fill="#065f46">Row</text>
+  <rect x="340" y="288" width="420" height="26" rx="5" fill="#d1fae5" stroke="#34a38a"/>
+  <text class="font" x="550" y="307.0" text-anchor="middle" font-size="16" fill="#065f46">Slot array</text>
+  <path d="M38 569 H1062" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="10 9"/>
+  <rect x="38" y="590" width="1024" height="656" rx="24" fill="#f8faff" stroke="#c7d2fe" stroke-width="2"/>
+  <rect x="66" y="610" width="474" height="42" rx="21" fill="#e0e7ff"/>
+  <text class="font group" x="303" y="637" text-anchor="middle" fill="#3730a3" style="font-size:17px;letter-spacing:1px">OPERATING SYSTEM AND STORAGE DEVICE</text>
+  <path class="arrow" d="M550 530 V676"/>
+  <text class="font lab" x="572" y="672">extents are stored in the file</text>
+  <rect x="200" y="686" width="700" height="96" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2.5" filter="url(#shadow)"/>
+  <g transform="translate(244 701) scale(0.95)"><path d="M0 0 H54 L74 20 V66 H0 Z" fill="#e2e8f0" stroke="#475569" stroke-width="2"/><path d="M54 0 V20 H74" fill="none" stroke="#475569" stroke-width="2"/><path d="M13 34 H60 M13 45 H60 M13 56 H48" stroke="#64748b" stroke-width="3" stroke-linecap="round"/></g>
+  <text class="font heading" x="630" y="728" text-anchor="middle">DATABASE DATA FILE</text>
+  <text class="font sub" x="630" y="758" text-anchor="middle">IndexLab.mdf  ·  optional .ndf files</text>
+  <path class="arrow" d="M550 782 V832"/>
+  <text class="font lab" x="572" y="818">file space is allocated in clusters</text>
+  <rect x="98" y="842" width="904" height="160" rx="18" class="ntfs-box" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="880" text-anchor="middle">NTFS FILE SYSTEM</text>
+  <text class="font sub" x="550" y="908" text-anchor="middle">Clusters · e.g. 4 KB; 64 KB is often recommended for SQL Server data files</text>
+  <g class="font" text-anchor="middle" font-size="17" fill="#334155">
+    <rect x="166" y="926" width="192" height="56" rx="6" fill="#e2e8f0" stroke="#64748b"/><text x="262" y="960">cluster</text>
+    <rect x="358" y="926" width="192" height="56" rx="6" fill="#e2e8f0" stroke="#64748b"/><text x="454" y="960">cluster</text>
+    <rect x="550" y="926" width="192" height="56" rx="6" fill="#e2e8f0" stroke="#64748b"/><text x="646" y="960">cluster</text>
+    <rect x="742" y="926" width="192" height="56" rx="6" fill="#e2e8f0" stroke="#64748b"/><text x="838" y="960">cluster</text>
+  </g>
+  <path class="arrow" d="M550 1002 V1052"/>
+  <text class="font lab" x="572" y="1038">a cluster consists of sectors</text>
+  <rect x="98" y="1062" width="904" height="160" rx="18" class="device-box" filter="url(#shadow)"/>
+  <text class="font heading" x="550" y="1100" text-anchor="middle">STORAGE DEVICE</text>
+  <text class="font sub" x="550" y="1128" text-anchor="middle">Sectors · typically 512 B or 4 KB</text>
+  <g class="font" text-anchor="middle" font-size="17" fill="#312e81">
+    <rect x="166" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="214" y="1180">sector</text>
+    <rect x="262" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="310" y="1180">sector</text>
+    <rect x="358" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="406" y="1180">sector</text>
+    <rect x="454" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="502" y="1180">sector</text>
+    <rect x="550" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="598" y="1180">sector</text>
+    <rect x="646" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="694" y="1180">sector</text>
+    <rect x="742" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="790" y="1180">sector</text>
+    <rect x="838" y="1146" width="96" height="56" rx="6" fill="#c7d2fe" stroke="#818cf8"/><text x="886" y="1180">sector</text>
+  </g>
 </svg>

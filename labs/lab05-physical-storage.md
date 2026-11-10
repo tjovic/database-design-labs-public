@@ -14,7 +14,7 @@ By the end of this lab, you should be able to:
 - describe the structure of an 8 KB SQL Server data page;
 - explain why row width influences page count and query cost;
 - distinguish logical reads from physical reads and explain the buffer pool;
-- inspect table pages using `DBCC IND` and `DBCC PAGE`;
+- use `DBCC IND` and `DBCC PAGE` to find a table's data and index pages, the rows stored on a page, and the size of a record;
 - interpret simple page-count and I/O measurements;
 - explain why indexes can reduce the amount of data SQL Server must read.
 
@@ -29,13 +29,15 @@ This lab contains more than you need to know. Each section is marked with one of
 | Level | What it means for you | Sections |
 |---|---|---|
 | 🟢 **Core** | Understand it; Lab 06 builds on it. | 1, 2, 3, 5, 6, 7, 8, 16 |
-| 🛠️ **Hands-on** | Do it in the lab, but you do not need to memorize the commands or every detail of their output. | 10, 11, 12, 14 |
+| 🛠️ **Hands-on** | Do it yourself. You need to be able to use `DBCC IND` and `DBCC PAGE` on your own and read the key values from their output; you do not need to understand every field. | 10, 11, 12, 14 |
 | 🔍 **Deep dive** | Optional, for those who want to know more. You can skip it without missing anything needed later. | 4, 9, 13, 15 |
 
 Some core sections also contain short collapsible deep-dive parts.
 
 > [!IMPORTANT]
-> **If you only have time for the core sections, you will still have everything you need for Lab 06.** The one idea to take away: SQL Server stores and reads all data in **8 KB pages**, and the number of pages a query has to process largely determines how much work it does.
+> **The core sections give you everything you need for Lab 06.** The one idea to take away: SQL Server stores and reads all data in **8 KB pages**, and the number of pages a query has to process largely determines how much work it does.
+>
+> The hands-on sections are not required for Lab 06, but do not skip them: inspecting a table's pages with `DBCC IND` and `DBCC PAGE` is a skill you are expected to have.
 
 > [!NOTE]
 > **Demo Database – IndexLab**
@@ -1271,7 +1273,7 @@ In the following sections, we will use `DBCC IND` to identify these page types i
 
 # 10. Inspecting physical pages
 
-🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
+🛠️ **Hands-on** · Do it yourself. You need to be able to use these commands on your own, but not to understand every field of their output.
 
 So far, we have learned how SQL Server organizes data into pages and how different page types serve different purposes.
 
@@ -1310,6 +1312,20 @@ Because we have not specified the `-1` global option, this setting applies only 
 > [!NOTE]
 > The page identifiers and diagnostic output shown in the following sections may differ on your computer. SQL Server determines how pages are allocated, so always use the page identifiers returned by your own database.
 
+## Commands you need to know
+
+Sections 11 and 12 explain these commands in detail. This summary lists what you should be able to do with them on your own:
+
+| Question | Command | What to read in the output |
+|---|---|---|
+| Which pages belong to a table? | `DBCC IND('<database>', 'dbo.<Table>', -1);` | One row per page: `PageFID`, `PagePID` |
+| How many data and index pages does it use? | the same `DBCC IND` | Count the rows with `PageType = 1` (data page) and `PageType = 2` (index page) |
+| In which order are the data pages linked? | the same `DBCC IND` | `PrevPagePID` and `NextPagePID`; the first data page has `PrevPagePID = 0`, the last one `NextPagePID = 0` |
+| Which rows are stored on a page? | `DBCC PAGE('<database>', <PageFID>, <PagePID>, 3);` | The records in slot order, with their column values |
+| How long is a record? | the same `DBCC PAGE` | `Length` (or `Record Size`) of the record's slot |
+
+Remember to run `DBCC TRACEON(3604);` first in the session, so `DBCC PAGE` shows its output.
+
 We are now ready to examine the physical pages belonging to our tables.
 
 In **Section 11**, we will use `DBCC IND` to locate pages.
@@ -1320,7 +1336,7 @@ In **Section 12**, we will use `DBCC PAGE` to inspect their contents.
 
 # 11. DBCC IND – Which pages belong to a table?
 
-🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
+🛠️ **Hands-on** · Do it yourself. You need to be able to use these commands on your own, but not to understand every field of their output.
 
 When we execute SQL queries, we work with logical objects such as tables and rows. However, SQL Server physically stores these rows in **8 KB pages** inside database files.
 
@@ -1487,7 +1503,7 @@ In Section 12, we will use it to examine the internal structure of a data page, 
 
 # 12. DBCC PAGE – Look inside a data page
 
-🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
+🛠️ **Hands-on** · Do it yourself. You need to be able to use these commands on your own, but not to understand every field of their output.
 
 In Section 11, we used `DBCC IND` to locate the pages associated with the `Category` table. Our reference database contains one data page for its 100 rows:
 
@@ -1854,7 +1870,7 @@ It also explains why choosing appropriate data types and avoiding unnecessarily 
 
 # 14. Guided investigation – Product: From pages to query performance
 
-🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
+🛠️ **Hands-on** · Do it yourself. You need to be able to use these commands on your own, but not to understand every field of their output.
 
 In the previous sections, we examined the `Category` table and discovered that all 100 rows fit into a single 8 KB data page.
 
@@ -2782,7 +2798,7 @@ GO
 
 ## Exercise 3 – Investigate SalesOrder without listing every page
 
-🛠️ **Hands-on** · Do it in the lab, but you do not need to memorize the commands or every detail of their output.
+🛠️ **Hands-on** · Do it yourself. You need to be able to use these commands on your own, but not to understand every field of their output.
 
 `SalesOrder` is much larger than the tables we inspected with `DBCC IND`. Producing an individual row for every allocated page could overwhelm the SSMS result window.
 

@@ -305,53 +305,16 @@ Look for entries similar to these (the exact names and values may differ):
 
 ```text
 Bytes Per Sector          : 512
-Bytes Per Physical Sector : 4096
 Bytes Per Cluster         : 4096
 ```
 
-These values describe different storage units. Let's examine what each one means.
+The output contains many other lines; for this lab, these two are enough. Let's examine what each one means.
 
-## 4.1 Sectors: 512 B and 4 KB
+## 4.1 Sectors
 
-A **sector** is a unit of storage addressing exposed by a storage device to the operating system.
+A **sector** is the smallest unit of storage that a storage device exposes to the operating system. The operating system reads and writes the disk in whole sectors.
 
-Older hard disk drives traditionally used 512-byte sectors. Modern storage devices commonly use 4 KB physical sectors, although they may still expose 512-byte logical sectors for compatibility.
-
-Two important concepts are:
-
-- **Logical sector:** The smallest addressable unit exposed by the storage device to the operating system.
-- **Physical sector:** The unit in which the device actually reads and writes data internally, as reported by the device.
-
-Modern storage devices commonly use the following configurations:
-
-| Configuration | Logical sector | Physical sector |
-|---|---:|---:|
-| 512n | 512 B | 512 B |
-| 512e | 512 B | 4096 B |
-| 4Kn | 4096 B | 4096 B |
-
-### Understanding 512e
-
-A **512e (512-byte emulation)** device uses 4 KB physical sectors but presents 512-byte logical sectors to the operating system.
-
-Therefore:
-
-$$
-4096 \div 512 = 8
-$$
-
-Eight logical sectors correspond to one reported 4 KB physical sector.
-
-This distinction matters because a write that updates only part of a physical sector may require the device to perform a **read-modify-write operation**.
-
-The device may need to read the entire physical sector, modify the relevant portion, and write it back.
-
-> [!NOTE]
-> **What about SSDs?**
->
-> SSDs do not have rotating platters or magnetic tracks. They still expose logical sectors to the operating system, but internally organize NAND flash memory using different structures.
->
-> A reported 4 KB physical sector is not necessarily the same as an internal NAND flash page.
+`Bytes Per Sector` shows the sector size. It is typically **512 bytes** or **4 KB (4096 bytes)**. Many modern devices work internally with 4 KB units even when they report 512-byte sectors; this is what the `Bytes Per Physical Sector` line in the output shows. For this lab, the difference does not matter.
 
 The following illustration provides a conceptual overview of how logical table data relates to SQL Server data pages and physical storage.
 
@@ -363,15 +326,15 @@ The arrows illustrate conceptual relationships, not a direct one-to-one mapping 
 
 A **cluster**, also called an *allocation unit*, is the basic unit of disk space that the NTFS file system normally allocates to a file.
 
-A cluster consists of one or more logical sectors.
+A cluster consists of one or more sectors.
 
-For example, if a volume uses 512-byte logical sectors and 4096-byte clusters:
+For example, if a volume uses 512-byte sectors and 4096-byte clusters:
 
 $$
 4096 \div 512 = 8
 $$
 
-One NTFS cluster contains eight logical sectors.
+One NTFS cluster contains eight sectors.
 
 ### How cluster size affects file allocation
 
@@ -422,8 +385,7 @@ The illustration at the beginning of Section 5 shows how these layers relate to 
 
 | Layer | Unit | Example size | Purpose |
 |---|---|---|---|
-| Storage device | Logical sector | 512 B | Addressable unit exposed to the operating system |
-| Storage device | Reported physical sector | 4 KB | Reported physical sector granularity |
+| Storage device | Sector | 512 B or 4 KB | Smallest unit the device exposes to the operating system |
 | NTFS file system | Cluster | 4 KB | File-space allocation unit |
 | SQL Server | Page | 8 KB | Basic unit of database storage |
 | SQL Server | Extent | 64 KB | Group of eight consecutive database pages |
@@ -432,8 +394,7 @@ The illustration at the beginning of Section 5 shows how these layers relate to 
 
 Consider a system with:
 
-- 512-byte logical sectors
-- 4096-byte physical sectors
+- 512-byte sectors
 - 4096-byte NTFS clusters
 - 8192-byte SQL Server pages
 
@@ -442,7 +403,7 @@ In terms of size:
 **One NTFS cluster:**
 
 $$
-4096 \div 512 = 8 \text{ logical sectors}
+4096 \div 512 = 8 \text{ sectors}
 $$
 
 **One SQL Server page:**
@@ -488,7 +449,7 @@ Before that, let's take a closer look at how SQL Server organizes its database f
 
 ![Storage layers](../images/lab05/storage-layers.svg)
 
-The operating system stores the database file on disk using its own units (sectors and clusters). SQL Server does not work with those units: it sees the file as a sequence of **8 KB pages**, grouped into **64 KB extents**, and stores rows inside the pages. Everything in the rest of this lab — and in Lab 06 — happens at the level of pages.
+The operating system stores the database file on disk using its own units (sectors and clusters). SQL Server does not work with those units: it sees the file as a sequence of **8 KB pages**, grouped into **64 KB extents**, and stores rows inside the pages. Everything in the rest of this lab — and in Lab 06 — happens at the level of pages. The layers use different units, so the figure shows how they relate to each other, not a one-to-one mapping of physical I/O operations.
 
 Section 4 (deep dive) explains the operating-system layers in more detail.
 
@@ -2905,7 +2866,7 @@ A table contains **1,000,000 rows** and currently fits **16 rows per page**. Aft
 ## From the hands-on and deep-dive sections
 
 - `DBCC IND` and `DBCC PAGE` are useful laboratory tools for examining page allocation and contents.
-- **Logical sectors**, **physical sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
+- **Sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
 - A clustered index gains levels as the table grows, but finding one row by its key still requires only a few page accesses.
 
 > **The key performance question is often not how many rows a query returns, but how many pages SQL Server has to examine to produce the result.**

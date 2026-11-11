@@ -89,20 +89,9 @@ On the real data in `AdventureWorksENG`, the same statement produces very differ
 | `99999` | does not exist | 0 rows deleted, **no error** |
 | `1` – Gustavo Achong | has 7 invoices | **error 547** (`FK_Invoice_Customer`) — and `@@ROWCOUNT` is still 0 |
 
-A fourth outcome is not reported by SQL Server at all. A **business rule** — for example, *customers with invoices are never deleted* — can reject the request inside a procedure before any `DELETE` runs.
+Look at Gustavo Achong's row. His invoices are safe — the foreign key `FK_Invoice_Customer` refuses to delete a customer who still has invoices. But what the application receives is an error message and `@@ROWCOUNT = 0`: the same row count as for a customer who does not exist.
 
-```mermaid
-flowchart TD
-    A[Request: delete a customer] --> B{Does the row exist?}
-    B -- No --> R1[0 rows affected<br/>not an error]
-    B -- Yes --> C{Does a business rule<br/>allow it?}
-    C -- No --> R2[Rejected by the procedure<br/>no DELETE runs]
-    C -- Yes --> D{Does a foreign key<br/>allow it?}
-    D -- No --> R3[SQL Server error 547<br/>statement terminated]
-    D -- Yes --> R4[1 row deleted]
-```
-
-In every outcome except the last, *nothing was deleted* — but for completely different reasons. An application that cannot tell these outcomes apart will show the wrong message to the user, or silently ignore a real problem.
+In two of the three cases *nothing was deleted*, for completely different reasons. An application that cannot tell them apart will show the wrong message to the user, or silently ignore a real problem.
 
 ## The procedure reports the outcome
 
@@ -122,7 +111,25 @@ sequenceDiagram
     Note left of A: "Customer cannot be deleted<br/>because invoices exist."
 ```
 
-This is the business-rule outcome from the flowchart above: the procedure rejects the request before any `DELETE` runs, and return code `2` says why. The application only has to translate the code into a message. You will build exactly this procedure in Section 8.
+Inside, the procedure decides between four answers and returns a different code for each:
+
+```mermaid
+flowchart TD
+    A["EXEC usp_DeleteCustomer"] --> B{Does the customer exist?}
+    B -- No --> R1["RETURN 1<br/>not found"]
+    B -- Yes --> C{Does the customer<br/>have invoices?}
+    C -- Yes --> R2["RETURN 2<br/>rejected, with a reason"]
+    C -- No --> D[DELETE]
+    D --> E{Did SQL Server<br/>raise an error?}
+    E -- Yes --> R3["RETURN 3<br/>SQL Server error"]
+    E -- No --> R4["RETURN 0<br/>deleted"]
+```
+
+Notice what the invoice check does **not** do: it does not protect the data any better. The foreign key already does that. What the check adds is a **clear answer** — return code `2` instead of error 547 — which the application can translate into a message.
+
+Not every rule has a constraint behind it. Some rules cannot be expressed as a constraint at all (Section 7.2), and for those, the check in the procedure is the only protection.
+
+You will build exactly this procedure in Section 8.
 
 > [!IMPORTANT]
 > **Designing CRUD operations whose outcomes the caller can tell apart is the main goal of this lab.** Every section adds one piece: verifying affected rows (Section 2), return codes for business rules (Section 3), handling errors (Section 6), and understanding the constraints behind them (Section 7). Section 8 brings everything together.
@@ -140,7 +147,7 @@ This is the business-rule outcome from the flowchart above: the procedure reject
 1. No. It usually means that no row matched the `WHERE` condition — for example, the record does not exist. SQL Server does not treat that as an error.
 2. It shows `0` — the same value as for a customer that does not exist. Looking only at the number of affected rows, the caller cannot tell a missing record from a rejected operation.
 3. No. CRUD describes four types of operations. They can be implemented using separate or combined procedures.
-4. A stored procedure provides a reusable operation and can enforce business rules, such as preventing the deletion of a customer who still has invoices. It can also report clearly what happened.
+4. A stored procedure provides a reusable operation and can report clearly what happened. For a customer who still has invoices, the foreign key protects the data either way — but the procedure can answer with return code `2` instead of error 547. For rules that have no constraint behind them, the procedure is also the place where they are enforced.
 
 </details>
 

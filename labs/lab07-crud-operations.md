@@ -1171,7 +1171,7 @@ Consider three possible designs for managing categories.
 | Approach | Example | Description |
 | --- | --- | --- |
 | Separate procedures | `usp_InsertCategory`, `usp_UpdateCategoryName` | Each operation has its own procedure |
-| Combined Create + Update | `usp_SaveCategory` | One procedure inserts or updates a record |
+| Combined Create + Update | `usp_SaveCustomer` | One procedure inserts or updates a record |
 | Action-based procedure | `usp_ManageCategory` | An `@Action` parameter selects the operation |
 
 A combined procedure usually needs a way to determine which operation to execute.
@@ -1187,74 +1187,96 @@ Let's examine both approaches.
 
 A common requirement in applications is to use the same form for creating a new record and editing an existing one.
 
-For example, consider a form for managing states.
+For example, consider a customer form in a web shop.
 
-When the user creates a new state, the application does not yet have its ID.
+When a new customer registers, the application does not yet have an ID.
 
-When the user edits an existing state, the application already knows its ID.
+When an existing customer edits their details, the application already knows the ID.
 
 We can support both operations using one procedure.
 
-### Example – `usp_SaveState`
+### Example – `usp_SaveCustomer`
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_SaveState
-    @IDState int OUTPUT,
-    @Name    nvarchar(50)
+CREATE OR ALTER PROCEDURE dbo.usp_SaveCustomer
+    @IDCustomer  int OUTPUT,
+    @FirstName   nvarchar(50),
+    @LastName    nvarchar(50),
+    @Email       nvarchar(50),
+    @PhoneNumber nvarchar(25),
+    @CityID      int
 AS
 BEGIN
-    IF @IDState IS NULL
+    IF @IDCustomer IS NULL
     BEGIN
-        INSERT INTO State (Name)
-        VALUES (@Name);
+        INSERT INTO Customer (FirstName, LastName, Email, PhoneNumber, CityID)
+        VALUES (@FirstName, @LastName, @Email, @PhoneNumber, @CityID);
 
-        SET @IDState = SCOPE_IDENTITY();
+        SET @IDCustomer = SCOPE_IDENTITY();
     END
     ELSE
     BEGIN
-        UPDATE State
-        SET Name = @Name
-        WHERE IDState = @IDState;
+        UPDATE Customer
+        SET FirstName   = @FirstName,
+            LastName    = @LastName,
+            Email       = @Email,
+            PhoneNumber = @PhoneNumber,
+            CityID      = @CityID
+        WHERE IDCustomer = @IDCustomer;
     END
 END;
 GO
 ```
 
-The procedure uses the value of `@IDState` to determine which operation to perform.
+The procedure uses the value of `@IDCustomer` to determine which operation to perform.
 
-| `@IDState` | Operation |
+| `@IDCustomer` | Operation |
 | --- | --- |
-| `NULL` | Insert a new state |
-| Existing ID | Update the state with that ID |
+| `NULL` | Insert a new customer |
+| Existing ID | Update the customer with that ID |
 | Nonexistent ID | Update affects zero rows |
+
+Notice that the `UPDATE` sets **every** column, not only the one that changed. A form sends all of its fields when the user saves, so the procedure simply writes them all.
 
 ### Test the procedure
 
-Run both calls together in one batch, so the second call receives the ID returned by the first:
+Ana Horvat from Zagreb (`CityID = 1`) registers in the web shop. Later, she changes her phone number. Run both calls together in one batch, so the second call receives the ID returned by the first:
 
 ```sql
-DECLARE @IDState int = NULL;
+DECLARE @IDCustomer int = NULL;
 
--- Test 1: Insert a new state
-EXEC dbo.usp_SaveState
-    @IDState = @IDState OUTPUT,
-    @Name = N'Austria';
+-- Test 1: A new customer registers
+EXEC dbo.usp_SaveCustomer
+    @IDCustomer  = @IDCustomer OUTPUT,
+    @FirstName   = N'Ana',
+    @LastName    = N'Horvat',
+    @Email       = N'ana.horvat@example.com',
+    @PhoneNumber = N'091-555-0142',
+    @CityID      = 1;
 
-SELECT @IDState AS NewStateID;
+SELECT @IDCustomer AS NewCustomerID;
 
--- Test 2: Update the same state
-EXEC dbo.usp_SaveState
-    @IDState = @IDState OUTPUT,
-    @Name = N'Republic of Austria';
+-- Test 2: The same customer changes her phone number
+EXEC dbo.usp_SaveCustomer
+    @IDCustomer  = @IDCustomer OUTPUT,
+    @FirstName   = N'Ana',
+    @LastName    = N'Horvat',
+    @Email       = N'ana.horvat@example.com',
+    @PhoneNumber = N'098-555-0177',
+    @CityID      = 1;
 
 SELECT *
-FROM State
-WHERE IDState = @IDState;
+FROM Customer
+WHERE IDCustomer = @IDCustomer;
 ```
 
-In the first call `@IDState` is `NULL`, so the procedure inserts a new state and returns its generated ID.
+In the first call `@IDCustomer` is `NULL`, so the procedure inserts a new customer and returns the generated ID — `19978` on a freshly created database.
 
-The second call receives that ID, so it updates the existing state instead of inserting another one.
+The second call receives that ID, so it updates the existing customer instead of inserting another one:
+
+| IDCustomer | FirstName | LastName | Email | PhoneNumber | CityID |
+|---:|---|---|---|---|---:|
+| 19978 | Ana | Horvat | ana.horvat@example.com | 098-555-0177 | 1 |
 
 > [!IMPORTANT]
 > The same `OUTPUT` parameter can be used to pass an ID into a procedure and return an ID to the caller.
@@ -1265,26 +1287,30 @@ This pattern is often called a **Save procedure**.
 
 Notice that it does not automatically insert a new row when the supplied ID does not exist. In that case, the `UPDATE` simply affects zero rows.
 
-**Predict:** an application calls `usp_SaveState` with `@IDState = 999` and `@Name = N'Switzerland'`. No state has that ID. What does the caller see?
+**Predict:** an application calls `usp_SaveCustomer` with `@IDCustomer = 99999`. No customer has that ID. What does the caller see?
 
 ```sql
-DECLARE @IDState int = 999, @Result int;
+DECLARE @IDCustomer int = 99999, @Result int;
 
-EXEC @Result = dbo.usp_SaveState
-    @IDState = @IDState OUTPUT,
-    @Name = N'Switzerland';
+EXEC @Result = dbo.usp_SaveCustomer
+    @IDCustomer  = @IDCustomer OUTPUT,
+    @FirstName   = N'Ivan',
+    @LastName    = N'Kovač',
+    @Email       = NULL,
+    @PhoneNumber = NULL,
+    @CityID      = 1;
 
-SELECT @IDState AS IDStateAfterCall, @Result AS ReturnValue;
+SELECT @IDCustomer AS IDCustomerAfterCall, @Result AS ReturnValue;
 ```
 
 <details>
 <summary>Show answer</summary>
 
-| IDStateAfterCall | ReturnValue |
+| IDCustomerAfterCall | ReturnValue |
 |---:|---:|
-| 999 | 0 |
+| 99999 | 0 |
 
-Nothing was saved, but the caller cannot tell. There is no error, the return value is `0` (the default when a procedure has no `RETURN`), and `@IDState` still holds an ID — so the application would report that the state was saved.
+Nothing was saved, but the caller cannot tell. There is no error, the return value is `0` (the default when a procedure has no `RETURN`), and `@IDCustomer` still holds an ID — so the application would report that the customer was saved.
 
 One line after the `UPDATE` would fix it:
 
@@ -1654,23 +1680,23 @@ Two problems are visible here:
 
 ## Check your understanding
 
-1. What determines whether `usp_SaveState` inserts or updates a record?
+1. What determines whether `usp_SaveCustomer` inserts or updates a record?
 2. What is the purpose of the `@Action` parameter?
 3. Why does `usp_ManageSubcategory` return `2` when a subcategory has products?
 4. What is one advantage of separate CRUD procedures?
 5. When might a combined procedure be useful?
-6. `usp_SaveState` is called with an ID that does not exist. What does the caller receive, and why is that a problem?
+6. `usp_SaveCustomer` is called with an ID that does not exist. What does the caller receive, and why is that a problem?
 7. `usp_ManageCategory` is called with `@Action = N'INSERT'` but without `@Name`. The `INSERT` fails — why is the return code still `0`?
 
 <details>
 <summary>Show answers</summary>
 
-1. The value of `@IDState`. `NULL` means Insert; a supplied ID means Update.
+1. The value of `@IDCustomer`. `NULL` means Insert; a supplied ID means Update.
 2. It explicitly selects which operation the procedure should execute.
 3. Because the procedure enforces a business rule that prevents deleting subcategories that still have products.
 4. Each procedure has one clearly defined responsibility, making the interface easier to understand and maintain.
 5. When operations are closely related, such as inserting and updating records through the same application form.
-6. Return value `0`, no error, and the same ID in `@IDState`. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
+6. Return value `0`, no error, and the same ID in `@IDCustomer`. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
 7. The `NULL` violates the `NOT NULL` column, so SQL Server terminates the `INSERT` statement — but not the procedure. Execution continues with `RETURN 0`.
 
 </details>
@@ -2224,7 +2250,7 @@ GO
 
 ### The customers we will use
 
-No test data is needed. `AdventureWorksENG` already contains both cases — 19119 customers have invoices and 853 do not:
+No test data is needed. The original `AdventureWorksENG` data already contains both cases — 19119 customers have invoices and 853 do not:
 
 | IDCustomer | Name | Invoices | Role in this scenario |
 |---:|---|---:|---|

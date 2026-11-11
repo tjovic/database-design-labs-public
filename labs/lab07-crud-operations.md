@@ -2043,46 +2043,13 @@ Other foreign key configurations, such as `ON DELETE SET NULL` or `ON DELETE CAS
 
 ## 7.2 Business rules
 
-Database constraints enforce structural rules, such as primary key uniqueness and referential integrity.
+Database constraints enforce structural rules, such as primary key uniqueness and referential integrity. **Business rules** describe what an application allows users to do — for example, *a customer cannot be deleted if they have invoices*.
 
-Business rules describe what an application allows users to do.
-
-For example:
-
-- A customer cannot be deleted if they have invoices.
-- A product cannot be deleted if it has been sold.
-- A subcategory cannot be deleted if it contains products.
-
-These rules can be implemented explicitly in stored procedures.
-
-Consider the following check:
-
-```sql
-IF EXISTS (
-    SELECT 1
-    FROM Invoice
-    WHERE CustomerID = @IDCustomer
-)
-    RETURN 2;
-```
-
-The procedure checks whether the customer has invoices before attempting to delete the customer.
-
-If invoices exist, it returns a specific status code without executing `DELETE`.
-
-This gives the caller a meaningful result that can be translated into an application message, such as:
-
-```text
-Customer cannot be deleted because invoices exist.
-```
-
-### When a business rule matches a database constraint
-
-`Invoice.CustomerID` is a required foreign key, so SQL Server would reject deleting a customer with invoices even without this check. Section 3.4 showed the same situation for cities: the check does not protect the data — the foreign key already does. It turns a database error into a **specific business result** the caller can act on.
+Every business rule in this lab so far mirrors an existing foreign key. Section 1 and Section 3.4 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
 
 ### Rules that no constraint can express
 
-Every business rule in this lab so far mirrors an existing foreign key. That is common, but it is not the whole picture. Many rules cannot be written as a constraint at all, for example:
+Many rules cannot be written as a constraint at all, for example:
 
 > *A subcategory cannot be deleted if any of its products has ever been sold.*
 
@@ -2103,14 +2070,6 @@ On the real data, `Chains` fails this check — its product `Chain` has been sol
 
 For rules like this, the procedure is the **only** protection.
 
-| Protection | Purpose |
-|---|---|
-| Foreign key constraint | Prevent invalid references |
-| Business rule check | Decide whether the operation is allowed and report a meaningful outcome |
-| `TRY/CATCH` | Handle SQL Server errors if the operation fails |
-
-These mechanisms complement each other.
-
 ## 7.3 What should be enforced where?
 
 A useful general guideline is:
@@ -2123,7 +2082,6 @@ A useful general guideline is:
 | Value must be unique, such as a category name | `UNIQUE` constraint |
 | Value must satisfy a simple condition | `CHECK` constraint |
 | Deletion depends on application-specific rules | Stored procedure or application business logic |
-| SQL Server rejects an operation | `TRY/CATCH` |
 
 Some business rules can also be enforced directly through database constraints.
 
@@ -2149,22 +2107,18 @@ If category names must be unique, that is a rule the database *can* guarantee �
 
 1. What is the purpose of a foreign key constraint?
 2. What is the difference between a required and an optional foreign key?
-3. Can a referenced parent always be deleted when the child's foreign key column is nullable?
-4. Why might a stored procedure check for related invoices when the foreign key already prevents deleting the customer?
-5. What is the role of `TRY/CATCH` when a CRUD operation violates a database constraint?
-6. `Product.SubcategoryID` is nullable. Why does deleting the subcategory `Chains` still fail?
-7. Why did SQL Server allow two categories named `Scooters` in Section 2.1? How could the database prevent it?
+3. `Product.SubcategoryID` is nullable. Why does deleting the subcategory `Chains` still fail?
+4. Why can the rule *"a subcategory whose products have been sold cannot be deleted"* not be written as a foreign key?
+5. Why did SQL Server allow two categories named `Scooters` in Section 2.1? How could the database prevent it?
 
 <details>
 <summary>Show answers</summary>
 
 1. It ensures that non-NULL foreign key values reference existing rows in the parent table.
 2. A required foreign key column cannot contain `NULL`; an optional one can.
-3. No. With the default `NO ACTION` behavior, SQL Server prevents deleting a parent that is still referenced, even when the foreign key column is nullable.
-4. To return a meaningful business status instead of relying on the caller to interpret a database error.
-5. It allows the procedure or caller to handle the SQL Server error and report the failure appropriately.
-6. Nullability only means that a product *may* have no subcategory. The product `Chain` does have one — `SubcategoryID = 7` — and the foreign key protects that existing reference.
-7. `Category.Name` has no `UNIQUE` constraint, so two rows with different IDs and the same name are valid. Adding a `UNIQUE` constraint on `Name` would make the database reject the second insert.
+3. Nullability only means that a product *may* have no subcategory. The product `Chain` does have one — `SubcategoryID = 7` — and the foreign key protects that existing reference. With the default `NO ACTION` behavior, a referenced parent cannot be deleted.
+4. A foreign key only checks that a referenced row exists. This rule depends on data in two other tables — whether the subcategory's products appear in `InvoiceItem` — so it must be checked by code, for example in a procedure.
+5. `Category.Name` has no `UNIQUE` constraint, so two rows with different IDs and the same name are valid. Adding a `UNIQUE` constraint on `Name` would make the database reject the second insert.
 
 </details>
 

@@ -20,7 +20,7 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 >
 > Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects change nothing.
 >
-> Two deletions in Section 8 **succeed**: customer `16` (Lili Alameda, who has no invoices) and product `680` (HL Road Frame - Black, 58, which was never sold). The expected results in this lab assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, those two deletions return "does not exist" instead of "deleted".
+> Several examples insert, change, or delete rows — for example, Section 8 deletes customer `16` (Lili Alameda, who has no invoices). The expected results, including the generated IDs, assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, the results will differ.
 
 ---
 
@@ -2124,59 +2124,16 @@ If category names must be unique, that is a rule the database *can* guarantee �
 
 ---
 
-# Section 8 – Putting It Together: Get and Delete Without Breaking the Rules
+# Section 8 – Putting It Together: The Procedure from Section 1
 
-This final section combines the concepts covered throughout the lab:
+Section 1 showed an application asking `usp_DeleteCustomer` to delete Gustavo Achong and receiving return code `2`. This final section builds that procedure. It brings together the pieces from the whole lab:
 
-- Implementing CRUD operations using stored procedures and functions.
-- Choosing between separate and combined procedures.
-- Checking business rules before modifying data.
-- Using `RETURN` codes to report operation results.
-- Handling SQL Server errors with `TRY/CATCH`.
+- checking that the record exists (Sections 2 and 3);
+- checking a business rule and reporting it with a return code (Section 3);
+- handling SQL Server errors with `TRY/CATCH` (Section 6);
+- the foreign key that protects the data behind it all (Section 7).
 
-We implement two scenarios using different approaches.
-
-Both scenarios focus on **Read and Delete** operations, but the same principles apply to other CRUD operations.
-
-## 8.1 Scenario A – Customer: Separate function and procedure
-
-An application needs to retrieve customer information and delete customers who no longer have invoices.
-
-We implement two database objects:
-
-| Object | Purpose |
-|---|---|
-| `dbo.fn_GetCustomer` | Retrieve a customer by ID |
-| `dbo.usp_DeleteCustomer` | Delete a customer if they have no invoices |
-
-### The function
-
-`dbo.fn_GetCustomer` is an inline table-valued function, following the pattern from Section 4. It accepts `@IDCustomer` and returns `IDCustomer`, `FirstName`, `LastName`, `Email`, `PhoneNumber`, and `CityID` of that customer — or an empty result set if the customer does not exist.
-
-```sql
-CREATE OR ALTER FUNCTION dbo.fn_GetCustomer
-(
-    @IDCustomer int
-)
-RETURNS TABLE
-AS
-RETURN
-(
-    SELECT
-        IDCustomer,
-        FirstName,
-        LastName,
-        Email,
-        PhoneNumber,
-        CityID
-    FROM Customer
-    WHERE IDCustomer = @IDCustomer
-);
-GO
-
-```
-
-### The delete procedure
+## 8.1 The procedure
 
 `dbo.usp_DeleteCustomer` accepts `@IDCustomer` and:
 
@@ -2227,27 +2184,17 @@ END;
 GO
 ```
 
-### The customers we will use
+## 8.2 Test the procedure
 
 No test data is needed. The original `AdventureWorksENG` data already contains both cases — 19119 customers have invoices and 853 do not:
 
-| IDCustomer | Name | Invoices | Role in this scenario |
+| IDCustomer | Name | Invoices | Role in this test |
 |---:|---|---:|---|
 | 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
 | 16 | Lili Alameda | 0 | Deletion must **succeed** |
 
-### Test the implementation
-
 ```sql
 DECLARE @Result int;
-
--- Read a real customer: Gustavo Achong
-SELECT *
-FROM dbo.fn_GetCustomer(1);
-
--- Read a nonexistent customer
-SELECT *
-FROM dbo.fn_GetCustomer(999999);
 
 -- Delete Lili Alameda, who has no invoices
 EXEC @Result = dbo.usp_DeleteCustomer
@@ -2274,25 +2221,17 @@ SELECT COUNT(*) AS AchongInvoices FROM Invoice WHERE CustomerID = 1;
 
 Expected results:
 
-| Test | Expected result |
-|---|---|
-| Get customer `1` (Gustavo Achong) | One row |
-| Get customer `999999` | Zero rows |
-| Delete customer `16` (no invoices) | Return `0` |
-| Delete customer `1` (7 invoices) | Return `2` |
-| Delete customer `16` again | Return `1` |
-
-Reading customer `1` returns the real record:
-
-| IDCustomer | FirstName | LastName | Email | PhoneNumber | CityID |
-|---:|---|---|---|---|---:|
-| 1 | Gustavo | Achong | gustavo0@adventure-works.com | 398-555-0132 | 9 |
+| Test | Return code |
+|---|---:|
+| Delete customer `16` (no invoices) | `0` |
+| Delete customer `1` (7 invoices) | `2` |
+| Delete customer `16` again | `1` |
 
 Gustavo Achong and his seven invoices still exist after the rejected deletion.
 
-### Test the safety net
+## 8.3 Test the safety net
 
-Return code `3` never appeared in the tests above. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
+Return code `3` never appeared in the tests in Section 8.2. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
 
 To see it work, temporarily disable the business rule. In `usp_DeleteCustomer`, comment out the invoice check, then run `CREATE OR ALTER` again:
 
@@ -2342,203 +2281,20 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 > [!NOTE]
 > Return code `3` tells the caller *that* an error occurred, but not *which* one. The error number and message are lost. A procedure can return them alongside the code, or pass the original error on to the caller with `THROW` — Lab 9 covers this.
 
-## 8.2 Scenario B – Product: Combined procedure
-
-An application needs to retrieve product information and delete products that have never been sold.
-
-This time, both operations are implemented in **one stored procedure**, `dbo.usp_ManageProduct`, using the `@Action` pattern from Section 5:
-
-```sql
-@Action    nvarchar(10),
-@IDProduct int
-```
-
-The procedure supports two actions:
-
-- **`GET`** retrieves the product identified by `@IDProduct` and returns `IDProduct`, `Name`, `ProductNumber`, `Color`, `PriceWithoutVAT`, and `SubcategoryID`. It returns code `1` if the product does not exist.
-- **`DELETE`** checks whether the product exists and whether it appears in `InvoiceItem`, and deletes it only if it has never been sold. The `DELETE` runs inside `TRY/CATCH`, and `@@ROWCOUNT` is checked immediately after it.
-
-| Return code | Meaning |
-|---:|---|
-| `0` | Operation completed successfully |
-| `1` | Product does not exist |
-| `2` | Product has been sold; deletion rejected |
-| `3` | SQL Server error occurred |
-| `99` | Unknown action |
-
-Return code `1` applies to both actions: as in Section 5.3, `GET` tells the caller when the product does not exist.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_ManageProduct
-    @Action    nvarchar(10),
-    @IDProduct int
-AS
-BEGIN
-    IF @Action = N'GET'
-    BEGIN
-        SELECT
-            IDProduct,
-            Name,
-            ProductNumber,
-            Color,
-            PriceWithoutVAT,
-            SubcategoryID
-        FROM Product
-        WHERE IDProduct = @IDProduct;
-
-        IF @@ROWCOUNT = 0
-            RETURN 1;
-
-        RETURN 0;
-    END
-
-    IF @Action = N'DELETE'
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM Product
-            WHERE IDProduct = @IDProduct
-        )
-            RETURN 1;
-
-        IF EXISTS (
-            SELECT 1
-            FROM InvoiceItem
-            WHERE ProductID = @IDProduct
-        )
-            RETURN 2;
-
-        BEGIN TRY
-            DELETE FROM Product
-            WHERE IDProduct = @IDProduct;
-
-            IF @@ROWCOUNT = 0
-                RETURN 1;
-        END TRY
-        BEGIN CATCH
-            RETURN 3;
-        END CATCH
-
-        RETURN 0;
-    END
-
-    RETURN 99;
-END;
-GO
-```
-
-### The products we will use
-
-Again, no test data is needed. Of the 504 real products, 266 have been sold at least once and 238 never have:
-
-| IDProduct | Name | Times sold | Role in this scenario |
-|---:|---|---:|---|
-| 707 | Sport-100 Helmet, Red | 3083 | Deletion must be **rejected** |
-| 680 | HL Road Frame - Black, 58 | 0 | Deletion must **succeed** |
-
-### Test the implementation
-
-```sql
-DECLARE @Result int;
-
--- GET a real product: Sport-100 Helmet, Red
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'GET',
-    @IDProduct = 707;
-
-SELECT @Result AS GetHelmet; -- 0
-
--- GET nonexistent product
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'GET',
-    @IDProduct = 999999;
-
-SELECT @Result AS GetMissing; -- 1
-
--- DELETE HL Road Frame - Black, 58, which was never sold
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'DELETE',
-    @IDProduct = 680;
-
-SELECT @Result AS DeleteNeverSold; -- 0
-
--- DELETE Sport-100 Helmet, Red, which was sold 3083 times
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'DELETE',
-    @IDProduct = 707;
-
-SELECT @Result AS DeleteSold; -- 2
-
--- DELETE the already deleted product
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'DELETE',
-    @IDProduct = 680;
-
-SELECT @Result AS DeleteMissing; -- 1
-
--- Unknown action
-EXEC @Result = dbo.usp_ManageProduct
-    @Action = N'UNKNOWN',
-    @IDProduct = 707;
-
-SELECT @Result AS UnknownAction; -- 99
-
--- Sport-100 Helmet, Red and its invoice items are untouched
-SELECT IDProduct, Name FROM Product WHERE IDProduct = 707;
-SELECT COUNT(*) AS HelmetInvoiceItems FROM InvoiceItem WHERE ProductID = 707;
-```
-
-Expected results:
-
-| Test | Expected result |
-|---|---|
-| GET product `707` | One row, return `0` |
-| GET product `999999` | Zero rows, return `1` |
-| DELETE product `680` (never sold) | Return `0` |
-| DELETE product `707` (sold 3083 times) | Return `2` |
-| DELETE product `680` again | Return `1` |
-| Unknown action | Return `99` |
-
-The `GET` action returns the real product:
-
-| IDProduct | Name | ProductNumber | Color | PriceWithoutVAT | SubcategoryID |
-|---:|---|---|---|---:|---:|
-| 707 | Sport-100 Helmet, Red | HL-U509-R | Crvena | 34.9900 | 31 |
-
-## 8.3 Compare the two approaches
-
-Both scenarios implement Read and Delete operations, but they organize them differently.
-
-| Aspect | Scenario A – Customer | Scenario B – Product |
-|---|---|---|
-| Read | Inline TVF | Stored procedure |
-| Delete | Separate procedure | Combined with GET |
-| Interface | Two database objects | One database object |
-| Operation selection | Function or procedure name | `@Action` parameter |
-| Business rule | Customer must have no invoices | Product must never have been sold |
-
-Neither approach is universally better.
-
-The appropriate design depends on the application's requirements, how the results will be used, and how the database interface should be organized.
-
 ## Final questions
 
-1. Which approach would you find easier to maintain: separate objects or one combined procedure?
-2. Why can `fn_GetCustomer` be used in a `JOIN`, while `usp_ManageProduct` cannot?
-3. Why do both DELETE procedures check related records before attempting deletion?
-4. Why do the procedures still use `TRY/CATCH` after checking business rules?
-5. What is the advantage of using consistent `RETURN` codes across multiple procedures?
-6. Section 1 described four outcomes of a delete request. Map return codes `0`, `1`, `2`, and `3` to them.
+1. `FK_Invoice_Customer` already prevents deleting a customer who has invoices. Why does `usp_DeleteCustomer` still check for invoices?
+2. Why does the procedure still use `TRY/CATCH` after checking the business rule?
+3. What is the advantage of using consistent `RETURN` codes across multiple procedures?
+4. Section 1 described four answers to a delete request. Map return codes `0`, `1`, `2`, and `3` to them.
 
 <details>
 <summary>Discussion</summary>
 
-1. Both approaches are valid. Separate objects usually have clearer responsibilities, while combined procedures provide a single entry point.
-2. An inline TVF returns a table that can participate directly in SQL queries. A stored procedure cannot be used directly as a table source.
-3. To enforce business rules and return meaningful status codes instead of immediately attempting an operation that should be rejected.
-4. Database errors may still occur, including constraint violations caused by concurrent changes or other unexpected conditions.
-5. Consistent return codes make it easier for applications to handle operation results in a predictable way.
-6. The return codes are exactly the four outcomes:
+1. Not to protect the data — the foreign key does that. The check gives the caller a specific reason: return code `2` instead of error 547.
+2. An error can still occur: the business rule may be missing or bypassed, as the safety-net test showed, or another session may insert an invoice between the check and the `DELETE`. `TRY/CATCH` turns such an error into return code `3`.
+3. Consistent return codes make it easier for applications to handle operation results in a predictable way.
+4. The return codes are exactly the four outcomes:
 
    | Return code | Outcome from Section 1 |
    |---:|---|

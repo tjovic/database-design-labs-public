@@ -61,37 +61,6 @@ Most applications need four basic operations on data: **Create, Read, Update, an
 
 Applications usually do not run these statements directly. They call stored procedures such as `usp_InsertCustomer` or `usp_DeleteCustomer`, and the procedure runs the SQL. This gives the database a **reusable interface** and a place to enforce **business rules**.
 
-Lab 3 introduced stored procedures as a database interface. For CRUD, that interface has one more job: to report clearly **what happened**.
-
-Compare the two ways an application can delete customer `1`, Gustavo Achong, who has 7 invoices.
-
-**Without a procedure** — the application sends SQL and must work out the meaning of the response itself:
-
-```mermaid
-sequenceDiagram
-    participant A as Application
-    participant DB as SQL Server
-    A->>DB: DELETE FROM Customer WHERE IDCustomer = 1
-    DB-->>A: 0 rows? 1 row? error 547?
-    Note left of A: the application must<br/>work out what happened
-```
-
-**With a procedure** — the procedure checks the rules, decides the outcome, and reports it:
-
-```mermaid
-sequenceDiagram
-    participant A as Application
-    participant P as usp_DeleteCustomer
-    participant T as Tables
-    A->>P: EXEC dbo.usp_DeleteCustomer @IDCustomer = 1
-    P->>T: exists? has invoices?
-    T-->>P: yes, 7 invoices
-    P-->>A: RETURN 2
-    Note left of A: "Customer cannot be deleted<br/>because invoices exist."
-```
-
-The application only has to translate return code `2` into a message. You will build exactly this procedure in Section 8.
-
 > [!IMPORTANT]
 > **CRUD describes four types of operations, not necessarily four stored procedures.**
 >
@@ -101,7 +70,18 @@ The application only has to translate return code `2` into a message. You will b
 
 Writing a `DELETE` statement is easy. Knowing what happened after it ran is not.
 
-An application asks the database to delete a customer. On the real data in `AdventureWorksENG`, the same statement — `DELETE FROM Customer WHERE IDCustomer = …` — produces very different results:
+When an application sends a `DELETE` directly, it has to work out the meaning of the response itself:
+
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant DB as SQL Server
+    A->>DB: DELETE FROM Customer WHERE IDCustomer = …
+    DB-->>A: 0 rows? 1 row? error 547?
+    Note left of A: the application must<br/>work out what happened
+```
+
+On the real data in `AdventureWorksENG`, the same statement produces very different results:
 
 | Customer | Situation | What SQL Server reports |
 |---|---|---|
@@ -123,6 +103,26 @@ flowchart TD
 ```
 
 In every outcome except the last, *nothing was deleted* — but for completely different reasons. An application that cannot tell these outcomes apart will show the wrong message to the user, or silently ignore a real problem.
+
+## The procedure reports the outcome
+
+Lab 3 introduced stored procedures as a database interface. For CRUD, that interface has one more job: to report clearly **what happened**.
+
+Here is the same request for Gustavo Achong, this time through a procedure:
+
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant P as usp_DeleteCustomer
+    participant T as Tables
+    A->>P: EXEC dbo.usp_DeleteCustomer @IDCustomer = 1
+    P->>T: exists? has invoices?
+    T-->>P: yes, 7 invoices
+    P-->>A: RETURN 2
+    Note left of A: "Customer cannot be deleted<br/>because invoices exist."
+```
+
+This is the business-rule outcome from the flowchart above: the procedure rejects the request before any `DELETE` runs, and return code `2` says why. The application only has to translate the code into a message. You will build exactly this procedure in Section 8.
 
 > [!IMPORTANT]
 > **Designing CRUD operations whose outcomes the caller can tell apart is the main goal of this lab.** Every section adds one piece: verifying affected rows (Section 2), return codes for business rules (Section 3), handling errors (Section 6), and understanding the constraints behind them (Section 7). Section 8 brings everything together.

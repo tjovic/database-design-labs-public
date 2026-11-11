@@ -13,7 +13,7 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 >
 > Almost every example is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT` ([Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount)), and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
 >
-> If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Try to write each procedure yourself before looking at the solution.
+> If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Before you run each example, try to predict what it will return.
 
 > [!NOTE]
 > **This lab works on the real `AdventureWorksENG` data.**
@@ -610,9 +610,7 @@ END;
 GO
 ```
 
-Insert the first two Slovenian cities, `Ljubljana` and `Maribor`:
-
-`usp_InsertState` returned `IDState = 4` for `Slovenia`, so the application passes that ID to `usp_InsertCity`:
+Insert the first two Slovenian cities, `Ljubljana` and `Maribor`. `usp_InsertState` returned `IDState = 4` for `Slovenia`, so the application passes that ID to `usp_InsertCity`:
 
 ```sql
 DECLARE @City1 int, @City2 int;
@@ -774,9 +772,7 @@ We test all three outcomes:
 2. Delete `Ljubljana` again, using the same ID.
 3. Delete `Zagreb` (`IDCity = 1`). No test data is needed here: every real city in `AdventureWorksENG` already has customers, and `Zagreb` has 1492 of them.
 
-The return code is captured with `EXEC @Result = ...`:
-
-The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` above.
+The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` above. The return code is captured with `EXEC @Result = ...`:
 
 ```sql
 DECLARE @Result int;
@@ -818,7 +814,7 @@ Expected results:
 >
 > However, a check followed by a `DELETE` is not automatically atomic. In a concurrent environment, another session could modify related data between these statements.
 >
-> Later sections discuss database constraints and error handling as additional protection.
+> Section 7.3 returns to this problem, and Labs 9 and 10 show how transactions solve it.
 
 ### What does the business rule actually add?
 
@@ -838,7 +834,7 @@ The statement has been terminated.
 
 So the check in `usp_DeleteCity` does not protect the data — the foreign key already does that. What it adds is a **clear answer**: instead of an error, the caller receives return code `2`, which says exactly why the city was not deleted.
 
-In terms of Section 1, the procedure turns outcome *SQL Server error* into outcome *rejected by a business rule*.
+In terms of Section 1, the procedure turns error 547 into a specific answer — return code `2`.
 
 ## Check your understanding
 
@@ -1703,7 +1699,7 @@ SELECT @NewID AS NewCategoryID, @Result AS InsertResult;
 SQL Server raises an error:
 
 ```text
-Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 11
+Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 10
 Cannot insert the value NULL into column 'Name', table 'AdventureWorksENG.dbo.Category';
 column does not allow nulls. INSERT fails.
 The statement has been terminated.
@@ -1737,7 +1733,7 @@ Two problems are visible here:
 
 1. The value of `@IDCustomer`. `NULL` means Insert; a supplied ID means Update.
 2. It explicitly selects which operation the procedure should execute.
-3. Because the procedure enforces a business rule that prevents deleting subcategories that still have products.
+3. Because the subcategory still has products. The foreign key `FK_Product_Subcategory` would reject the `DELETE` anyway — return code `2` tells the caller *why*, instead of error 547.
 4. Each procedure has one clearly defined responsibility, making the interface easier to understand and maintain.
 5. When operations are closely related, such as inserting and updating records through the same application form.
 6. Return value `0`, no error, and the same ID in `@IDCustomer`. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
@@ -1931,7 +1927,7 @@ Section 1 asked what can happen when you delete a row. We have now met every out
 | Outcome | Example in this lab | How the caller detects it |
 |---|---|---|
 | The row does not exist | `usp_GetCategory` and `usp_UpdateCategoryName` with ID `999999` (Section 2) | Empty result set, `@@ROWCOUNT = 0`, or return code `1` (Sections 3 and 5) |
-| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 3), `DELETE` of `Chains` (Section 5.3) | Explicit return code `2` |
+| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 3.4), `DELETE` of `Chains` (Section 5.3) | Explicit return code `2` |
 | SQL Server error | Deleting `Bicycles` (Section 6.1), `INSERT` without a name (Section 5.5) | `TRY/CATCH`; return code `3` (Section 6.2) |
 | Success | Deleting `Electric Scooters` (Section 2.5) | Return code `0`, rows affected |
 
@@ -2311,7 +2307,7 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 
 # What You Should Know After This Lab
 
-The main idea of this lab: **"nothing was deleted" can mean four different things, and the caller must be able to tell them apart.**
+The main idea of this lab: **a delete request can end in four different ways, and the caller must be able to tell them apart.**
 
 | Outcome | How it is detected | Return code used in this lab |
 |---|---|---:|
@@ -2351,6 +2347,11 @@ Function
 Procedure
     -> can implement INSERT / UPDATE / DELETE
     -> can report the outcome with a return code or OUTPUT parameters
+
+Read
+    -> called by the application: procedure
+    -> part of another query: inline TVF
+    -> often both: the function holds the query, the procedure calls it
 ```
 
 ```text

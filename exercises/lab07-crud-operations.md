@@ -469,7 +469,7 @@ Create `dbo.usp_Exercises_ChangeStudent` that performs insert, update, or delete
 | `'U'` | Update the student with `@IDStudent` |
 | `'D'` | Delete the student with `@IDStudent` |
 
-Return values: `0` = success, `1` = student does not exist, `-1` = unknown action.
+Return values: `0` = success, `1` = student does not exist, `99` = unknown action — the same convention as `usp_ManageSubcategory` in Lab 07, Section 5.3.
 
 Only the parameters the action needs should be required: `@FirstName`, `@LastName`, and `@StudentNumber` should default to `NULL`.
 
@@ -529,7 +529,7 @@ BEGIN
         RETURN 0;
     END;
 
-    RETURN -1;   -- unknown action
+    RETURN 99;   -- unknown action
 END;
 GO
 
@@ -548,7 +548,7 @@ SELECT @Result AS DeleteResult;                       -- 0
 SELECT * FROM dbo.fn_Exercises_GetStudent(@ID);       -- empty
 
 EXEC @Result = dbo.usp_Exercises_ChangeStudent 'X', @ID OUTPUT;
-SELECT @Result AS UnknownActionResult;                -- -1
+SELECT @Result AS UnknownActionResult;                -- 99
 GO
 ```
 
@@ -570,7 +570,7 @@ The delete call passes only the action and the ID, because the other parameters 
 | --- | --- |
 | `0` | Student inserted |
 | `2` | Student number already exists |
-| `-1` | Any other error |
+| `3` | Any other error |
 
 Call it with an existing and with a new student number (`0036599999`).
 
@@ -632,7 +632,7 @@ BEGIN
         IF ERROR_NUMBER() IN (2627, 2601)
             RETURN 2;   -- student number already exists
 
-        RETURN -1;      -- any other error
+        RETURN 3;       -- any other error
     END CATCH;
 END;
 GO
@@ -653,7 +653,7 @@ The new student's ID is higher than you might expect: each failed `INSERT` still
 
 **Part C** – In Part A, the **caller** handles the error. Every caller has to write its own `TRY/CATCH` and understand SQL Server error numbers.
 
-In Part B, the **procedure** handles the error and translates it into a simple, documented return value. Callers only check `0`, `2`, or `-1`. The cost is that the original error message is hidden from the caller, so the procedure should only translate errors it understands and report the rest as a general failure.
+In Part B, the **procedure** handles the error and translates it into a simple, documented return value. Callers only check `0`, `2`, or `3`. The cost is that the original error message is hidden from the caller, so the procedure should only translate errors it understands and report the rest as a general failure.
 
 </details>
 
@@ -676,7 +676,7 @@ Behavior:
 | The student does not exist | Change nothing | `1` |
 | The student has enrollments and `@DeleteEnrollments = 0` | Change nothing | `2` |
 | Otherwise | Delete the student's enrollments (if any) and then the student | `0` |
-| An error occurs | Catch it | `-1` |
+| An error occurs | Catch it | `3` |
 
 Test the procedure in this order:
 
@@ -730,7 +730,7 @@ BEGIN
         RETURN 0;
     END TRY
     BEGIN CATCH
-        RETURN -1;
+        RETURN 3;
     END CATCH;
 END;
 GO
@@ -786,7 +786,7 @@ Behavior:
 3. If no course has `@CourseCode`, insert a new course with `@CourseName`. Otherwise use the existing course.
 4. Insert the enrollment, return its ID through `@IDEnrollment`, and `RETURN 0`.
 
-If an error occurs, catch it and `RETURN -1`.
+If an error occurs, catch it and `RETURN 3`.
 
 Test the procedure:
 
@@ -867,7 +867,7 @@ BEGIN
     END TRY
     BEGIN CATCH
         SET @IDEnrollment = NULL;
-        RETURN -1;
+        RETURN 3;
     END CATCH;
 END;
 GO

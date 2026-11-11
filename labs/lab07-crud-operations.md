@@ -219,7 +219,7 @@ EXEC dbo.usp_InsertCategory
 SELECT @NewID AS NewCategoryID;
 ```
 
-The procedure inserts a new row and returns its generated primary key.
+The procedure inserts a new row and returns its generated primary key. On a freshly created database, `Scooters` receives `IDCategory = 5`.
 
 Verify the result:
 
@@ -228,6 +228,9 @@ SELECT *
 FROM Category
 WHERE Name = N'Scooters';
 ```
+
+> [!NOTE]
+> **Two kinds of SQL in this lab.** The application — the caller — works only through procedures: it calls `EXEC` and uses what the procedure returns. The verification queries, such as the `SELECT` above, are for us. They look directly into the table to confirm what the procedure did, and they are not part of the application.
 
 > [!NOTE]
 > The `OUTPUT` parameter and `SCOPE_IDENTITY()` were introduced in Lab 3. Here, we use them to return the ID of a newly created record.
@@ -330,7 +333,6 @@ The first call returns one row, `Bicycles`. The second returns every category, s
 | 2 | Parts |
 | 5 | Scooters |
 
-On a freshly created database `Scooters` receives ID `5`.
 
 Searching for a pattern that matches nothing, such as `N'Q%'`, returns zero rows rather than an error.
 
@@ -366,17 +368,22 @@ END;
 GO
 ```
 
-First, retrieve the ID of the `Scooters` category created in Section 2.1.
+An application changes a record the way a user does: it first finds the record, then updates it using its ID. Find the `Scooters` category with the search procedure from Section 2.3:
 
 ```sql
-DECLARE @CategoryID int;
+EXEC dbo.usp_FindCategoriesByName
+    @NamePattern = N'Scooters';
+```
 
-SELECT @CategoryID = IDCategory
-FROM Category
-WHERE Name = N'Scooters';
+| IDCategory | Name |
+|---:|---|
+| 5 | Scooters |
 
+Then update it using the ID from the result:
+
+```sql
 EXEC dbo.usp_UpdateCategoryName
-    @IDCategory = @CategoryID,
+    @IDCategory = 5,
     @NewName = N'Electric Scooters';
 ```
 
@@ -441,22 +448,16 @@ GO
 The scooter line is discontinued. Delete the category:
 
 ```sql
-DECLARE @CategoryID int;
-
-SELECT @CategoryID = IDCategory
-FROM Category
-WHERE Name = N'Electric Scooters';
-
 -- First attempt
 EXEC dbo.usp_DeleteCategory
-    @IDCategory = @CategoryID;
+    @IDCategory = 5;
 
 -- Try deleting the same category again
 EXEC dbo.usp_DeleteCategory
-    @IDCategory = @CategoryID;
+    @IDCategory = 5;
 ```
 
-Both calls run in the same batch, so the second one can reuse `@CategoryID`.
+`Electric Scooters` still has `IDCategory = 5` — renaming a record does not change its primary key.
 
 Expected results:
 
@@ -625,20 +626,16 @@ GO
 
 Insert the first two Slovenian cities, `Ljubljana` and `Maribor`:
 
+`usp_InsertState` returned `IDState = 4` for `Slovenia`, so the application passes that ID to `usp_InsertCity`:
+
 ```sql
-DECLARE @StateID int;
-
-SELECT @StateID = IDState
-FROM State
-WHERE Name = N'Slovenia';
-
 DECLARE @City1 int, @City2 int;
 
 EXEC dbo.usp_InsertCity
-    N'Ljubljana', @StateID, @City1 OUTPUT;
+    N'Ljubljana', 4, @City1 OUTPUT;
 
 EXEC dbo.usp_InsertCity
-    N'Maribor', @StateID, @City2 OUTPUT;
+    N'Maribor', 4, @City2 OUTPUT;
 
 SELECT
     @City1 AS City1ID,
@@ -647,7 +644,7 @@ SELECT
 -- Verify the inserted cities
 SELECT *
 FROM City
-WHERE StateID = @StateID;
+WHERE StateID = 4;
 ```
 
 On a freshly created database, `Ljubljana` receives `IDCity = 14` and `Maribor` `IDCity = 15`.
@@ -729,14 +726,8 @@ Expected result:
 Then read the cities of `Slovenia`:
 
 ```sql
-DECLARE @StateID int;
-
-SELECT @StateID = IDState
-FROM State
-WHERE Name = N'Slovenia';
-
 EXEC dbo.usp_GetCitiesByState
-    @IDState = @StateID;
+    @IDState = 4;
 ```
 
 Expected result:
@@ -803,19 +794,17 @@ We test all three outcomes:
 
 The return code is captured with `EXEC @Result = ...`:
 
-```sql
-DECLARE @City1 int, @Result int;
+The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` above.
 
-SELECT @City1 = IDCity
-FROM City
-WHERE Name = N'Ljubljana';
+```sql
+DECLARE @Result int;
 
 -- Test 1: Ljubljana exists and has no customers yet
-EXEC @Result = dbo.usp_DeleteCity @IDCity = @City1;
+EXEC @Result = dbo.usp_DeleteCity @IDCity = 14;
 SELECT @Result AS DeleteTestCity_FirstTry;
 
 -- Test 2: Same city again
-EXEC @Result = dbo.usp_DeleteCity @IDCity = @City1;
+EXEC @Result = dbo.usp_DeleteCity @IDCity = 14;
 SELECT @Result AS DeleteTestCity_SecondTry;
 
 -- Test 3: Real city that has customers (Zagreb)
@@ -1316,6 +1305,8 @@ VALUES (2, N'Kickstands');
 SELECT SCOPE_IDENTITY() AS SubWithoutProduct;
 ```
 
+On a freshly created database, `Kickstands` receives `IDSubcategory = 38`.
+
 ### Example – `usp_ManageSubcategory`
 
 The procedure supports two operations:
@@ -1386,12 +1377,10 @@ For `GET`, return code `1` tells the caller that the subcategory does not exist.
 
 ### Test the procedure
 
-```sql
-DECLARE @SubWithoutProduct int, @Result int;
+`Kickstands` received `IDSubcategory = 38` when it was inserted above.
 
-SELECT @SubWithoutProduct = IDSubcategory
-FROM Subcategory
-WHERE Name = N'Kickstands';
+```sql
+DECLARE @Result int;
 
 -- Read the real subcategory 'Chains'
 EXEC @Result = dbo.usp_ManageSubcategory
@@ -1431,7 +1420,7 @@ SELECT @Result AS UnknownAction; -- 99
 -- Delete the empty subcategory
 EXEC @Result = dbo.usp_ManageSubcategory
     @Action = N'DELETE',
-    @IDSubcategory = @SubWithoutProduct;
+    @IDSubcategory = 38;
 
 SELECT @Result AS DeleteUnused; -- 0
 

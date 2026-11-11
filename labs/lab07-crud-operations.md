@@ -197,8 +197,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertCategory
     @NewCategoryID int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO Category (Name)
     VALUES (@Name);
 
@@ -249,8 +247,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetCategory
     @IDCategory int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCategory,
         Name
@@ -299,8 +295,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_FindCategoriesByName
     @NamePattern nvarchar(50)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCategory,
         Name
@@ -357,8 +351,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_UpdateCategoryName
     @NewName    nvarchar(50)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     UPDATE Category
     SET Name = @NewName
     WHERE IDCategory = @IDCategory;
@@ -433,8 +425,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
     @IDCategory int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     DELETE FROM Category
     WHERE IDCategory = @IDCategory;
 
@@ -565,8 +555,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertState
     @NewStateID int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO State (Name)
     VALUES (@Name);
 
@@ -614,8 +602,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertCity
     @NewCityID int OUTPUT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO City (Name, StateID)
     VALUES (@Name, @StateID);
 
@@ -694,8 +680,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
     @IDState int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         IDCity,
         Name
@@ -760,8 +744,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteCity
     @IDCity int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF NOT EXISTS (
         SELECT 1
         FROM City
@@ -910,8 +892,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_GetCustomersByCity
     @CityName nvarchar(50)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     SELECT
         c.IDCustomer,
         c.FirstName,
@@ -1172,8 +1152,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_SaveState
     @Name    nvarchar(50)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @IDState IS NULL
     BEGIN
         INSERT INTO State (Name)
@@ -1320,8 +1298,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_ManageSubcategory
     @IDSubcategory int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @Action = N'GET'
     BEGIN
         SELECT
@@ -1497,8 +1473,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_ManageCategory
     @Name       nvarchar(50) = NULL
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @Action = N'INSERT'
     BEGIN
         INSERT INTO Category (Name)
@@ -1608,7 +1582,7 @@ SELECT @IDCategory AS NewCategoryID, @Result AS InsertResult;
 SQL Server raises an error:
 
 ```text
-Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 11
+Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 9
 Cannot insert the value NULL into column 'Name', table 'AdventureWorksENG.dbo.Category';
 column does not allow nulls. INSERT fails.
 The statement has been terminated.
@@ -1683,7 +1657,7 @@ SQL Server rejects the `DELETE` because the category is still referenced by its 
 The output is:
 
 ```text
-Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteCategory, Line 7
+Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteCategory, Line 5
 The DELETE statement conflicted with the REFERENCE constraint "FK_Subcategory_Category".
 The conflict occurred in database "AdventureWorksENG", table "dbo.Subcategory", column 'CategoryID'.
 The statement has been terminated.
@@ -1718,8 +1692,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
     @IDCategory int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     BEGIN TRY
         DELETE FROM Category
         WHERE IDCategory = @IDCategory;
@@ -1786,8 +1758,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
     @IDCategory int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     DELETE FROM Category
     WHERE IDCategory = @IDCategory;
 
@@ -2171,8 +2141,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteCustomer
     @IDCustomer int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF NOT EXISTS (
         SELECT 1
         FROM Customer
@@ -2350,8 +2318,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_ManageProduct
     @IDProduct int
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @Action = N'GET'
     BEGIN
         SELECT

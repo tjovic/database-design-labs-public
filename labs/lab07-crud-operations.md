@@ -11,7 +11,7 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 > [!IMPORTANT]
 > **This lab is mostly about stored procedures.**
 >
-> Almost every example is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT`, and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
+> Almost every example is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT` ([Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount)), and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
 >
 > If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Try to write each procedure yourself before looking at the solution.
 
@@ -44,7 +44,7 @@ GO
 ```
 
 > [!NOTE]
-> **Prerequisites:** This lab builds directly on [Lab 3 – Stored Procedures](lab03-stored-procedures.md) (input parameters, `OUTPUT` parameters, `RETURN`, `CREATE OR ALTER`) and on the basic `TRY/CATCH` block from [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md). It also uses the inline table-valued function syntax from [Lab 4 – Functions](lab04-functions.md). None of these topics are re-explained in depth here — only applied.
+> **Prerequisites:** This lab builds directly on [Lab 3 – Stored Procedures](lab03-stored-procedures.md) (input parameters, `OUTPUT` parameters, `RETURN`, `CREATE OR ALTER`) and on `@@ROWCOUNT` and the basic `TRY/CATCH` block from [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md). It also uses the inline table-valued function syntax from [Lab 4 – Functions](lab04-functions.md). None of these topics are re-explained in depth here — only applied.
 
 ---
 
@@ -415,7 +415,7 @@ Again, this is the outcome *the row does not exist* — this time reported throu
 >
 > The `UPDATE` executed successfully, but no record matched the specified ID.
 >
-> We use `@@ROWCOUNT`, introduced in Lab 0, to detect this situation.
+> We use `@@ROWCOUNT`, introduced in [Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount), to detect this situation.
 
 ## 2.5 Delete – Remove a category
 

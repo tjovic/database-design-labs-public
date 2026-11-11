@@ -967,6 +967,8 @@ The caller decides the order — the query in Section 4.4 sorts the function's r
 
 </details>
 
+So which one should you use? It depends on **who calls it**: an application calls a procedure, while other SQL queries use a function. Often the best answer is both — Section 4.7 shows how.
+
 The difference between the two is **how their results can be used**.
 
 ## 4.4 Using a function in a larger query
@@ -1039,15 +1041,12 @@ A stored procedure is executed using `EXEC`, while an inline TVF can participate
 | Useful for database operations and application interfaces | Useful for reusable, parameterized queries |
 | Caller learns the outcome from a return code, `OUTPUT` parameters, or result sets | Caller learns the outcome only from the returned rows |
 
-For CRUD operations:
-
-- **Create, Update, Delete:** stored procedures can implement these operations.
-- **Read:** both stored procedures and inline TVFs are possible choices.
+For CRUD operations, **Create, Update, and Delete** are always procedures — a function cannot modify tables. For **Read**, choose by who calls it:
 
 > [!TIP]
-> If the result needs to be joined with other tables or used inside a larger SQL query, an inline TVF is often a convenient choice.
->
-> If the application needs to execute a defined database operation, a stored procedure may be more appropriate.
+> - **The application calls the Read → use a procedure.** It is the stable interface from Lab 3, it can sort the result, and it can report when the requested record does not exist.
+> - **The Read is part of another query** — a `JOIN`, a report, or another procedure → **use an inline TVF.**
+> - **You need both → write the query once in a function, and let the procedure call it.** Section 4.7 shows this pattern.
 
 ## 4.6 What can a function tell its caller?
 
@@ -1067,10 +1066,62 @@ Both return `0`.
 
 Two different situations produce exactly the same answer. The function has no return code and no `OUTPUT` parameter — the only thing it can give the caller is rows. Zero rows cannot say *why* there are zero rows.
 
-A stored procedure could tell the difference: it could check whether the city exists and return code `1` if it does not, just as `usp_DeleteCity` did in Section 3.
+A stored procedure could tell the difference: it could check whether the city exists and return code `1` if it does not, just as `usp_DeleteCity` did in Section 3. Section 4.7 does exactly that.
 
 > [!NOTE]
 > This is not a reason to avoid functions. For a Read operation, "no matching rows" is often all the caller needs. But when the caller must distinguish *missing* from *empty*, a function is not enough on its own.
+
+## 4.7 Using both: a procedure built on a function
+
+The function from Section 4.3 contains the query. The application, however, should call a procedure — and the procedure can add what the function cannot: sorting, and telling *missing* from *empty*.
+
+Replace `usp_GetCustomersByCity` from Section 4.2 with a version that uses the function:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetCustomersByCity
+    @CityName nvarchar(50)
+AS
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM City
+        WHERE Name = @CityName
+    )
+        RETURN 1;
+
+    SELECT IDCustomer, FirstName, LastName, City
+    FROM dbo.fn_CustomersByCity(@CityName)
+    ORDER BY LastName, FirstName;
+
+    RETURN 0;
+END;
+GO
+```
+
+Test it with the three cities from this section:
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Zagreb';
+SELECT @Result AS Zagreb;
+
+EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Maribor';
+SELECT @Result AS Maribor;
+
+EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Atlantis';
+SELECT @Result AS Atlantis;
+```
+
+Expected results:
+
+| City | Return code | Rows returned |
+|---|---:|---:|
+| Zagreb | 0 | 1492 |
+| Maribor — exists, no customers | 0 | 0 |
+| Atlantis — does not exist | 1 | 0 |
+
+The query exists in one place only — the function. Reports and other queries can join it; the application calls the procedure and gets a sorted result and a clear answer when the city does not exist.
 
 ## Check your understanding
 

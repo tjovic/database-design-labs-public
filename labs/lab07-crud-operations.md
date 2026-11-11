@@ -1527,10 +1527,23 @@ The Read operations remain in the separate procedures created in Section 2.
 It uses the same `@Action` approach as `usp_ManageSubcategory` in Section 5.3, with these parameters:
 
 ```sql
-@Action     nvarchar(10),
-@IDCategory int OUTPUT,
-@Name       nvarchar(50) = NULL
+@Action        nvarchar(10),
+@IDCategory    int          = NULL,        -- UPDATE, DELETE: the category to change
+@Name          nvarchar(50) = NULL,        -- INSERT, UPDATE: the (new) name
+@NewCategoryID int          = NULL OUTPUT  -- INSERT: the generated ID
 ```
+
+Each parameter has one role. `@IDCategory` is an input — it tells the procedure *which* category to change. `@NewCategoryID` is an output — it returns the ID that `INSERT` generated, just like `usp_InsertCategory` in Section 2.1.
+
+Not every action uses every parameter:
+
+| Action | `@IDCategory` | `@Name` | `@NewCategoryID` |
+|---|:---:|:---:|:---:|
+| `INSERT` | – | ✓ | ✓ (output) |
+| `UPDATE` | ✓ | ✓ | – |
+| `DELETE` | ✓ | – | – |
+
+This is typical of a combined procedure: the parameter list is shared, so each action ignores some of it. That is why every parameter except `@Action` has a default value.
 
 Each action reports its outcome with a return code:
 
@@ -1545,9 +1558,10 @@ Each action reports its outcome with a return code:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_ManageCategory
-    @Action     nvarchar(10),
-    @IDCategory int OUTPUT,
-    @Name       nvarchar(50) = NULL
+    @Action        nvarchar(10),
+    @IDCategory    int          = NULL,
+    @Name          nvarchar(50) = NULL,
+    @NewCategoryID int          = NULL OUTPUT
 AS
 BEGIN
     IF @Action = N'INSERT'
@@ -1555,15 +1569,15 @@ BEGIN
         INSERT INTO Category (Name)
         VALUES (@Name);
 
-        SET @IDCategory = SCOPE_IDENTITY();
+        SET @NewCategoryID = SCOPE_IDENTITY();
         RETURN 0;
     END
 
     IF @Action = N'UPDATE'
     BEGIN
         UPDATE Category
-        SET Name = @Name
-        WHERE IDCategory = @IDCategory;
+        SET Name = @Name                 -- the new name
+        WHERE IDCategory = @IDCategory;  -- the category to change
 
         IF @@ROWCOUNT = 0
             RETURN 1;
@@ -1598,59 +1612,89 @@ END;
 GO
 ```
 
+In the `UPDATE` branch, `@IDCategory` identifies the row and `@Name` is its new value. The procedure never needs the old name — the ID is enough to find the row.
+
 ### Test the procedure
 
 The test inserts a new category named `Gift Cards`, captures its generated ID, renames it to `Gift Vouchers`, deletes it, and then tries to delete it again:
 
 ```sql
-DECLARE @IDCategory int = NULL;
-DECLARE @Result int;
+DECLARE @NewID int, @Result int;
 
 -- INSERT
 EXEC @Result = dbo.usp_ManageCategory
-    @Action = N'INSERT',
-    @IDCategory = @IDCategory OUTPUT,
-    @Name = N'Gift Cards';
+    @Action        = N'INSERT',
+    @Name          = N'Gift Cards',
+    @NewCategoryID = @NewID OUTPUT;
 
-SELECT @IDCategory AS CategoryID, @Result AS InsertResult;
+SELECT @NewID AS NewCategoryID, @Result AS InsertResult;
 
 -- UPDATE
 EXEC @Result = dbo.usp_ManageCategory
-    @Action = N'UPDATE',
-    @IDCategory = @IDCategory OUTPUT,
-    @Name = N'Gift Vouchers';
+    @Action     = N'UPDATE',
+    @IDCategory = @NewID,
+    @Name       = N'Gift Vouchers';
 
 SELECT @Result AS UpdateResult;
 
 -- DELETE
 EXEC @Result = dbo.usp_ManageCategory
-    @Action = N'DELETE',
-    @IDCategory = @IDCategory OUTPUT;
+    @Action     = N'DELETE',
+    @IDCategory = @NewID;
 
 SELECT @Result AS DeleteResult;
 
 -- DELETE again
 EXEC @Result = dbo.usp_ManageCategory
-    @Action = N'DELETE',
-    @IDCategory = @IDCategory OUTPUT;
+    @Action     = N'DELETE',
+    @IDCategory = @NewID;
 
 SELECT @Result AS DeleteAgainResult;
 ```
 
 Expected return codes: `0`, `0`, `0`, `1`.
 
+### A caller that only updates
+
+The test runs all four calls in one batch for convenience, but the actions do not depend on each other. A caller that only edits a category gets the ID the same way as in Section 2.4 — from a search:
+
+```sql
+-- The user searches for the category and sees its ID
+EXEC dbo.usp_FindCategoriesByName
+    @NamePattern = N'Clothes';
+```
+
+| IDCategory | Name |
+|---:|---|
+| 3 | Clothes |
+
+```sql
+-- The user renames it
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'UPDATE',
+    @IDCategory = 3,
+    @Name       = N'Clothing';
+
+SELECT @Result AS UpdateResult;  -- 0
+```
+
+> [!TIP]
+> **Always call a combined procedure with named parameters.** Because each action uses a different subset of parameters, a positional call is easy to get wrong. `EXEC dbo.usp_ManageCategory N'UPDATE', 3, N'Clothing'` happens to work, but a positional `INSERT` would need an explicit `NULL` for `@IDCategory` before the name — skip it, and `Gift Cards` lands in the `int` parameter and the call fails with *Error converting data type nvarchar to int*. With named parameters, each value goes exactly where its name says.
+
 ### Predict, then try
 
 `@Name` has a default value of `NULL`, so the caller may omit it — for every action. What happens when the caller omits it for `INSERT`?
 
 ```sql
-DECLARE @IDCategory int = NULL, @Result int;
+DECLARE @NewID int, @Result int;
 
 EXEC @Result = dbo.usp_ManageCategory
-    @Action = N'INSERT',
-    @IDCategory = @IDCategory OUTPUT;
+    @Action        = N'INSERT',
+    @NewCategoryID = @NewID OUTPUT;
 
-SELECT @IDCategory AS NewCategoryID, @Result AS InsertResult;
+SELECT @NewID AS NewCategoryID, @Result AS InsertResult;
 ```
 
 <details>
@@ -1659,7 +1703,7 @@ SELECT @IDCategory AS NewCategoryID, @Result AS InsertResult;
 SQL Server raises an error:
 
 ```text
-Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 9
+Msg 515, Level 16, State 2, Procedure dbo.usp_ManageCategory, Line 11
 Cannot insert the value NULL into column 'Name', table 'AdventureWorksENG.dbo.Category';
 column does not allow nulls. INSERT fails.
 The statement has been terminated.

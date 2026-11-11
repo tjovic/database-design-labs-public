@@ -95,7 +95,14 @@ In two of the three cases *nothing was deleted*, for completely different reason
 
 ## The procedure reports the outcome
 
-Lab 3 introduced stored procedures as a database interface. For CRUD, that interface has one more job: to report clearly **what happened**.
+The reasons for using stored procedures from [Lab 3](lab03-stored-procedures.md#why-use-stored-procedures) still apply to CRUD operations. Take `usp_DeleteCustomer`:
+
+- **Encapsulation** — the application does not need to know which tables are checked or in which order. Those steps live inside the procedure.
+- **Reusability** — a web shop, a mobile app, and an internal admin tool can all call the same procedure. The rule about invoices is written once, not repeated in every application.
+- **A stable interface** — the application knows only the procedure name, the parameter `@IDCustomer`, and the meaning of the return codes. The checks inside can change without changing the application.
+- **Fewer network round-trips** — without a procedure, the application would send three statements: check that the customer exists, check for invoices, then delete. With a procedure, it sends one `EXEC`.
+
+For CRUD, the interface has one more job: to report clearly **what happened**.
 
 Here is the same request for Gustavo Achong, this time through a procedure:
 

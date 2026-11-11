@@ -1924,7 +1924,7 @@ Both approaches are valid, but they have different characteristics.
 >
 > We will explore `THROW` and more advanced error-handling techniques in Lab 9.
 
-## 6.4 Different outcomes of a CRUD operation
+## 6.4 Which mechanism detects which outcome?
 
 Section 1 asked what can happen when you delete a row. We have now met every outcome, and for each one we have a way for the caller to detect it:
 
@@ -1935,30 +1935,11 @@ Section 1 asked what can happen when you delete a row. We have now met every out
 | SQL Server error | Deleting `Bicycles` (Section 6.1), `INSERT` without a name (Section 5.5) | `TRY/CATCH`; return code `3` (Section 6.2) |
 | Success | Deleting `Electric Scooters` (Section 2.5) | Return code `0`, rows affected |
 
-The decision flow from Section 1, now with the mechanism for each outcome:
-
-```mermaid
-flowchart TD
-    A[Request: delete a row] --> B{Does the row exist?}
-    B -- No --> R1["Not found<br/>@@ROWCOUNT = 0 or RETURN 1"]
-    B -- Yes --> C{Does a business rule<br/>allow it?}
-    C -- No --> R2["Rejected<br/>IF EXISTS ... RETURN 2"]
-    C -- Yes --> D{Does a foreign key<br/>allow it?}
-    D -- No --> R3["Error 547<br/>TRY/CATCH ... RETURN 3"]
-    D -- Yes --> R4["Deleted<br/>RETURN 0"]
-```
-
-These situations should not be treated as equivalent. Only one of them is a SQL Server error — the others are normal results that the procedure must report explicitly.
+Only one of these outcomes is a SQL Server error. The others are normal results that the procedure must report explicitly.
 
 Sections 5.5 and 6.1 also showed a trap. A statement that fails with an error such as 547 or 515 terminates only itself — the procedure continues. Any `@@ROWCOUNT` or `RETURN` that follows then reports a misleading result: `RowsDeleted = 0` or return code `0`.
 
 > [!IMPORTANT]
-> Use `@@ROWCOUNT` to determine how many rows a statement affected.
->
-> Use explicit checks and `RETURN` codes to report business-rule outcomes.
->
-> Use `TRY/CATCH` to handle SQL Server errors.
->
 > **A row count or return code read after a statement that can fail is reliable only if the error is caught.**
 
 ## Check your understanding

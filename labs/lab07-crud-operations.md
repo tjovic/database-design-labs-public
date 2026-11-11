@@ -61,6 +61,37 @@ Most applications need four basic operations on data: **Create, Read, Update, an
 
 Applications usually do not run these statements directly. They call stored procedures such as `usp_InsertCustomer` or `usp_DeleteCustomer`, and the procedure runs the SQL. This gives the database a **reusable interface** and a place to enforce **business rules**.
 
+Lab 3 introduced stored procedures as a database interface. For CRUD, that interface has one more job: to report clearly **what happened**.
+
+Compare the two ways an application can delete customer `1`, Gustavo Achong, who has 7 invoices.
+
+**Without a procedure** — the application sends SQL and must work out the meaning of the response itself:
+
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant DB as SQL Server
+    A->>DB: DELETE FROM Customer WHERE IDCustomer = 1
+    DB-->>A: 0 rows? 1 row? error 547?
+    Note left of A: the application must<br/>work out what happened
+```
+
+**With a procedure** — the procedure checks the rules, decides the outcome, and reports it:
+
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant P as usp_DeleteCustomer
+    participant T as Tables
+    A->>P: EXEC dbo.usp_DeleteCustomer @IDCustomer = 1
+    P->>T: exists? has invoices?
+    T-->>P: yes, 7 invoices
+    P-->>A: RETURN 2
+    Note left of A: "Customer cannot be deleted<br/>because invoices exist."
+```
+
+The application only has to translate return code `2` into a message. You will build exactly this procedure in Section 8.
+
 > [!IMPORTANT]
 > **CRUD describes four types of operations, not necessarily four stored procedures.**
 >

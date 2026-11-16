@@ -1146,16 +1146,76 @@ SELECT @NewID AS NewCustomerID, @Result AS ReturnValue;
 
 Nothing was saved, but the caller cannot tell. There is no error, and the return value is `0` — the default when a procedure has no `RETURN`. `NewCustomerID` is `NULL`, but that is expected for every update, so it says nothing either. The application would report that the customer was saved.
 
-One line after the `UPDATE` would fix it:
+</details>
+
+### Telling the caller that the customer does not exist
+
+Usually the ID is valid — the application loaded the customer into the form before the user edited it. But not always: another user may have deleted the customer in the meantime, or the ID may come from a URL that was changed by hand. The application cannot check this itself, so the procedure has to tell it.
+
+Two lines after the `UPDATE` close the gap — the same `@@ROWCOUNT` check that `usp_UpdateCityName` used in Section 2.4, now turned into a return code:
 
 ```sql
-IF @@ROWCOUNT = 0
-    RETURN 1;
+CREATE OR ALTER PROCEDURE dbo.usp_SaveCustomer
+    @IDCustomer    int = NULL,        -- NULL: insert; an ID: update that customer
+    @FirstName     nvarchar(50),
+    @LastName      nvarchar(50),
+    @Email         nvarchar(50),
+    @PhoneNumber   nvarchar(25),
+    @CityID        int,
+    @NewCustomerID int = NULL OUTPUT  -- INSERT: the generated ID
+AS
+BEGIN
+    IF @IDCustomer IS NULL
+    BEGIN
+        INSERT INTO Customer (FirstName, LastName, Email, PhoneNumber, CityID)
+        VALUES (@FirstName, @LastName, @Email, @PhoneNumber, @CityID);
+
+        SET @NewCustomerID = SCOPE_IDENTITY();
+    END
+    ELSE
+    BEGIN
+        UPDATE Customer
+        SET FirstName   = @FirstName,
+            LastName    = @LastName,
+            Email       = @Email,
+            PhoneNumber = @PhoneNumber,
+            CityID      = @CityID
+        WHERE IDCustomer = @IDCustomer;
+
+        IF @@ROWCOUNT = 0
+            RETURN 1;   -- the customer does not exist
+    END
+
+    RETURN 0;
+END;
+GO
 ```
 
-The procedure in Section 4.5 uses exactly this pattern for its `UPDATE` action.
+| Return code | Meaning |
+|---:|---|
+| `0` | Saved — inserted or updated |
+| `1` | Not saved — the customer does not exist |
 
-</details>
+Run the same call again:
+
+```sql
+DECLARE @NewID int, @Result int;
+
+EXEC @Result = dbo.usp_SaveCustomer
+    @IDCustomer    = 99999,
+    @FirstName     = N'Ivan',
+    @LastName      = N'Kovač',
+    @Email         = NULL,
+    @PhoneNumber   = NULL,
+    @CityID        = 1,
+    @NewCustomerID = @NewID OUTPUT;
+
+SELECT @NewID AS NewCustomerID, @Result AS ReturnValue;
+```
+
+Expected: `NewCustomerID = NULL` and `ReturnValue = 1`. Now the application can tell the user that the customer no longer exists, instead of reporting a successful save.
+
+This is the same convention as in Section 2.6 — `0` for success, `1` for a record that does not exist. Section 4.5 uses the same check for its `UPDATE` action.
 
 ## 4.3 Using an action parameter
 
@@ -1178,6 +1238,32 @@ EXEC dbo.usp_ManageSubcategory
 ```
 
 The `@Action` parameter determines which branch of the procedure runs. Do not run these two calls yet — the procedure is created later in this section.
+
+### The tables
+
+The procedures in Sections 4.3 and 4.5 work with three tables of the product catalog:
+
+```mermaid
+erDiagram
+    Category ||--o{ Subcategory : contains
+    Subcategory |o--o{ Product : contains
+    Category {
+        int IDCategory PK
+        nvarchar Name
+    }
+    Subcategory {
+        int IDSubcategory PK
+        int CategoryID FK
+        nvarchar Name
+    }
+    Product {
+        int IDProduct PK
+        nvarchar Name
+        int SubcategoryID FK
+    }
+```
+
+Every subcategory must belong to a category — `Subcategory.CategoryID` is required. A product may have no subcategory — `Product.SubcategoryID` is nullable. Section 6 returns to what this difference means.
 
 ### Prepare test data
 
@@ -1394,7 +1480,7 @@ However, they have different characteristics.
 
 ## 4.5 Create, Update, and Delete combined
 
-`Category` is the top level of the product catalog. `AdventureWorksENG` has four categories — `Bicycles` (1), `Parts` (2), `Clothes` (3), and `Accessories` (4) — and every subcategory belongs to one of them through the foreign key `FK_Subcategory_Category`.
+`Category` is the top of the product catalog shown in Section 4.3. `AdventureWorksENG` has four categories: `Bicycles` (1), `Parts` (2), `Clothes` (3), and `Accessories` (4).
 
 The procedure `dbo.usp_ManageCategory` combines three operations on `Category`:
 
@@ -1620,7 +1706,7 @@ Two problems are visible here:
 3. Why does `usp_ManageSubcategory` return `2` when a subcategory has products?
 4. What is one advantage of separate CRUD procedures?
 5. When might a combined procedure be useful?
-6. `usp_SaveCustomer` is called with an ID that does not exist. What does the caller receive, and why is that a problem?
+6. The first version of `usp_SaveCustomer` is called with an ID that does not exist. What does the caller receive, why is that a problem, and how does the final version solve it?
 7. `usp_ManageCategory` is called with `@Action = N'INSERT'` but without `@Name`. The `INSERT` fails — why is the return code still `0`?
 
 <details>
@@ -1631,7 +1717,7 @@ Two problems are visible here:
 3. Because the subcategory still has products. The foreign key `FK_Product_Subcategory` would reject the `DELETE` anyway — return code `2` tells the caller *why*, instead of error 547.
 4. Each procedure has one clearly defined responsibility, making the interface easier to understand and maintain.
 5. When operations are closely related, such as inserting and updating records through the same application form.
-6. Return value `0`, no error, and `@NewCustomerID = NULL` — the same as after any successful update. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
+6. Return value `0`, no error, and `@NewCustomerID = NULL` — the same as after any successful update. Nothing was saved, but nothing tells the caller so. The final version checks `@@ROWCOUNT` after the `UPDATE` and returns `1` when no row was updated.
 7. The `NULL` violates the `NOT NULL` column, so SQL Server terminates the `INSERT` statement — but not the procedure. Execution continues with `RETURN 0`.
 
 </details>

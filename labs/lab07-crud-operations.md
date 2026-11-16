@@ -2007,9 +2007,20 @@ An optional foreign key column can contain `NULL`, allowing a child record to ex
 
 ### Does an optional foreign key allow deleting the parent?
 
-Consider `Product.SubcategoryID`.
+Consider `Product.SubcategoryID`. This is how it is defined (an excerpt — the table already exists, so do not run it):
 
-This column is nullable, so a product can exist without belonging to a subcategory.
+```sql
+CREATE TABLE Product (
+    IDProduct     int IDENTITY PRIMARY KEY,
+    Name          nvarchar(50) NOT NULL,
+    -- ...
+    SubcategoryID int NULL,
+    CONSTRAINT FK_Product_Subcategory
+        FOREIGN KEY (SubcategoryID) REFERENCES Subcategory (IDSubcategory)
+);
+```
+
+Two separate properties are defined here: `NULL` says the column may be empty, and the `FOREIGN KEY` says that any value it does contain must exist in `Subcategory`. So a product can exist without belonging to a subcategory.
 
 In fact, 209 real products have `SubcategoryID = NULL` — for example `Adjustable Race` (`IDProduct = 1`). Such products reference nothing, so they block nothing.
 

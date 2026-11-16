@@ -75,7 +75,9 @@ When an application sends a `DELETE` directly, it has to work out the meaning of
 ```mermaid
 sequenceDiagram
     participant A as Application
-    participant DB as SQL Server
+    box SQL Server
+        participant DB as Tables
+    end
     A->>DB: DELETE FROM Customer WHERE IDCustomer = …
     DB-->>A: 0 rows? 1 row? error 547?
     Note left of A: the application must<br/>work out what happened
@@ -109,8 +111,10 @@ Here is the same request for Gustavo Achong, this time through a procedure:
 ```mermaid
 sequenceDiagram
     participant A as Application
-    participant P as usp_DeleteCustomer
-    participant T as Tables
+    box SQL Server
+        participant P as usp_DeleteCustomer
+        participant T as Tables
+    end
     A->>P: EXEC dbo.usp_DeleteCustomer @IDCustomer = 1
     P->>T: exists? has invoices?
     T-->>P: yes, 7 invoices

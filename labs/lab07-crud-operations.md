@@ -2327,7 +2327,7 @@ Section 1 showed an application asking `usp_DeleteCustomer` to delete Gustavo Ac
 - checking that the record exists (Section 2);
 - checking a business rule and reporting it with a return code (Section 2.6);
 - handling SQL Server errors with `TRY/CATCH` (Section 5);
-- the foreign key that protects the data behind it all (Section 6).
+- the foreign key behind the rule — and why not every rule has one (Section 6).
 
 ## 7.1 The procedure
 
@@ -2379,6 +2379,8 @@ BEGIN
 END;
 GO
 ```
+
+The `IF @@ROWCOUNT = 0` inside `TRY` may look unnecessary — the procedure has already checked that the customer exists. But between that check and the `DELETE`, another session could delete the same customer. The row count catches that case, using the same check as `usp_SaveCustomer` in Section 4.2.
 
 ## 7.2 Test the procedure
 
@@ -2487,6 +2489,8 @@ This is protection in layers:
 2. If the rule is missing or bypassed, the **foreign key** still protects the data.
 3. **`TRY/CATCH`** turns the resulting error into a code the caller can handle (return code `3`).
 
+These layers exist here only because this rule mirrors a foreign key. The rule in Section 6.2 has no constraint behind it — remove its check from `usp_AssignSalesman`, and nothing stops the assignment. There, the procedure is the only layer.
+
 Remove the comments and run `CREATE OR ALTER` once more to restore the procedure.
 
 </details>
@@ -2500,6 +2504,7 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 2. Why does the procedure still use `TRY/CATCH` after checking the business rule?
 3. What is the advantage of using consistent `RETURN` codes across multiple procedures?
 4. Section 1 described four answers to a delete request. Map return codes `0`, `1`, `2`, and `3` to them.
+5. Comment out the rule check in `usp_AssignSalesman` (Section 6.2) the same way as in Section 7.3. What happens when you assign invoice `75123` to Marino Alessi? Why is the result different from Section 7.3?
 
 <details>
 <summary>Discussion</summary>
@@ -2517,6 +2522,7 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
    | `3` | SQL Server error |
 
    Each outcome now has its own answer — which is what Section 1 set out to achieve.
+5. The assignment succeeds and the procedure returns `0`. In Section 7.3, the foreign key `FK_Invoice_Customer` stopped the `DELETE` when the rule was missing. Here no constraint stands behind the rule — the foreign key only checks that salesman `268` exists — so nothing stops the change. Restore the check afterwards, and undo the assignment by setting `SalesmanID` back to `NULL`.
 
 </details>
 

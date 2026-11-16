@@ -162,7 +162,9 @@ You will build exactly this procedure in Section 7.
 
 # Section 2 – CRUD for `State` and `City`
 
-This section implements every CRUD operation on two related tables, `State` and `City`, using a separate stored procedure for each operation. The two tables are connected through a foreign key:
+Section 1 showed the problem on `Customer` and `Invoice`, and the procedure that solves it. Before building that procedure in Section 7, we work through the same idea on two smaller tables, `State` and `City`. Their relationship is the same — a parent and its children, connected through a foreign key — but each table has only a name and an ID, so every CRUD operation fits on one screen.
+
+This section implements every CRUD operation on `State` and `City`, using a separate stored procedure for each operation. The two tables are connected through a foreign key:
 
 ```mermaid
 erDiagram
@@ -483,6 +485,8 @@ Suppose our application has the following business rule:
 
 **A city cannot be deleted if it has at least one customer.**
 
+This is the decision from Section 1 on a smaller scale: `City` and its customers play the role of `Customer` and its invoices. Only the error branch (`RETURN 3`) is missing — Section 5 adds it.
+
 The new version of `dbo.usp_DeleteCity` implements this rule and replaces the one from Section 2.5. It checks whether the city exists and whether any customers belong to it, and deletes the city only when it exists and has no customers. Instead of a row count, it reports the result with `RETURN`:
 
 | Return code | Meaning |
@@ -600,8 +604,6 @@ The statement has been terminated.
 ```
 
 So the check in `usp_DeleteCity` does not protect the data — the foreign key already does that. What it adds is a **clear answer**: instead of an error, the caller receives return code `2`, which says exactly why the city was not deleted.
-
-In terms of Section 1, the procedure turns error 547 into a specific answer — return code `2`.
 
 ## 2.7 Summary – How does the caller learn what happened?
 

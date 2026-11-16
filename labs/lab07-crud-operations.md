@@ -1023,12 +1023,13 @@ We can support both operations using one procedure.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_SaveCustomer
-    @IDCustomer  int OUTPUT,
-    @FirstName   nvarchar(50),
-    @LastName    nvarchar(50),
-    @Email       nvarchar(50),
-    @PhoneNumber nvarchar(25),
-    @CityID      int
+    @IDCustomer    int = NULL,        -- NULL: insert; an ID: update that customer
+    @FirstName     nvarchar(50),
+    @LastName      nvarchar(50),
+    @Email         nvarchar(50),
+    @PhoneNumber   nvarchar(25),
+    @CityID        int,
+    @NewCustomerID int = NULL OUTPUT  -- INSERT: the generated ID
 AS
 BEGIN
     IF @IDCustomer IS NULL
@@ -1036,7 +1037,7 @@ BEGIN
         INSERT INTO Customer (FirstName, LastName, Email, PhoneNumber, CityID)
         VALUES (@FirstName, @LastName, @Email, @PhoneNumber, @CityID);
 
-        SET @IDCustomer = SCOPE_IDENTITY();
+        SET @NewCustomerID = SCOPE_IDENTITY();
     END
     ELSE
     BEGIN
@@ -1052,6 +1053,8 @@ END;
 GO
 ```
 
+Each ID parameter has one role. `@IDCustomer` is an input — it tells the procedure *which* customer to update. `@NewCustomerID` is an output — it returns the ID that `INSERT` generated, just like `@NewStateID` in Section 2.1.
+
 The procedure uses the value of `@IDCustomer` to determine which operation to perform.
 
 | `@IDCustomer` | Operation |
@@ -1064,25 +1067,35 @@ Notice that the `UPDATE` sets **every** column, not only the one that changed. A
 
 ### Test the procedure
 
-Ana Horvat from Zagreb (`CityID = 1`) registers in the web shop. Later, she changes her phone number. Run both calls together in one batch, so the second call receives the ID returned by the first:
+Ana Horvat from Zagreb (`CityID = 1`) registers in the web shop. Later, she changes her phone number.
+
+**Test 1 – A new customer registers**
+
+The application does not have an ID yet, so it does not pass `@IDCustomer` at all:
 
 ```sql
-DECLARE @IDCustomer int = NULL;
+DECLARE @NewID int;
 
--- Test 1: A new customer registers
 EXEC dbo.usp_SaveCustomer
-    @IDCustomer  = @IDCustomer OUTPUT,
-    @FirstName   = N'Ana',
-    @LastName    = N'Horvat',
-    @Email       = N'ana.horvat@example.com',
-    @PhoneNumber = N'091-555-0142',
-    @CityID      = 1;
+    @FirstName     = N'Ana',
+    @LastName      = N'Horvat',
+    @Email         = N'ana.horvat@example.com',
+    @PhoneNumber   = N'091-555-0142',
+    @CityID        = 1,
+    @NewCustomerID = @NewID OUTPUT;
 
-SELECT @IDCustomer AS NewCustomerID;
+SELECT @NewID AS NewCustomerID;
+```
 
--- Test 2: The same customer changes her phone number
+`@IDCustomer` is `NULL`, so the procedure inserts a new customer and returns the generated ID — `19978` on a freshly created database.
+
+**Test 2 – The same customer changes her phone number**
+
+Now the application knows Ana's ID and passes it as `@IDCustomer`:
+
+```sql
 EXEC dbo.usp_SaveCustomer
-    @IDCustomer  = @IDCustomer OUTPUT,
+    @IDCustomer  = 19978,
     @FirstName   = N'Ana',
     @LastName    = N'Horvat',
     @Email       = N'ana.horvat@example.com',
@@ -1091,21 +1104,17 @@ EXEC dbo.usp_SaveCustomer
 
 SELECT *
 FROM Customer
-WHERE IDCustomer = @IDCustomer;
+WHERE IDCustomer = 19978;
 ```
 
-In the first call `@IDCustomer` is `NULL`, so the procedure inserts a new customer and returns the generated ID — `19978` on a freshly created database.
-
-The second call receives that ID, so it updates the existing customer instead of inserting another one:
+The procedure updates the existing customer instead of inserting another one:
 
 | IDCustomer | FirstName | LastName | Email | PhoneNumber | CityID |
 |---:|---|---|---|---|---:|
 | 19978 | Ana | Horvat | ana.horvat@example.com | 098-555-0177 | 1 |
 
-> [!IMPORTANT]
-> The same `OUTPUT` parameter can be used to pass an ID into a procedure and return an ID to the caller.
->
-> In this example, `NULL` means Create, while a supplied ID means Update.
+> [!NOTE]
+> You may also see Save procedures that use **one** `OUTPUT` parameter for both directions: the caller passes `NULL` or an ID in, and the procedure overwrites it with the new ID after an insert. It works, but the parameter then means two different things before and after the call. Separate input and output parameters are easier to read.
 
 This pattern is often called a **Save procedure**.
 
@@ -1114,27 +1123,28 @@ Notice that it does not automatically insert a new row when the supplied ID does
 **Predict:** an application calls `usp_SaveCustomer` with `@IDCustomer = 99999`. No customer has that ID. What does the caller see?
 
 ```sql
-DECLARE @IDCustomer int = 99999, @Result int;
+DECLARE @NewID int, @Result int;
 
 EXEC @Result = dbo.usp_SaveCustomer
-    @IDCustomer  = @IDCustomer OUTPUT,
-    @FirstName   = N'Ivan',
-    @LastName    = N'Kovač',
-    @Email       = NULL,
-    @PhoneNumber = NULL,
-    @CityID      = 1;
+    @IDCustomer    = 99999,
+    @FirstName     = N'Ivan',
+    @LastName      = N'Kovač',
+    @Email         = NULL,
+    @PhoneNumber   = NULL,
+    @CityID        = 1,
+    @NewCustomerID = @NewID OUTPUT;
 
-SELECT @IDCustomer AS IDCustomerAfterCall, @Result AS ReturnValue;
+SELECT @NewID AS NewCustomerID, @Result AS ReturnValue;
 ```
 
 <details>
 <summary>Show answer</summary>
 
-| IDCustomerAfterCall | ReturnValue |
+| NewCustomerID | ReturnValue |
 |---:|---:|
-| 99999 | 0 |
+| NULL | 0 |
 
-Nothing was saved, but the caller cannot tell. There is no error, the return value is `0` (the default when a procedure has no `RETURN`), and `@IDCustomer` still holds an ID — so the application would report that the customer was saved.
+Nothing was saved, but the caller cannot tell. There is no error, and the return value is `0` — the default when a procedure has no `RETURN`. `NewCustomerID` is `NULL`, but that is expected for every update, so it says nothing either. The application would report that the customer was saved.
 
 One line after the `UPDATE` would fix it:
 
@@ -1621,7 +1631,7 @@ Two problems are visible here:
 3. Because the subcategory still has products. The foreign key `FK_Product_Subcategory` would reject the `DELETE` anyway — return code `2` tells the caller *why*, instead of error 547.
 4. Each procedure has one clearly defined responsibility, making the interface easier to understand and maintain.
 5. When operations are closely related, such as inserting and updating records through the same application form.
-6. Return value `0`, no error, and the same ID in `@IDCustomer`. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
+6. Return value `0`, no error, and `@NewCustomerID = NULL` — the same as after any successful update. Nothing was saved, but nothing tells the caller so. Checking `@@ROWCOUNT` after the `UPDATE` and returning `1` would fix it.
 7. The `NULL` violates the `NOT NULL` column, so SQL Server terminates the `INSERT` statement — but not the procedure. Execution continues with `RETURN 0`.
 
 </details>

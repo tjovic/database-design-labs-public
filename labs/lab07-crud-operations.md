@@ -435,28 +435,25 @@ GO
 
 `@@ROWCOUNT` must be read immediately after the `DELETE`. Most statements in between would overwrite it — for example, `SET @x = 5` sets it to `1`, and `PRINT` sets it to `0`.
 
-The scooter line is discontinued. Delete the category:
+The scooter line is discontinued. `Electric Scooters` still has `IDCategory = 5` — renaming a record does not change its primary key.
+
+**Test 1 – Delete the category**
 
 ```sql
--- First attempt
-EXEC dbo.usp_DeleteCategory
-    @IDCategory = 5;
-
--- Try deleting the same category again
 EXEC dbo.usp_DeleteCategory
     @IDCategory = 5;
 ```
 
-`Electric Scooters` still has `IDCategory = 5` — renaming a record does not change its primary key.
+Expected: `RowsDeleted = 1`.
 
-Expected results:
+**Test 2 – Delete the same category again**
 
-| Call | RowsDeleted |
-|---|---:|
-| First attempt | 1 |
-| Same category again | 0 |
+```sql
+EXEC dbo.usp_DeleteCategory
+    @IDCategory = 5;
+```
 
-The second call affects zero rows because the category has already been deleted.
+Expected: `RowsDeleted = 0` — the category has already been deleted.
 
 > [!WARNING]
 > Not every category can be deleted successfully.
@@ -1044,28 +1041,46 @@ END;
 GO
 ```
 
-Test it with the three cities from this section:
+Test it with the three cities from this section.
+
+**Test 1 – Zagreb**
 
 ```sql
 DECLARE @Result int;
 
-EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Zagreb';
-SELECT @Result AS Zagreb;
+EXEC @Result = dbo.usp_GetCustomersByCity
+    @CityName = N'Zagreb';
 
-EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Maribor';
-SELECT @Result AS Maribor;
-
-EXEC @Result = dbo.usp_GetCustomersByCity @CityName = N'Atlantis';
-SELECT @Result AS Atlantis;
+SELECT @Result AS ReturnCode;
 ```
 
-Expected results:
+Expected: 1492 customers, sorted by last name, and return code `0`.
 
-| City | Return code | Rows returned |
-|---|---:|---:|
-| Zagreb | 0 | 1492 |
-| Maribor — exists, no customers | 0 | 0 |
-| Atlantis — does not exist | 1 | 0 |
+**Test 2 – Maribor exists, but has no customers**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_GetCustomersByCity
+    @CityName = N'Maribor';
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: an empty result and return code `0`.
+
+**Test 3 – Atlantis does not exist**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_GetCustomersByCity
+    @CityName = N'Atlantis';
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: an empty result and return code `1`.
 
 The query exists in one place only — the function. Reports and other queries can join it; the application calls the procedure and gets a sorted result and a clear answer when the city does not exist.
 
@@ -1376,63 +1391,107 @@ For `GET`, return code `1` tells the caller that the subcategory does not exist.
 
 ### Test the procedure
 
-`Kickstands` received `IDSubcategory = 38` when it was inserted above.
+`Kickstands` received `IDSubcategory = 38` when it was inserted above. Each test covers one outcome; predict the return code before you run it.
+
+**Test 1 – Read the real subcategory `Chains`**
 
 ```sql
 DECLARE @Result int;
 
--- Read the real subcategory 'Chains'
 EXEC @Result = dbo.usp_ManageSubcategory
     @Action = N'GET',
     @IDSubcategory = 7;
 
-SELECT @Result AS GetChains; -- 0
-
--- Read a nonexistent subcategory
-EXEC @Result = dbo.usp_ManageSubcategory
-    @Action = N'GET',
-    @IDSubcategory = 999999;
-
-SELECT @Result AS GetMissing; -- 1
-
--- Delete a nonexistent subcategory
-EXEC @Result = dbo.usp_ManageSubcategory
-    @Action = N'DELETE',
-    @IDSubcategory = 999999;
-
-SELECT @Result AS DeleteMissing; -- 1
-
--- Try deleting 'Chains', which contains the product 'Chain'
-EXEC @Result = dbo.usp_ManageSubcategory
-    @Action = N'DELETE',
-    @IDSubcategory = 7;
-
-SELECT @Result AS DeleteChains; -- 2
-
--- A typo in the action name
-EXEC @Result = dbo.usp_ManageSubcategory
-    @Action = N'REMOVE',
-    @IDSubcategory = 7;
-
-SELECT @Result AS UnknownAction; -- 99
-
--- Delete the empty subcategory
-EXEC @Result = dbo.usp_ManageSubcategory
-    @Action = N'DELETE',
-    @IDSubcategory = 38;
-
-SELECT @Result AS DeleteUnused; -- 0
-
--- 'Chains' and its product are untouched
-SELECT IDSubcategory, CategoryID, Name FROM Subcategory WHERE IDSubcategory = 7;
-SELECT IDProduct, Name FROM Product WHERE SubcategoryID = 7;
+SELECT @Result AS ReturnCode;
 ```
 
-The `GET` action returns the real subcategory:
+Expected: return code `0` and one row:
 
 | IDSubcategory | CategoryID | Name |
 |---:|---:|---|
 | 7 | 2 | Chains |
+
+**Test 2 – Read a nonexistent subcategory**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageSubcategory
+    @Action = N'GET',
+    @IDSubcategory = 999999;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: an empty result and return code `1`.
+
+**Test 3 – Delete a nonexistent subcategory**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageSubcategory
+    @Action = N'DELETE',
+    @IDSubcategory = 999999;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `1` — the subcategory does not exist.
+
+**Test 4 – Delete `Chains`, which contains the product `Chain`**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageSubcategory
+    @Action = N'DELETE',
+    @IDSubcategory = 7;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `2` — the subcategory has products, so the deletion is rejected.
+
+**Test 5 – A typo in the action name**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageSubcategory
+    @Action = N'REMOVE',
+    @IDSubcategory = 7;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `99` — unknown action.
+
+**Test 6 – Delete the empty subcategory `Kickstands`**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageSubcategory
+    @Action = N'DELETE',
+    @IDSubcategory = 38;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `0` — the subcategory is deleted.
+
+Verify that `Chains` and its product are untouched:
+
+```sql
+SELECT IDSubcategory, CategoryID, Name
+FROM Subcategory
+WHERE IDSubcategory = 7;
+
+SELECT IDProduct, Name
+FROM Product
+WHERE SubcategoryID = 7;
+```
 
 The same procedure supports different operations, but the caller must supply the correct `@Action`. A typo such as `REMOVE` is not an error — the procedure simply returns `99`, and the caller has to check for it.
 
@@ -1562,47 +1621,69 @@ In the `UPDATE` branch, `@IDCategory` identifies the row and `@Name` is its new 
 
 ### Test the procedure
 
-The test inserts a new category named `Gift Cards`, captures its generated ID, renames it to `Gift Vouchers`, deletes it, and then tries to delete it again:
+The test inserts a new category named `Gift Cards`, renames it to `Gift Vouchers`, deletes it, and then tries to delete it again.
+
+**Test 1 – INSERT**
 
 ```sql
 DECLARE @NewID int, @Result int;
 
--- INSERT
 EXEC @Result = dbo.usp_ManageCategory
     @Action        = N'INSERT',
     @Name          = N'Gift Cards',
     @NewCategoryID = @NewID OUTPUT;
 
-SELECT @NewID AS NewCategoryID, @Result AS InsertResult;
-
--- UPDATE
-EXEC @Result = dbo.usp_ManageCategory
-    @Action     = N'UPDATE',
-    @IDCategory = @NewID,
-    @Name       = N'Gift Vouchers';
-
-SELECT @Result AS UpdateResult;
-
--- DELETE
-EXEC @Result = dbo.usp_ManageCategory
-    @Action     = N'DELETE',
-    @IDCategory = @NewID;
-
-SELECT @Result AS DeleteResult;
-
--- DELETE again
-EXEC @Result = dbo.usp_ManageCategory
-    @Action     = N'DELETE',
-    @IDCategory = @NewID;
-
-SELECT @Result AS DeleteAgainResult;
+SELECT @NewID AS NewCategoryID, @Result AS ReturnCode;
 ```
 
-Expected return codes: `0`, `0`, `0`, `1`.
+Expected: return code `0` and the new ID — `6` on a freshly created database, after `Scooters` used `5` in Section 2. The next tests use this ID.
+
+**Test 2 – UPDATE**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'UPDATE',
+    @IDCategory = 6,
+    @Name       = N'Gift Vouchers';
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `0` — the category is renamed.
+
+**Test 3 – DELETE**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'DELETE',
+    @IDCategory = 6;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `0` — the category has no subcategories, so it is deleted.
+
+**Test 4 – DELETE again**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_ManageCategory
+    @Action     = N'DELETE',
+    @IDCategory = 6;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `1` — the category no longer exists.
 
 ### A caller that only updates
 
-The test runs all four calls in one batch for convenience, but the actions do not depend on each other. A caller that only edits a category gets the ID the same way as in Section 2.4 — from a search:
+The four tests run one after another, but the actions do not depend on each other. A caller that only edits a category gets the ID the same way as in Section 2.4 — from a search:
 
 ```sql
 -- The user searches for the category and sees its ID
@@ -2139,39 +2220,56 @@ No test data is needed. The original `AdventureWorksENG` data already contains b
 | 1 | Gustavo Achong | 7 | Deletion must be **rejected** |
 | 16 | Lili Alameda | 0 | Deletion must **succeed** |
 
+**Test 1 – Delete Lili Alameda, who has no invoices**
+
 ```sql
 DECLARE @Result int;
 
--- Delete Lili Alameda, who has no invoices
 EXEC @Result = dbo.usp_DeleteCustomer
     @IDCustomer = 16;
 
-SELECT @Result AS DeleteNoInvoices; -- 0
+SELECT @Result AS ReturnCode;
+```
 
--- Attempt to delete Gustavo Achong, who has 7 invoices
+Expected: `0` — the customer is deleted.
+
+**Test 2 – Delete Gustavo Achong, who has 7 invoices**
+
+```sql
+DECLARE @Result int;
+
 EXEC @Result = dbo.usp_DeleteCustomer
     @IDCustomer = 1;
 
-SELECT @Result AS DeleteWithInvoice; -- 2
+SELECT @Result AS ReturnCode;
+```
 
--- Delete Lili Alameda again
+Expected: `2` — the deletion is rejected.
+
+**Test 3 – Delete Lili Alameda again**
+
+```sql
+DECLARE @Result int;
+
 EXEC @Result = dbo.usp_DeleteCustomer
     @IDCustomer = 16;
 
-SELECT @Result AS DeleteAgain; -- 1
-
--- Gustavo Achong and his invoices are untouched
-SELECT IDCustomer, FirstName, LastName FROM Customer WHERE IDCustomer = 1;
-SELECT COUNT(*) AS AchongInvoices FROM Invoice WHERE CustomerID = 1;
+SELECT @Result AS ReturnCode;
 ```
 
-Expected results:
+Expected: `1` — the customer no longer exists.
 
-| Test | Return code |
-|---|---:|
-| Delete customer `16` (no invoices) | `0` |
-| Delete customer `1` (7 invoices) | `2` |
-| Delete customer `16` again | `1` |
+Verify that Gustavo Achong and his invoices are untouched:
+
+```sql
+SELECT IDCustomer, FirstName, LastName
+FROM Customer
+WHERE IDCustomer = 1;
+
+SELECT COUNT(*) AS AchongInvoices
+FROM Invoice
+WHERE CustomerID = 1;
+```
 
 Gustavo Achong and his seven invoices still exist after the rejected deletion.
 

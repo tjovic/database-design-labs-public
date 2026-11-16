@@ -3,6 +3,8 @@ import pyodbc
 from api.config import SERVER
 from api.config import DATABASE
 from api.config import DRIVER
+from api.config import DB_USER
+from api.config import DB_PASSWORD
 
 
 def get_connection():
@@ -11,9 +13,15 @@ def get_connection():
         f"DRIVER={{{DRIVER}}};"
         f"SERVER={SERVER};"
         f"DATABASE={DATABASE};"
-        "Trusted_Connection=yes;"
         "TrustServerCertificate=yes;"
     )
+
+    if DB_USER:
+        # SQL authentication (login and password)
+        connection_string += f"UID={DB_USER};PWD={DB_PASSWORD};"
+    else:
+        # Windows authentication
+        connection_string += "Trusted_Connection=yes;"
 
     return pyodbc.connect(connection_string)
 

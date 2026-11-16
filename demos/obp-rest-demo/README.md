@@ -107,6 +107,44 @@ Open Swagger at <http://localhost:8000/docs>.
 
 ---
 
+## Running on a computer without Python (packaged .exe)
+
+To run the demo on a computer where you cannot install Python or other
+software (for example, a lab computer without admin rights), package it
+into a single `.exe` on a machine where you can.
+
+### Build (on your own Windows computer)
+
+```bash
+cd demos/obp-rest-demo
+build.bat
+```
+
+This creates:
+
+```
+dist/obp-rest-demo.exe
+dist/config.env
+```
+
+### Run (on the target computer)
+
+1. Copy both files into the same folder (Desktop or a USB drive is fine).
+2. Edit `config.env`: set `SERVER`, `DATABASE`, and, for SQL
+   authentication, `DB_USER` and `DB_PASSWORD`. Leave the last two empty
+   to use Windows authentication.
+3. Double-click `obp-rest-demo.exe`. Swagger opens automatically at
+   <http://127.0.0.1:8000/docs>.
+
+The API listens only on `127.0.0.1`, so Windows Firewall does not ask
+for permission.
+
+> [!NOTE]
+> The target computer still needs **ODBC Driver 18 for SQL Server**.
+> Check without admin rights in PowerShell: `Get-OdbcDriver`.
+
+---
+
 ## Common problems
 
 **`Login failed for user`** — SQL Server does not allow Windows auth for
@@ -144,5 +182,8 @@ obp-rest-demo/
 │   ├── 02_SeedData.sql
 │   └── 03_StoredProcedures.sql
 ├── .env.example
+├── build.bat               # builds dist/obp-rest-demo.exe
+├── config.env.example      # settings for the packaged .exe
+├── run.py                  # entry point for the packaged .exe
 └── requirements.txt
 ```

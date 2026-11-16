@@ -11,3 +11,9 @@ lab*.test.sql
 lab*_out.txt
 lab*_verify.sql
 lab*_verify_out.txt
+
+# PyInstaller build output (demos/obp-rest-demo/build.bat)
+build/
+dist/
+*.spec
+config.env

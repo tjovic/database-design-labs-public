@@ -1734,41 +1734,41 @@ In Lab 0, you learned how to use `TRY/CATCH` to handle SQL Server errors. Now we
 
 ## 5.1 The problem – Deleting a referenced record
 
-Section 2 deleted cities, but never a state. Each city belongs to a state through the foreign key `FK_City_State` on `City.StateID`.
+Section 4.5 ended with a trap: the `INSERT` failed with error 515, but the procedure still returned `0`. This section starts with the same trap in its simplest form.
 
-`dbo.usp_DeleteState` follows the same pattern as the first version of `usp_DeleteCity` in Section 2.5:
+`usp_ManageCategory` checks for subcategories before it deletes a category, so its `DELETE` never fails. A procedure without that check does. `dbo.usp_DeleteCategory` follows the same pattern as the first version of `usp_DeleteCity` in Section 2.5:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
-    @IDState int
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
+    @IDCategory int
 AS
 BEGIN
-    DELETE FROM State
-    WHERE IDState = @IDState;
+    DELETE FROM Category
+    WHERE IDCategory = @IDCategory;
 
     SELECT @@ROWCOUNT AS RowsDeleted;
 END;
 GO
 ```
 
-Try deleting `Croatia` (`IDState = 1`), which has five cities — `Zagreb`, `Osijek`, `Pula`, `Rijeka`, and `Split`. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? And if there is a result set, what will `RowsDeleted` contain?
+Try deleting `Bicycles` (`IDCategory = 1`). As the diagram in Section 4.3 shows, every subcategory belongs to a category — and `Bicycles` has three: `Mountain Bikes`, `Road Bikes`, and `Touring Bikes`. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? And if there is a result set, what will `RowsDeleted` contain?
 
 ```sql
-EXEC dbo.usp_DeleteState
-    @IDState = 1;
+EXEC dbo.usp_DeleteCategory
+    @IDCategory = 1;
 ```
 
 <details>
 <summary>Show answer</summary>
 
-SQL Server rejects the `DELETE` because the state is still referenced by its cities.
+SQL Server rejects the `DELETE` because the category is still referenced by its subcategories.
 
 The output is:
 
 ```text
-Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteState, Line 5
-The DELETE statement conflicted with the REFERENCE constraint "FK_City_State".
-The conflict occurred in database "AdventureWorksENG", table "dbo.City", column 'StateID'.
+Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteCategory, Line 5
+The DELETE statement conflicted with the REFERENCE constraint "FK_Subcategory_Category".
+The conflict occurred in database "AdventureWorksENG", table "dbo.Subcategory", column 'CategoryID'.
 The statement has been terminated.
 ```
 
@@ -1778,32 +1778,32 @@ followed by a result set:
 |---:|
 | 0 |
 
-`Croatia` and its five cities remain in the database.
+`Bicycles` and its three subcategories remain in the database.
 
 </details>
 
 Notice the last line of the message: *the statement has been terminated*. Error 547 stops only the failed `DELETE`. The procedure then continues with the next statement, so `SELECT @@ROWCOUNT` still runs and reports zero deleted rows.
 
 > [!WARNING]
-> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a state that does not exist. Section 5.4 returns to why these two outcomes must not be confused.
+> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a category that does not exist. Section 5.4 returns to why these two outcomes must not be confused.
 
 > [!IMPORTANT]
 > **A foreign key constraint protects referential integrity.**
 >
-> SQL Server does not allow a referenced state to be deleted while related cities still exist, assuming the foreign key uses the default `NO ACTION` behavior.
+> SQL Server does not allow a referenced category to be deleted while related subcategories still exist, assuming the foreign key uses the default `NO ACTION` behavior.
 
 ## 5.2 Handling the error with TRY/CATCH
 
-We can modify `usp_DeleteState` to catch SQL Server errors.
+We can modify `usp_DeleteCategory` to catch SQL Server errors.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
-    @IDState int
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
+    @IDCategory int
 AS
 BEGIN
     BEGIN TRY
-        DELETE FROM State
-        WHERE IDState = @IDState;
+        DELETE FROM Category
+        WHERE IDCategory = @IDCategory;
 
         SELECT @@ROWCOUNT AS RowsDeleted;
         RETURN 0;
@@ -1823,8 +1823,8 @@ Execute the same deletion again, this time capturing the return code:
 ```sql
 DECLARE @Result int;
 
-EXEC @Result = dbo.usp_DeleteState
-    @IDState = 1;
+EXEC @Result = dbo.usp_DeleteCategory
+    @IDCategory = 1;
 
 SELECT @Result AS ReturnCode;
 ```
@@ -1841,7 +1841,7 @@ Expected results:
 |---:|
 | 3 |
 
-Notice that `Croatia` is **still not deleted**.
+Notice that `Bicycles` is **still not deleted**.
 
 `TRY/CATCH` changes how the error is handled, not whether the database constraint is enforced.
 
@@ -1850,6 +1850,8 @@ Look at what changed for the caller:
 - **The caller no longer receives an error.** The procedure handled it. If the caller wraps the call in its own `TRY/CATCH`, its `CATCH` does not run.
 - **The result set has a different shape.** On success the caller receives `RowsDeleted`; on failure it receives `ErrorNumber` and `ErrorMessage`. Recognising the outcome by the columns of a result set is fragile.
 - **The return code says what happened.** `0` means the `DELETE` ran; `3` means it failed with an error. This is the most reliable signal for the caller, and Section 7 uses the same convention.
+
+The same `TRY/CATCH` would also close the trap from the end of Section 4.5: wrapped in `TRY`, the failed `INSERT` in `usp_ManageCategory` would jump to `CATCH` and return `3` instead of `0`.
 
 > [!NOTE]
 > Why add `RETURN 3` explicitly? Without it, a procedure that catches an error does not return `0`. In this example SQL Server returned **`-6`** — a value it chose itself. Negative return values are used by SQL Server itself, so a procedure should always return its own documented code instead.
@@ -1860,15 +1862,15 @@ So far, we placed `TRY/CATCH` inside the stored procedure.
 
 However, error handling can also be implemented by the caller.
 
-For this demonstration, first restore the original version of `usp_DeleteState` from Section 5.1. That version does not catch the error internally.
+For this demonstration, first restore the original version of `usp_DeleteCategory` from Section 5.1. That version does not catch the error internally.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
-    @IDState int
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
+    @IDCategory int
 AS
 BEGIN
-    DELETE FROM State
-    WHERE IDState = @IDState;
+    DELETE FROM Category
+    WHERE IDCategory = @IDCategory;
 
     SELECT @@ROWCOUNT AS RowsDeleted;
 END;
@@ -1879,8 +1881,8 @@ Now the caller can handle the error:
 
 ```sql
 BEGIN TRY
-    EXEC dbo.usp_DeleteState
-        @IDState = 1;
+    EXEC dbo.usp_DeleteCategory
+        @IDCategory = 1;
 END TRY
 BEGIN CATCH
     SELECT
@@ -1896,7 +1898,7 @@ When an error occurs inside a `TRY` block, execution jumps to the `CATCH` block 
 
 The `ERROR_PROCEDURE()` function identifies the stored procedure in which the error occurred.
 
-In this example, it returns `dbo.usp_DeleteState` — the schema-qualified name. If the procedure still contained the internal `CATCH` from Section 5.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
+In this example, it returns `dbo.usp_DeleteCategory` — the schema-qualified name. If the procedure still contained the internal `CATCH` from Section 5.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
 
 Both approaches are valid, but they have different characteristics.
 
@@ -1920,7 +1922,7 @@ Section 1 asked what can happen when you delete a row. We have now met every out
 |---|---|---|
 | The row does not exist | `usp_GetCitiesByState` and `usp_UpdateCityName` with a nonexistent ID (Section 2) | Empty result set, `@@ROWCOUNT = 0`, or return code `1` (Sections 2.6 and 4) |
 | Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 2.6), `DELETE` of `Chains` (Section 4.3) | Explicit return code `2` |
-| SQL Server error | Deleting `Croatia` (Section 5.1), `INSERT` without a name (Section 4.5) | `TRY/CATCH`; return code `3` (Section 5.2) |
+| SQL Server error | Deleting `Bicycles` (Section 5.1), `INSERT` without a name (Section 4.5) | `TRY/CATCH`; return code `3` (Section 5.2) |
 | Success | Deleting `Koper` (Section 2.5) and `Ljubljana` (Section 2.6) | `RowsDeleted = 1` or return code `0` |
 
 Only one of these outcomes is a SQL Server error. The others are normal results that the procedure must report explicitly.
@@ -1932,19 +1934,19 @@ Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error su
 
 ## Check your understanding
 
-1. Why does SQL Server reject the deletion of a state that has cities?
+1. Why does SQL Server reject the deletion of a category that has subcategories?
 2. What is SQL Server error 547?
-3. Does adding `TRY/CATCH` allow the state to be deleted?
+3. Does adding `TRY/CATCH` allow the category to be deleted?
 4. Can `TRY/CATCH` be placed outside a stored procedure?
 5. What is the difference between `@@ROWCOUNT = 0` and a SQL Server error?
 6. What does `ERROR_PROCEDURE()` return?
-7. Why did `usp_DeleteState` in Section 5.1 return `RowsDeleted = 0`, even though the `DELETE` failed with an error?
+7. Why did `usp_DeleteCategory` in Section 5.1 return `RowsDeleted = 0`, even though the `DELETE` failed with an error?
 8. In Section 5.3, the caller wraps the call in `TRY/CATCH`. Does the procedure still return `RowsDeleted`? Why?
 
 <details>
 <summary>Show answers</summary>
 
-1. Because existing cities reference the state through a foreign key.
+1. Because existing subcategories reference the category through a foreign key.
 2. Error 547 indicates a constraint conflict, such as a foreign key violation.
 3. No. The foreign key constraint still prevents deletion.
 4. Yes. The caller can wrap the procedure call in `TRY/CATCH`, provided the procedure propagates the error.

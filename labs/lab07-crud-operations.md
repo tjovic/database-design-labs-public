@@ -2049,6 +2049,16 @@ Deleting `Chains` would leave the product `Chain` pointing at a row that no long
 
 </details>
 
+What the foreign key checks when a subcategory is deleted:
+
+```mermaid
+flowchart LR
+    D["DELETE FROM Subcategory<br/>WHERE IDSubcategory = 7"] --> Q{"Does any product have<br/>SubcategoryID = 7?"}
+    Q -- "Yes: Chain (952)" --> E["Error 547<br/>Chains is not deleted"]
+    Q -- No --> OK["Subcategory deleted"]
+    N["Products with SubcategoryID = NULL<br/>(e.g. Adjustable Race)<br/>reference nothing — not checked"] -.- Q
+```
+
 > [!IMPORTANT]
 > **Nullable foreign key does not mean unrestricted deletion.**
 >
@@ -2102,6 +2112,16 @@ The foreign key `FK_Invoice_Salesman` checks only one thing: that a salesman wit
 
 </details>
 
+Compare with the diagram in Section 6.1 — the foreign key asks the same question here, and only that question:
+
+```mermaid
+flowchart LR
+    U["UPDATE Invoice<br/>SET SalesmanID = 268"] --> F{"Does salesman<br/>268 exist?"}
+    F -- No --> E["Error 547"]
+    F -- Yes --> S["Invoice updated"]
+    N["Is he a permanent employee?<br/>— not checked"] -.- F
+```
+
 Undo the assignment before you continue:
 
 ```sql
@@ -2114,7 +2134,17 @@ Could another constraint enforce the rule? A `CHECK` constraint on `Invoice` see
 
 ### The procedure
 
-`dbo.usp_AssignSalesman` checks the rule before it changes anything:
+`dbo.usp_AssignSalesman` checks the rule before it changes anything. Its decisions follow the same shape as `usp_DeleteCustomer` in Section 1:
+
+```mermaid
+flowchart TD
+    A["EXEC usp_AssignSalesman"] --> B{Does the invoice exist?}
+    B -- No --> R1["RETURN 1<br/>not found"]
+    B -- Yes --> C{Is the salesman a<br/>permanent employee?}
+    C -- No --> R2["RETURN 2<br/>rejected, with a reason"]
+    C -- Yes --> D["UPDATE Invoice"]
+    D --> R0["RETURN 0<br/>assigned"]
+```
 
 | Return code | Meaning |
 |---:|---|

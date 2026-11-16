@@ -41,7 +41,7 @@ def add_invoice(invoice: InvoiceRequest):
 
     cursor.execute(
 
-        "EXEC sp_AddInvoice ?",
+        "EXEC usp_AddInvoice ?",
 
         json_data
 
@@ -175,7 +175,7 @@ def update_invoice(id: int, invoice: InvoiceRequest):
     cursor = conn.cursor()
 
     cursor.execute(
-        "EXEC sp_UpdateInvoice ?, ?",
+        "EXEC usp_UpdateInvoice ?, ?",
         id,
         json.dumps(invoice.model_dump())
     )
@@ -196,7 +196,7 @@ def delete_invoice(id: int):
     cursor = conn.cursor()
 
     cursor.execute(
-        "EXEC sp_DeleteInvoice ?",
+        "EXEC usp_DeleteInvoice ?",
         id
     )
 

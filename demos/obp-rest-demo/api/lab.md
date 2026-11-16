@@ -127,7 +127,7 @@ flowchart LR
         InvoiceItem
         Product
     end
-    SQL -->|"sp_GetInvoice"| JSON["One JSON object<br/>{ invoiceId, customer, items[] }"]
+    SQL -->|"usp_GetInvoice"| JSON["One JSON object<br/>{ invoiceId, customer, items[] }"]
     style JSON fill:#c8e6c9
 ```
 
@@ -187,7 +187,7 @@ Explain — trace this exact path for the JSON you just sent:
 ```mermaid
 flowchart TD
     A["Swagger"] --> B["FastAPI<br/>POST /invoices"]
-    B --> C["EXEC sp_AddInvoice<br/>@Json"]
+    B --> C["EXEC usp_AddInvoice<br/>@Json"]
     C --> D["JSON_VALUE<br/>reads customerId, date"]
     C --> E["OPENJSON(@Json, '$.items')<br/>shreds the items array"]
     D --> F["INSERT Invoice<br/>(1 row)"]

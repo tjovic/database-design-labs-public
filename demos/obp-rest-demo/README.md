@@ -16,7 +16,7 @@ shreds it with `OPENJSON` and inserts it atomically.
 
 | Lab 8 concept | Where it lives here |
 |---|---|
-| `nvarchar(max)` JSON parameter | `sp_AddInvoice`, called from `POST /invoices` |
+| `nvarchar(max)` JSON parameter | `usp_AddInvoice`, called from `POST /invoices` |
 | `OPENJSON(@Json, '$.items') WITH (...)` | [sql/03_StoredProcedures.sql](sql/03_StoredProcedures.sql) |
 | `BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK` for a 1:N insert | the same procedure, inserting an `Invoice` header and its `InvoiceItem` rows together |
 | "Thin API, fat stored procedure" | [api/routes.py](api/routes.py) — the route does no business logic, it only forwards JSON to SQL Server |
@@ -200,7 +200,7 @@ this order:
 Check that the data is there:
 
 ```sql
-EXEC OBPRestDemo.dbo.sp_GetInvoices;   -- 2 invoices
+EXEC OBPRestDemo.dbo.usp_GetInvoices;   -- 2 invoices
 ```
 
 **4. Edit `config.env`** in Notepad and set `SERVER` to the instance

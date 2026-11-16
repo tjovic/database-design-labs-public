@@ -1,7 +1,7 @@
 USE [OBPRestDemo]
 GO
 
-CREATE PROCEDURE [dbo].[sp_UpdateInvoice]
+CREATE PROCEDURE [dbo].[usp_UpdateInvoice]
     @InvoiceID INT,
     @Json NVARCHAR (MAX)
 AS
@@ -16,7 +16,7 @@ GO
 
 
 /******************************************************************************
-    PROCEDURE: sp_AddInvoice
+    PROCEDURE: usp_AddInvoice
 
     Description:
         Inserts an invoice and all of its items.
@@ -26,7 +26,7 @@ GO
 
 ******************************************************************************/
 
-CREATE OR ALTER PROCEDURE [dbo].[sp_AddInvoice]
+CREATE OR ALTER PROCEDURE [dbo].[usp_AddInvoice]
     @Json NVARCHAR (MAX)
 AS
 BEGIN
@@ -74,10 +74,10 @@ GO
 
 
 /******************************************************************************
-    PROCEDURE: sp_GetCustomers
+    PROCEDURE: usp_GetCustomers
 ******************************************************************************/
 
-CREATE PROCEDURE [dbo].[sp_GetCustomers]
+CREATE PROCEDURE [dbo].[usp_GetCustomers]
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -92,7 +92,7 @@ END
 GO
 
 
-CREATE PROCEDURE [dbo].[sp_GetInvoice]
+CREATE PROCEDURE [dbo].[usp_GetInvoice]
     @InvoiceID INT
 AS
 BEGIN
@@ -124,7 +124,7 @@ END
 GO
 
 
-CREATE   PROCEDURE [dbo].[sp_GetInvoices]
+CREATE   PROCEDURE [dbo].[usp_GetInvoices]
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -154,7 +154,7 @@ GO
 
 
 
-CREATE   PROCEDURE [dbo].[sp_DeleteInvoice]
+CREATE   PROCEDURE [dbo].[usp_DeleteInvoice]
 (
     @InvoiceID int
 )

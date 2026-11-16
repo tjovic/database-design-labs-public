@@ -38,7 +38,7 @@ def get_customers():
 
     cursor = conn.cursor()
 
-    cursor.execute("EXEC sp_GetCustomers")
+    cursor.execute("EXEC usp_GetCustomers")
 
     result = cursor.fetchall()
 
@@ -54,7 +54,7 @@ def get_invoice(invoice_id: int):
     cursor = conn.cursor()
 
     cursor.execute(
-        "EXEC sp_GetInvoice ?",
+        "EXEC usp_GetInvoice ?",
         invoice_id
     )
 
@@ -71,7 +71,7 @@ def get_invoices():
 
     cursor = conn.cursor()
 
-    cursor.execute("EXEC sp_GetInvoices")
+    cursor.execute("EXEC usp_GetInvoices")
 
     result = cursor.fetchall()
 

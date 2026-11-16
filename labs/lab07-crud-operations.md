@@ -282,16 +282,15 @@ On a freshly created database, `Ljubljana` receives `IDCity = 14` and `Maribor` 
 
 ### Predict, then try
 
-After `Ljubljana` and `Maribor` are inserted, consider two calls with a wrong `@StateID`. **Predict** what each one does, then run them:
+After `Ljubljana` and `Maribor` are inserted, try two calls with a wrong `@StateID`. **Predict** what each one does before you run it.
+
+**Test 1 – A state that does not exist**
 
 ```sql
 DECLARE @NewCityID int;
 
--- A state that does not exist
-EXEC dbo.usp_InsertCity N'Koper', 999, @NewCityID OUTPUT;
-
--- No state at all
-EXEC dbo.usp_InsertCity N'Koper', NULL, @NewCityID OUTPUT;
+EXEC dbo.usp_InsertCity
+    N'Koper', 999, @NewCityID OUTPUT;
 
 SELECT IDCity, Name, StateID
 FROM City
@@ -301,20 +300,41 @@ WHERE Name = N'Koper';
 <details>
 <summary>Show answer</summary>
 
-The two calls look almost the same, but they end in two different outcomes from Section 1:
+**Error 547** — the `INSERT` conflicts with the foreign key `FK_City_State`, because no state has `IDState = 999`. No row is inserted, so the `SELECT` returns an empty result set.
 
-| Call | Result |
-|---|---|
-| `@StateID = 999` | **Error 547** — the `INSERT` conflicts with the foreign key `FK_City_State`. No row is inserted. |
-| `@StateID = NULL` | **Success** — `Koper` is inserted without a state. No error, no warning. |
+Notice also that `usp_InsertCity` does not handle the error yet — the caller receives SQL Server's error message directly. For now, that is intentional: Section 5 shows how a procedure catches errors like this one with `TRY/CATCH` and reports them to the caller in a controlled way.
+
+</details>
+
+**Test 2 – No state at all**
+
+```sql
+DECLARE @NewCityID int;
+
+EXEC dbo.usp_InsertCity
+    N'Koper', NULL, @NewCityID OUTPUT;
+
+SELECT IDCity, Name, StateID
+FROM City
+WHERE Name = N'Koper';
+```
+
+<details>
+<summary>Show answer</summary>
+
+**Success** — `Koper` is inserted without a state. No error, no warning:
+
+| IDCity | Name | StateID |
+|---:|---|---|
+| 17 | Koper | NULL |
 
 A foreign key checks only values that are present. Because `City.StateID` is nullable, `NULL` simply means "no state", and the database accepts it.
 
-Notice also that `usp_InsertCity` does not handle the error yet — for `@StateID = 999`, the caller receives SQL Server's error message directly. For now, that is intentional: Section 5 shows how a procedure catches errors like this one with `TRY/CATCH` and reports them to the caller in a controlled way.
+</details>
+
+The two calls look almost the same, but they end in two different outcomes from Section 1: an error, and a success that may not be what the caller intended.
 
 This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 2.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and `usp_GetCitiesByState` would return no cities for Slovenia.
-
-</details>
 
 ## 2.3 Read – Retrieve the cities of a state
 

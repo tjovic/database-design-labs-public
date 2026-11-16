@@ -1,6 +1,26 @@
 USE [OBPRestDemo]
 GO
 
+/******************************************************************************
+    PROCEDURE: usp_UpdateInvoice
+
+    Description:
+        Updates the invoice header: date and customer.
+        Note: the "items" array in the JSON is ignored - invoice items
+        are not changed.
+
+    Called by:
+        PUT /invoices/{id}
+        api/routes.py -> update_invoice()
+
+    Input:
+        @InvoiceID  ID of the invoice to update
+        @Json       invoice as JSON (same shape as usp_AddInvoice)
+
+    Output:
+        none
+******************************************************************************/
+
 CREATE PROCEDURE [dbo].[usp_UpdateInvoice]
     @InvoiceID INT,
     @Json NVARCHAR (MAX)
@@ -19,11 +39,26 @@ GO
     PROCEDURE: usp_AddInvoice
 
     Description:
-        Inserts an invoice and all of its items.
+        Inserts an invoice header and all of its items in one transaction.
+        The JSON is shredded with JSON_VALUE (header) and OPENJSON (items).
+        If any insert fails, nothing is saved (ROLLBACK).
+
+    Called by:
+        POST /invoices
+        api/routes.py -> add_invoice()
 
     Input:
-        JSON document.
+        @Json  invoice as JSON, for example:
+          {
+            "customerId": 1,
+            "date": "2025-06-15",
+            "items": [
+              { "productId": 2, "quantity": 1, "unitPrice": 109.00 }
+            ]
+          }
 
+    Output:
+        none
 ******************************************************************************/
 
 CREATE OR ALTER PROCEDURE [dbo].[usp_AddInvoice]
@@ -75,6 +110,19 @@ GO
 
 /******************************************************************************
     PROCEDURE: usp_GetCustomers
+
+    Description:
+        Returns all customers, sorted by last name and first name.
+
+    Called by:
+        GET /customers
+        api/routes.py -> customers() -> api/database.py -> get_customers()
+
+    Input:
+        none
+
+    Output:
+        one row per customer: CustomerID, FirstName, LastName, Email
 ******************************************************************************/
 
 CREATE PROCEDURE [dbo].[usp_GetCustomers]
@@ -91,6 +139,27 @@ BEGIN
 END
 GO
 
+
+/******************************************************************************
+    PROCEDURE: usp_GetInvoice
+
+    Description:
+        Returns one invoice with its customer and items.
+        The result has one row per invoice item; the invoice and customer
+        columns repeat in every row. The API turns these rows into one
+        nested JSON object { invoiceId, customer, items[] }.
+
+    Called by:
+        GET /invoices/{id}
+        api/routes.py -> get_invoice_by_id() -> api/database.py -> get_invoice()
+
+    Input:
+        @InvoiceID  ID of the invoice
+
+    Output:
+        InvoiceID, Date, CustomerID, FirstName, LastName, Email,
+        ProductID, Name, Quantity, UnitPrice
+******************************************************************************/
 
 CREATE PROCEDURE [dbo].[usp_GetInvoice]
     @InvoiceID INT
@@ -124,6 +193,26 @@ END
 GO
 
 
+/******************************************************************************
+    PROCEDURE: usp_GetInvoices
+
+    Description:
+        Returns the list of all invoices with the customer name and the
+        invoice total (SUM of Quantity * UnitPrice), newest first.
+        Note: an invoice without items is not listed (INNER JOIN).
+
+    Called by:
+        GET /invoices
+        api/routes.py -> invoices() -> api/database.py -> get_invoices()
+
+    Input:
+        none
+
+    Output:
+        one row per invoice: InvoiceID, Date, CustomerID, FirstName,
+        LastName, Total
+******************************************************************************/
+
 CREATE   PROCEDURE [dbo].[usp_GetInvoices]
 AS
 BEGIN
@@ -153,6 +242,23 @@ END;
 GO
 
 
+/******************************************************************************
+    PROCEDURE: usp_DeleteInvoice
+
+    Description:
+        Deletes an invoice. Its items are deleted automatically by the
+        foreign key FK_InvoiceItem_Invoice (ON DELETE CASCADE).
+
+    Called by:
+        DELETE /invoices/{id}
+        api/routes.py -> delete_invoice()
+
+    Input:
+        @InvoiceID  ID of the invoice to delete
+
+    Output:
+        none
+******************************************************************************/
 
 CREATE   PROCEDURE [dbo].[usp_DeleteInvoice]
 (

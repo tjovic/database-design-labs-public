@@ -34,7 +34,7 @@ After completing this lab, you should be able to:
 - implement a read operation as an inline table-valued function when that is appropriate;
 - verify the result of an operation, including when zero rows are affected;
 - use a basic `TRY/CATCH` block to handle an error raised by a CRUD operation;
-- explain how primary keys, foreign keys, and business rules constrain CRUD operations.
+- explain what a foreign key guarantees, and decide whether a rule belongs in a constraint or in a procedure.
 
 Start by selecting the training database:
 
@@ -2283,8 +2283,8 @@ The same applies to `State.Name` from Section 2.1: SQL Server would accept a sec
 
 Section 1 showed an application asking `usp_DeleteCustomer` to delete Gustavo Achong and receiving return code `2`. This final section builds that procedure. It brings together the pieces from the whole lab:
 
-- checking that the record exists (Sections 2 and 3);
-- checking a business rule and reporting it with a return code (Section 3);
+- checking that the record exists (Section 2);
+- checking a business rule and reporting it with a return code (Section 2.6);
 - handling SQL Server errors with `TRY/CATCH` (Section 5);
 - the foreign key that protects the data behind it all (Section 6).
 
@@ -2503,6 +2503,7 @@ Combined procedure
     -> one entry point; an @Action parameter or an ID-based decision (Save pattern)
     -> one shared parameter list fits no action exactly
     -> a typo in @Action is not an error - check for the "unknown action" code
+    -> an UPDATE of a missing row is not an error - check @@ROWCOUNT and RETURN 1
 ```
 
 ```text
@@ -2535,6 +2536,9 @@ Protection in layers
     -> business rule: rejects the request first and explains why (RETURN 2)
     -> constraint: protects the data even when the rule is missing or bypassed
     -> TRY/CATCH: turns the constraint error into a code the caller can handle (RETURN 3)
+    -> a rule no constraint can express is protected only by the procedure -
+       a direct UPDATE bypasses it
+    -> if the database can enforce a rule (UNIQUE, CHECK), let it
 
 The database enforces only the rules it has been given
     -> State.Name has no UNIQUE constraint, so two Slovenia rows are valid

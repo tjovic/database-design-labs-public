@@ -703,30 +703,51 @@ GO
 
 ### Test the procedure
 
-We test all three outcomes:
+Each test covers one outcome. The return code is captured with `EXEC @Result = ...`. Before running a test, predict which code it will return.
 
-1. Delete `Ljubljana`, which exists and has no customers yet.
-2. Delete `Ljubljana` again, using the same ID.
-3. Delete `Zagreb` (`IDCity = 1`). No test data is needed here: every real city in `AdventureWorksENG` already has customers, and `Zagreb` has 1492 of them.
+**Test 1 – Ljubljana exists and has no customers yet**
 
-The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` above. The return code is captured with `EXEC @Result = ...`:
+The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` in Section 3.2.
 
 ```sql
 DECLARE @Result int;
 
--- Test 1: Ljubljana exists and has no customers yet
 EXEC @Result = dbo.usp_DeleteCity @IDCity = 14;
-SELECT @Result AS DeleteTestCity_FirstTry;
 
--- Test 2: Same city again
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `0` — the city is deleted.
+
+**Test 2 – Delete the same city again**
+
+```sql
+DECLARE @Result int;
+
 EXEC @Result = dbo.usp_DeleteCity @IDCity = 14;
-SELECT @Result AS DeleteTestCity_SecondTry;
 
--- Test 3: Real city that has customers (Zagreb)
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `1` — the city no longer exists.
+
+**Test 3 – Zagreb has customers**
+
+No test data is needed here: every real city in `AdventureWorksENG` already has customers, and `Zagreb` (`IDCity = 1`) has 1492 of them.
+
+```sql
+DECLARE @Result int;
+
 EXEC @Result = dbo.usp_DeleteCity @IDCity = 1;
-SELECT @Result AS DeleteZagreb;
 
--- Verify that Zagreb is untouched
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `2` — the business rule rejects the deletion.
+
+Verify that `Zagreb` is untouched:
+
+```sql
 SELECT IDCity, Name, StateID
 FROM City
 WHERE IDCity = 1;
@@ -735,14 +756,6 @@ SELECT COUNT(*) AS ZagrebCustomers
 FROM Customer
 WHERE CityID = 1;
 ```
-
-Expected results:
-
-| Test | Return code |
-|---|---:|
-| Delete Ljubljana | 0 |
-| Delete Ljubljana again | 1 |
-| Delete Zagreb (1492 customers) | 2 |
 
 `Zagreb` still exists and still has 1492 customers. The business rule stopped the operation before any `DELETE` ran.
 

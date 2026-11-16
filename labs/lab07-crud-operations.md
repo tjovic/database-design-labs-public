@@ -609,7 +609,7 @@ WHERE CityID = 1;
 >
 > However, a check followed by a `DELETE` is not automatically atomic. In a concurrent environment, another session could modify related data between these statements.
 >
-> Section 6.3 returns to this problem, and Labs 9 and 10 show how transactions solve it.
+> Section 6.2 returns to this problem, and Labs 9 and 10 show how transactions solve it.
 
 ### What does the business rule actually add?
 
@@ -1977,7 +1977,11 @@ However, database constraints are not the only rules that control how data can b
 
 Applications often have additional **business rules** that determine whether an operation is allowed.
 
-In this section, we will compare these two types of protection and see how they work together.
+This section answers three questions:
+
+- What exactly does a foreign key guarantee? (Section 6.1)
+- What if a rule needs more than that — a rule the foreign key allows to be broken? (Section 6.2)
+- When should a rule be left to the database instead of a procedure? (Section 6.3)
 
 ## 6.1 Database constraints
 
@@ -2041,34 +2045,164 @@ Deleting `Chains` would leave the product `Chain` pointing at a row that no long
 
 Other foreign key configurations, such as `ON DELETE SET NULL` or `ON DELETE CASCADE`, can produce different behavior. These depend on how the relationship was defined.
 
-## 6.2 Business rules
+## 6.2 When the foreign key does not protect
 
 Database constraints enforce structural rules, such as primary key uniqueness and referential integrity. **Business rules** describe what an application allows users to do — for example, *a customer cannot be deleted if they have invoices*.
 
 Every business rule in this lab so far mirrors an existing foreign key. Sections 1 and 2.6 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
 
-### Rules that no constraint can express
+Now consider a rule where the foreign key says *yes*, but the business says *no*.
 
-Many rules cannot be written as a constraint at all, for example:
+### The rule
 
-> *A subcategory cannot be deleted if any of its products has ever been sold.*
+Most invoices in `AdventureWorksENG` are web orders: 27,659 of the 31,465 invoices have no salesman (`SalesmanID` is `NULL`). The shop decides that every web order will be handed over to a salesman — with one rule:
 
-A foreign key only checks whether a reference exists. This rule looks through two tables — `Product` and `InvoiceItem` — and depends on the data in them, so it has to be checked by code:
+> *A web order may be assigned only to a permanent employee.*
+
+`Salesman.Employee` tells permanent employees (`1`) from external sales agents (`0`):
 
 ```sql
-IF EXISTS (
-    SELECT 1
-    FROM Product AS p
-    JOIN InvoiceItem AS ii
-        ON ii.ProductID = p.IDProduct
-    WHERE p.SubcategoryID = @IDSubcategory
-)
-    RETURN 2;
+SELECT IDSalesman, FirstName, LastName, Employee
+FROM Salesman
+WHERE IDSalesman IN (268, 275);
 ```
 
-On the real data, `Chains` fails this check — its product `Chain` has been sold 250 times. `Panniers` (`IDSubcategory = 35`) passes it: it contains one product, which has never been sold. The foreign key would still stop the `DELETE` of `Panniers`, because the product exists. The two protections check different things, and both apply.
+| IDSalesman | FirstName | LastName | Employee |
+|---:|---|---|---:|
+| 268 | Marino | Alessi | 0 |
+| 275 | Santi | Ajello | 1 |
 
-For rules like this, the procedure is the **only** protection.
+Invoice `75123` (`SO75123`, customer Devin Phillips) is a web order without a salesman.
+
+**Predict:** `Invoice.SalesmanID` has a foreign key to `Salesman`. Will SQL Server let you assign invoice `75123` to the external agent Marino Alessi?
+
+```sql
+UPDATE Invoice
+SET SalesmanID = 268
+WHERE IDInvoice = 75123;
+```
+
+<details>
+<summary>Show answer</summary>
+
+Yes. The `UPDATE` succeeds — `1 row affected`, no error.
+
+The foreign key `FK_Invoice_Salesman` checks only one thing: that a salesman with ID `268` **exists**. He does. Whether he is a permanent employee is a **value in his row**, and a foreign key never looks at values.
+
+</details>
+
+Undo the assignment before you continue:
+
+```sql
+UPDATE Invoice
+SET SalesmanID = NULL
+WHERE IDInvoice = 75123;
+```
+
+Could another constraint enforce the rule? A `CHECK` constraint on `Invoice` sees only the columns of its own row — it cannot read `Salesman.Employee`. No constraint can express this rule. For rules like this, the procedure is the **only** protection.
+
+### The procedure
+
+`dbo.usp_AssignSalesman` checks the rule before it changes anything:
+
+| Return code | Meaning |
+|---:|---|
+| `0` | Invoice assigned to the salesman |
+| `1` | Invoice does not exist |
+| `2` | Salesman is not a permanent employee; assignment rejected |
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_AssignSalesman
+    @IDInvoice  int,
+    @IDSalesman int
+AS
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Invoice
+        WHERE IDInvoice = @IDInvoice
+    )
+        RETURN 1;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Salesman
+        WHERE IDSalesman = @IDSalesman
+          AND Employee = 1
+    )
+        RETURN 2;
+
+    UPDATE Invoice
+    SET SalesmanID = @IDSalesman
+    WHERE IDInvoice = @IDInvoice;
+
+    RETURN 0;
+END;
+GO
+```
+
+The second check asks for a salesman who exists **and** is a permanent employee. That one condition is the whole business rule.
+
+**Test 1 – An external agent**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_AssignSalesman
+    @IDInvoice  = 75123,
+    @IDSalesman = 268;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `2` — Marino Alessi is not a permanent employee. The invoice stays without a salesman.
+
+**Test 2 – A permanent employee**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_AssignSalesman
+    @IDInvoice  = 75123,
+    @IDSalesman = 275;
+
+SELECT @Result AS ReturnCode;
+
+SELECT IDInvoice, InvoiceNumber, SalesmanID
+FROM Invoice
+WHERE IDInvoice = 75123;
+```
+
+Expected: `0`, and the invoice now belongs to Santi Ajello:
+
+| IDInvoice | InvoiceNumber | SalesmanID |
+|---:|---|---:|
+| 75123 | SO75123 | 275 |
+
+**Test 3 – An invoice that does not exist**
+
+```sql
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_AssignSalesman
+    @IDInvoice  = 999999,
+    @IDSalesman = 275;
+
+SELECT @Result AS ReturnCode;
+```
+
+Expected: `1`.
+
+### What the procedure does not protect
+
+Look back at the `UPDATE` in the *Predict* step. It assigned an invoice to an external agent without calling the procedure — and nothing stopped it. A rule that lives only in a procedure protects only the calls that go **through** that procedure. Any code that writes to `Invoice` directly bypasses it.
+
+The rule also works differently from a constraint in one useful way. Marino Alessi already has 48 invoices from the past. The procedure checks only **new** assignments, so those invoices stay valid. A constraint checks every row, old and new alike.
+
+> [!NOTE]
+> A business-rule check and the following `UPDATE` or `DELETE` are separate statements. In a concurrent environment, another session could change the data between the check and the change — for example, the salesman's `Employee` value.
+>
+> A constraint is checked as part of the statement itself, so it cannot be bypassed this way. Procedural checks need transactions and appropriate locking for the same guarantee — Labs 9 and 10 cover these topics.
 
 ## 6.3 What should be enforced where?
 
@@ -2079,37 +2213,56 @@ A useful general guideline is:
 | Primary key must be unique | `PRIMARY KEY` constraint |
 | Foreign key must reference an existing row | `FOREIGN KEY` constraint |
 | Required column must contain a value | `NOT NULL` constraint |
-| Value must be unique, such as a state name | `UNIQUE` constraint |
-| Value must satisfy a simple condition | `CHECK` constraint |
-| Deletion depends on application-specific rules | Stored procedure or application business logic |
+| Value must be unique, such as an invoice number | `UNIQUE` constraint |
+| Value must satisfy a condition within its own row | `CHECK` constraint |
+| Rule depends on other rows or tables, or applies only to new changes | Stored procedure or application business logic |
 
-Some business rules can also be enforced directly through database constraints.
+If the database **can** enforce a rule, let it. A constraint protects the data no matter which procedure, application, or direct `UPDATE` changes it.
 
-The important point is to understand **which mechanism guarantees data integrity and which mechanism provides application-specific behavior**.
+### A rule the database can enforce
 
-### Back to the two `Slovenia` rows
+Every invoice has a number, such as `SO75123`. Two invoices with the same number would be a serious problem — and yet `AdventureWorksENG` does not prevent it: the only constraint on `Invoice` is the primary key on `IDInvoice`.
 
-Section 2.1 warned that running the insert twice creates two states named `Slovenia`. Now you can say why SQL Server allows it: `State.Name` has no `UNIQUE` constraint. The only rule the database enforces on `State` is the primary key on `IDState` — and two rows with different IDs satisfy it.
+The real data contains no duplicate numbers, so the rule can be added as a constraint:
 
-If state names must be unique, that is a rule the database *can* guarantee — the real data contains no duplicate names, so a `UNIQUE` constraint could be added. Until it is, every procedure that inserts or renames a state would have to check for duplicates itself, and any code that bypasses those procedures could still create them.
+```sql
+ALTER TABLE Invoice
+ADD CONSTRAINT UQ_Invoice_InvoiceNumber UNIQUE (InvoiceNumber);
+```
 
-> [!NOTE]
-> A business-rule check and the following `DELETE` are separate statements. In a concurrent environment, another session could insert a related record between the check and the deletion.
->
-> A constraint is checked as part of the statement itself, so it cannot be bypassed this way. Procedural checks need transactions and appropriate locking for the same guarantee — Labs 9 and 10 cover these topics.
+If the table already contained a duplicate, this statement would fail — SQL Server refuses to add a constraint that the existing data violates.
+
+Now try to create a second invoice with the number `SO75123`:
+
+```sql
+INSERT INTO Invoice (InvoiceDate, InvoiceNumber, CustomerID)
+VALUES (GETDATE(), N'SO75123', 4189);
+```
+
+```text
+Msg 2627, Level 14, State 1, Line 1
+Violation of UNIQUE KEY constraint 'UQ_Invoice_InvoiceNumber'. Cannot insert duplicate key in object 'dbo.Invoice'. The duplicate key value is (SO75123).
+The statement has been terminated.
+```
+
+The database now rejects the duplicate for **every** caller — including a direct `INSERT` like this one, which no procedure could have stopped.
+
+The same applies to `State.Name` from Section 2.1: SQL Server would accept a second `Slovenia` row because `State.Name` has no `UNIQUE` constraint. The database enforces only the rules it has been given.
 
 > [!IMPORTANT]
-> **Do not rely only on procedural checks to protect referential integrity.**
+> **Do not rely only on procedural checks to protect data integrity.**
 >
-> Database constraints protect the data regardless of which application or procedure modifies it.
+> Use a constraint whenever the rule can be expressed as one. Keep procedural checks for rules that no constraint can express — and for giving the caller a clear answer.
 
 ## Check your understanding
 
 1. What is the purpose of a foreign key constraint?
 2. What is the difference between a required and an optional foreign key?
 3. `Product.SubcategoryID` is nullable. Why does deleting the subcategory `Chains` still fail?
-4. Why can the rule *"a subcategory whose products have been sold cannot be deleted"* not be written as a foreign key?
-5. Why would SQL Server allow two states named `Slovenia` in Section 2.1? How could the database prevent it?
+4. Why did the direct `UPDATE` that assigned invoice `75123` to Marino Alessi succeed, even though `Invoice.SalesmanID` has a foreign key?
+5. Why can a `CHECK` constraint on `Invoice` not enforce the rule *"web orders go only to permanent employees"*?
+6. Name one situation in which `usp_AssignSalesman` does not protect the rule.
+7. Why is a `UNIQUE` constraint on `InvoiceNumber` better than a duplicate check inside an insert procedure?
 
 <details>
 <summary>Show answers</summary>
@@ -2117,8 +2270,10 @@ If state names must be unique, that is a rule the database *can* guarantee — t
 1. It ensures that non-NULL foreign key values reference existing rows in the parent table.
 2. A required foreign key column cannot contain `NULL`; an optional one can.
 3. Nullability only means that a product *may* have no subcategory. The product `Chain` does have one — `SubcategoryID = 7` — and the foreign key protects that existing reference. With the default `NO ACTION` behavior, a referenced parent cannot be deleted.
-4. A foreign key only checks that a referenced row exists. This rule depends on data in two other tables — whether the subcategory's products appear in `InvoiceItem` — so it must be checked by code, for example in a procedure.
-5. `State.Name` has no `UNIQUE` constraint, so two rows with different IDs and the same name are valid. Adding a `UNIQUE` constraint on `Name` would make the database reject the second insert.
+4. A foreign key checks only that the referenced row exists. Salesman `268` exists; whether he is a permanent employee is a value in his row, which the foreign key does not look at.
+5. A `CHECK` constraint sees only the columns of its own row. The rule depends on `Salesman.Employee`, a column in another table.
+6. When code updates `Invoice` directly instead of calling the procedure. (Also when another session changes the salesman's `Employee` value between the check and the `UPDATE` — Labs 9 and 10.)
+7. The constraint protects every way of inserting or changing data — any procedure, any application, any direct `INSERT` or `UPDATE`. A check in a procedure protects only the calls that go through that procedure.
 
 </details>
 
@@ -2383,7 +2538,7 @@ Protection in layers
 
 The database enforces only the rules it has been given
     -> State.Name has no UNIQUE constraint, so two Slovenia rows are valid
-    -> some rules (e.g. "a product was ever sold") cannot be a constraint at all
+    -> some rules (e.g. "web orders go only to permanent employees") cannot be a constraint at all
 ```
 
 And remember:

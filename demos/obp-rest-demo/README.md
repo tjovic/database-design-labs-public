@@ -120,28 +120,91 @@ cd demos/obp-rest-demo
 build.bat
 ```
 
-This creates:
+This creates the `dist` folder with everything the lab computer needs:
 
 ```
 dist/obp-rest-demo.exe
 dist/config.env
+dist/sql/          (setup scripts)
 ```
 
-### Run (on the target computer)
+### Run in the lab (step by step)
 
-1. Copy both files into the same folder (Desktop or a USB drive is fine).
-2. Edit `config.env`: set `SERVER`, `DATABASE`, and, for SQL
-   authentication, `DB_USER` and `DB_PASSWORD`. Leave the last two empty
-   to use Windows authentication.
-3. Double-click `obp-rest-demo.exe`. Swagger opens automatically at
-   <http://127.0.0.1:8000/docs>.
+**1. Copy the files.** Copy the whole `dist` folder to the lab computer
+(Desktop or a USB drive is fine). It contains:
 
-The API listens only on `127.0.0.1`, so Windows Firewall does not ask
-for permission.
+```
+obp-rest-demo.exe
+config.env
+sql\
+```
 
-> [!NOTE]
-> The target computer still needs **ODBC Driver 18 for SQL Server**.
-> Check without admin rights in PowerShell: `Get-OdbcDriver`.
+**2. Find the SQL Server instance name.** Open SSMS on the lab
+computer: the **Server name** field in the *Connect* dialog shows it,
+for example `LAB-PC12\SQLEXPRESS`. After connecting you can also run:
+
+```sql
+SELECT @@SERVERNAME;
+```
+
+> [!IMPORTANT]
+> `localhost` and `localhost\SQLEXPRESS` are **two different
+> instances**. The database must be created on the same instance that
+> you put in `config.env`.
+
+**3. Create the database.** In SSMS, connected to that instance, open
+each script (*File → Open → File*) and run it with **Execute** (F5), in
+this order:
+
+1. `sql\01_CreateDatabase.sql`
+2. `sql\02_SeedData.sql` — run it **twice** on a new database. The
+   first run reports a `FOREIGN KEY` error (the first `IDENTITY` value
+   on a brand-new table is 0, not 1); the second run fixes the data.
+3. `sql\03_StoredProcedures.sql`
+
+Check that the data is there:
+
+```sql
+EXEC OBPRestDemo.dbo.sp_GetInvoices;   -- 2 invoices
+```
+
+**4. Edit `config.env`** in Notepad and set `SERVER` to the instance
+name from step 2:
+
+```
+SERVER=LAB-PC12\SQLEXPRESS
+```
+
+Leave `DB_USER` and `DB_PASSWORD` empty to log in with your Windows
+account. Fill them in only if you use a SQL Server login.
+
+**5. Start the app.** Double-click `obp-rest-demo.exe`.
+
+- If Windows shows *"Windows protected your PC"*, click **More info →
+  Run anyway**.
+- A black console window opens and the browser opens
+  <http://127.0.0.1:8000/docs> automatically. If the browser does not open, type the
+  address yourself.
+- **Keep the console window open** while you work: closing it stops
+  the app.
+
+**6. Stop the app** by closing the console window (or pressing
+CTRL+C in it).
+
+### Troubleshooting in the lab
+
+| Error | Cause and fix |
+|---|---|
+| `Login failed for user ...` (18456) **together with** `Cannot open database ...` (4060) | The database does not exist on that instance. Check that `SERVER` in `config.env` is the instance where you ran the scripts (step 2 and 3). |
+| `Login failed for user ...` (18456) alone | Your Windows account has no login on that instance. Use a SQL Server login (`DB_USER`, `DB_PASSWORD`). |
+| `Data source name not found` (IM002) | ODBC Driver 18 is not installed. Check in PowerShell: `Get-OdbcDriver`. |
+| `[WinError 10048]` / address already in use | Another app uses the port. Change `PORT` in `config.env`. |
+| The console window closes immediately | Open a Command Prompt in the folder and run `obp-rest-demo.exe` from there to see the error message. |
+| A change in `config.env` has no effect | `config.env` is read only at start. Close the console window and start the `.exe` again. |
+
+The lab computer needs **ODBC Driver 18 for SQL Server**; nothing else
+has to be installed. The app listens only on `127.0.0.1`, so Windows
+Firewall does not ask for permission.
 
 ---
 

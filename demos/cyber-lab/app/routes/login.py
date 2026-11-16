@@ -2,10 +2,11 @@ from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from app.database import get_connection
+from app.config import TEMPLATES_DIR
 
 router = APIRouter()
 
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("/login", response_class=HTMLResponse)

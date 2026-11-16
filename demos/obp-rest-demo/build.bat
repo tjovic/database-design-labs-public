@@ -10,8 +10,10 @@ pyinstaller --noconfirm --onefile --name obp-rest-demo --collect-submodules uvic
 if errorlevel 1 exit /b 1
 
 if not exist dist\config.env copy config.env.example dist\config.env
+xcopy /e /i /y sql dist\sql >nul
 
 echo.
-echo Done. Copy these two files to the lab computer:
+echo Done. Copy the whole dist folder to the lab computer:
 echo   dist\obp-rest-demo.exe
 echo   dist\config.env
+echo   dist\sql\

@@ -49,13 +49,19 @@ pip install -r requirements.txt
 
 ### 2. Connection configuration
 
-The connection string is hard-coded in [app/database.py](app/database.py):
+The defaults in [app/config.py](app/config.py) work for a local,
+Windows-authenticated SQL Server:
 
-```python
+```
 SERVER=localhost
 DATABASE=CyberLab
-Trusted_Connection=yes
+DRIVER=ODBC Driver 18 for SQL Server
 ```
+
+To use another instance (for example `localhost\SQLEXPRESS`) or SQL
+authentication, create a `.env` file in `demos/cyber-lab` with the
+values you want to change, plus `DB_USER` and `DB_PASSWORD` for SQL
+authentication.
 
 ### 3. Create the database and data
 
@@ -95,6 +101,110 @@ Endpoints:
 | `/` | Home page |
 | `/db-test` | Database connection check |
 | `/login` | SQL injection demo (form + payload buttons) |
+
+---
+
+## Running on a computer without Python (packaged .exe)
+
+To run the demo on a computer where you cannot install Python or other
+software (for example, a lab computer without admin rights), package it
+into a single `.exe` on a machine where you can.
+
+### Build (on your own Windows computer)
+
+```bash
+cd demos/cyber-lab
+build.bat
+```
+
+This creates the `dist` folder with everything the lab computer needs:
+
+```
+dist/cyber-lab.exe
+dist/config.env
+dist/database/     (setup scripts)
+```
+
+The packaged app uses port **8001**, so it can run next to the packaged
+`obp-rest-demo` (port 8000). It listens only on `127.0.0.1`, so it is
+not reachable from the network — important for an app that is
+deliberately vulnerable.
+
+### Run in the lab (step by step)
+
+**1. Copy the files.** Copy the whole `dist` folder to the lab computer
+(Desktop or a USB drive is fine). It contains:
+
+```
+cyber-lab.exe
+config.env
+database\
+```
+
+**2. Find the SQL Server instance name.** Open SSMS on the lab
+computer: the **Server name** field in the *Connect* dialog shows it,
+for example `LAB-PC12\SQLEXPRESS`. After connecting you can also run:
+
+```sql
+SELECT @@SERVERNAME;
+```
+
+> [!IMPORTANT]
+> `localhost` and `localhost\SQLEXPRESS` are **two different
+> instances**. The database must be created on the same instance that
+> you put in `config.env`.
+
+**3. Create the database.** In SSMS, connected to that instance, open
+each script (*File → Open → File*) and run it with **Execute** (F5), in
+this order:
+
+1. `database\init.sql`
+2. `database\seed.sql`
+
+Check that the data is there:
+
+```sql
+SELECT * FROM CyberLab.dbo.Users;   -- 3 users
+```
+
+**4. Edit `config.env`** in Notepad and set `SERVER` to the instance
+name from step 2:
+
+```
+SERVER=LAB-PC12\SQLEXPRESS
+```
+
+Leave `DB_USER` and `DB_PASSWORD` empty to log in with your Windows
+account. Fill them in only if you use a SQL Server login.
+
+**5. Start the app.** Double-click `cyber-lab.exe`.
+
+- If Windows shows *"Windows protected your PC"*, click **More info →
+  Run anyway**.
+- A black console window opens and the browser opens
+  <http://127.0.0.1:8001/login> automatically. If the browser does not open, type the
+  address yourself.
+- **Keep the console window open** while you work: closing it stops
+  the app.
+
+**6. Stop the app** by closing the console window (or pressing
+CTRL+C in it).
+
+### Troubleshooting in the lab
+
+| Error | Cause and fix |
+|---|---|
+| `Login failed for user ...` (18456) **together with** `Cannot open database ...` (4060) | The database does not exist on that instance. Check that `SERVER` in `config.env` is the instance where you ran the scripts (step 2 and 3). |
+| `Login failed for user ...` (18456) alone | Your Windows account has no login on that instance. Use a SQL Server login (`DB_USER`, `DB_PASSWORD`). |
+| `Data source name not found` (IM002) | ODBC Driver 18 is not installed. Check in PowerShell: `Get-OdbcDriver`. |
+| `[WinError 10048]` / address already in use | Another app uses the port. Change `PORT` in `config.env`. |
+| The page has no styling | Bootstrap is loaded from the internet (CDN). The demo still works without it. |
+| The console window closes immediately | Open a Command Prompt in the folder and run `cyber-lab.exe` from there to see the error message. |
+| A change in `config.env` has no effect | `config.env` is read only at start. Close the console window and start the `.exe` again. |
+
+The lab computer needs **ODBC Driver 18 for SQL Server**; nothing else
+has to be installed. The app listens only on `127.0.0.1`, so Windows
+Firewall does not ask for permission.
 
 ---
 
@@ -220,6 +330,7 @@ structurally safe.
 cyber-lab/
 ├── app/
 │   ├── main.py                # FastAPI entry point
+│   ├── config.py              # connection settings and folder paths
 │   ├── database.py            # pyodbc connection
 │   ├── routes/
 │   │   ├── home.py            # / and /db-test
@@ -229,6 +340,9 @@ cyber-lab/
 ├── database/
 │   ├── init.sql               # CREATE DATABASE + CREATE TABLE
 │   └── seed.sql               # INSERT test data
+├── build.bat                  # builds dist/cyber-lab.exe
+├── config.env.example         # settings for the packaged .exe
+├── run.py                     # entry point for the packaged .exe
 ├── requirements.txt
 ├── README.md                  # this file — setup
 └── lab.md                     # guided classroom walkthrough
@@ -240,8 +354,8 @@ cyber-lab/
 
 **`Login failed for user`** — SQL Server does not allow Windows auth for
 the account running the Python process. Add your Windows account to the
-SQL Server logins, or switch the connection string to SQL auth
-(`UID=...; PWD=...`).
+SQL Server logins, or switch to SQL auth by setting
+`DB_USER` and `DB_PASSWORD` (in `.env`, or in `config.env` for the .exe).
 
 **`Cannot open database "CyberLab"`** — you did not run `init.sql`. Run
 it from `sqlcmd` (above).

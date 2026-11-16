@@ -22,7 +22,9 @@ shreds it with `OPENJSON` and inserts it atomically.
 | "Thin API, fat stored procedure" | [api/routes.py](api/routes.py) — the route does no business logic, it only forwards JSON to SQL Server |
 
 The full guided walkthrough (what to click, what to say, what to look
-at in SSMS) is in [api/lab.md](api/lab.md). Once you've completed setup
+at in SSMS) is in [api/lab.md](api/lab.md). For anyone who wants to know
+more, [how-it-works.md](how-it-works.md) explains what happens behind
+each request, step by step, with links to Labs 7, 8, and 9. Once you've completed setup
 below, [api/README.md](api/README.md) is a quick reference for
 re-running the demo without repeating the full setup.
 
@@ -282,6 +284,7 @@ obp-rest-demo/
 │   ├── 01_CreateDatabase.sql
 │   ├── 02_SeedData.sql
 │   └── 03_StoredProcedures.sql
+├── how-it-works.md          # optional reading: how the app works, links to Labs 7–9
 ├── .env.example
 ├── build.bat               # builds dist/obp-rest-demo.exe
 ├── config.env.example      # settings for the packaged .exe

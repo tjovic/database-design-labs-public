@@ -49,9 +49,12 @@ end to end, that "a REST client sends JSON, a stored procedure turns it
 into rows" is not just a classroom exercise — it is how real systems
 are built.
 
-See [obp-rest-demo/README.md](obp-rest-demo/README.md) for setup, and
+See [obp-rest-demo/README.md](obp-rest-demo/README.md) for setup,
 [obp-rest-demo/api/lab.md](obp-rest-demo/api/lab.md) for a guided,
-click-by-click classroom walkthrough.
+click-by-click classroom walkthrough, and
+[obp-rest-demo/how-it-works.md](obp-rest-demo/how-it-works.md) for
+optional reading on how the application works, with links to Labs 7,
+8, and 9.
 
 ---
 

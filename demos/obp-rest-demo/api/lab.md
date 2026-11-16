@@ -3,6 +3,9 @@
 Pairs with [Lab 8 – Complex Parameters](../../../labs/lab08-complex-parameters.md),
 **Section 6 (JSON Parameters)**.
 
+For a detailed explanation of how the application works, with links to
+Labs 7, 8, and 9, see [How It Works](../how-it-works.md).
+
 ## Topic
 
 Demonstration of how a modern application communicates with a SQL Server database.
@@ -235,13 +238,15 @@ count the `items` in the request body against the rows in `InvoiceItem`.
 
 ## 7. PUT /invoices/{id}
 
-Change the date or the customer.
+Change the date, the customer, or the items (for example, a quantity).
 
-Show that only the invoice header is changed.
+Show in SSMS that the header is updated and the items are replaced.
 
 Explain:
 
-We do not touch the items.
+`usp_UpdateInvoice` updates the header, deletes the old items, and
+inserts the new ones — all in one transaction. If one new item is
+invalid, the old items are kept.
 
 ---
 

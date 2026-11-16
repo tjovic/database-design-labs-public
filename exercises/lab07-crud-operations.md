@@ -469,7 +469,7 @@ Create `dbo.usp_Exercises_ChangeStudent` that performs insert, update, or delete
 | `'U'` | Update the student with `@IDStudent` |
 | `'D'` | Delete the student with `@IDStudent` |
 
-Return values: `0` = success, `1` = student does not exist, `99` = unknown action — the same convention as `usp_ManageSubcategory` in Lab 07, Section 5.3.
+Return values: `0` = success, `1` = student does not exist, `99` = unknown action — the same convention as `usp_ManageSubcategory` in Lab 07, Section 4.3.
 
 Only the parameters the action needs should be required: `@FirstName`, `@LastName`, and `@StudentNumber` should default to `NULL`.
 

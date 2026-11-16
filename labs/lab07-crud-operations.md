@@ -652,6 +652,8 @@ The two calls look almost the same, but they end in two different outcomes from 
 
 A foreign key checks only values that are present. Because `City.StateID` is nullable, `NULL` simply means "no state", and the database accepts it.
 
+Notice also that `usp_InsertCity` does not handle the error yet — for `@StateID = 999`, the caller receives SQL Server's error message directly. For now, that is intentional: Section 6 shows how a procedure catches errors like this one with `TRY/CATCH` and reports them to the caller in a controlled way.
+
 This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 3.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and `usp_GetCitiesByState` would return no cities for Slovenia.
 
 </details>

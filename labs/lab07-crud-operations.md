@@ -506,23 +506,17 @@ Separate procedures are also not the only possible design. Section 5 explores ho
 
 ---
 
-# Section 3 – CRUD for `State` and `City`
+# Section 3 – Related Tables and Return Codes
 
-In Section 2, we implemented CRUD operations for the `Category` table using separate stored procedures.
-
-In this section, we apply the same pattern to the `State` and `City` tables.
-
-These tables are connected through a foreign key:
+Section 2 worked with a single table. This section works with two related tables, `State` and `City`, connected through a foreign key:
 
 ```mermaid
 erDiagram
     State ||--o{ City : contains
-
     State {
         int IDState PK
         nvarchar Name
     }
-
     City {
         int IDCity PK
         nvarchar Name
@@ -532,22 +526,11 @@ erDiagram
 
 The `City.StateID` column is nullable, meaning that a city can exist without being assigned to a state.
 
-We start with simple `INSERT` and `SELECT` operations, then implement a `DELETE` procedure that checks a business rule before removing data.
+The section brings two new things. Section 3.2 inserts rows into a table that references another table. Section 3.3 answers the question from Section 2.6 — can a row count tell the caller **why** nothing was deleted? Instead of a row count, the procedure returns a **return code**: a number that says which of several outcomes occurred.
 
-Section 2.6 ended with a question: can a row count tell the caller **why** nothing was deleted? Section 3.4 answers it. Instead of a row count, the procedure returns a **return code** — a number that says which of several outcomes occurred.
+## 3.1 Insert a state
 
-> [!NOTE]
-> The procedures follow the patterns from Section 2. The required T-SQL concepts, including `OUTPUT`, `SCOPE_IDENTITY()`, `IF`, and `RETURN`, were introduced in previous labs.
-
-## 3.1 Create – Insert a state
-
-The shop is expanding to Slovenia. The procedure `dbo.usp_InsertState`:
-
-- accepts the state name through `@Name`;
-- inserts the new state;
-- returns its generated ID through the `OUTPUT` parameter `@NewStateID`.
-
-It uses the same `INSERT`, `SCOPE_IDENTITY()`, and `OUTPUT` pattern as `usp_InsertCategory` in Section 2.1.
+The shop is expanding to Slovenia. `dbo.usp_InsertState` follows exactly the same pattern as `usp_InsertCategory` in Section 2.1:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertState
@@ -563,8 +546,6 @@ END;
 GO
 ```
 
-Insert `Slovenia`:
-
 ```sql
 DECLARE @NewID int;
 
@@ -575,25 +556,11 @@ EXEC dbo.usp_InsertState
 SELECT @NewID AS NewStateID;
 ```
 
-Verify that the new state exists:
+On a freshly created database, `Slovenia` receives `IDState = 4`. Run the insert only once — like `Category.Name`, `State.Name` is not unique, so a second run inserts a second `Slovenia`.
 
-```sql
-SELECT IDState, Name
-FROM State
-WHERE Name = N'Slovenia';
-```
+## 3.2 Insert cities into a state
 
-Run the insert only once. Like `Category.Name`, `State.Name` is not unique, so a second run inserts a second `Slovenia`. On a freshly created database, `Slovenia` receives `IDState = 4`.
-
-## 3.2 Create – Insert cities
-
-The procedure `dbo.usp_InsertCity`:
-
-- accepts the city name through `@Name` and the state's ID through `@StateID`;
-- inserts the city and associates it with that state;
-- returns the generated city ID through `@NewCityID`.
-
-The caller already knows the state's ID, so the procedure does not need to search for the state by name. It inserts the supplied `@StateID` directly into `City.StateID`.
+`dbo.usp_InsertCity` inserts a city and associates it with a state. The caller passes the state's ID, so the procedure does not need to search for the state by name — it stores `@StateID` directly in `City.StateID`:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCity
@@ -624,14 +591,36 @@ EXEC dbo.usp_InsertCity
 SELECT
     @City1 AS City1ID,
     @City2 AS City2ID;
-
--- Verify the inserted cities
-SELECT *
-FROM City
-WHERE StateID = 4;
 ```
 
-On a freshly created database, `Ljubljana` receives `IDCity = 14` and `Maribor` `IDCity = 15`.
+To read the cities of a state, the application calls `dbo.usp_GetCitiesByState`. It needs no `JOIN` — a `WHERE` condition on `City.StateID` is enough:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
+    @IDState int
+AS
+BEGIN
+    SELECT
+        IDCity,
+        Name
+    FROM City
+    WHERE StateID = @IDState
+    ORDER BY Name;
+END;
+GO
+```
+
+```sql
+EXEC dbo.usp_GetCitiesByState
+    @IDState = 4;
+```
+
+| IDCity | Name |
+|---:|---|
+| 14 | Ljubljana |
+| 15 | Maribor |
+
+The IDs assume a freshly created database and that each insert was run once.
 
 ### Predict, then try
 
@@ -663,65 +652,11 @@ The two calls look almost the same, but they end in two different outcomes from 
 
 A foreign key checks only values that are present. Because `City.StateID` is nullable, `NULL` simply means "no state", and the database accepts it.
 
-This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 3.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and Section 3.3 would return no cities for Slovenia.
+This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 3.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and `usp_GetCitiesByState` would return no cities for Slovenia.
 
 </details>
 
-## 3.3 Read – Retrieve cities by state
-
-The procedure `dbo.usp_GetCitiesByState` accepts `@IDState` and returns `IDCity` and `Name` for all cities of that state, sorted alphabetically by name.
-
-A `JOIN` is not required because the procedure already receives the state's ID; a `WHERE` condition on `City.StateID` is enough.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
-    @IDState int
-AS
-BEGIN
-    SELECT
-        IDCity,
-        Name
-    FROM City
-    WHERE StateID = @IDState
-    ORDER BY Name;
-END;
-GO
-```
-
-First, read the cities of the real state `Croatia` (`IDState = 1`):
-
-```sql
-EXEC dbo.usp_GetCitiesByState
-    @IDState = 1;
-```
-
-Expected result:
-
-| IDCity | Name |
-|---:|---|
-| 2 | Osijek |
-| 3 | Pula |
-| 4 | Rijeka |
-| 5 | Split |
-| 1 | Zagreb |
-
-Then read the cities of `Slovenia`:
-
-```sql
-EXEC dbo.usp_GetCitiesByState
-    @IDState = 4;
-```
-
-Expected result:
-
-| IDCity | Name |
-|---:|---|
-| 14 | Ljubljana |
-| 15 | Maribor |
-
-The IDs assume a freshly created database and that each insert was run once.
-
-## 3.4 Delete – Remove a city with a business rule
+## 3.3 Delete a city – return codes
 
 A city may have customers associated with it through `Customer.CityID`.
 
@@ -839,7 +774,7 @@ In terms of Section 1, the procedure turns error 547 into a specific answer — 
 ## Check your understanding
 
 1. Why does `usp_InsertCity` need a `@StateID` parameter?
-2. What happens when `usp_GetCitiesByState` finds no matching cities?
+2. What happens when `usp_InsertCity` is called with `@StateID = NULL`? And with `@StateID = 999`?
 3. Why does `usp_DeleteCity` check whether the city exists before deleting it?
 4. What is the difference between return codes `1` and `2`?
 5. `Customer.CityID` has a foreign key to `City`. What would happen if `usp_DeleteCity` skipped the customer check and simply ran `DELETE` for `Zagreb`?
@@ -848,7 +783,7 @@ In terms of Section 1, the procedure turns error 547 into a specific answer — 
 <summary>Show answers</summary>
 
 1. To associate the new city with an existing state.
-2. The procedure returns an empty result set.
+2. With `NULL`, the city is inserted without a state — no error. With `999`, the foreign key `FK_City_State` rejects the `INSERT` with error 547, because no state has that ID.
 3. To distinguish a nonexistent city from a successful deletion.
 4. Code `1` means the city does not exist; code `2` means the city exists but cannot be deleted because it has customers.
 5. The foreign key `FK_Customer_City` would reject the `DELETE` with error 547, and `Zagreb` would remain. The data would be safe either way — but the caller would receive an error instead of return code `2`, which explains the reason.
@@ -1927,7 +1862,7 @@ Section 1 asked what can happen when you delete a row. We have now met every out
 | Outcome | Example in this lab | How the caller detects it |
 |---|---|---|
 | The row does not exist | `usp_GetCategory` and `usp_UpdateCategoryName` with ID `999999` (Section 2) | Empty result set, `@@ROWCOUNT = 0`, or return code `1` (Sections 3 and 5) |
-| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 3.4), `DELETE` of `Chains` (Section 5.3) | Explicit return code `2` |
+| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 3.3), `DELETE` of `Chains` (Section 5.3) | Explicit return code `2` |
 | SQL Server error | Deleting `Bicycles` (Section 6.1), `INSERT` without a name (Section 5.5) | `TRY/CATCH`; return code `3` (Section 6.2) |
 | Success | Deleting `Electric Scooters` (Section 2.5) | Return code `0`, rows affected |
 
@@ -2041,7 +1976,7 @@ Other foreign key configurations, such as `ON DELETE SET NULL` or `ON DELETE CAS
 
 Database constraints enforce structural rules, such as primary key uniqueness and referential integrity. **Business rules** describe what an application allows users to do — for example, *a customer cannot be deleted if they have invoices*.
 
-Every business rule in this lab so far mirrors an existing foreign key. Section 1 and Section 3.4 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
+Every business rule in this lab so far mirrors an existing foreign key. Section 1 and Section 3.3 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
 
 ### Rules that no constraint can express
 

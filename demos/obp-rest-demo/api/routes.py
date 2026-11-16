@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import json
 
 from fastapi.responses import RedirectResponse
@@ -96,7 +96,7 @@ def get_invoice_by_id(id: int):
     data = get_invoice(id)
 
     if len(data) == 0:
-        return None
+        raise HTTPException(status_code=404, detail="Invoice not found.")
 
     first = data[0]
 

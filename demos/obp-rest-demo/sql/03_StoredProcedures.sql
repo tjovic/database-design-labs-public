@@ -5,9 +5,10 @@ GO
     PROCEDURE: usp_UpdateInvoice
 
     Description:
-        Updates the invoice header: date and customer.
-        Note: the "items" array in the JSON is ignored - invoice items
-        are not changed.
+        Updates an invoice in one transaction: the header (date and
+        customer) is updated and all existing items are replaced with
+        the items from the JSON. If any step fails, nothing is changed
+        (ROLLBACK).
 
     Called by:
         PUT /invoices/{id}
@@ -21,16 +22,48 @@ GO
         none
 ******************************************************************************/
 
-CREATE PROCEDURE [dbo].[usp_UpdateInvoice]
+CREATE OR ALTER PROCEDURE [dbo].[usp_UpdateInvoice]
     @InvoiceID INT,
     @Json NVARCHAR (MAX)
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE Invoice
-    SET    Date       = JSON_VALUE(@Json, '$.date'),
-           CustomerID = JSON_VALUE(@Json, '$.customerId')
-    WHERE  InvoiceID = @InvoiceID;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        -------------------------------------------------------
+        -- Invoice header
+        -------------------------------------------------------
+        UPDATE Invoice
+        SET    Date       = JSON_VALUE(@Json, '$.date'),
+               CustomerID = JSON_VALUE(@Json, '$.customerId')
+        WHERE  InvoiceID = @InvoiceID;
+        -------------------------------------------------------
+        -- Invoice items: replace the old items with the new ones
+        -------------------------------------------------------
+        DELETE FROM InvoiceItem
+        WHERE  InvoiceID = @InvoiceID;
+
+        INSERT INTO InvoiceItem (
+            InvoiceID,
+            ProductID,
+            Quantity,
+            UnitPrice
+        )
+        SELECT @InvoiceID,
+               j.ProductID,
+               j.Quantity,
+               j.UnitPrice
+        FROM   OPENJSON (@Json, '$.items')
+		WITH
+			(ProductID INT '$.productId', Quantity INT '$.quantity', UnitPrice DECIMAL (10, 2) '$.unitPrice') AS j;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK;
+        THROW;
+    END CATCH
 END
 GO
 

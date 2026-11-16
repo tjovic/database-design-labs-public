@@ -60,22 +60,57 @@ pip install -r requirements.txt
 
 ### 2. Configure the connection
 
-Copy the example environment file and adjust if needed (the defaults
-work for a local, Windows-authenticated SQL Server instance):
+Create a file named `.env` in the `demos/obp-rest-demo` folder (next to
+`requirements.txt`). The easiest way is to copy the example file:
 
 ```bash
 copy .env.example .env
 ```
 
+Then open `.env` in a text editor and set the values. The complete file
+looks like this:
+
+```
+SERVER=localhost\SQLEXPRESS
+DATABASE=OBPRestDemo
+DRIVER=ODBC Driver 18 for SQL Server
+DB_USER=
+DB_PASSWORD=
+```
+
+| Setting | What to put there |
+|---|---|
+| `SERVER` | Your SQL Server instance — exactly what you type in the **Server name** field in SSMS. `localhost` is the default instance, `localhost\SQLEXPRESS` is a named Express instance. These are **two different instances**. |
+| `DATABASE` | `OBPRestDemo` — do not change it. |
+| `DRIVER` | `ODBC Driver 18 for SQL Server` — the exact name, without `{ }`. Check the installed drivers with `python -c "import pyodbc; print(pyodbc.drivers())"`. |
+| `DB_USER`, `DB_PASSWORD` | Leave **both empty** to log in with your Windows account (Windows authentication). Fill them in only for a SQL Server login, e.g. `DB_USER=sa`. |
+
+Rules for the `.env` file:
+
+- one setting per line, in the form `NAME=value`
+- **no spaces** around `=`
+- write the password exactly as it is, without quotes — characters such
+  as `;`, `$`, `{` or `}` are fine. Only if the password contains a
+  space or `#`, wrap it in single quotes: `DB_PASSWORD='my #pass'`
+- the file name is exactly `.env` (not `.env.txt` — in Notepad, choose
+  *Save as type: All files*)
+- the app reads `.env` only at start: after a change, stop the app
+  (CTRL+C) and start it again
+
 ### 3. Create the database
 
-In SQL Server Management Studio (or `sqlcmd`), run, in order:
+In SQL Server Management Studio (or `sqlcmd`), connected to the **same
+instance** as `SERVER` in `.env`, run, in order:
 
 ```
 sql/01_CreateDatabase.sql
-sql/02_SeedData.sql
+sql/02_SeedData.sql          (run it twice on a new database)
 sql/03_StoredProcedures.sql
 ```
+
+On a brand-new database the first run of `02_SeedData.sql` reports a
+`FOREIGN KEY` error (the first `IDENTITY` value on a new table is 0,
+not 1); the second run fixes the data.
 
 `01_CreateDatabase.sql` drops and recreates a dedicated `OBPRestDemo`
 database — it does **not** touch `AdventureWorksENG`. `02_SeedData.sql`
@@ -182,7 +217,10 @@ account. Fill them in only if you use a SQL Server login.
 
 - If Windows shows *"Windows protected your PC"*, click **More info →
   Run anyway**.
-- A black console window opens and the browser opens
+- A black console window opens. The app first checks the database
+  connection: if it fails, the window shows the error and a hint what
+  to fix in `config.env`.
+- If the connection works, the browser opens
   <http://127.0.0.1:8000/docs> automatically. If the browser does not open, type the
   address yourself.
 - **Keep the console window open** while you work: closing it stops
@@ -196,7 +234,7 @@ CTRL+C in it).
 | Error | Cause and fix |
 |---|---|
 | `Login failed for user ...` (18456) **together with** `Cannot open database ...` (4060) | The database does not exist on that instance. Check that `SERVER` in `config.env` is the instance where you ran the scripts (step 2 and 3). |
-| `Login failed for user ...` (18456) alone | Your Windows account has no login on that instance. Use a SQL Server login (`DB_USER`, `DB_PASSWORD`). |
+| `Login failed for user ...` (18456) alone | With `DB_USER` set: wrong login or password — try the same login in SSMS (*SQL Server Authentication*). The console shows how many characters the password has, which helps to spot extra characters. With `DB_USER` empty: your Windows account has no login on that instance. |
 | `Data source name not found` (IM002) | ODBC Driver 18 is not installed. Check in PowerShell: `Get-OdbcDriver`. |
 | `[WinError 10048]` / address already in use | Another app uses the port. Change `PORT` in `config.env`. |
 | The console window closes immediately | Open a Command Prompt in the folder and run `obp-rest-demo.exe` from there to see the error message. |

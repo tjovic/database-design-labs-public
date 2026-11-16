@@ -1,7 +1,8 @@
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# interpolate=False: a "$" in a password is kept as it is
+load_dotenv(interpolate=False)
 
 SERVER = os.getenv("SERVER")
 DATABASE = os.getenv("DATABASE")

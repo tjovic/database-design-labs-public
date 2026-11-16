@@ -2,7 +2,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# interpolate=False: a "$" in a password is kept as it is
+load_dotenv(interpolate=False)
 
 # Folders are resolved relative to this file, so the app works from any
 # working directory and inside the packaged .exe.

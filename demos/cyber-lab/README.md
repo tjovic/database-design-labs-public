@@ -47,29 +47,56 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Connection configuration
+### 2. Configure the connection
 
-The defaults in [app/config.py](app/config.py) work for a local,
-Windows-authenticated SQL Server:
+Create a file named `.env` in the `demos/cyber-lab` folder (next to
+`requirements.txt`). The easiest way is to copy the example file:
+
+```bash
+copy .env.example .env
+```
+
+Then open `.env` in a text editor and set the values. The complete file
+looks like this:
 
 ```
-SERVER=localhost
+SERVER=localhost\SQLEXPRESS
 DATABASE=CyberLab
 DRIVER=ODBC Driver 18 for SQL Server
+DB_USER=
+DB_PASSWORD=
 ```
 
-To use another instance (for example `localhost\SQLEXPRESS`) or SQL
-authentication, create a `.env` file in `demos/cyber-lab` with the
-values you want to change, plus `DB_USER` and `DB_PASSWORD` for SQL
-authentication.
+| Setting | What to put there |
+|---|---|
+| `SERVER` | Your SQL Server instance — exactly what you type in the **Server name** field in SSMS. `localhost` is the default instance, `localhost\SQLEXPRESS` is a named Express instance. These are **two different instances**. |
+| `DATABASE` | `CyberLab` — do not change it. |
+| `DRIVER` | `ODBC Driver 18 for SQL Server` — the exact name, without `{ }`. Check the installed drivers with `python -c "import pyodbc; print(pyodbc.drivers())"`. |
+| `DB_USER`, `DB_PASSWORD` | Leave **both empty** to log in with your Windows account (Windows authentication). Fill them in only for a SQL Server login, e.g. `DB_USER=sa`. |
+
+Rules for the `.env` file:
+
+- one setting per line, in the form `NAME=value`
+- **no spaces** around `=`
+- write the password exactly as it is, without quotes — characters such
+  as `;`, `$`, `{` or `}` are fine. Only if the password contains a
+  space or `#`, wrap it in single quotes: `DB_PASSWORD='my #pass'`
+- the file name is exactly `.env` (not `.env.txt` — in Notepad, choose
+  *Save as type: All files*)
+- the app reads `.env` only at start: after a change, stop the app
+  (CTRL+C) and start it again
+
+Without a `.env` file the app uses `SERVER=localhost`,
+`DATABASE=CyberLab` and Windows authentication.
 
 ### 3. Create the database and data
 
-From `sqlcmd` (or SSMS) run:
+From `sqlcmd` (or SSMS) run — use the same instance as `SERVER` in
+`.env` after `-S`:
 
 ```bash
-sqlcmd -S localhost -E -C -i database\init.sql
-sqlcmd -S localhost -E -C -i database\seed.sql
+sqlcmd -S localhost\SQLEXPRESS -E -C -i database\init.sql
+sqlcmd -S localhost\SQLEXPRESS -E -C -i database\seed.sql
 ```
 
 `init.sql` creates the `CyberLab` database and the `Users` and `CreditCards`
@@ -181,7 +208,10 @@ account. Fill them in only if you use a SQL Server login.
 
 - If Windows shows *"Windows protected your PC"*, click **More info →
   Run anyway**.
-- A black console window opens and the browser opens
+- A black console window opens. The app first checks the database
+  connection: if it fails, the window shows the error and a hint what
+  to fix in `config.env`.
+- If the connection works, the browser opens
   <http://127.0.0.1:8001/login> automatically. If the browser does not open, type the
   address yourself.
 - **Keep the console window open** while you work: closing it stops
@@ -195,7 +225,7 @@ CTRL+C in it).
 | Error | Cause and fix |
 |---|---|
 | `Login failed for user ...` (18456) **together with** `Cannot open database ...` (4060) | The database does not exist on that instance. Check that `SERVER` in `config.env` is the instance where you ran the scripts (step 2 and 3). |
-| `Login failed for user ...` (18456) alone | Your Windows account has no login on that instance. Use a SQL Server login (`DB_USER`, `DB_PASSWORD`). |
+| `Login failed for user ...` (18456) alone | With `DB_USER` set: wrong login or password — try the same login in SSMS (*SQL Server Authentication*). The console shows how many characters the password has, which helps to spot extra characters. With `DB_USER` empty: your Windows account has no login on that instance. |
 | `Data source name not found` (IM002) | ODBC Driver 18 is not installed. Check in PowerShell: `Get-OdbcDriver`. |
 | `[WinError 10048]` / address already in use | Another app uses the port. Change `PORT` in `config.env`. |
 | The page has no styling | Bootstrap is loaded from the internet (CDN). The demo still works without it. |
@@ -343,6 +373,7 @@ cyber-lab/
 ├── build.bat                  # builds dist/cyber-lab.exe
 ├── config.env.example         # settings for the packaged .exe
 ├── run.py                     # entry point for the packaged .exe
+├── .env.example               # connection settings template (copy to .env)
 ├── requirements.txt
 ├── README.md                  # this file — setup
 └── lab.md                     # guided classroom walkthrough

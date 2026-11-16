@@ -1736,7 +1736,7 @@ In Lab 0, you learned how to use `TRY/CATCH` to handle SQL Server errors. Now we
 
 Section 4.5 ended with a trap: the `INSERT` failed with error 515, but the procedure still returned `0`. This section starts with the same trap in its simplest form.
 
-`usp_ManageCategory` checks for subcategories before it deletes a category, so its `DELETE` never fails. A procedure without that check does. `dbo.usp_DeleteCategory` follows the same pattern as the first version of `usp_DeleteCity` in Section 2.5:
+`usp_ManageCategory` checks for subcategories before it deletes a category, so its `DELETE` never fails. A procedure without that check does. `dbo.usp_DeleteCategory` follows the same pattern as the first version of `usp_DeleteCity` in Section 2.5. Like the other procedures in this lab, it reports success with `RETURN 0`:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
@@ -1747,15 +1747,20 @@ BEGIN
     WHERE IDCategory = @IDCategory;
 
     SELECT @@ROWCOUNT AS RowsDeleted;
+    RETURN 0;
 END;
 GO
 ```
 
-Try deleting `Bicycles` (`IDCategory = 1`). As the diagram in Section 4.3 shows, every subcategory belongs to a category — and `Bicycles` has three: `Mountain Bikes`, `Road Bikes`, and `Touring Bikes`. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? And if there is a result set, what will `RowsDeleted` contain?
+Try deleting `Bicycles` (`IDCategory = 1`). As the diagram in Section 4.3 shows, every subcategory belongs to a category — and `Bicycles` has three: `Mountain Bikes`, `Road Bikes`, and `Touring Bikes`. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? What will `RowsDeleted` contain, and which return code will the procedure return?
 
 ```sql
-EXEC dbo.usp_DeleteCategory
+DECLARE @Result int;
+
+EXEC @Result = dbo.usp_DeleteCategory
     @IDCategory = 1;
+
+SELECT @Result AS ReturnCode;
 ```
 
 <details>
@@ -1772,20 +1777,24 @@ The conflict occurred in database "AdventureWorksENG", table "dbo.Subcategory", 
 The statement has been terminated.
 ```
 
-followed by a result set:
+followed by two result sets:
 
 | RowsDeleted |
 |---:|
 | 0 |
 
-`Bicycles` and its three subcategories remain in the database.
+| ReturnCode |
+|---:|
+| 0 |
+
+`Bicycles` and its three subcategories remain in the database — yet the procedure reported success.
 
 </details>
 
-Notice the last line of the message: *the statement has been terminated*. Error 547 stops only the failed `DELETE`. The procedure then continues with the next statement, so `SELECT @@ROWCOUNT` still runs and reports zero deleted rows.
+Notice the last line of the message: *the statement has been terminated*. Error 547 stops only the failed `DELETE`. The procedure then continues with the next statements: `SELECT @@ROWCOUNT` reports zero deleted rows, and `RETURN 0` reports success.
 
 > [!WARNING]
-> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a category that does not exist. Section 5.4 returns to why these two outcomes must not be confused.
+> The caller now receives both an error and a normal-looking result. Reading only the return code, it would see `0` — success. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a category that does not exist. Section 5.4 returns to why these outcomes must not be confused.
 
 > [!IMPORTANT]
 > **A foreign key constraint protects referential integrity.**
@@ -1818,7 +1827,7 @@ END;
 GO
 ```
 
-Execute the same deletion again, this time capturing the return code:
+Execute the same deletion again:
 
 ```sql
 DECLARE @Result int;
@@ -1849,7 +1858,7 @@ Look at what changed for the caller:
 
 - **The caller no longer receives an error.** The procedure handled it. If the caller wraps the call in its own `TRY/CATCH`, its `CATCH` does not run.
 - **The result set has a different shape.** On success the caller receives `RowsDeleted`; on failure it receives `ErrorNumber` and `ErrorMessage`. Recognising the outcome by the columns of a result set is fragile.
-- **The return code says what happened.** `0` means the `DELETE` ran; `3` means it failed with an error. This is the most reliable signal for the caller, and Section 7 uses the same convention.
+- **The return code says what happened.** In Section 5.1 the same call returned `0`; now it returns `3`. `0` means the `DELETE` ran; `3` means it failed with an error. This is the most reliable signal for the caller, and Section 7 uses the same convention.
 
 The same `TRY/CATCH` would also close the trap from the end of Section 4.5: wrapped in `TRY`, the failed `INSERT` in `usp_ManageCategory` would jump to `CATCH` and return `3` instead of `0`.
 
@@ -1873,6 +1882,7 @@ BEGIN
     WHERE IDCategory = @IDCategory;
 
     SELECT @@ROWCOUNT AS RowsDeleted;
+    RETURN 0;
 END;
 GO
 ```
@@ -1927,7 +1937,7 @@ Section 1 asked what can happen when you delete a row. We have now met every out
 
 Only one of these outcomes is a SQL Server error. The others are normal results that the procedure must report explicitly.
 
-Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error such as 547 or 515 terminates only itself — the procedure continues. Any `@@ROWCOUNT` or `RETURN` that follows then reports a misleading result: `RowsDeleted = 0` or return code `0`.
+Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error such as 547 or 515 terminates only itself — the procedure continues. Any `@@ROWCOUNT` or `RETURN` that follows then reports a misleading result: `RowsDeleted = 0` and return code `0`.
 
 > [!IMPORTANT]
 > **A row count or return code read after a statement that can fail is reliable only if the error is caught.**
@@ -1940,7 +1950,7 @@ Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error su
 4. Can `TRY/CATCH` be placed outside a stored procedure?
 5. What is the difference between `@@ROWCOUNT = 0` and a SQL Server error?
 6. What does `ERROR_PROCEDURE()` return?
-7. Why did `usp_DeleteCategory` in Section 5.1 return `RowsDeleted = 0`, even though the `DELETE` failed with an error?
+7. Why did `usp_DeleteCategory` in Section 5.1 return `RowsDeleted = 0` and return code `0`, even though the `DELETE` failed with an error?
 8. In Section 5.3, the caller wraps the call in `TRY/CATCH`. Does the procedure still return `RowsDeleted`? Why?
 
 <details>
@@ -1952,8 +1962,8 @@ Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error su
 4. Yes. The caller can wrap the procedure call in `TRY/CATCH`, provided the procedure propagates the error.
 5. `@@ROWCOUNT = 0` means no rows were affected. A SQL Server error means the statement encountered a condition that prevented successful execution.
 6. It returns the name of the procedure or trigger where the error occurred, or `NULL` when no such object is associated with the error.
-7. Error 547 terminates only the `DELETE` statement. The procedure continues with the next statement, so `SELECT @@ROWCOUNT` runs and reports the zero rows of the failed statement.
-8. No. Inside a `TRY` block, an error transfers control to the `CATCH` block immediately — including errors raised inside the called procedure. The rest of the procedure, including `SELECT @@ROWCOUNT`, is skipped.
+7. Error 547 terminates only the `DELETE` statement. The procedure continues with the next statements: `SELECT @@ROWCOUNT` reports the zero rows of the failed statement, and `RETURN 0` reports success.
+8. No. Inside a `TRY` block, an error transfers control to the `CATCH` block immediately — including errors raised inside the called procedure. The rest of the procedure, including `SELECT @@ROWCOUNT` and `RETURN 0`, is skipped.
 
 </details>
 

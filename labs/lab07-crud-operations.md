@@ -20,7 +20,7 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 >
 > Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects change nothing.
 >
-> Several examples insert, change, or delete rows — for example, Section 8 deletes customer `16` (Lili Alameda, who has no invoices). The expected results, including the generated IDs, assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, the results will differ.
+> Several examples insert, change, or delete rows — for example, Section 7 deletes customer `16` (Lili Alameda, who has no invoices). The expected results, including the generated IDs, assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, the results will differ.
 
 ---
 
@@ -134,12 +134,12 @@ flowchart TD
 
 Notice what the invoice check does **not** do: it does not protect the data any better. The foreign key already does that. What the check adds is a **clear answer** — return code `2` instead of error 547 — which the application can translate into a message.
 
-Not every rule has a constraint behind it. Some rules cannot be expressed as a constraint at all (Section 7.2), and for those, the check in the procedure is the only protection.
+Not every rule has a constraint behind it. Some rules cannot be expressed as a constraint at all (Section 6.2), and for those, the check in the procedure is the only protection.
 
-You will build exactly this procedure in Section 8.
+You will build exactly this procedure in Section 7.
 
 > [!IMPORTANT]
-> **Designing CRUD operations whose outcomes the caller can tell apart is the main goal of this lab.** Every section adds one piece: verifying affected rows (Section 2), return codes for business rules (Section 3), handling errors (Section 6), and understanding the constraints behind them (Section 7). Section 8 brings everything together.
+> **Designing CRUD operations whose outcomes the caller can tell apart is the main goal of this lab.** Every section adds one piece: verifying affected rows and reporting business rules with return codes (Section 2), handling errors (Section 5), and understanding the constraints behind them (Section 6). Section 7 brings everything together.
 
 ## Check your understanding
 
@@ -160,352 +160,9 @@ You will build exactly this procedure in Section 8.
 
 ---
 
-# Section 2 – CRUD with Separate Procedures
+# Section 2 – CRUD for `State` and `City`
 
-One way to implement CRUD is to create a **separate stored procedure for each operation**.
-
-Each procedure has a specific responsibility: inserting, retrieving, updating, or deleting data.
-
-In this section, we will implement CRUD operations for the `Category` table.
-
-The table contains two columns:
-
-| Column | Description |
-|---|---|
-| `IDCategory` | Primary key, automatically generated using `IDENTITY` |
-| `Name` | Category name |
-
-We will create five procedures:
-
-| Procedure | Operation |
-|---|---|
-| `usp_InsertCategory` | Create |
-| `usp_GetCategory` | Read one category |
-| `usp_FindCategoriesByName` | Read multiple categories |
-| `usp_UpdateCategoryName` | Update |
-| `usp_DeleteCategory` | Delete |
-
-Notice that we have **five procedures for four CRUD operations**. This is because reading one category and searching for multiple categories are different requirements.
-
-## 2.1 Create – Insert a category
-
-The first procedure inserts a new category and returns its generated ID through an `OUTPUT` parameter.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertCategory
-    @Name          nvarchar(50),
-    @NewCategoryID int OUTPUT
-AS
-BEGIN
-    INSERT INTO Category (Name)
-    VALUES (@Name);
-
-    SET @NewCategoryID = SCOPE_IDENTITY();
-END;
-GO
-```
-
-The shop is adding a new product line, scooters. Execute the procedure:
-
-```sql
-DECLARE @NewID int;
-
-EXEC dbo.usp_InsertCategory
-    @Name = N'Scooters',
-    @NewCategoryID = @NewID OUTPUT;
-
-SELECT @NewID AS NewCategoryID;
-```
-
-The procedure inserts a new row and returns its generated primary key. On a freshly created database, `Scooters` receives `IDCategory = 5`.
-
-Verify the result:
-
-```sql
-SELECT *
-FROM Category
-WHERE Name = N'Scooters';
-```
-
-> [!NOTE]
-> **Two kinds of SQL in this lab.** The application — the caller — works only through procedures: it calls `EXEC` and uses what the procedure returns. The verification queries, such as the `SELECT` above, are for us. They look directly into the table to confirm what the procedure did, and they are not part of the application.
-
-> [!NOTE]
-> The `OUTPUT` parameter and `SCOPE_IDENTITY()` were introduced in Lab 3. Here, we use them to return the ID of a newly created record.
-
-> [!WARNING]
-> **Run the insert only once.** `Category.Name` is not protected by a unique constraint — only `IDCategory` is. If you execute the block twice, SQL Server inserts a second `Scooters` row without complaint, and the expected results later in this section will no longer match.
->
-> The database enforces only the rules it has been given. Section 7 returns to this question: which rules does the database guarantee, and which must your code enforce?
-
-## 2.2 Read – Retrieve one category
-
-A common requirement is to retrieve a single record using its primary key.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_GetCategory
-    @IDCategory int
-AS
-BEGIN
-    SELECT
-        IDCategory,
-        Name
-    FROM Category
-    WHERE IDCategory = @IDCategory;
-END;
-GO
-```
-
-Test the procedure against the real catalog. `AdventureWorksENG` contains four categories:
-
-| IDCategory | Name |
-|---:|---|
-| 1 | Bicycles |
-| 2 | Parts |
-| 3 | Clothes |
-| 4 | Accessories |
-
-Before you run the two calls below, **predict**: what will the second call return — an error, or something else?
-
-```sql
-EXEC dbo.usp_GetCategory @IDCategory = 1;
-
-EXEC dbo.usp_GetCategory @IDCategory = 999999;
-```
-
-The first call retrieves the real category `Bicycles`.
-
-The second call returns an empty result set, because no category has that ID.
-
-This is the first outcome from Section 1: **the row does not exist**. SQL Server does not report it as an error — the caller has to notice that the result set is empty.
-
-> [!IMPORTANT]
-> A `SELECT` statement that finds no matching records does not raise an error.
->
-> It simply returns **zero rows**.
-
-## 2.3 Read – Search for multiple categories
-
-Sometimes an application needs to search for records rather than retrieve one specific record.
-
-For example, users might search for categories whose names start with a particular text.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_FindCategoriesByName
-    @NamePattern nvarchar(50)
-AS
-BEGIN
-    SELECT
-        IDCategory,
-        Name
-    FROM Category
-    WHERE Name LIKE @NamePattern
-    ORDER BY Name;
-END;
-GO
-```
-
-Execute the procedure against the real catalog:
-
-```sql
--- Categories starting with 'B'
-EXEC dbo.usp_FindCategoriesByName
-    @NamePattern = N'B%';
-
--- Every category
-EXEC dbo.usp_FindCategoriesByName
-    @NamePattern = N'%';
-```
-
-The first call returns one row, `Bicycles`. The second returns every category, sorted by name — the four real ones plus `Scooters`, which you created in Section 2.1:
-
-| IDCategory | Name |
-|---:|---|
-| 4 | Accessories |
-| 1 | Bicycles |
-| 3 | Clothes |
-| 2 | Parts |
-| 5 | Scooters |
-
-
-Searching for a pattern that matches nothing, such as `N'Q%'`, returns zero rows rather than an error.
-
-Compare the two Read procedures:
-
-| Procedure | Result |
-|---|---|
-| `usp_GetCategory` | Zero or one record, identified by primary key |
-| `usp_FindCategoriesByName` | Zero, one, or multiple records matching a search pattern |
-
-Both procedures implement the **Read** operation, but they serve different purposes.
-
-## 2.4 Update – Change a category name
-
-The next procedure updates the name of an existing category.
-
-It also returns the number of affected rows.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_UpdateCategoryName
-    @IDCategory int,
-    @NewName    nvarchar(50)
-AS
-BEGIN
-    UPDATE Category
-    SET Name = @NewName
-    WHERE IDCategory = @IDCategory;
-
-    SELECT @@ROWCOUNT AS RowsUpdated;
-END;
-GO
-```
-
-An application changes a record the way a user does: it first finds the record, then updates it using its ID. Find the `Scooters` category with the search procedure from Section 2.3:
-
-```sql
-EXEC dbo.usp_FindCategoriesByName
-    @NamePattern = N'Scooters';
-```
-
-| IDCategory | Name |
-|---:|---|
-| 5 | Scooters |
-
-Then update it using the ID from the result:
-
-```sql
-EXEC dbo.usp_UpdateCategoryName
-    @IDCategory = 5,
-    @NewName = N'Electric Scooters';
-```
-
-Expected result:
-
-| RowsUpdated |
-|---:|
-| 1 |
-
-Verify the change:
-
-```sql
-SELECT *
-FROM Category
-WHERE Name = N'Electric Scooters';
-```
-
-Now try updating a category that does not exist. **Predict** the result before you run it:
-
-```sql
-EXEC dbo.usp_UpdateCategoryName
-    @IDCategory = 999999,
-    @NewName = N'Unknown Category';
-```
-
-Expected result:
-
-| RowsUpdated |
-|---:|
-| 0 |
-
-Again, this is the outcome *the row does not exist* — this time reported through the number of affected rows.
-
-> [!IMPORTANT]
-> **Zero affected rows does not mean that the SQL statement failed.**
->
-> The `UPDATE` executed successfully, but no record matched the specified ID.
->
-> We use `@@ROWCOUNT`, introduced in [Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount), to detect this situation.
-
-## 2.5 Delete – Remove a category
-
-The final procedure deletes a category using its primary key. It follows the same pattern as `usp_UpdateCategoryName`.
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
-    @IDCategory int
-AS
-BEGIN
-    DELETE FROM Category
-    WHERE IDCategory = @IDCategory;
-
-    SELECT @@ROWCOUNT AS RowsDeleted;
-END;
-GO
-```
-
-`@@ROWCOUNT` must be read immediately after the `DELETE`. Most statements in between would overwrite it — for example, `SET @x = 5` sets it to `1`, and `PRINT` sets it to `0`.
-
-The scooter line is discontinued. `Electric Scooters` still has `IDCategory = 5` — renaming a record does not change its primary key.
-
-**Test 1 – Delete the category**
-
-```sql
-EXEC dbo.usp_DeleteCategory
-    @IDCategory = 5;
-```
-
-Expected: `RowsDeleted = 1`.
-
-**Test 2 – Delete the same category again**
-
-```sql
-EXEC dbo.usp_DeleteCategory
-    @IDCategory = 5;
-```
-
-Expected: `RowsDeleted = 0` — the category has already been deleted.
-
-> [!WARNING]
-> Not every category can be deleted successfully.
->
-> `Electric Scooters` deleted cleanly because nothing referenced it. Every **real** category in `AdventureWorksENG` has subcategories — `Bicycles` has 3, `Parts` has 14, `Clothes` has 8, `Accessories` has 12 — so the foreign key constraint prevents deleting any of them.
->
-> Section 6 runs exactly that deletion against the real `Bicycles` category and examines the error.
-
-## 2.6 Summary – Complete CRUD interface
-
-We have now implemented all four CRUD operations using five stored procedures. Each performs one clearly defined operation, which makes the interface straightforward to understand, test, and maintain.
-
-Look at the procedures from the caller's point of view. How does the caller learn what happened?
-
-| Procedure | The caller learns the outcome from |
-|---|---|
-| `usp_InsertCategory` | the `OUTPUT` parameter (the new ID) |
-| `usp_GetCategory`, `usp_FindCategoriesByName` | the number of rows in the result set |
-| `usp_UpdateCategoryName`, `usp_DeleteCategory` | a result set containing `@@ROWCOUNT` |
-
-A row count tells the caller **whether** something changed. It cannot tell the caller **why** nothing changed — and Section 1 showed that "nothing was deleted" can have several very different causes.
-
-Section 3 introduces return codes, which can carry that reason. Section 6 shows what happens to a row count when SQL Server raises an error.
-
-Separate procedures are also not the only possible design. Section 5 explores how multiple CRUD operations can be combined into a single procedure.
-
-## Check your understanding
-
-1. Why did we create five procedures for four CRUD operations?
-2. What is the purpose of the `OUTPUT` parameter in `usp_InsertCategory`?
-3. What happens when `usp_GetCategory` receives an ID that does not exist?
-4. What does `RowsUpdated = 0` mean?
-5. How does the caller of `usp_GetCategory` know that the requested category does not exist?
-6. What happens if you run the insert from Section 2.1 twice? Why doesn't SQL Server stop you?
-
-<details>
-<summary>Show answers</summary>
-
-1. Because we implemented two different Read operations: retrieving one category by ID and searching for multiple categories by name.
-2. It returns the generated primary key of the newly inserted category.
-3. The procedure returns an empty result set.
-4. The `UPDATE` executed successfully but did not match any rows.
-5. Only by checking that the result set is empty. No error is raised, so the caller must check the number of returned rows itself.
-6. A second `Scooters` row is inserted with a new ID. SQL Server allows it because `Category.Name` has no unique constraint — the database only enforces the rules that have been defined for it.
-
-</details>
-
----
-
-# Section 3 – Related Tables and Return Codes
-
-Section 2 worked with a single table. This section works with two related tables, `State` and `City`, connected through a foreign key:
+This section implements every CRUD operation on two related tables, `State` and `City`, using a separate stored procedure for each operation. The two tables are connected through a foreign key:
 
 ```mermaid
 erDiagram
@@ -523,11 +180,20 @@ erDiagram
 
 The `City.StateID` column is nullable, meaning that a city can exist without being assigned to a state.
 
-The section brings two new things. Section 3.2 inserts rows into a table that references another table. Section 3.3 answers the question from Section 2.6 — can a row count tell the caller **why** nothing was deleted? Instead of a row count, the procedure returns a **return code**: a number that says which of several outcomes occurred.
+`AdventureWorksENG` already contains three states — `Croatia` (1), `Germany` (2), and `Italy` (3) — and 13 cities, all of which have customers.
 
-## 3.1 Insert a state
+| Procedure | Operation |
+|---|---|
+| `usp_InsertState`, `usp_InsertCity` | Create |
+| `usp_GetCitiesByState` | Read |
+| `usp_UpdateCityName` | Update |
+| `usp_DeleteCity` | Delete — first with a row count, then with a business rule and return codes |
 
-The shop is expanding to Slovenia. `dbo.usp_InsertState` follows exactly the same pattern as `usp_InsertCategory` in Section 2.1:
+The procedures use T-SQL you know from earlier labs: `OUTPUT` parameters and `SCOPE_IDENTITY()` from Lab 3, and `@@ROWCOUNT` from [Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount). What is new is the question the whole lab is about: after each call, **how does the caller learn what happened?**
+
+## 2.1 Create – Insert a state
+
+The shop is expanding to Slovenia. `dbo.usp_InsertState` inserts a state and returns its generated ID through an `OUTPUT` parameter:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertState
@@ -553,9 +219,25 @@ EXEC dbo.usp_InsertState
 SELECT @NewID AS NewStateID;
 ```
 
-On a freshly created database, `Slovenia` receives `IDState = 4`. Run the insert only once — like `Category.Name`, `State.Name` is not unique, so a second run inserts a second `Slovenia`.
+On a freshly created database, `Slovenia` receives `IDState = 4`.
 
-## 3.2 Insert cities into a state
+Verify the result:
+
+```sql
+SELECT *
+FROM State
+WHERE Name = N'Slovenia';
+```
+
+> [!NOTE]
+> **Two kinds of SQL in this lab.** The application — the caller — works only through procedures: it calls `EXEC` and uses what the procedure returns. The verification queries, such as the `SELECT` above, are for us. They look directly into the table to confirm what the procedure did, and they are not part of the application.
+
+> [!WARNING]
+> **Run the insert only once.** `State.Name` is not protected by a unique constraint — only `IDState` is. If you execute the block twice, SQL Server inserts a second `Slovenia` row without complaint, and the expected results later in this lab will no longer match.
+>
+> The database enforces only the rules it has been given. Section 6 returns to this question: which rules does the database guarantee, and which must your code enforce?
+
+## 2.2 Create – Insert cities into a state
 
 `dbo.usp_InsertCity` inserts a city and associates it with a state. The caller passes the state's ID, so the procedure does not need to search for the state by name — it stores `@StateID` directly in `City.StateID`:
 
@@ -590,34 +272,7 @@ SELECT
     @City2 AS City2ID;
 ```
 
-To read the cities of a state, the application calls `dbo.usp_GetCitiesByState`. It needs no `JOIN` — a `WHERE` condition on `City.StateID` is enough:
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
-    @IDState int
-AS
-BEGIN
-    SELECT
-        IDCity,
-        Name
-    FROM City
-    WHERE StateID = @IDState
-    ORDER BY Name;
-END;
-GO
-```
-
-```sql
-EXEC dbo.usp_GetCitiesByState
-    @IDState = 4;
-```
-
-| IDCity | Name |
-|---:|---|
-| 14 | Ljubljana |
-| 15 | Maribor |
-
-The IDs assume a freshly created database and that each insert was run once.
+On a freshly created database, `Ljubljana` receives `IDCity = 14` and `Maribor` `IDCity = 15`.
 
 ### Predict, then try
 
@@ -649,13 +304,178 @@ The two calls look almost the same, but they end in two different outcomes from 
 
 A foreign key checks only values that are present. Because `City.StateID` is nullable, `NULL` simply means "no state", and the database accepts it.
 
-Notice also that `usp_InsertCity` does not handle the error yet — for `@StateID = 999`, the caller receives SQL Server's error message directly. For now, that is intentional: Section 6 shows how a procedure catches errors like this one with `TRY/CATCH` and reports them to the caller in a controlled way.
+Notice also that `usp_InsertCity` does not handle the error yet — for `@StateID = 999`, the caller receives SQL Server's error message directly. For now, that is intentional: Section 5 shows how a procedure catches errors like this one with `TRY/CATCH` and reports them to the caller in a controlled way.
 
-This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 3.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and `usp_GetCitiesByState` would return no cities for Slovenia.
+This also matters for the test data: if `@StateID` were `NULL` because the insert in Section 2.1 failed, `Ljubljana` and `Maribor` would be inserted without a state, and `usp_GetCitiesByState` would return no cities for Slovenia.
 
 </details>
 
-## 3.3 Delete a city – return codes
+## 2.3 Read – Retrieve the cities of a state
+
+`dbo.usp_GetCitiesByState` returns the cities of one state. It needs no `JOIN` — a `WHERE` condition on `City.StateID` is enough:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_GetCitiesByState
+    @IDState int
+AS
+BEGIN
+    SELECT
+        IDCity,
+        Name
+    FROM City
+    WHERE StateID = @IDState
+    ORDER BY Name;
+END;
+GO
+```
+
+**Test 1 – Slovenia**
+
+```sql
+EXEC dbo.usp_GetCitiesByState
+    @IDState = 4;
+```
+
+Expected:
+
+| IDCity | Name |
+|---:|---|
+| 14 | Ljubljana |
+| 15 | Maribor |
+
+**Test 2 – Croatia, a real state**
+
+```sql
+EXEC dbo.usp_GetCitiesByState
+    @IDState = 1;
+```
+
+Expected:
+
+| IDCity | Name |
+|---:|---|
+| 2 | Osijek |
+| 3 | Pula |
+| 4 | Rijeka |
+| 5 | Split |
+| 1 | Zagreb |
+
+**Test 3 – A state that does not exist**
+
+**Predict:** what will this call return — an error, or something else?
+
+```sql
+EXEC dbo.usp_GetCitiesByState
+    @IDState = 999;
+```
+
+Expected: an empty result set.
+
+This is the first outcome from Section 1: **the row does not exist**. SQL Server does not report it as an error — the caller has to notice that the result set is empty.
+
+> [!IMPORTANT]
+> A `SELECT` statement that finds no matching records does not raise an error.
+>
+> It simply returns **zero rows**.
+
+## 2.4 Update – Rename a city
+
+The shop wants Croatian city names, but one of the Italian cities is still stored in English: `Rome` (`IDCity = 10`). `dbo.usp_UpdateCityName` changes the name of a city and returns the number of affected rows:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_UpdateCityName
+    @IDCity  int,
+    @NewName nvarchar(50)
+AS
+BEGIN
+    UPDATE City
+    SET Name = @NewName
+    WHERE IDCity = @IDCity;
+
+    SELECT @@ROWCOUNT AS RowsUpdated;
+END;
+GO
+```
+
+**Test 1 – Rename `Rome` to `Rim`**
+
+```sql
+EXEC dbo.usp_UpdateCityName
+    @IDCity = 10,
+    @NewName = N'Rim';
+```
+
+Expected: `RowsUpdated = 1`.
+
+Verify the change:
+
+```sql
+SELECT *
+FROM City
+WHERE IDCity = 10;
+```
+
+**Test 2 – A city that does not exist**
+
+**Predict** the result before you run it:
+
+```sql
+EXEC dbo.usp_UpdateCityName
+    @IDCity = 99999,
+    @NewName = N'Atlantis';
+```
+
+Expected: `RowsUpdated = 0`.
+
+Again, this is the outcome *the row does not exist* — this time reported through the number of affected rows.
+
+> [!IMPORTANT]
+> **Zero affected rows does not mean that the SQL statement failed.**
+>
+> The `UPDATE` executed successfully, but no record matched the specified ID. `@@ROWCOUNT` is how the procedure detects this situation.
+
+## 2.5 Delete – Remove a city
+
+The first version of `dbo.usp_DeleteCity` follows the same pattern as `usp_UpdateCityName`:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteCity
+    @IDCity int
+AS
+BEGIN
+    DELETE FROM City
+    WHERE IDCity = @IDCity;
+
+    SELECT @@ROWCOUNT AS RowsDeleted;
+END;
+GO
+```
+
+`@@ROWCOUNT` must be read immediately after the `DELETE`. Most statements in between would overwrite it — for example, `SET @x = 5` sets it to `1`, and `PRINT` sets it to `0`.
+
+The experiment in Section 2.2 left `Koper` in the table without a state. On a freshly created database it has `IDCity = 17` — the failed insert with `@StateID = 999` used up ID 16. Clean it up.
+
+**Test 1 – Delete `Koper`**
+
+```sql
+EXEC dbo.usp_DeleteCity
+    @IDCity = 17;
+```
+
+Expected: `RowsDeleted = 1`.
+
+**Test 2 – Delete the same city again**
+
+```sql
+EXEC dbo.usp_DeleteCity
+    @IDCity = 17;
+```
+
+Expected: `RowsDeleted = 0` — the city has already been deleted.
+
+`Koper` could be deleted because nothing referenced it. A row count tells the caller **whether** something was deleted, but it cannot tell the caller **why** nothing was deleted — and Section 1 showed that "nothing was deleted" can have several very different causes. The next version of the procedure solves this.
+
+## 2.6 Delete with a business rule – return codes
 
 A city may have customers associated with it through `Customer.CityID`.
 
@@ -663,7 +483,7 @@ Suppose our application has the following business rule:
 
 **A city cannot be deleted if it has at least one customer.**
 
-The procedure `dbo.usp_DeleteCity` implements this rule. It checks whether the city exists and whether any customers belong to it, and deletes the city only when it exists and has no customers. Instead of a row count, it reports the result with `RETURN`:
+The new version of `dbo.usp_DeleteCity` implements this rule and replaces the one from Section 2.5. It checks whether the city exists and whether any customers belong to it, and deletes the city only when it exists and has no customers. Instead of a row count, it reports the result with `RETURN`:
 
 | Return code | Meaning |
 |---:|---|
@@ -704,7 +524,7 @@ Each test covers one outcome. The return code is captured with `EXEC @Result = .
 
 **Test 1 – Ljubljana exists and has no customers yet**
 
-The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` in Section 3.2.
+The ID of `Ljubljana` — `14` — comes from the result of `usp_GetCitiesByState` in Section 2.3.
 
 ```sql
 DECLARE @Result int;
@@ -761,7 +581,7 @@ WHERE CityID = 1;
 >
 > However, a check followed by a `DELETE` is not automatically atomic. In a concurrent environment, another session could modify related data between these statements.
 >
-> Section 7.3 returns to this problem, and Labs 9 and 10 show how transactions solve it.
+> Section 6.3 returns to this problem, and Labs 9 and 10 show how transactions solve it.
 
 ### What does the business rule actually add?
 
@@ -783,28 +603,45 @@ So the check in `usp_DeleteCity` does not protect the data — the foreign key a
 
 In terms of Section 1, the procedure turns error 547 into a specific answer — return code `2`.
 
+## 2.7 Summary – How does the caller learn what happened?
+
+We have implemented all four CRUD operations, each with its own procedure. Look at them from the caller's point of view:
+
+| Procedure | The caller learns the outcome from |
+|---|---|
+| `usp_InsertState`, `usp_InsertCity` | the `OUTPUT` parameter (the new ID) |
+| `usp_GetCitiesByState` | the number of rows in the result set |
+| `usp_UpdateCityName`, `usp_DeleteCity` (Section 2.5) | a result set containing `@@ROWCOUNT` |
+| `usp_DeleteCity` (Section 2.6) | the return code |
+
+A row count says **whether** something changed. A return code can also say **why** not. Section 4 shows how several CRUD operations can be combined into one procedure, and Section 5 shows what happens to a row count when SQL Server raises an error.
+
 ## Check your understanding
 
 1. Why does `usp_InsertCity` need a `@StateID` parameter?
 2. What happens when `usp_InsertCity` is called with `@StateID = NULL`? And with `@StateID = 999`?
-3. Why does `usp_DeleteCity` check whether the city exists before deleting it?
-4. What is the difference between return codes `1` and `2`?
-5. `Customer.CityID` has a foreign key to `City`. What would happen if `usp_DeleteCity` skipped the customer check and simply ran `DELETE` for `Zagreb`?
+3. What happens when `usp_GetCitiesByState` receives a state that does not exist?
+4. What does `RowsUpdated = 0` mean?
+5. What is the difference between return codes `1` and `2` of `usp_DeleteCity`?
+6. `Customer.CityID` has a foreign key to `City`. What would happen if `usp_DeleteCity` skipped the customer check and simply ran `DELETE` for `Zagreb`?
+7. What happens if you run the insert from Section 2.1 twice? Why doesn't SQL Server stop you?
 
 <details>
 <summary>Show answers</summary>
 
 1. To associate the new city with an existing state.
 2. With `NULL`, the city is inserted without a state — no error. With `999`, the foreign key `FK_City_State` rejects the `INSERT` with error 547, because no state has that ID.
-3. To distinguish a nonexistent city from a successful deletion.
-4. Code `1` means the city does not exist; code `2` means the city exists but cannot be deleted because it has customers.
-5. The foreign key `FK_Customer_City` would reject the `DELETE` with error 547, and `Zagreb` would remain. The data would be safe either way — but the caller would receive an error instead of return code `2`, which explains the reason.
+3. The procedure returns an empty result set. No error is raised, so the caller must check the number of returned rows itself.
+4. The `UPDATE` executed successfully but did not match any rows.
+5. Code `1` means the city does not exist; code `2` means the city exists but cannot be deleted because it has customers.
+6. The foreign key `FK_Customer_City` would reject the `DELETE` with error 547, and `Zagreb` would remain. The data would be safe either way — but the caller would receive an error instead of return code `2`, which explains the reason.
+7. A second `Slovenia` row is inserted with a new ID. SQL Server allows it because `State.Name` has no unique constraint — the database only enforces the rules that have been defined for it.
 
 </details>
 
 ---
 
-# Section 4 – Functions and Data Access
+# Section 3 – Functions and Data Access
 
 So far, we have implemented CRUD operations using stored procedures.
 
@@ -814,7 +651,7 @@ In Lab 4, you learned how inline table-valued functions (TVFs) return tables tha
 
 In this section, we will implement the same Read operation using both a stored procedure and an inline TVF, then compare how they can be used.
 
-## 4.1 The data we will read
+## 3.1 The data we will read
 
 No test data is needed for this section. All 13 original cities in `AdventureWorksENG` have customers, so we can read real records:
 
@@ -826,7 +663,7 @@ No test data is needed for this section. All 13 original cities in `AdventureWor
 
 We will use `Zagreb` throughout this section.
 
-## 4.2 Read using a stored procedure
+## 3.2 Read using a stored procedure
 
 Create a procedure that retrieves customers by city name.
 
@@ -858,7 +695,7 @@ EXEC dbo.usp_GetCustomersByCity
 
 The procedure returns all 1492 customers who live in `Zagreb`, sorted by last name.
 
-## 4.3 Read using an inline table-valued function
+## 3.3 Read using an inline table-valued function
 
 Now implement the same operation using an inline TVF.
 
@@ -906,15 +743,15 @@ The ORDER BY clause is invalid in views, inline functions, derived tables, subqu
 and common table expressions, unless TOP, OFFSET or FOR XML is also specified.
 ```
 
-The caller decides the order — the query in Section 4.4 sorts the function's result with its own `ORDER BY`. A procedure, on the other hand, returns a final result set to the caller, so it can sort it.
+The caller decides the order — the query in Section 3.4 sorts the function's result with its own `ORDER BY`. A procedure, on the other hand, returns a final result set to the caller, so it can sort it.
 
 </details>
 
-So which one should you use? It depends on **who calls it**: an application calls a procedure, while other SQL queries use a function. Often the best answer is both — Section 4.7 shows how.
+So which one should you use? It depends on **who calls it**: an application calls a procedure, while other SQL queries use a function. Often the best answer is both — Section 3.7 shows how.
 
 The difference between the two is **how their results can be used**.
 
-## 4.4 Using a function in a larger query
+## 3.4 Using a function in a larger query
 
 Suppose we want to retrieve customers from a particular city together with their invoices.
 
@@ -973,7 +810,7 @@ A stored procedure is executed using `EXEC`, while an inline TVF can participate
 >
 > A procedure is executed as an operation, while an inline TVF provides a table result that can be combined with other SQL queries.
 
-## 4.5 When should you use each approach?
+## 3.5 When should you use each approach?
 
 | Stored procedure | Inline TVF |
 |---|---|
@@ -989,11 +826,11 @@ For CRUD operations, **Create, Update, and Delete** are always procedures — a 
 > [!TIP]
 > - **The application calls the Read → use a procedure.** It is the stable interface from Lab 3, it can sort the result, and it can report when the requested record does not exist.
 > - **The Read is part of another query** — a `JOIN`, a report, or another procedure → **use an inline TVF.**
-> - **You need both → write the query once in a function, and let the procedure call it.** Section 4.7 shows this pattern.
+> - **You need both → write the query once in a function, and let the procedure call it.** Section 3.7 shows this pattern.
 
-## 4.6 What can a function tell its caller?
+## 3.6 What can a function tell its caller?
 
-In Section 3, `Maribor` was added to `Slovenia` and nobody lives there yet. Compare two calls:
+In Section 2, `Maribor` was added to `Slovenia` and nobody lives there yet. Compare two calls:
 
 ```sql
 -- A city that exists but has no customers
@@ -1009,16 +846,16 @@ Both return `0`.
 
 Two different situations produce exactly the same answer. The function has no return code and no `OUTPUT` parameter — the only thing it can give the caller is rows. Zero rows cannot say *why* there are zero rows.
 
-A stored procedure could tell the difference: it could check whether the city exists and return code `1` if it does not, just as `usp_DeleteCity` did in Section 3. Section 4.7 does exactly that.
+A stored procedure could tell the difference: it could check whether the city exists and return code `1` if it does not, just as `usp_DeleteCity` did in Section 2.6. Section 3.7 does exactly that.
 
 > [!NOTE]
 > This is not a reason to avoid functions. For a Read operation, "no matching rows" is often all the caller needs. But when the caller must distinguish *missing* from *empty*, a function is not enough on its own.
 
-## 4.7 Using both: a procedure built on a function
+## 3.7 Using both: a procedure built on a function
 
-The function from Section 4.3 contains the query. The application, however, should call a procedure — and the procedure can add what the function cannot: sorting, and telling *missing* from *empty*.
+The function from Section 3.3 contains the query. The application, however, should call a procedure — and the procedure can add what the function cannot: sorting, and telling *missing* from *empty*.
 
-Replace `usp_GetCustomersByCity` from Section 4.2 with a version that uses the function:
+Replace `usp_GetCustomersByCity` from Section 3.2 with a version that uses the function:
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_GetCustomersByCity
@@ -1109,7 +946,7 @@ The query exists in one place only — the function. Reports and other queries c
 
 ---
 
-# Section 5 – One Procedure for Multiple Operations
+# Section 4 – One Procedure for Multiple Operations
 
 In Section 2, we implemented CRUD using separate stored procedures. Each procedure performed one specific operation.
 
@@ -1125,13 +962,13 @@ For example, an application might use:
 
 The choice depends on the application's requirements and how we want to organize the database interface.
 
-## 5.1 Common approaches
+## 4.1 Common approaches
 
-Consider three possible designs for managing categories.
+Consider three possible designs.
 
 | Approach | Example | Description |
 | --- | --- | --- |
-| Separate procedures | `usp_InsertCategory`, `usp_UpdateCategoryName` | Each operation has its own procedure |
+| Separate procedures | `usp_InsertCity`, `usp_UpdateCityName` | Each operation has its own procedure |
 | Combined Create + Update | `usp_SaveCustomer` | One procedure inserts or updates a record |
 | Action-based procedure | `usp_ManageCategory` | An `@Action` parameter selects the operation |
 
@@ -1144,7 +981,7 @@ Two common techniques are:
 
 Let's examine both approaches.
 
-## 5.2 Combining Create and Update – Save pattern
+## 4.2 Combining Create and Update – Save pattern
 
 A common requirement in applications is to use the same form for creating a new record and editing an existing one.
 
@@ -1280,11 +1117,11 @@ IF @@ROWCOUNT = 0
     RETURN 1;
 ```
 
-The procedure in Section 5.5 uses exactly this pattern for its `UPDATE` action.
+The procedure in Section 4.5 uses exactly this pattern for its `UPDATE` action.
 
 </details>
 
-## 5.3 Using an action parameter
+## 4.3 Using an action parameter
 
 Another approach is to let the caller explicitly specify which operation should be performed.
 
@@ -1387,7 +1224,7 @@ The procedure uses these return codes:
 | `2` | Subcategory has products; deletion rejected |
 | `99` | Unknown action |
 
-For `GET`, return code `1` tells the caller that the subcategory does not exist. Section 4.6 showed that a function cannot make this distinction — a procedure can.
+For `GET`, return code `1` tells the caller that the subcategory does not exist. Section 3.6 showed that a function cannot make this distinction — a procedure can.
 
 ### Test the procedure
 
@@ -1498,7 +1335,7 @@ The same procedure supports different operations, but the caller must supply the
 > [!NOTE]
 > `@Action = N'get'` in lowercase also works. `AdventureWorksENG` uses the case-insensitive collation `Croatian_CI_AS`, so `N'get' = N'GET'` is true. On a database with a case-sensitive collation, the same call would return `99`.
 
-## 5.4 Comparing the approaches
+## 4.4 Comparing the approaches
 
 Both separate and combined procedures can implement CRUD operations.
 
@@ -1519,7 +1356,9 @@ However, they have different characteristics.
 >
 > Combined procedures can be useful when operations are closely related, such as Create and Update in a Save procedure.
 
-## 5.5 Create, Update, and Delete combined
+## 4.5 Create, Update, and Delete combined
+
+`Category` is the top level of the product catalog. `AdventureWorksENG` has four categories — `Bicycles` (1), `Parts` (2), `Clothes` (3), and `Accessories` (4) — and every subcategory belongs to one of them through the foreign key `FK_Subcategory_Category`.
 
 The procedure `dbo.usp_ManageCategory` combines three operations on `Category`:
 
@@ -1527,9 +1366,9 @@ The procedure `dbo.usp_ManageCategory` combines three operations on `Category`:
 - `UPDATE`
 - `DELETE`
 
-The Read operations remain in the separate procedures created in Section 2.
+Reading stays in a separate procedure, as in Section 2.
 
-It uses the same `@Action` approach as `usp_ManageSubcategory` in Section 5.3, with these parameters:
+It uses the same `@Action` approach as `usp_ManageSubcategory` in Section 4.3, with these parameters:
 
 ```sql
 @Action        nvarchar(10),
@@ -1538,7 +1377,7 @@ It uses the same `@Action` approach as `usp_ManageSubcategory` in Section 5.3, w
 @NewCategoryID int          = NULL OUTPUT  -- INSERT: the generated ID
 ```
 
-Each parameter has one role. `@IDCategory` is an input — it tells the procedure *which* category to change. `@NewCategoryID` is an output — it returns the ID that `INSERT` generated, just like `usp_InsertCategory` in Section 2.1.
+Each parameter has one role. `@IDCategory` is an input — it tells the procedure *which* category to change. `@NewCategoryID` is an output — it returns the ID that `INSERT` generated, just like `usp_InsertState` in Section 2.1.
 
 Not every action uses every parameter:
 
@@ -1636,7 +1475,7 @@ EXEC @Result = dbo.usp_ManageCategory
 SELECT @NewID AS NewCategoryID, @Result AS ReturnCode;
 ```
 
-Expected: return code `0` and the new ID — `6` on a freshly created database, after `Scooters` used `5` in Section 2. The next tests use this ID.
+Expected: return code `0` and the new ID — `5` on a freshly created database. The next tests use this ID.
 
 **Test 2 – UPDATE**
 
@@ -1645,7 +1484,7 @@ DECLARE @Result int;
 
 EXEC @Result = dbo.usp_ManageCategory
     @Action     = N'UPDATE',
-    @IDCategory = 6,
+    @IDCategory = 5,
     @Name       = N'Gift Vouchers';
 
 SELECT @Result AS ReturnCode;
@@ -1660,7 +1499,7 @@ DECLARE @Result int;
 
 EXEC @Result = dbo.usp_ManageCategory
     @Action     = N'DELETE',
-    @IDCategory = 6;
+    @IDCategory = 5;
 
 SELECT @Result AS ReturnCode;
 ```
@@ -1674,7 +1513,7 @@ DECLARE @Result int;
 
 EXEC @Result = dbo.usp_ManageCategory
     @Action     = N'DELETE',
-    @IDCategory = 6;
+    @IDCategory = 5;
 
 SELECT @Result AS ReturnCode;
 ```
@@ -1683,20 +1522,9 @@ Expected: `1` — the category no longer exists.
 
 ### A caller that only updates
 
-The four tests run one after another, but the actions do not depend on each other. A caller that only edits a category gets the ID the same way as in Section 2.4 — from a search:
+The four tests run one after another, but the actions do not depend on each other. A caller that only edits a category already knows its ID — for example, the application showed the list of categories, and the user picked `Clothes` (`IDCategory = 3`) and typed a new name:
 
 ```sql
--- The user searches for the category and sees its ID
-EXEC dbo.usp_FindCategoriesByName
-    @NamePattern = N'Clothes';
-```
-
-| IDCategory | Name |
-|---:|---|
-| 3 | Clothes |
-
-```sql
--- The user renames it
 DECLARE @Result int;
 
 EXEC @Result = dbo.usp_ManageCategory
@@ -1745,7 +1573,7 @@ and then returns:
 Two problems are visible here:
 
 1. **A shared parameter list fits no action exactly.** `@Name` is optional because `DELETE` does not need it — but `INSERT` does. The procedure's signature cannot express "required only for some actions".
-2. **The error did not stop the procedure.** Error 515 terminated only the `INSERT` statement. The procedure continued with the next statement, `RETURN 0`, and reported success. Section 6 examines this behavior and how to handle it.
+2. **The error did not stop the procedure.** Error 515 terminated only the `INSERT` statement. The procedure continued with the next statement, `RETURN 0`, and reported success. Section 5 examines this behavior and how to handle it.
 
 </details>
 
@@ -1774,7 +1602,7 @@ Two problems are visible here:
 
 ---
 
-# Section 6 – Error Handling in CRUD Operations
+# Section 5 – Error Handling in CRUD Operations
 
 In previous sections, we implemented CRUD procedures that check whether records exist and whether business rules allow an operation.
 
@@ -1782,32 +1610,43 @@ However, even a correctly written SQL statement can fail because of database con
 
 In Lab 0, you learned how to use `TRY/CATCH` to handle SQL Server errors. Now we will apply that knowledge to a real CRUD operation.
 
-## 6.1 The problem – Deleting a referenced record
+## 5.1 The problem – Deleting a referenced record
 
-Consider the relationship between `Category` and `Subcategory`.
+Section 2 deleted cities, but never a state. Each city belongs to a state through the foreign key `FK_City_State` on `City.StateID`.
 
-Each subcategory belongs to a category through the foreign key `Subcategory.CategoryID`.
-
-No setup is required: the real category `Bicycles` (`IDCategory = 1`) already has three subcategories — `Mountain Bikes`, `Road Bikes`, and `Touring Bikes`.
-
-Try deleting it using `usp_DeleteCategory` from Section 2. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? And if there is a result set, what will `RowsDeleted` contain?
+`dbo.usp_DeleteState` follows the same pattern as the first version of `usp_DeleteCity` in Section 2.5:
 
 ```sql
-EXEC dbo.usp_DeleteCategory
-    @IDCategory = 1;
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
+    @IDState int
+AS
+BEGIN
+    DELETE FROM State
+    WHERE IDState = @IDState;
+
+    SELECT @@ROWCOUNT AS RowsDeleted;
+END;
+GO
+```
+
+Try deleting `Croatia` (`IDState = 1`), which has five cities — `Zagreb`, `Osijek`, `Pula`, `Rijeka`, and `Split`. Before you run it, **predict**: what will the caller receive — an error, a result set, or both? And if there is a result set, what will `RowsDeleted` contain?
+
+```sql
+EXEC dbo.usp_DeleteState
+    @IDState = 1;
 ```
 
 <details>
 <summary>Show answer</summary>
 
-SQL Server rejects the `DELETE` because the category is still referenced by its subcategories.
+SQL Server rejects the `DELETE` because the state is still referenced by its cities.
 
 The output is:
 
 ```text
-Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteCategory, Line 5
-The DELETE statement conflicted with the REFERENCE constraint "FK_Subcategory_Category".
-The conflict occurred in database "AdventureWorksENG", table "dbo.Subcategory", column 'CategoryID'.
+Msg 547, Level 16, State 1, Procedure dbo.usp_DeleteState, Line 5
+The DELETE statement conflicted with the REFERENCE constraint "FK_City_State".
+The conflict occurred in database "AdventureWorksENG", table "dbo.City", column 'StateID'.
 The statement has been terminated.
 ```
 
@@ -1817,32 +1656,32 @@ followed by a result set:
 |---:|
 | 0 |
 
-`Bicycles` and its three subcategories remain in the database.
+`Croatia` and its five cities remain in the database.
 
 </details>
 
 Notice the last line of the message: *the statement has been terminated*. Error 547 stops only the failed `DELETE`. The procedure then continues with the next statement, so `SELECT @@ROWCOUNT` still runs and reports zero deleted rows.
 
 > [!WARNING]
-> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a category that does not exist. Section 6.4 returns to why these two outcomes must not be confused.
+> The caller now receives both an error and a normal-looking result. Reading only the result set, it would see `RowsDeleted = 0` — the same answer as for a state that does not exist. Section 5.4 returns to why these two outcomes must not be confused.
 
 > [!IMPORTANT]
 > **A foreign key constraint protects referential integrity.**
 >
-> SQL Server does not allow a referenced category to be deleted while related subcategories still exist, assuming the foreign key uses the default `NO ACTION` behavior.
+> SQL Server does not allow a referenced state to be deleted while related cities still exist, assuming the foreign key uses the default `NO ACTION` behavior.
 
-## 6.2 Handling the error with TRY/CATCH
+## 5.2 Handling the error with TRY/CATCH
 
-We can modify `usp_DeleteCategory` to catch SQL Server errors.
+We can modify `usp_DeleteState` to catch SQL Server errors.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
-    @IDCategory int
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
+    @IDState int
 AS
 BEGIN
     BEGIN TRY
-        DELETE FROM Category
-        WHERE IDCategory = @IDCategory;
+        DELETE FROM State
+        WHERE IDState = @IDState;
 
         SELECT @@ROWCOUNT AS RowsDeleted;
         RETURN 0;
@@ -1862,8 +1701,8 @@ Execute the same deletion again, this time capturing the return code:
 ```sql
 DECLARE @Result int;
 
-EXEC @Result = dbo.usp_DeleteCategory
-    @IDCategory = 1;
+EXEC @Result = dbo.usp_DeleteState
+    @IDState = 1;
 
 SELECT @Result AS ReturnCode;
 ```
@@ -1880,7 +1719,7 @@ Expected results:
 |---:|
 | 3 |
 
-Notice that `Bicycles` is **still not deleted**.
+Notice that `Croatia` is **still not deleted**.
 
 `TRY/CATCH` changes how the error is handled, not whether the database constraint is enforced.
 
@@ -1888,26 +1727,26 @@ Look at what changed for the caller:
 
 - **The caller no longer receives an error.** The procedure handled it. If the caller wraps the call in its own `TRY/CATCH`, its `CATCH` does not run.
 - **The result set has a different shape.** On success the caller receives `RowsDeleted`; on failure it receives `ErrorNumber` and `ErrorMessage`. Recognising the outcome by the columns of a result set is fragile.
-- **The return code says what happened.** `0` means the `DELETE` ran; `3` means it failed with an error. This is the most reliable signal for the caller, and Section 8 uses the same convention.
+- **The return code says what happened.** `0` means the `DELETE` ran; `3` means it failed with an error. This is the most reliable signal for the caller, and Section 7 uses the same convention.
 
 > [!NOTE]
 > Why add `RETURN 3` explicitly? Without it, a procedure that catches an error does not return `0`. In this example SQL Server returned **`-6`** — a value it chose itself. Negative return values are used by SQL Server itself, so a procedure should always return its own documented code instead.
 
-## 6.3 Where should TRY/CATCH be placed?
+## 5.3 Where should TRY/CATCH be placed?
 
 So far, we placed `TRY/CATCH` inside the stored procedure.
 
 However, error handling can also be implemented by the caller.
 
-For this demonstration, first restore the original version of `usp_DeleteCategory` from Section 2. That version does not catch the error internally.
+For this demonstration, first restore the original version of `usp_DeleteState` from Section 5.1. That version does not catch the error internally.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteCategory
-    @IDCategory int
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
+    @IDState int
 AS
 BEGIN
-    DELETE FROM Category
-    WHERE IDCategory = @IDCategory;
+    DELETE FROM State
+    WHERE IDState = @IDState;
 
     SELECT @@ROWCOUNT AS RowsDeleted;
 END;
@@ -1918,8 +1757,8 @@ Now the caller can handle the error:
 
 ```sql
 BEGIN TRY
-    EXEC dbo.usp_DeleteCategory
-        @IDCategory = 1;
+    EXEC dbo.usp_DeleteState
+        @IDState = 1;
 END TRY
 BEGIN CATCH
     SELECT
@@ -1929,13 +1768,13 @@ BEGIN CATCH
 END CATCH;
 ```
 
-Compare the output with Section 6.1. This time the caller receives **only** the `CATCH` result — no `RowsDeleted = 0`.
+Compare the output with Section 5.1. This time the caller receives **only** the `CATCH` result — no `RowsDeleted = 0`.
 
 When an error occurs inside a `TRY` block, execution jumps to the `CATCH` block immediately. That applies to statements executed *within* the call as well: the `DELETE` inside the procedure fails, the rest of the procedure is skipped, and control moves to the caller's `CATCH`. `TRY/CATCH` does not only report the error — it changes which statements run.
 
 The `ERROR_PROCEDURE()` function identifies the stored procedure in which the error occurred.
 
-In this example, it returns `dbo.usp_DeleteCategory` — the schema-qualified name. If the procedure still contained the internal `CATCH` from Section 6.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
+In this example, it returns `dbo.usp_DeleteState` — the schema-qualified name. If the procedure still contained the internal `CATCH` from Section 5.2, the caller's `CATCH` would not run because the procedure would already have handled the error.
 
 Both approaches are valid, but they have different characteristics.
 
@@ -1951,39 +1790,39 @@ Both approaches are valid, but they have different characteristics.
 >
 > We will explore `THROW` and more advanced error-handling techniques in Lab 9.
 
-## 6.4 Which mechanism detects which outcome?
+## 5.4 Which mechanism detects which outcome?
 
 Section 1 asked what can happen when you delete a row. We have now met every outcome, and for each one we have a way for the caller to detect it:
 
 | Outcome | Example in this lab | How the caller detects it |
 |---|---|---|
-| The row does not exist | `usp_GetCategory` and `usp_UpdateCategoryName` with ID `999999` (Section 2) | Empty result set, `@@ROWCOUNT = 0`, or return code `1` (Sections 3 and 5) |
-| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 3.3), `DELETE` of `Chains` (Section 5.3) | Explicit return code `2` |
-| SQL Server error | Deleting `Bicycles` (Section 6.1), `INSERT` without a name (Section 5.5) | `TRY/CATCH`; return code `3` (Section 6.2) |
-| Success | Deleting `Electric Scooters` (Section 2.5) | Return code `0`, rows affected |
+| The row does not exist | `usp_GetCitiesByState` and `usp_UpdateCityName` with a nonexistent ID (Section 2) | Empty result set, `@@ROWCOUNT = 0`, or return code `1` (Sections 2.6 and 4) |
+| Rejected by a business rule | `usp_DeleteCity` for `Zagreb` (Section 2.6), `DELETE` of `Chains` (Section 4.3) | Explicit return code `2` |
+| SQL Server error | Deleting `Croatia` (Section 5.1), `INSERT` without a name (Section 4.5) | `TRY/CATCH`; return code `3` (Section 5.2) |
+| Success | Deleting `Koper` (Section 2.5) and `Ljubljana` (Section 2.6) | `RowsDeleted = 1` or return code `0` |
 
 Only one of these outcomes is a SQL Server error. The others are normal results that the procedure must report explicitly.
 
-Sections 5.5 and 6.1 also showed a trap. A statement that fails with an error such as 547 or 515 terminates only itself — the procedure continues. Any `@@ROWCOUNT` or `RETURN` that follows then reports a misleading result: `RowsDeleted = 0` or return code `0`.
+Sections 4.5 and 5.1 also showed a trap. A statement that fails with an error such as 547 or 515 terminates only itself — the procedure continues. Any `@@ROWCOUNT` or `RETURN` that follows then reports a misleading result: `RowsDeleted = 0` or return code `0`.
 
 > [!IMPORTANT]
 > **A row count or return code read after a statement that can fail is reliable only if the error is caught.**
 
 ## Check your understanding
 
-1. Why does SQL Server reject the deletion of a category that has subcategories?
+1. Why does SQL Server reject the deletion of a state that has cities?
 2. What is SQL Server error 547?
-3. Does adding `TRY/CATCH` allow the category to be deleted?
+3. Does adding `TRY/CATCH` allow the state to be deleted?
 4. Can `TRY/CATCH` be placed outside a stored procedure?
 5. What is the difference between `@@ROWCOUNT = 0` and a SQL Server error?
 6. What does `ERROR_PROCEDURE()` return?
-7. Why did `usp_DeleteCategory` in Section 6.1 return `RowsDeleted = 0`, even though the `DELETE` failed with an error?
-8. In Section 6.3, the caller wraps the call in `TRY/CATCH`. Does the procedure still return `RowsDeleted`? Why?
+7. Why did `usp_DeleteState` in Section 5.1 return `RowsDeleted = 0`, even though the `DELETE` failed with an error?
+8. In Section 5.3, the caller wraps the call in `TRY/CATCH`. Does the procedure still return `RowsDeleted`? Why?
 
 <details>
 <summary>Show answers</summary>
 
-1. Because existing subcategories reference the category through a foreign key.
+1. Because existing cities reference the state through a foreign key.
 2. Error 547 indicates a constraint conflict, such as a foreign key violation.
 3. No. The foreign key constraint still prevents deletion.
 4. Yes. The caller can wrap the procedure call in `TRY/CATCH`, provided the procedure propagates the error.
@@ -1996,9 +1835,9 @@ Sections 5.5 and 6.1 also showed a trap. A statement that fails with an error su
 
 ---
 
-# Section 7 – Data Integrity and Business Rules
+# Section 6 – Data Integrity and Business Rules
 
-In Section 6, we saw that SQL Server can reject a CRUD operation when it violates a database constraint.
+In Section 5, we saw that SQL Server can reject a CRUD operation when it violates a database constraint.
 
 However, database constraints are not the only rules that control how data can be modified.
 
@@ -2006,7 +1845,7 @@ Applications often have additional **business rules** that determine whether an 
 
 In this section, we will compare these two types of protection and see how they work together.
 
-## 7.1 Database constraints
+## 6.1 Database constraints
 
 Database constraints protect the integrity of stored data.
 
@@ -2068,11 +1907,11 @@ Deleting `Chains` would leave the product `Chain` pointing at a row that no long
 
 Other foreign key configurations, such as `ON DELETE SET NULL` or `ON DELETE CASCADE`, can produce different behavior. These depend on how the relationship was defined.
 
-## 7.2 Business rules
+## 6.2 Business rules
 
 Database constraints enforce structural rules, such as primary key uniqueness and referential integrity. **Business rules** describe what an application allows users to do — for example, *a customer cannot be deleted if they have invoices*.
 
-Every business rule in this lab so far mirrors an existing foreign key. Section 1 and Section 3.3 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
+Every business rule in this lab so far mirrors an existing foreign key. Sections 1 and 2.6 showed what the check adds in that case: not extra protection — the foreign key already protects the data — but a **specific answer** for the caller, such as return code `2` instead of error 547.
 
 ### Rules that no constraint can express
 
@@ -2097,7 +1936,7 @@ On the real data, `Chains` fails this check — its product `Chain` has been sol
 
 For rules like this, the procedure is the **only** protection.
 
-## 7.3 What should be enforced where?
+## 6.3 What should be enforced where?
 
 A useful general guideline is:
 
@@ -2106,7 +1945,7 @@ A useful general guideline is:
 | Primary key must be unique | `PRIMARY KEY` constraint |
 | Foreign key must reference an existing row | `FOREIGN KEY` constraint |
 | Required column must contain a value | `NOT NULL` constraint |
-| Value must be unique, such as a category name | `UNIQUE` constraint |
+| Value must be unique, such as a state name | `UNIQUE` constraint |
 | Value must satisfy a simple condition | `CHECK` constraint |
 | Deletion depends on application-specific rules | Stored procedure or application business logic |
 
@@ -2114,11 +1953,11 @@ Some business rules can also be enforced directly through database constraints.
 
 The important point is to understand **which mechanism guarantees data integrity and which mechanism provides application-specific behavior**.
 
-### Back to the two `Scooters`
+### Back to the two `Slovenia` rows
 
-Section 2.1 warned that running the insert twice creates two categories named `Scooters`. Now you can say why SQL Server allows it: `Category.Name` has no `UNIQUE` constraint. The only rule the database enforces on `Category` is the primary key on `IDCategory` — and two rows with different IDs satisfy it.
+Section 2.1 warned that running the insert twice creates two states named `Slovenia`. Now you can say why SQL Server allows it: `State.Name` has no `UNIQUE` constraint. The only rule the database enforces on `State` is the primary key on `IDState` — and two rows with different IDs satisfy it.
 
-If category names must be unique, that is a rule the database *can* guarantee — the real data contains no duplicate names, so a `UNIQUE` constraint could be added. Until it is, every procedure that inserts or renames a category would have to check for duplicates itself, and any code that bypasses those procedures could still create them.
+If state names must be unique, that is a rule the database *can* guarantee — the real data contains no duplicate names, so a `UNIQUE` constraint could be added. Until it is, every procedure that inserts or renames a state would have to check for duplicates itself, and any code that bypasses those procedures could still create them.
 
 > [!NOTE]
 > A business-rule check and the following `DELETE` are separate statements. In a concurrent environment, another session could insert a related record between the check and the deletion.
@@ -2136,7 +1975,7 @@ If category names must be unique, that is a rule the database *can* guarantee �
 2. What is the difference between a required and an optional foreign key?
 3. `Product.SubcategoryID` is nullable. Why does deleting the subcategory `Chains` still fail?
 4. Why can the rule *"a subcategory whose products have been sold cannot be deleted"* not be written as a foreign key?
-5. Why did SQL Server allow two categories named `Scooters` in Section 2.1? How could the database prevent it?
+5. Why would SQL Server allow two states named `Slovenia` in Section 2.1? How could the database prevent it?
 
 <details>
 <summary>Show answers</summary>
@@ -2145,22 +1984,22 @@ If category names must be unique, that is a rule the database *can* guarantee �
 2. A required foreign key column cannot contain `NULL`; an optional one can.
 3. Nullability only means that a product *may* have no subcategory. The product `Chain` does have one — `SubcategoryID = 7` — and the foreign key protects that existing reference. With the default `NO ACTION` behavior, a referenced parent cannot be deleted.
 4. A foreign key only checks that a referenced row exists. This rule depends on data in two other tables — whether the subcategory's products appear in `InvoiceItem` — so it must be checked by code, for example in a procedure.
-5. `Category.Name` has no `UNIQUE` constraint, so two rows with different IDs and the same name are valid. Adding a `UNIQUE` constraint on `Name` would make the database reject the second insert.
+5. `State.Name` has no `UNIQUE` constraint, so two rows with different IDs and the same name are valid. Adding a `UNIQUE` constraint on `Name` would make the database reject the second insert.
 
 </details>
 
 ---
 
-# Section 8 – Putting It Together: The Procedure from Section 1
+# Section 7 – Putting It Together: The Procedure from Section 1
 
 Section 1 showed an application asking `usp_DeleteCustomer` to delete Gustavo Achong and receiving return code `2`. This final section builds that procedure. It brings together the pieces from the whole lab:
 
 - checking that the record exists (Sections 2 and 3);
 - checking a business rule and reporting it with a return code (Section 3);
-- handling SQL Server errors with `TRY/CATCH` (Section 6);
-- the foreign key that protects the data behind it all (Section 7).
+- handling SQL Server errors with `TRY/CATCH` (Section 5);
+- the foreign key that protects the data behind it all (Section 6).
 
-## 8.1 The procedure
+## 7.1 The procedure
 
 `dbo.usp_DeleteCustomer` accepts `@IDCustomer` and:
 
@@ -2211,7 +2050,7 @@ END;
 GO
 ```
 
-## 8.2 Test the procedure
+## 7.2 Test the procedure
 
 No test data is needed. The original `AdventureWorksENG` data already contains both cases — 19119 customers have invoices and 853 do not:
 
@@ -2273,9 +2112,9 @@ WHERE CustomerID = 1;
 
 Gustavo Achong and his seven invoices still exist after the rejected deletion.
 
-## 8.3 Test the safety net
+## 7.3 Test the safety net
 
-Return code `3` never appeared in the tests in Section 8.2. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
+Return code `3` never appeared in the tests in Section 7.2. The invoice check runs first, so the `DELETE` never reaches a customer with invoices — and the `CATCH` block never runs.
 
 To see it work, temporarily disable the business rule. In `usp_DeleteCustomer`, comment out the invoice check, then run `CREATE OR ALTER` again:
 
@@ -2409,7 +2248,7 @@ Protection in layers
     -> TRY/CATCH: turns the constraint error into a code the caller can handle (RETURN 3)
 
 The database enforces only the rules it has been given
-    -> Category.Name has no UNIQUE constraint, so two Scooters are valid
+    -> State.Name has no UNIQUE constraint, so two Slovenia rows are valid
     -> some rules (e.g. "a product was ever sold") cannot be a constraint at all
 ```
 

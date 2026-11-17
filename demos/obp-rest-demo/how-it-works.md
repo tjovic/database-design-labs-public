@@ -77,9 +77,11 @@ Here is `GET /customers`, the simplest request in the application:
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant R as routes.py
-    participant D as database.py
-    box SQL Server
+    box rgb(255,243,224) The API — FastAPI
+        participant R as routes.py
+        participant D as database.py
+    end
+    box rgb(243,229,245) SQL Server
         participant P as usp_GetCustomers
         participant T as Customer
     end

@@ -1,0 +1,271 @@
+{
+  "info": {
+    "name": "OBP REST Demo",
+    "description": "Requests for the OBP REST Demo API (demos/obp-rest-demo).\n\n## Setup\n1. Start the API (the packaged `obp-rest-demo.exe`, or `uvicorn api.app:app`). It listens on http://127.0.0.1:8000.\n2. If your port differs, change the `baseUrl` collection variable.\n\n## Suggested order\nRun **List invoices** first — it stores the newest invoice id in the `invoiceId` variable, which **Get**, **Update**, and **Delete** then use. **Create invoice** adds a new one; run **List invoices** again to pick it up.\n\nEvery request has a test tab with a couple of basic checks, so you can run the whole collection with the Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Get customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "Returns all customers (usp_GetCustomers)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is a JSON array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "List invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ]
+            },
+            "description": "Returns all invoices with a calculated total (usp_GetInvoices), newest first.\n\nThis request also saves the newest invoice's id into the collection variable `invoiceId`, so the Get / Update / Delete requests below work without editing anything. Run this first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('is a JSON array', () => pm.expect(data).to.be.an('array'));",
+                  "if (Array.isArray(data) && data.length > 0) {",
+                  "    pm.collectionVariables.set('invoiceId', data[0].invoiceId);",
+                  "    console.log('invoiceId set to ' + data[0].invoiceId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get invoice by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": "Returns one invoice with its customer and items (usp_GetInvoice). Uses the `invoiceId` variable — run 'List invoices' first to set it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has customer and items', () => {",
+                  "    pm.expect(body).to.have.property('customer');",
+                  "    pm.expect(body).to.have.property('items').that.is.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get invoice by id — not found (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "999999"
+              ]
+            },
+            "description": "Requests an invoice that does not exist. The API answers 404 Not Found. Shows how a missing row is reported to the caller."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('detail: Invoice not found.', () => pm.expect(pm.response.json().detail).to.eql('Invoice not found.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": 1,\n  \"date\": \"2025-06-27\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2,\n      \"unitPrice\": 1450\n    },\n    {\n      \"productId\": 2,\n      \"quantity\": 1,\n      \"unitPrice\": 109\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ]
+            },
+            "description": "Creates an invoice header and its items in one transaction (usp_AddInvoice). The body is one JSON document: a customer, a date, and a list of items.\n\nThe response contains only a status message, not the new id. Run 'List invoices' afterwards to see it at the top (and to refresh the `invoiceId` variable)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('saved', () => pm.expect(pm.response.json().status).to.include('saved'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update invoice",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": 2,\n  \"date\": \"2025-07-01\",\n  \"items\": [\n    {\n      \"productId\": 3,\n      \"quantity\": 1,\n      \"unitPrice\": 299\n    },\n    {\n      \"productId\": 7,\n      \"quantity\": 3,\n      \"unitPrice\": 12\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": "Replaces the header and all items of an invoice in one transaction (usp_UpdateInvoice). Uses the `invoiceId` variable. Run 'List invoices' first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": "Deletes an invoice; its items are removed automatically by ON DELETE CASCADE (usp_DeleteInvoice). Uses the `invoiceId` variable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "invoiceId",
+      "value": "1"
+    }
+  ]
+}

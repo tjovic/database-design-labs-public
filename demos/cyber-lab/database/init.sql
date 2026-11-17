@@ -34,3 +34,18 @@ CREATE TABLE dbo.CreditCards
     ExpiryDate NVARCHAR(10)  NOT NULL
 );
 GO
+
+IF OBJECT_ID('dbo.Products', 'U') IS NOT NULL
+    DROP TABLE dbo.Products;
+GO
+
+-- Products are what the search page is meant to show.
+-- Users and CreditCards are what an attacker wants instead.
+CREATE TABLE dbo.Products
+(
+    Id       INT IDENTITY(1,1) PRIMARY KEY,
+    Name     NVARCHAR(100)  NOT NULL,
+    Category NVARCHAR(50)   NOT NULL,
+    Price    DECIMAL(10, 2) NOT NULL
+);
+GO

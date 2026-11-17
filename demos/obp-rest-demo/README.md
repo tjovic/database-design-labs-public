@@ -152,6 +152,16 @@ into a single `.exe` on a machine where you can.
 
 ### Build (on your own Windows computer)
 
+**What you need:**
+
+| | Build computer (home) | Lab computer |
+|---|---|---|
+| Windows 10/11, 64-bit | yes | yes |
+| Python 3.10+ in PATH (`python --version` works) | yes | **no** |
+| Internet access | first build only (installs packages) | no |
+| ODBC Driver 18 for SQL Server | only to test the `.exe` | yes |
+| Admin rights | no | no |
+
 ```bash
 cd demos/obp-rest-demo
 build.bat

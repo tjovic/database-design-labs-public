@@ -1,9 +1,16 @@
 # Cyber Lab — SQL Injection Demo
 
-An educational FastAPI application that uses a single login form to show
-the difference between a **vulnerable** (concatenated SQL) and a **secure**
-(parameterized SQL) approach, and demonstrates classic SQL injection
-attacks against a live SQL Server database. Pairs with
+An educational FastAPI application about **designing the data access of
+an application correctly**, so that SQL injection cannot happen. Each page
+has a **vulnerable** version (SQL built by string concatenation) and a
+**secure** version (parameterized SQL), running against a live SQL Server
+database:
+
+- **`/login`** — a login that answers only *welcome* or *wrong password*;
+- **`/search`** — a product search that shows a table of results.
+
+The attacks are shown only to explain **why** each design rule exists —
+see [Design rules](#design-rules-this-demo-teaches) below. Pairs with
 [Lab 8, Section 2 — Client-Side Query Building](../../labs/lab08-complex-parameters.md).
 
 > This application is intended for local learning only. The vulnerable
@@ -99,8 +106,9 @@ sqlcmd -S localhost\SQLEXPRESS -E -C -i database\init.sql
 sqlcmd -S localhost\SQLEXPRESS -E -C -i database\seed.sql
 ```
 
-`init.sql` creates the `CyberLab` database and the `Users` and `CreditCards`
-tables. `seed.sql` populates 3 users and 3 cards.
+`init.sql` creates the `CyberLab` database and three tables: `Users`,
+`CreditCards`, and `Products`. `seed.sql` fills them with 3 users, 3
+credit cards, and 8 products.
 
 ### 4. Verify the DB connection
 
@@ -125,9 +133,10 @@ Endpoints:
 
 | URL | Description |
 |---|---|
-| `/` | Home page |
+| `/` | Home page (links to both demo pages) |
 | `/db-test` | Database connection check |
-| `/login` | SQL injection demo (form + payload buttons) |
+| `/login` | Login form — leaks through welcome / error / blind |
+| `/search` | Product search — leaks through `UNION` into the result table |
 
 ---
 
@@ -138,6 +147,16 @@ software (for example, a lab computer without admin rights), package it
 into a single `.exe` on a machine where you can.
 
 ### Build (on your own Windows computer)
+
+**What you need:**
+
+| | Build computer (home) | Lab computer |
+|---|---|---|
+| Windows 10/11, 64-bit | yes | yes |
+| Python 3.10+ in PATH (`python --version` works) | yes | **no** |
+| Internet access | first build only (installs packages) | only for the page styling (Bootstrap from a CDN) |
+| ODBC Driver 18 for SQL Server | only to test the `.exe` | yes |
+| Admin rights | no | no |
 
 ```bash
 cd demos/cyber-lab
@@ -238,22 +257,48 @@ Firewall does not ask for permission.
 
 ---
 
+## Design rules this demo teaches
+
+The goal of the demo is not to learn attacks, but to learn five rules for
+designing an application's database access:
+
+| Rule | Prevents | Seen in the demo |
+|---|---|---|
+| **1. Parameters, never string concatenation** — user input is sent as a parameter value (`?` placeholders or stored procedure parameters) | the attack itself: input cannot become SQL | the green **Secure** buttons on both pages |
+| **2. Generic error messages** — the user sees a general message, the details go to a log | leaking data and table structure through error messages | the vulnerable login prints the SQL error |
+| **3. Least privilege** — the application's SQL Server login can reach only what the application needs | one mistake exposing the whole database | the search page reaches `Users` and `CreditCards` |
+| **4. Hashed passwords** — the database stores a password hash, never the password | readable passwords in a stolen or copied table | passwords appear in the search results |
+| **5. Hiding the output is not protection** | false confidence ("our page shows nothing") | the login leaks data through the welcome text, an error, or yes/no answers |
+
+Rule 1 removes the cause. Rules 2–4 limit the damage if a mistake ever
+slips through. Rule 5 warns against a fix that does not work.
+
+> [!NOTE]
+> Rules 3 and 4 are **deliberately broken** in this demo: the application
+> connects with your own account (which can read every table), and the
+> passwords are stored as plain text. That way every effect is visible.
+> [lab.md](lab.md#32-design-rule-3--least-privilege) shows how a real
+> application login with least privilege is set up.
+
+---
+
 ## Demo: how to use
 
-At `/login` there is a single form with two submit buttons:
+Each page has a red **Vulnerable** and a green **Secure** button. Under
+every result is a gray **"Behind the scenes"** panel with the SQL that
+actually ran — a classroom X-ray that a real application would never show.
 
-- **Vulnerable** (`/login/vulnerable`) — builds SQL by string concatenation
-- **Secure** (`/login/secure`) — uses a parameterized query (`?` placeholders)
+Typical flow for each example:
 
-Below the form are buttons that fill the `username` and `password` fields
-with example payloads in one click. Run the demo like this:
+1. Click a prepared payload (it fills the input).
+2. Click **Vulnerable** and look at the result and the executed SQL.
+3. Run the same input with **Secure** — it has no effect.
+4. Discuss which design rule prevents it.
 
-1. Click a payload button (fills the inputs).
-2. Click **Vulnerable** → see the effect of the attack.
-3. Click the same payload again, then **Secure** → see that the attack
-   fails.
+For the full classroom script, organized around the five rules, see
+[lab.md](lab.md).
 
-### Test users (from `seed.sql`)
+### Test data (from `seed.sql`)
 
 | Username | Password |
 |---|---|
@@ -261,96 +306,59 @@ with example payloads in one click. Run the demo like this:
 | `tomislav` | `tajna123` |
 | `ana` | `ana2025` |
 
-### Prepared payloads
+`CreditCards` holds 3 cards, and `Products` holds 8 products.
 
-#### 1. `' OR 1=1 --` — classic authentication bypass
+### Prepared examples
 
-The vulnerable query becomes:
-
-```sql
-SELECT Id, Username, FullName, Department, Password
-FROM Users
-WHERE Username = '' OR 1=1 --' AND Password = 'x'
-```
-
-`--` comments out everything after it, `1=1` is always true → **all users
-are returned** together with their passwords (the "Password (leaked!)"
-column in the results table).
-
-#### 2. `admin' --` — log in as admin without knowing the password
-
-```sql
-WHERE Username = 'admin' --' AND Password = 'x'
-```
-
-The password check is commented out, the row for `admin` is returned.
-
-#### 3. `' OR Username='admin' --` — targeted bypass
-
-Similar to #1 but uses a specific condition instead of `1=1`, useful when
-the attacker knows who they want to log in as.
-
-#### 4. `' UNION SELECT Id, CardNumber, CVV, Owner, ExpiryDate FROM CreditCards --` — **data exfiltration**
-
-```sql
-SELECT Id, Username, FullName, Department, Password FROM Users
-WHERE Username = ''
-UNION
-SELECT Id, CardNumber, CVV, Owner, ExpiryDate FROM CreditCards --' AND Password = 'x'
-```
-
-The login endpoint returns **credit card numbers** from a completely
-different table. This is a qualitatively different attack from a bypass:
-it is not about circumventing an access control, it is about stealing
-data from a table that has nothing to do with login.
-
-UNION requires the number and types of columns to match the original
-query (here 5 nvarchar/int columns).
-
-#### 5. `admin / 12345` — valid combination
-
-For comparison — shows what a normal, legitimate login looks like.
+| Page | Example | What it demonstrates | Rule |
+|---|---|---|---|
+| `/login` | `admin` / `12345` | a normal login — both versions look the same | — |
+| `/login` | `admin' --` | input changes the query: login without a password | 1 |
+| `/login` | `' OR 1=1 --` | the condition is always true | 1 |
+| `/login` | *welcome = a credit card number* | the one value the page shows (the name) is replaced with data from another table | 1, 5 |
+| `/login` | *card number inside an error* | the database error message reveals data | 2, 5 |
+| `/login` | *blind* (yes / no) | even a yes/no answer leaks data, one character at a time | 5 |
+| `/search` | `Logitech` | a normal search | — |
+| `/search` | *UNION → user passwords* | the result table lists users and their passwords | 1, 3, 4 |
+| `/search` | *UNION → credit cards* | the result table lists credit cards | 1, 3 |
 
 ---
 
 ## What exactly separates Vulnerable and Secure
 
-### Vulnerable — [app/routes/login.py](app/routes/login.py) `/login/vulnerable`
+The only difference is **how the input reaches SQL Server** —
+[app/routes/login.py](app/routes/login.py) and
+[app/routes/search.py](app/routes/search.py).
+
+### Vulnerable
 
 ```python
 query = (
-    "SELECT Id, Username, FullName, Department, Password "
-    "FROM Users "
+    "SELECT FullName FROM Users "
     f"WHERE Username = '{username}' AND Password = '{password}'"
 )
 cursor.execute(query)
 ```
 
-User input becomes **part of the SQL statement's text**. The SQL parser
-cannot tell data from code → the input can terminate a SQL clause and
-inject a new one.
+The input is pasted into the SQL text. SQL Server cannot tell which part
+of the text came from the developer and which from the user, so the input
+can end a condition and add a new one.
 
-### Secure — [app/routes/login.py](app/routes/login.py) `/login/secure`
+### Secure
 
 ```python
-query = """
-    SELECT Id, Username, FullName, Department
-    FROM Users
-    WHERE Username = ? AND Password = ?
-"""
+query = "SELECT FullName FROM Users WHERE Username = ? AND Password = ?"
 cursor.execute(query, (username, password))
 ```
 
-`?` are **placeholders**. The ODBC driver sends the SQL and parameters
-separately; a parameter never becomes part of the parsed SQL. Input
-`' OR 1=1 --` is interpreted as a literal username of that length —
-there is no user with that name, so 0 rows are returned. Also:
-`/login/secure` does not `SELECT` `Password`, so an accidental leak
-cannot expose it.
+`?` are **placeholders**. The SQL text and the values are sent separately:
+SQL Server parses the statement first and then uses the values only as
+values. Input such as `admin' --` is just a username that does not exist.
+The secure paths also do not print database errors to the user (Rule 2).
 
-Rule: **always use parameterized queries**. Input sanitization (escaping,
-character blacklists) is fragile and bypassable; parameterization is
-structurally safe.
+Escaping quotes or blacklisting words such as `UNION` is **not** a
+substitute: it tries to guess every dangerous input, while a parameter does
+not need to guess anything.
 
 ---
 
@@ -364,11 +372,12 @@ cyber-lab/
 │   ├── database.py            # pyodbc connection
 │   ├── routes/
 │   │   ├── home.py            # / and /db-test
-│   │   └── login.py           # /login + /login/secure + /login/vulnerable
-│   ├── templates/             # Jinja2 (base, index, login)
+│   │   ├── login.py           # /login + /login/secure + /login/vulnerable
+│   │   └── search.py          # /search (vulnerable + secure, one route)
+│   ├── templates/             # Jinja2 (base, index, login, search, _sql_panel)
 │   └── static/css/style.css
 ├── database/
-│   ├── init.sql               # CREATE DATABASE + CREATE TABLE
+│   ├── init.sql               # CREATE DATABASE + Users, CreditCards, Products
 │   └── seed.sql               # INSERT test data
 ├── build.bat                  # builds dist/cyber-lab.exe
 ├── config.env.example         # settings for the packaged .exe

@@ -1,0 +1,42 @@
+{# Classroom X-ray: the SQL that actually ran. A real application
+   would never show any of this to the user. #}
+
+{% if mode %}
+<div class="card mt-3 border-secondary">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between">
+        <span>Behind the scenes (classroom only)</span>
+        {% if mode == "Secure" %}
+        <span class="badge bg-success">{{ mode }}</span>
+        {% else %}
+        <span class="badge bg-danger">{{ mode }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+
+        <p class="mb-1 small fw-bold">SQL that was executed</p>
+        <pre class="mb-3 p-2 bg-light border rounded">{{ query }}</pre>
+
+        {% if parameters %}
+        <p class="mb-1 small fw-bold">What you typed</p>
+        <table class="table table-bordered table-sm mb-0">
+            <tr><th style="width:150px;">Username</th><td><code>{{ parameters.username }}</code></td></tr>
+            <tr><th>Password</th><td><code>{{ parameters.password }}</code></td></tr>
+        </table>
+        {% endif %}
+
+        {% if mode == "Secure" %}
+        <p class="mb-0 mt-2 small text-success">
+            The input was sent as a <strong>parameter value</strong>
+            (the <code>?</code> placeholders). SQL Server treats it as data,
+            never as part of the query, so none of the attacks above work.
+        </p>
+        {% else %}
+        <p class="mb-0 mt-2 small text-danger">
+            The input was pasted straight into the SQL text, so your input
+            <strong>became part of the query</strong>. That is the whole bug.
+        </p>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}

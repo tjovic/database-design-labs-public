@@ -23,13 +23,14 @@ database used by the rest of the course.
 
 Pairs with **Lab 8, Section 2** (Method 1 — Client-Side Query Building).
 
-A FastAPI login form with two code paths behind it: one builds SQL by
-string concatenation, the other uses parameterized queries. The same
-attack payloads described in the lab — `' OR 1=1 --`, `admin' --`, and
-a `UNION SELECT` that pulls rows out of an unrelated `CreditCards`
-table — are built into the page as one-click buttons. Run the same
-payload against both endpoints and watch one of them do nothing while
-the other leaks every password in the database.
+A FastAPI application with two pages, each offering a vulnerable (string
+concatenation) and a secure (parameterized) path. The **login** page
+answers only *welcome* or *wrong password*, like a real one, and shows
+that data leaks anyway — through the welcome text (`UNION`), through SQL
+error messages, and through blind yes/no injection. The **search** page
+returns a table of products, where a `UNION SELECT` quietly adds rows
+from `Users` and `CreditCards`. Every payload is a one-click button; run
+each against the secure path and watch it do nothing.
 
 See [cyber-lab/README.md](cyber-lab/README.md) for setup, and
 [cyber-lab/lab.md](cyber-lab/lab.md) for a guided, click-by-click

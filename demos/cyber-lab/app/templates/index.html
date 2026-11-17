@@ -2,10 +2,53 @@
 
 {% block content %}
 
-<h1>Welcome</h1>
+<h1>Cyber Lab</h1>
 
 <p class="lead">
-This is our educational application.
+An intentionally vulnerable application for learning about SQL injection.
 </p>
+
+<div class="row mt-4">
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <a href="/login">Login</a>
+            </div>
+            <div class="card-body">
+                <p>
+                    A login form that answers only <em>welcome</em> or
+                    <em>wrong password</em> — like a real one. It never
+                    shows the rows it read, yet data still leaks: through
+                    the welcome name, through error messages, or one
+                    yes/no answer at a time.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <a href="/search">Product search</a>
+            </div>
+            <div class="card-body">
+                <p>
+                    A product search that shows a <strong>table of
+                    results</strong>. Because the result is a table, a
+                    <code>UNION SELECT</code> can add rows from any other
+                    table — users, credit cards — to the list.
+                </p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="alert alert-warning mt-4">
+    <strong>Teaching aid.</strong> This application is deliberately
+    insecure and runs only on your own machine. Never expose it to a
+    network.
+</div>
 
 {% endblock %}

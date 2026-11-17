@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">Product search</h4>
+            </div>
+            <div class="card-body">
+
+                <form method="get" action="/search" class="mb-2">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="q"
+                               value="{{ term if term is not none else '' }}"
+                               placeholder="Search products by name">
+                        <button class="btn btn-danger" type="submit" name="safe" value="0">
+                            Search (Vulnerable)
+                        </button>
+                        <button class="btn btn-success" type="submit" name="safe" value="1">
+                            Search (Secure)
+                        </button>
+                    </div>
+                </form>
+
+                <p class="mb-1 text-muted small">
+                    A search box shows a <strong>table of rows</strong>. That is
+                    exactly what a <code>UNION SELECT</code> needs: it bolts rows
+                    from another table onto the product list.
+                </p>
+
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="/search?q=Logitech&safe=0">Logitech (normal)</a>
+                    <a class="btn btn-sm btn-outline-danger"
+                       href="/search?q=xyz'%20UNION%20SELECT%20Id,%20Username,%20Password,%200%20FROM%20Users%20--&safe=0">
+                       UNION → user passwords</a>
+                    <a class="btn btn-sm btn-outline-danger"
+                       href="/search?q=xyz'%20UNION%20SELECT%20Id,%20CardNumber,%20Owner%20%2B%20'%20CVV%20'%20%2B%20CVV,%200%20FROM%20CreditCards%20--&safe=0">
+                       UNION → credit cards</a>
+                </div>
+
+            </div>
+        </div>
+
+        {% if result and result.success %}
+        <div class="card mt-4">
+            <div class="card-header">
+                Results — <strong>{{ result.rows|length }}</strong> row(s)
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr>
+                    </thead>
+                    <tbody>
+                    {% for row in result.rows %}
+                        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% if mode == "Vulnerable" %}
+        <p class="text-muted small mt-2 mb-0">
+            ↑ The <code>Id</code>, <code>Name</code> and <code>Category</code>
+            columns still say "product" — but the rows came from another table.
+            A <code>UNION</code> only has to match the <em>number</em> and
+            <em>types</em> of columns, not their meaning.
+        </p>
+        {% endif %}
+        {% elif result and not result.success %}
+        <div class="card mt-4">
+            <div class="card-body">
+                <div class="alert alert-danger mb-0">{{ result.message }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% include "_sql_panel.html" %}
+
+    </div>
+</div>
+
+{% endblock %}

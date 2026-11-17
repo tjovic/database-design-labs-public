@@ -145,6 +145,11 @@ You will build exactly this procedure in Section 7.
 > [!IMPORTANT]
 > **Designing CRUD operations whose outcomes the caller can tell apart is the main goal of this lab.** Every section adds one piece: verifying affected rows and reporting business rules with return codes (Section 2), handling errors (Section 5), and understanding the constraints behind them (Section 6). Section 7 brings everything together.
 
+> [!TIP]
+> **Optional – the same problem in a running application.** The [OBP REST Demo](../demos/obp-rest-demo/README.md) is a small invoicing web application that calls one stored procedure for every CRUD operation. In it, `DELETE /invoices/999` answers *"Invoice deleted."* although no invoice was deleted — the problem from this section, seen from the application's side. [How It Works](../demos/obp-rest-demo/how-it-works.md) explains the application step by step.
+>
+> The demo is not required for this lab. It uses its own `OBPRestDemo` database and does not change `AdventureWorksENG`, so the results in this lab stay the same.
+
 ## Check your understanding
 
 1. A `DELETE` statement affects zero rows. Is that an error?

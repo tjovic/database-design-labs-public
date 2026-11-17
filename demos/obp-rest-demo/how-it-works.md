@@ -20,6 +20,7 @@ This document is **optional reading** for anyone who wants to know what happens 
 After reading this document, you should be able to:
 
 - describe the path of a request from the browser to the tables and back;
+- explain what Swagger UI is and where its page comes from;
 - map each HTTP action (`GET`, `POST`, `PUT`, `DELETE`) to a CRUD operation and a stored procedure;
 - explain how `usp_AddInvoice` turns one JSON document into one `Invoice` row and many `InvoiceItem` rows;
 - explain why the invoice is written inside a transaction;
@@ -80,6 +81,37 @@ sequenceDiagram
 ```
 
 Notice what the Python code does **not** know: the table name, the columns used for sorting, or how the query is written. It knows only the procedure name and the columns it receives back. This is the **stable interface** from [Lab 7, Section 1](../../labs/lab07-crud-operations.md#the-procedure-reports-the-outcome) — the query inside the procedure can change without changing the application.
+
+## 1.3 What is Swagger UI?
+
+During the demo, you work in the page at <http://127.0.0.1:8000/docs>. That page is **Swagger UI**, and nobody wrote it by hand.
+
+```mermaid
+flowchart LR
+    A["routes.py<br/>models.py"] -->|"FastAPI generates"| B["OpenAPI description<br/>/openapi.json"]
+    B -->|"Swagger UI reads"| C["Page at /docs"]
+    C -->|"Execute"| D["Real HTTP request<br/>to the API"]
+    style C fill:#e1f5ff
+```
+
+1. FastAPI reads the code — every route in [api/routes.py](api/routes.py) and every model in [api/models.py](api/models.py) — and generates a description of the API in a standard format called **OpenAPI**. You can see it as plain JSON at `/openapi.json`.
+2. Swagger UI reads that description and draws a page with one block for every HTTP action.
+3. When you click **Try it out**, fill in the values, and click **Execute**, Swagger UI sends a **real HTTP request**, exactly as any other client would.
+
+After **Execute**, each block shows:
+
+| Part | What it tells you |
+|---|---|
+| **Request body** / **Schema** | the JSON the action expects — generated from `InvoiceRequest` in `models.py` |
+| **Request URL** | the address that was called, e.g. `http://127.0.0.1:8000/invoices/1` |
+| **Curl** | the same request as a command you could run in a terminal |
+| **Code** | the HTTP status: `200` OK, `404` not found, `422` invalid JSON shape, `500` server error |
+| **Response body** | the JSON that came back |
+
+Because the page is generated from the code, a new route appears in Swagger UI as soon as the application is restarted — and the page always matches what the API really accepts.
+
+> [!NOTE]
+> Swagger UI is only **one of many clients**. Postman, a mobile app, a web shop, or another server would send the same HTTP requests and receive the same JSON. SQL Server cannot tell who the caller is — it only sees `EXEC usp_…`.
 
 ---
 
@@ -396,6 +428,7 @@ The demo is built to show the main path clearly, so it skips several things a re
 6. Who deletes the rows in `InvoiceItem` when an invoice is deleted?
 7. `DELETE /invoices/999` answers *"Invoice deleted."* Is that true? How could the procedure tell the caller what really happened?
 8. Why should the price of an item be read from `Product` rather than taken from the request?
+9. Who wrote the Swagger UI page, and what happens to it when a new route is added to `routes.py`?
 
 ---
 

@@ -40,13 +40,26 @@ A request passes through four layers. Each layer has one job and lives in its ow
 
 ```mermaid
 flowchart LR
-    A["Browser<br/>Swagger UI"] -->|"HTTP + JSON"| B["routes.py<br/>HTTP actions"]
-    B --> C["database.py<br/>pyodbc"]
-    C -->|"EXEC usp_…"| D["Stored procedures"]
-    D --> E[("Customer, Product,<br/>Invoice, InvoiceItem")]
+    A["Browser<br/>Swagger UI"]
+    subgraph API["The API — FastAPI (Python)"]
+        B["routes.py<br/>HTTP actions"]
+        C["database.py<br/>pyodbc"]
+    end
+    subgraph DB["SQL Server"]
+        D["Stored procedures"]
+        E[("Customer, Product,<br/>Invoice, InvoiceItem")]
+    end
+    A -->|"HTTP + JSON"| B
+    B --> C
+    C -->|"EXEC usp_…"| D
+    D --> E
     style A fill:#e1f5ff
     style E fill:#c8e6c9
+    style API fill:#fff3e0,stroke:#fb8c00,stroke-width:2px
+    style DB fill:#f3e5f5,stroke:#8e24aa,stroke-width:1px
 ```
+
+The orange box is the API: the two Python files that turn an HTTP request into an `EXEC` and the result back into JSON. The browser on the left is just one possible client, and everything on the right runs inside SQL Server.
 
 | Layer | File | Job |
 |---|---|---|

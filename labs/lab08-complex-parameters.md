@@ -678,16 +678,24 @@ SELECT
 FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 ```
 
-The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer` element inside the root `Customers` element. The syntax `AS tbl(col)` names the resulting table (`tbl`) and its only column (`col`). Each row of `col` holds one `Customer` element.
+The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer` element inside the root `Customers` element.
 
-The result contains two rows, each holding one XML fragment:
+`.nodes()` is used in the `FROM` clause because it returns a **table**:
 
-| CustomerXml |
+- The table always has **one column** of type `xml`.
+- Each row of that column holds one matching element.
+- We **must** name the table and its column with an alias: `AS tbl(col)` names the table `tbl` and its column `col`.
+
+For our document, the table `tbl` looks like this:
+
+| col |
 |---|
 | `<Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />` |
 | `<Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />` |
 
-Here, `.query('.')` only displays the current element as XML, so we can see what each row contains.
+The names `tbl` and `col` are our choice — any valid names work.
+
+In the `SELECT` list, `tbl.col` is the XML from the current row. `.query('.')` displays that element as XML, so we can see what each row contains.
 
 > [!NOTE]
 > The path `/Customers/Customer` uses **XQuery**, a language for navigating XML:
@@ -726,7 +734,8 @@ Result:
 **The XML document has been converted into relational rows and columns.**
 
 1. `.nodes('/Customers/Customer')` creates one row for each customer.
-2. Each `.value()` reads one attribute from the current customer and converts it to `nvarchar(50)`.
+2. In each row, `tbl.col` is the XML of that customer.
+3. `tbl.col.value('@FirstName', 'nvarchar(50)')` takes that XML, reads its `FirstName` attribute, and converts it to `nvarchar(50)`.
 
 This process is sometimes called **XML shredding**.
 

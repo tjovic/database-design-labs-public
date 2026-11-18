@@ -21,7 +21,7 @@ After completing this lab, you should be able to:
 - explain the risks of unsafe SQL concatenation, the benefits of parameterization, and the overhead of separate database calls;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
 - pass hierarchical data as XML, shred it with `.nodes()` and `.value()`, and build it back with `FOR XML PATH`;
-- use XML to pass items with several fields, and insert a parent row with its children from one XML document using `.value()`'s singleton syntax and `.nodes()`;
+- use XML to pass items with several fields, read both attributes and element text, and insert a parent row with its children from one XML document;
 - define a table type with `CREATE TYPE ... AS TABLE` and pass tables as parameters using Table-Valued Parameters (TVPs);
 - accept JSON data with `OPENJSON(@json) WITH (...)`, shred it into typed columns, and build JSON output with `FOR JSON PATH` and dotted aliases;
 - insert a parent row and its children from a single nested JSON document, using `JSON_VALUE` and `OPENJSON` together;
@@ -663,14 +663,18 @@ XML can also be **nested**. For example, a state can contain its cities:
 
 ### Attributes vs. element text
 
-XML can store a value in two ways:
+An element can store values in two ways — as **attributes** and as **element text**:
 
-| Form | Example | XQuery path |
+```xml
+<City PostalCode="10000">Zagreb</City>
+```
+
+| Form | Value | Read with |
 |---|---|---|
-| Attribute | `<City Name="Oslo" />` | `@Name` |
-| Element text | `<Name>Norway</Name>` | `Name` |
+| Attribute | `10000` | `@PostalCode` |
+| Element text | `Zagreb` | `.` (the current element) |
 
-Both forms contain one value. Section 4.2 shows how to read each of them.
+Section 4.2 shows how to read each of them.
 
 SQL Server has a built-in `xml` data type for storing and processing XML documents.
 
@@ -717,6 +721,7 @@ Here, `.query('.')` only displays the current node, so we can see what each row 
 > - `/Customers/Customer` — all `Customer` elements inside `Customers`.
 > - `@FirstName` — the `FirstName` attribute.
 > - `.` — the current XML node.
+> - `..` — the parent of the current node.
 
 ### Step 2 – Extract values using `.value()`
 
@@ -750,68 +755,39 @@ Result:
 
 This process is sometimes called **XML shredding**.
 
-### The `[1]` rule
+### Step 3 – Read element text with `.`
 
-`.value()` must return **exactly one** SQL value. SQL Server checks this **before** the query runs, by looking only at the path — not at the data.
-
-Consider this document:
+Some XML documents store values as element text. An element can also have attributes and text at the same time:
 
 ```sql
-DECLARE @State xml = N'<State Name="Norway" />';
+DECLARE @Cities xml = N'
+<Cities>
+    <City PostalCode="10000">Zagreb</City>
+    <City PostalCode="21000">Split</City>
+    <City PostalCode="31000">Osijek</City>
+</Cities>';
 
-SELECT @State.value('/State/@Name', 'nvarchar(50)') AS StateName;
+SELECT
+    c.node.value('.', 'nvarchar(50)') AS CityName,
+    c.node.value('@PostalCode', 'nvarchar(10)') AS PostalCode
+FROM @Cities.nodes('/Cities/City') AS c(node);
 ```
 
-Our document contains only one `State`, but the query fails:
+Result:
 
-```text
-XQuery [value()]: 'value()' requires a singleton (or empty sequence)
-```
+| CityName | PostalCode |
+|---|---|
+| Zagreb | 10000 |
+| Split | 21000 |
+| Osijek | 31000 |
 
-SQL Server does not know how many `State` elements the document contains. The same `xml` variable could just as well hold this:
+In each row, `c.node` is one `City` element:
 
-```xml
-<State Name="Norway" />
-<State Name="Sweden" />
-```
+- `.` reads the text of that element.
+- `@PostalCode` reads its attribute.
 
-In that case, `/State/@Name` would return two values. Because the path **could** return more than one value, SQL Server rejects it.
-
-Adding `[1]` means **"take the first match"**. Now the path returns at most one value, and SQL Server accepts it:
-
-```sql
-DECLARE @State xml = N'<State Name="Norway" />';
-
-SELECT @State.value('(/State/@Name)[1]', 'nvarchar(50)') AS StateName;
-```
-
-| StateName |
-|---|
-| Norway |
-
-The parentheses make `[1]` apply to the result of the whole path.
-
-### Why the `.nodes()` example did not need `[1]`
-
-In Step 2, we wrote `c.node.value('@FirstName', ...)` without `[1]`.
-
-`.nodes()` returns one row for each `Customer`, and in each row `c.node` is **one specific element**. An XML element cannot have two attributes with the same name, so `@FirstName` on that element can never return more than one value. SQL Server knows this, so `[1]` is not required.
-
-A child **element** is different, because an element can contain several children with the same name. If the customer were written as `<Customer><FirstName>Nina</FirstName></Customer>`, we would need `c.node.value('(FirstName)[1]', ...)`.
-
-| Path | Needs `[1]`? | Why |
-|---|---|---|
-| `@FirstName` on the current node from `.nodes()` | No | An element has each attribute at most once |
-| `(FirstName)[1]` — a child element | Yes | An element can have several children with the same name |
-| `(/State/@Name)[1]` — read from the whole document | Yes | The document could contain several `State` elements |
-
-> [!IMPORTANT]
-> **Rule:** `[1]` is not needed only when reading an attribute of the current node from `.nodes()`. In every other case, add `[1]`.
-
-> [!TIP]
-> This is similar to a scalar subquery such as `SET @Name = (SELECT Name FROM ...)`, which must return one row. The difference is when the check happens: a scalar subquery fails at run time if it returns several rows, while XQuery rejects the path in advance if it **could** return several values.
-
-We will use this rule in Section 4.4 to read the state name.
+> [!NOTE]
+> Always read values from the nodes returned by `.nodes()`, as in the examples above. If you call `.value()` directly on the whole document, for example `@Cities.value('/Cities/City/@PostalCode', ...)`, SQL Server reports that `'value()' requires a singleton`, because the path could match several elements.
 
 ## 4.3 Passing XML to a Stored Procedure
 
@@ -886,13 +862,14 @@ AS
 BEGIN
     DECLARE @NewStateID int;
 
-    -- Insert the state (one value: singleton syntax)
+    -- Insert the state
     INSERT INTO State (Name)
-    VALUES (@State.value('(/State/@Name)[1]', 'nvarchar(50)'));
+    SELECT s.node.value('@Name', 'nvarchar(50)')
+    FROM @State.nodes('/State') AS s(node);
 
     SET @NewStateID = SCOPE_IDENTITY();
 
-    -- Insert all cities (many rows: .nodes())
+    -- Insert all cities
     INSERT INTO City (Name, StateID)
     SELECT
         c.node.value('@Name', 'nvarchar(50)'),
@@ -904,10 +881,10 @@ END;
 GO
 ```
 
-The procedure uses both reading styles:
+Both inserts use the same pattern:
 
-- `@State.value('(/State/@Name)[1]', ...)` reads **one value** from the whole document — the state's `Name` attribute.
-- `@State.nodes('/State/Cities/City')` turns the **collection** of cities into rows, and `.value('@Name', ...)` reads each city's attribute.
+- `@State.nodes('/State')` returns one row — the state — and `.value('@Name', ...)` reads its name.
+- `@State.nodes('/State/Cities/City')` returns one row per city, and `.value('@Name', ...)` reads each city's name.
 
 The `<Cities>` element groups the collection, just as the `Cities` array does in the JSON example in Section 6.6.
 
@@ -2250,7 +2227,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 
 3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
 
-4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. To read a child element instead, use its name with `[1]`, for example `(Name)[1]`, as explained in Section 4.2.
+4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. To read the text of the current element, use `.`, as shown in Section 4.2.
 
 5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 8.)
 

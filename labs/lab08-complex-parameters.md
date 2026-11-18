@@ -232,11 +232,7 @@ By the end of this lab, you should understand **how to pass collections of data 
 
 # Section 2 – Method 1: Client-Side Query Building
 
-In Section 1, we saw a simple problem: an application needs to retrieve several products using their IDs.
-
-For example, the user selects products `1`, `2`, and `3`.
-
-One possible solution is to construct a SQL statement directly in the application.
+In Section 1, the user selected products `1`, `2`, and `3`. One possible solution is to construct the SQL statement directly in the application.
 
 ## 2.1 Building SQL in Application Code
 
@@ -263,21 +259,15 @@ FROM Product
 WHERE IDProduct IN (1, 2, 3);
 ```
 
-The database receives a complete SQL statement and executes it.
-
 This example uses a fixed list of integers, so it contains no untrusted user input.
 
 However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
 
-Let's examine the main problems.
-
-## 2.2 Problem 1 – SQL Injection
+## 2.2 SQL Injection
 
 SQL injection occurs when user-provided data becomes part of the SQL command itself.
 
-Consider an application that allows users to search for customers by first and last name.
-
-The application builds a SQL statement like this:
+Consider an application that searches for customers by first and last name:
 
 ```python
 # UNSAFE — user input is inserted directly into SQL text
@@ -291,27 +281,6 @@ sql = (
 
 cursor.execute(sql)
 ```
-
-### Example 1 – Normal input
-
-The user enters:
-
-```text
-First name: Gustavo
-Last name: Achong
-```
-
-The application generates:
-
-```sql
-SELECT *
-FROM Customer
-WHERE FirstName = 'Gustavo' AND LastName = 'Achong';
-```
-
-Everything works as expected.
-
-### Example 2 – Malicious input
 
 Now imagine the user enters:
 
@@ -328,158 +297,44 @@ FROM Customer
 WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
 ```
 
-Let's examine what happened:
-
 1. The first `'` closes the original string.
 2. `OR 1=1` adds a condition that is always true.
-3. `--` starts a comment, causing SQL Server to ignore the closing quote added by the application and everything else on that line.
+3. `--` starts a comment, so SQL Server ignores the closing quote added by the application.
 
-Because `1=1` is always true, the query returns **all customers**, not just those matching the supplied first and last name.
-
-The user has changed the meaning of the SQL statement without changing the application code.
+The query returns **all customers**. The user has changed the meaning of the SQL statement without changing the application code.
 
 ### The solution – Parameterized queries
 
-Instead of inserting user input directly into SQL text, pass the values as parameters:
+Instead of inserting user input into SQL text, pass the values as parameters:
 
 ```python
-first_name = input("Enter first name: ")
-last_name = input("Enter last name: ")
-
 sql = "SELECT * FROM Customer WHERE FirstName = ? AND LastName = ?"
 
 cursor.execute(sql, (first_name, last_name))
 ```
 
-The `?` placeholders mark where parameter values belong. The values are supplied separately through `cursor.execute`.
-
-If a user enters:
-
-```text
-First name: Gustavo
-Last name: Achong' OR 1=1 --
-```
-
-SQL Server treats the entire last-name input as **a value to search for**, rather than as SQL code.
-
-The query searches for a customer whose last name is literally `Achong' OR 1=1 --`. It does not return all customers.
+The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
 
 > [!IMPORTANT]
 > Do not put quotes around the `?` placeholders. The database driver handles parameter values.
 
-Besides keeping input separate from SQL code, parameters can also help SQL Server reuse execution plans. We will examine that benefit next.
+> [!TIP]
+> The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
 
-## 2.3 Problem 2 – Query Plan Reuse
+## 2.3 Why Parameters Alone Are Not Enough
 
-Before executing a query, SQL Server needs an **execution plan** — instructions describing how to access the required data.
+Parameters have one more benefit: when the query text stays the same and only the values change, SQL Server can **reuse the cached execution plan** instead of compiling a new one for every value.
 
-Preparing a plan takes work. SQL Server can therefore **cache the plan and reuse it** when the same query runs again.
-
-### When values are part of the SQL text
-
-Suppose an application retrieves a product using this Python code:
-
-```python
-sql = f"SELECT * FROM Product WHERE IDProduct = {product_id}"
-cursor.execute(sql)
-```
-
-When the application searches for products `1`, `2`, and `3`, it sends these statements in separate calls:
-
-```sql
-SELECT * FROM Product WHERE IDProduct = 1;
-SELECT * FROM Product WHERE IDProduct = 2;
-SELECT * FROM Product WHERE IDProduct = 3;
-```
-
-The operation is the same each time: find a product by its ID.
-
-However, because the ID is embedded in the statement, **the SQL text changes with every different ID**.
-
-SQL Server may compile and cache separate plans for these statements. With many different IDs, this can increase compilation work and plan-cache usage.
-
-### When values are passed as parameters
-
-Instead, the application can use a parameterized query:
-
-```python
-cursor.execute(
-    "SELECT * FROM Product WHERE IDProduct = ?",
-    (product_id,)
-)
-```
-
-The `?` is a parameter placeholder. The application supplies the product ID separately.
-
-The query text stays the same across executions:
-
-| Execution | Query text | Parameter value |
-|---|---|---|
-| 1 | `SELECT * FROM Product WHERE IDProduct = ?` | `1` |
-| 2 | `SELECT * FROM Product WHERE IDProduct = ?` | `2` |
-| 3 | `SELECT * FROM Product WHERE IDProduct = ?` | `3` |
-
-SQL Server can reuse a cached plan for the parameterized query while processing a different ID each time.
-
-**The key idea: keep the query the same and pass changing values as parameters.**
-
-> [!NOTE]
-> SQL Server can automatically parameterize some queries containing literal values, so different SQL text does not always produce separate execution plans.
->
-> Explicit parameters make plan reuse more predictable.
-
-> [!IMPORTANT]
-> Parameterization does not reduce the number of calls.
->
-> Retrieving three products separately still requires three executions. Passing multiple IDs together — the main topic of this lab — addresses that separate problem.
-
-## 2.4 Problem 3 – Many Separate Database Calls
-
-Parameterized queries keep values separate from SQL code and can help SQL Server reuse execution plans.
-
-However, they do not reduce the number of database calls.
-
-Suppose an application needs to retrieve 100 products. It could execute the same parameterized query once for each product ID:
-
-```python
-for product_id in product_ids:
-    cursor.execute(
-        "SELECT * FROM Product WHERE IDProduct = ?",
-        (product_id,)
-    )
-    products = cursor.fetchall()
-```
-
-The query text stays the same, but the application executes it **100 times**.
-
-Each execution sends a request to SQL Server and waits for a response before continuing to the next product.
-
-Even if each query runs quickly, the time spent communicating with the server can add up. This is especially noticeable when the application and database run on different servers.
-
-### Send the IDs together
-
-Instead of retrieving one product at a time, the application can send all 100 IDs in **one call**.
-
-SQL Server then processes the collection and returns all matching products in one result set.
+However, a scalar parameter still carries only one value. As we saw in Section 1.1, retrieving 100 products with a parameterized query in a loop still requires **100 calls**:
 
 | Approach | IDs per call | Number of calls |
 |---|---|---|
-| Query inside a loop | 1 | 100 |
+| Parameterized query inside a loop | 1 | 100 |
 | Pass a collection | 100 | 1 |
 
-This reduces communication overhead and allows SQL Server to process the IDs together using a set-based query.
+Each call waits for a response from the server, so the communication time adds up — especially when the application and database run on different servers.
 
-> [!IMPORTANT]
-> **Parameters and collections address different needs.**
->
-> - Parameterization keeps values separate from SQL code and can support execution-plan reuse.
-> - A collection parameter allows multiple values or records to be sent in one call.
->
-> A collection can also be passed as a parameter. The following sections show several ways to do this.
-
-## 2.5 The Better Approach
-
-We have seen three separate problems:
+## 2.4 The Better Approach
 
 | Problem | Better approach |
 |---|---|
@@ -487,24 +342,7 @@ We have seen three separate problems:
 | Changing SQL text can reduce execution-plan reuse | Keep query text consistent and use parameters |
 | Separate queries require many database calls | Send multiple values together |
 
-For a single product ID, a scalar parameter is sufficient:
-
-```sql
-EXEC dbo.usp_GetProduct @ProductID = 1;
-```
-
-But calling this procedure once for each of 100 product IDs still requires **100 calls**.
-
-To process all selected products in one call, we need a way to pass **a collection of IDs**.
-
-In the following sections, we will explore four ways to represent that collection:
-
-- **Delimited strings** — combine values into one string.
-- **XML** — represent data using elements and attributes.
-- **Table-Valued Parameters (TVPs)** — pass typed rows.
-- **JSON** — represent data using arrays and objects.
-
-Each approach allows a procedure to receive multiple values through one parameter. The procedure then reads those values and processes them together.
+We need both: values passed **as parameters**, and many values passed **in one call**. The remaining four methods from Section 1.3 do exactly that — each passes a collection through a single parameter.
 
 We will begin with the simplest format: **delimited strings**.
 
@@ -2449,7 +2287,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 ## Check your understanding
 
 1. What is the 1:N insert problem, and why is it hard without collection parameters?
-2. Why should untrusted values be passed as parameters? How can parameterization help plan reuse, and how can collection parameters reduce network round-trips?
+2. Why should untrusted values be passed as parameters, and why is a parameterized query in a loop still not enough for 100 IDs?
 3. What does `STRING_SPLIT` return, and what type is the `value` column?
 4. When you use XML, what does `@Name` mean in `.value('@Name', 'nvarchar(50)')`?
 5. When you use `FOR XML PATH`, how do you create nested elements in the output?
@@ -2463,7 +2301,7 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 
 1. **1:N insert** — An invoice header and its line items must be inserted together. A simple implementation using a separate procedure call for every row would require one call for the header and twenty calls for twenty items. A collection parameter allows one call to carry all items. Ensuring that all related inserts succeed or fail together is a separate concern, covered in the next lab.
 
-2. **Parameters, plans, and round-trips** — Passing untrusted values as parameters keeps data separate from executable SQL code. Keeping the statement text stable can also improve execution-plan reuse, although SQL Server can automatically parameterize some literal queries. Collection parameters reduce round-trips when they replace separate calls for individual items. A single dynamically constructed `IN (...)` query can also use one round-trip; the number of calls and safe handling of values are separate concerns.
+2. **Parameters and round-trips** — Passing untrusted values as parameters keeps data separate from executable SQL code and lets SQL Server reuse the execution plan. But a scalar parameter carries one value, so 100 IDs still mean 100 calls. A collection parameter sends all IDs in one call.
 
 3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
 

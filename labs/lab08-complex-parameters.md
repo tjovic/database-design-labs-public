@@ -670,7 +670,7 @@ XML can store a value in two ways:
 | Attribute | `<City Name="Oslo" />` | `@Name` |
 | Element text | `<Name>Norway</Name>` | `Name` |
 
-Both forms contain one value. We will read both of them in this section.
+Both forms contain one value. Section 4.2 shows how to read each of them.
 
 SQL Server has a built-in `xml` data type for storing and processing XML documents.
 
@@ -752,25 +752,66 @@ This process is sometimes called **XML shredding**.
 
 ### The `[1]` rule
 
-`.value()` always returns **exactly one** SQL value, so its path must select at most one item.
+`.value()` must return **exactly one** SQL value. SQL Server checks this **before** the query runs, by looking only at the path — not at the data.
 
-- An attribute such as `@FirstName` on the current node can exist only once, so no `[1]` is needed.
-- An element can appear several times, so we must add `[1]` to select the first one: `(Name)[1]`.
-- When we read from the whole document, even an attribute needs `[1]`: the document could contain several elements with that attribute, for example `(/State/@Name)[1]`.
-
-When we read from the whole document instead of from a node returned by `.nodes()`, the path starts at the root:
+Consider this document:
 
 ```sql
-DECLARE @State xml = N'<State><Name>Norway</Name></State>';
+DECLARE @State xml = N'<State Name="Norway" />';
 
-SELECT @State.value('(/State/Name)[1]', 'nvarchar(50)') AS StateName;
+SELECT @State.value('/State/@Name', 'nvarchar(50)') AS StateName;
+```
+
+Our document contains only one `State`, but the query fails:
+
+```text
+XQuery [value()]: 'value()' requires a singleton (or empty sequence)
+```
+
+SQL Server does not know how many `State` elements the document contains. The same `xml` variable could just as well hold this:
+
+```xml
+<State Name="Norway" />
+<State Name="Sweden" />
+```
+
+In that case, `/State/@Name` would return two values. Because the path **could** return more than one value, SQL Server rejects it.
+
+Adding `[1]` means **"take the first match"**. Now the path returns at most one value, and SQL Server accepts it:
+
+```sql
+DECLARE @State xml = N'<State Name="Norway" />';
+
+SELECT @State.value('(/State/@Name)[1]', 'nvarchar(50)') AS StateName;
 ```
 
 | StateName |
 |---|
 | Norway |
 
-Without `[1]`, SQL Server reports that `.value()` requires a singleton. We will use the same rule in Section 4.4 to read the state name.
+The parentheses make `[1]` apply to the result of the whole path.
+
+### Why the `.nodes()` example did not need `[1]`
+
+In Step 2, we wrote `c.node.value('@FirstName', ...)` without `[1]`.
+
+`.nodes()` returns one row for each `Customer`, and in each row `c.node` is **one specific element**. An XML element cannot have two attributes with the same name, so `@FirstName` on that element can never return more than one value. SQL Server knows this, so `[1]` is not required.
+
+A child **element** is different, because an element can contain several children with the same name. If the customer were written as `<Customer><FirstName>Nina</FirstName></Customer>`, we would need `c.node.value('(FirstName)[1]', ...)`.
+
+| Path | Needs `[1]`? | Why |
+|---|---|---|
+| `@FirstName` on the current node from `.nodes()` | No | An element has each attribute at most once |
+| `(FirstName)[1]` — a child element | Yes | An element can have several children with the same name |
+| `(/State/@Name)[1]` — read from the whole document | Yes | The document could contain several `State` elements |
+
+> [!IMPORTANT]
+> **Rule:** `[1]` is not needed only when reading an attribute of the current node from `.nodes()`. In every other case, add `[1]`.
+
+> [!TIP]
+> This is similar to a scalar subquery such as `SET @Name = (SELECT Name FROM ...)`, which must return one row. The difference is when the check happens: a scalar subquery fails at run time if it returns several rows, while XQuery rejects the path in advance if it **could** return several values.
+
+We will use this rule in Section 4.4 to read the state name.
 
 ## 4.3 Passing XML to a Stored Procedure
 

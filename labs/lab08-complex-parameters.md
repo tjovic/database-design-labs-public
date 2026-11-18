@@ -652,11 +652,12 @@ Unlike a comma-separated string, XML names every value, so it is clear what each
 XML can also be **nested**. For example, a state can contain its cities:
 
 ```xml
-<State>
-    <Name>Norway</Name>
-    <City Name="Oslo" />
-    <City Name="Bergen" />
-    <City Name="Trondheim" />
+<State Name="Norway">
+    <Cities>
+        <City Name="Oslo" />
+        <City Name="Bergen" />
+        <City Name="Trondheim" />
+    </Cities>
 </State>
 ```
 
@@ -755,6 +756,7 @@ This process is sometimes called **XML shredding**.
 
 - An attribute such as `@FirstName` on the current node can exist only once, so no `[1]` is needed.
 - An element can appear several times, so we must add `[1]` to select the first one: `(Name)[1]`.
+- When we read from the whole document, even an attribute needs `[1]`: the document could contain several elements with that attribute, for example `(/State/@Name)[1]`.
 
 When we read from the whole document instead of from a node returned by `.nodes()`, the path starts at the root:
 
@@ -768,7 +770,7 @@ SELECT @State.value('(/State/Name)[1]', 'nvarchar(50)') AS StateName;
 |---|
 | Norway |
 
-Without `[1]`, SQL Server reports that `.value()` requires a singleton.
+Without `[1]`, SQL Server reports that `.value()` requires a singleton. We will use the same rule in Section 4.4 to read the state name.
 
 ## 4.3 Passing XML to a Stored Procedure
 
@@ -823,11 +825,12 @@ In Section 1.2, we described the 1:N insert problem: one parent row together wit
 We will insert a state together with its cities:
 
 ```xml
-<State>
-    <Name>Norway</Name>
-    <City Name="Oslo" />
-    <City Name="Bergen" />
-    <City Name="Trondheim" />
+<State Name="Norway">
+    <Cities>
+        <City Name="Oslo" />
+        <City Name="Bergen" />
+        <City Name="Trondheim" />
+    </Cities>
 </State>
 ```
 
@@ -844,7 +847,7 @@ BEGIN
 
     -- Insert the state (one value: singleton syntax)
     INSERT INTO State (Name)
-    VALUES (@State.value('(/State/Name)[1]', 'nvarchar(50)'));
+    VALUES (@State.value('(/State/@Name)[1]', 'nvarchar(50)'));
 
     SET @NewStateID = SCOPE_IDENTITY();
 
@@ -853,7 +856,7 @@ BEGIN
     SELECT
         c.node.value('@Name', 'nvarchar(50)'),
         @NewStateID
-    FROM @State.nodes('/State/City') AS c(node);
+    FROM @State.nodes('/State/Cities/City') AS c(node);
 
     SELECT @NewStateID AS NewStateID;
 END;
@@ -862,19 +865,22 @@ GO
 
 The procedure uses both reading styles:
 
-- `@State.value('(/State/Name)[1]', ...)` reads **one value** from the document — the state name stored as element text.
-- `@State.nodes('/State/City')` turns the **collection** of cities into rows, and `.value('@Name', ...)` reads each city's attribute.
+- `@State.value('(/State/@Name)[1]', ...)` reads **one value** from the whole document — the state's `Name` attribute.
+- `@State.nodes('/State/Cities/City')` turns the **collection** of cities into rows, and `.value('@Name', ...)` reads each city's attribute.
+
+The `<Cities>` element groups the collection, just as the `Cities` array does in the JSON example in Section 6.6.
 
 ### Step 2 – Call the procedure
 
 ```sql
 EXEC dbo.usp_InsertStateWithCitiesFromXml
     @State = N'
-<State>
-    <Name>Norway</Name>
-    <City Name="Oslo" />
-    <City Name="Bergen" />
-    <City Name="Trondheim" />
+<State Name="Norway">
+    <Cities>
+        <City Name="Oslo" />
+        <City Name="Bergen" />
+        <City Name="Trondheim" />
+    </Cities>
 </State>';
 
 -- Verify

@@ -487,7 +487,7 @@ Both calls should return the same customer ID.
 
 ### Hints
 
-- Use `.value()` to extract XML attributes.
+- Use `.nodes('/Customer')` and `.value()` to read the attributes into variables with `SELECT @Variable = ...`.
 - Use `SELECT @Variable = Column FROM Table` to find existing IDs.
 - Use `IF @Variable IS NULL` to decide whether an insert is necessary.
 - Use `SCOPE_IDENTITY()` to retrieve newly generated IDs.
@@ -506,23 +506,21 @@ CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
     @Customer xml
 AS
 BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @FirstName nvarchar(50) =
-        @Customer.value('(/Customer/@FirstName)[1]', 'nvarchar(50)');
-
-    DECLARE @LastName nvarchar(50) =
-        @Customer.value('(/Customer/@LastName)[1]', 'nvarchar(50)');
-
-    DECLARE @CityName nvarchar(50) =
-        @Customer.value('(/Customer/@City)[1]', 'nvarchar(50)');
-
-    DECLARE @StateName nvarchar(50) =
-        @Customer.value('(/Customer/@State)[1]', 'nvarchar(50)');
-
+    DECLARE @FirstName nvarchar(50);
+    DECLARE @LastName nvarchar(50);
+    DECLARE @CityName nvarchar(50);
+    DECLARE @StateName nvarchar(50);
     DECLARE @StateID int;
     DECLARE @CityID int;
     DECLARE @CustomerID int;
+
+    -- Read the customer's attributes
+    SELECT
+        @FirstName = c.node.value('@FirstName', 'nvarchar(50)'),
+        @LastName = c.node.value('@LastName', 'nvarchar(50)'),
+        @CityName = c.node.value('@City', 'nvarchar(50)'),
+        @StateName = c.node.value('@State', 'nvarchar(50)')
+    FROM @Customer.nodes('/Customer') AS c(node);
 
     -- Step 1: Find or create the state
     SELECT @StateID = IDState

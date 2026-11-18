@@ -632,7 +632,7 @@ We need a format that can represent **structured data**. One solution is **XML (
 
 ## 4.1 What Is XML?
 
-XML is a text-based format that describes data using **elements**, **attributes**, and **nested structures**.
+XML is a text-based format that describes data using **elements** and **attributes**.
 
 ```xml
 <Customers>
@@ -649,32 +649,7 @@ The XML document contains:
 
 Unlike a comma-separated string, XML names every value, so it is clear what each value represents.
 
-XML can also be **nested**. For example, a state can contain its cities:
-
-```xml
-<State Name="Norway">
-    <Cities>
-        <City Name="Oslo" />
-        <City Name="Bergen" />
-        <City Name="Trondheim" />
-    </Cities>
-</State>
-```
-
-### Attributes vs. element text
-
-An element can store values in two ways — as **attributes** and as **element text**:
-
-```xml
-<City PostalCode="10000">Zagreb</City>
-```
-
-| Form | Value | Read with |
-|---|---|---|
-| Attribute | `10000` | `@PostalCode` |
-| Element text | `Zagreb` | `.` (the current element) |
-
-Section 4.2 shows how to read each of them.
+Elements can also contain other elements, so XML can describe **nested** data, such as a state with its cities. We will use this in Section 4.4.
 
 SQL Server has a built-in `xml` data type for storing and processing XML documents.
 
@@ -699,11 +674,11 @@ DECLARE @Customers xml = N'
 </Customers>';
 
 SELECT
-    c.node.query('.') AS CustomerXml
-FROM @Customers.nodes('/Customers/Customer') AS c(node);
+    tbl.col.query('.') AS CustomerXml
+FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 ```
 
-The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer` element inside the root `Customers` element. The syntax `AS c(node)` names the resulting table and its XML column.
+The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer` element inside the root `Customers` element. The syntax `AS tbl(col)` names the resulting table (`tbl`) and its only column (`col`). Each row of `col` holds one `Customer` element.
 
 The result contains two rows, each holding one XML fragment:
 
@@ -712,16 +687,16 @@ The result contains two rows, each holding one XML fragment:
 | `<Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />` |
 | `<Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />` |
 
-Here, `.query('.')` only displays the current node, so we can see what each row contains.
+Here, `.query('.')` only displays the current element as XML, so we can see what each row contains.
 
 > [!NOTE]
 > The path `/Customers/Customer` uses **XQuery**, a language for navigating XML:
 >
 > - `/Customers` — the root element.
 > - `/Customers/Customer` — all `Customer` elements inside `Customers`.
-> - `@FirstName` — the `FirstName` attribute.
-> - `.` — the current XML node.
-> - `..` — the parent of the current node.
+> - `@FirstName` — the `FirstName` attribute of the current element.
+> - `.` — the current element. `.query('.')` returns it as XML; `.value('.', ...)` returns its text as a SQL value (Step 3).
+> - `..` — the parent of the current element (Section 4.4).
 
 ### Step 2 – Extract values using `.value()`
 
@@ -735,10 +710,10 @@ DECLARE @Customers xml = N'
 </Customers>';
 
 SELECT
-    c.node.value('@FirstName', 'nvarchar(50)') AS FirstName,
-    c.node.value('@LastName', 'nvarchar(50)') AS LastName,
-    c.node.value('@Email', 'nvarchar(50)') AS Email
-FROM @Customers.nodes('/Customers/Customer') AS c(node);
+    tbl.col.value('@FirstName', 'nvarchar(50)') AS FirstName,
+    tbl.col.value('@LastName', 'nvarchar(50)') AS LastName,
+    tbl.col.value('@Email', 'nvarchar(50)') AS Email
+FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 ```
 
 Result:
@@ -755,9 +730,23 @@ Result:
 
 This process is sometimes called **XML shredding**.
 
+> [!WARNING]
+> **XML names are case-sensitive.** The path `/customers/customer` does not match `<Customers><Customer>`, so the query returns **no rows** — without an error. Similarly, a misspelled attribute such as `@Firstname` returns `NULL`.
+>
+> If you get an empty result or unexpected `NULL` values, first check the letter case of every element and attribute name.
+
 ### Step 3 – Read element text with `.`
 
-Some XML documents store values as element text. An element can also have attributes and text at the same time:
+An element can store values in two ways — as **attributes** and as **element text**. It can also have both at the same time:
+
+```xml
+<City PostalCode="10000">Zagreb</City>
+```
+
+| Form | Value | Read with |
+|---|---|---|
+| Attribute | `10000` | `@PostalCode` |
+| Element text | `Zagreb` | `.` (the current element) |
 
 ```sql
 DECLARE @Cities xml = N'
@@ -768,9 +757,9 @@ DECLARE @Cities xml = N'
 </Cities>';
 
 SELECT
-    c.node.value('.', 'nvarchar(50)') AS CityName,
-    c.node.value('@PostalCode', 'nvarchar(10)') AS PostalCode
-FROM @Cities.nodes('/Cities/City') AS c(node);
+    tbl.col.value('.', 'nvarchar(50)') AS CityName,
+    tbl.col.value('@PostalCode', 'nvarchar(10)') AS PostalCode
+FROM @Cities.nodes('/Cities/City') AS tbl(col);
 ```
 
 Result:
@@ -781,13 +770,13 @@ Result:
 | Split | 21000 |
 | Osijek | 31000 |
 
-In each row, `c.node` is one `City` element:
+In each row, `tbl.col` is one `City` element:
 
 - `.` reads the text of that element.
 - `@PostalCode` reads its attribute.
 
 > [!NOTE]
-> Always read values from the nodes returned by `.nodes()`, as in the examples above. If you call `.value()` directly on the whole document, for example `@Cities.value('/Cities/City/@PostalCode', ...)`, SQL Server reports that `'value()' requires a singleton`, because the path could match several elements.
+> Always read values from the elements returned by `.nodes()`, as in the examples above. If you call `.value()` directly on the whole document, for example `@Cities.value('/Cities/City/@PostalCode', ...)`, SQL Server reports that `'value()' requires a singleton`, because the path could match several elements.
 
 ## 4.3 Passing XML to a Stored Procedure
 
@@ -802,10 +791,10 @@ AS
 BEGIN
     INSERT INTO Customer (FirstName, LastName, Email)
     SELECT
-        c.node.value('@FirstName', 'nvarchar(50)'),
-        c.node.value('@LastName', 'nvarchar(50)'),
-        c.node.value('@Email', 'nvarchar(50)')
-    FROM @Customers.nodes('/Customers/Customer') AS c(node);
+        tbl.col.value('@FirstName', 'nvarchar(50)'),
+        tbl.col.value('@LastName', 'nvarchar(50)'),
+        tbl.col.value('@Email', 'nvarchar(50)')
+    FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 END;
 GO
 ```
@@ -837,7 +826,7 @@ WHERE Email IN (
 
 ## 4.4 Inserting a Parent and Its Children
 
-In Section 1.2, we described the 1:N insert problem: one parent row together with several child rows. XML can carry both in one document.
+In Section 1.2, we described the 1:N insert problem: one parent row together with several child rows. Because XML elements can contain other elements, one document can carry both.
 
 We will insert a state together with its cities:
 
@@ -851,9 +840,45 @@ We will insert a state together with its cities:
 </State>
 ```
 
-The procedure inserts the state first, then uses its generated ID when inserting the cities.
+The `State` element is the parent. The `<Cities>` element groups the collection of child `City` elements, just as the `Cities` array does in the JSON example in Section 6.6.
 
-### Step 1 – Create the procedure
+### Step 1 – Read the nested XML
+
+Before writing the procedure, let's read the cities together with their state:
+
+```sql
+DECLARE @State xml = N'
+<State Name="Norway">
+    <Cities>
+        <City Name="Oslo" />
+        <City Name="Bergen" />
+        <City Name="Trondheim" />
+    </Cities>
+</State>';
+
+SELECT
+    tbl.col.value('@Name', 'nvarchar(50)') AS CityName,
+    tbl.col.value('../../@Name', 'nvarchar(50)') AS StateName
+FROM @State.nodes('/State/Cities/City') AS tbl(col);
+```
+
+Result:
+
+| CityName | StateName |
+|---|---|
+| Oslo | Norway |
+| Bergen | Norway |
+| Trondheim | Norway |
+
+Each row is one `City` element. To reach the state's name, we move up the tree with `..`:
+
+- `..` — the parent of `City`, which is `Cities`.
+- `../..` — the parent of `Cities`, which is `State`.
+- `../../@Name` — the state's `Name` attribute.
+
+### Step 2 – Create the procedure
+
+The procedure inserts the state first, then uses its generated ID when inserting the cities.
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertStateWithCitiesFromXml
@@ -864,17 +889,17 @@ BEGIN
 
     -- Insert the state
     INSERT INTO State (Name)
-    SELECT s.node.value('@Name', 'nvarchar(50)')
-    FROM @State.nodes('/State') AS s(node);
+    SELECT tbl.col.value('@Name', 'nvarchar(50)')
+    FROM @State.nodes('/State') AS tbl(col);
 
     SET @NewStateID = SCOPE_IDENTITY();
 
     -- Insert all cities
     INSERT INTO City (Name, StateID)
     SELECT
-        c.node.value('@Name', 'nvarchar(50)'),
+        tbl.col.value('@Name', 'nvarchar(50)'),
         @NewStateID
-    FROM @State.nodes('/State/Cities/City') AS c(node);
+    FROM @State.nodes('/State/Cities/City') AS tbl(col);
 
     SELECT @NewStateID AS NewStateID;
 END;
@@ -886,9 +911,7 @@ Both inserts use the same pattern:
 - `@State.nodes('/State')` returns one row — the state — and `.value('@Name', ...)` reads its name.
 - `@State.nodes('/State/Cities/City')` returns one row per city, and `.value('@Name', ...)` reads each city's name.
 
-The `<Cities>` element groups the collection, just as the `Cities` array does in the JSON example in Section 6.6.
-
-### Step 2 – Call the procedure
+### Step 3 – Call the procedure
 
 ```sql
 EXEC dbo.usp_InsertStateWithCitiesFromXml
@@ -920,6 +943,36 @@ The procedure inserts one state and three related cities in a single call.
 ## 4.5 Generating XML with FOR XML PATH
 
 So far, we have received XML and converted it into SQL rows. SQL Server can also do the opposite: **convert query results into XML**. This is useful when an application or external system expects XML output.
+
+### Building the same shape we read in Section 4.3
+
+The column aliases decide what the XML looks like. An alias starting with `@` creates an attribute:
+
+```sql
+SELECT
+    c.FirstName AS [@FirstName],
+    c.LastName AS [@LastName],
+    c.Email AS [@Email]
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR XML PATH('Customer'), ROOT('Customers');
+```
+
+Result:
+
+```xml
+<Customers>
+    <Customer FirstName="Gustavo" LastName="Achong" Email="gustavo0@adventure-works.com" />
+    <Customer FirstName="Catherine" LastName="Abel" Email="catherine0@adventure-works.com" />
+    <Customer FirstName="Kim" LastName="Abercrombie" Email="kim2@adventure-works.com" />
+</Customers>
+```
+
+This is exactly the shape that `dbo.usp_InsertCustomerBatch` accepts. `.nodes()` and `.value()` turn XML into rows; `FOR XML PATH` turns rows back into XML.
+
+### Elements and nested elements
+
+An alias without `@` creates a child element, and a `/` in the alias creates nested elements:
 
 ```sql
 SELECT
@@ -955,8 +1008,6 @@ The result contains one `Customer` element for each row. The first one looks lik
 | `FOR XML PATH('Customer')` | Creates one `Customer` element per row |
 | `ROOT('Customers')` | Wraps the result in a root element |
 
-The `/` in a column alias such as `[Emails/Email]` creates nested elements. This is how we build nested XML structures directly from relational data.
-
 ## 4.6 Advantages and Limitations of XML
 
 | Advantages | Limitations |
@@ -964,7 +1015,7 @@ The `/` in a column alias such as `[Emails/Email]` creates nested elements. This
 | Supports nested and hierarchical data | More verbose than simpler formats |
 | Names every value, so items can have several fields | XML syntax and XQuery require additional learning |
 | Built-in `xml` data type in SQL Server | XML processing introduces parsing overhead |
-| Can convert XML into relational rows | A missing attribute or element silently becomes `NULL` |
+| Can convert XML into relational rows | Names are case-sensitive; a wrong or missing name silently returns no rows or `NULL` |
 | Supports XML input and output | May be unnecessary when simpler formats are sufficient |
 
 XML remains useful when integrating with systems that already exchange XML documents, such as certain SOAP-based services.

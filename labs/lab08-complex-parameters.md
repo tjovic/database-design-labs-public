@@ -641,7 +641,7 @@ The XML document contains:
 
 Unlike a comma-separated string, XML names every value, so it is clear what each value represents.
 
-Elements can also contain other elements, so XML can describe **nested** data, such as a state with its cities. We will use this in Section 4.4.
+Elements can also contain other elements, so XML can describe **nested** data, such as an invoice with its items. We will use this in Section 4.4.
 
 SQL Server has a built-in `xml` data type for storing and processing XML documents.
 
@@ -826,118 +826,148 @@ WHERE Email IN (
 
 ## 4.4 Inserting a Parent and Its Children
 
-In Section 1.2, we described the 1:N insert problem: one parent row together with several child rows. Because XML elements can contain other elements, one document can carry both.
-
-We will insert a state together with its cities:
+In Section 1.2, we described the 1:N insert problem: an invoice header together with several invoice items. Because XML elements can contain other elements, one document can carry both:
 
 ```xml
-<State Name="Norway">
-    <Cities>
-        <City Name="Oslo" />
-        <City Name="Bergen" />
-        <City Name="Trondheim" />
-    </Cities>
-</State>
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TEST-001">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>
 ```
 
-The `State` element is the parent. The `<Cities>` element groups the collection of child `City` elements.
+The `Invoice` element is the parent; its attributes hold the header values. The `<Lines>` element groups the child `Line` elements, one for each invoice item.
 
 ### Step 1 – Read the nested XML
 
-Before writing the procedure, let's read the cities together with their state:
+Before writing the procedure, let's read the items together with their invoice number:
 
 ```sql
-DECLARE @State xml = N'
-<State Name="Norway">
-    <Cities>
-        <City Name="Oslo" />
-        <City Name="Bergen" />
-        <City Name="Trondheim" />
-    </Cities>
-</State>';
+DECLARE @Invoice xml = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TEST-001">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
 
 SELECT
-    tbl.col.value('@Name', 'nvarchar(50)') AS CityName,
-    tbl.col.value('../../@Name', 'nvarchar(50)') AS StateName
-FROM @State.nodes('/State/Cities/City') AS tbl(col);
+    tbl.col.value('../../@InvoiceNumber', 'nvarchar(20)') AS InvoiceNumber,
+    tbl.col.value('@ProductID', 'int') AS ProductID,
+    tbl.col.value('@Quantity', 'int') AS Quantity,
+    tbl.col.value('@UnitPrice', 'money') AS UnitPrice
+FROM @Invoice.nodes('/Invoice/Lines/Line') AS tbl(col);
 ```
 
 Result:
 
-| CityName | StateName |
-|---|---|
-| Oslo | Norway |
-| Bergen | Norway |
-| Trondheim | Norway |
+| InvoiceNumber | ProductID | Quantity | UnitPrice |
+|---|---|---|---|
+| SO-TEST-001 | 1 | 2 | 199.00 |
+| SO-TEST-001 | 2 | 1 | 49.90 |
+| SO-TEST-001 | 3 | 5 | 9.99 |
 
-Each row is one `City` element. To reach the state's name, we move up the tree with `..`:
+Each row is one `Line` element. To reach the invoice number, we move up the tree with `..`:
 
-- `..` — the parent of `City`, which is `Cities`.
-- `../..` — the parent of `Cities`, which is `State`.
-- `../../@Name` — the state's `Name` attribute.
+- `..` — the parent of `Line`, which is `Lines`.
+- `../..` — the parent of `Lines`, which is `Invoice`.
+- `../../@InvoiceNumber` — the invoice's `InvoiceNumber` attribute.
 
 ### Step 2 – Create the procedure
 
-The procedure inserts the state first, then uses its generated ID when inserting the cities.
+The procedure inserts the invoice header first, then uses its generated ID when inserting the items.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertStateWithCitiesFromXml
-    @State xml
+CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsertFromXml
+    @Invoice xml
 AS
 BEGIN
-    DECLARE @NewStateID int;
+    DECLARE @NewInvoiceID int;
 
-    -- Insert the state
-    INSERT INTO State (Name)
-    SELECT tbl.col.value('@Name', 'nvarchar(50)')
-    FROM @State.nodes('/State') AS tbl(col);
-
-    SET @NewStateID = SCOPE_IDENTITY();
-
-    -- Insert all cities
-    INSERT INTO City (Name, StateID)
+    -- Insert the invoice header
+    INSERT INTO Invoice (CustomerID, InvoiceDate, InvoiceNumber)
     SELECT
-        tbl.col.value('@Name', 'nvarchar(50)'),
-        @NewStateID
-    FROM @State.nodes('/State/Cities/City') AS tbl(col);
+        tbl.col.value('@CustomerID', 'int'),
+        tbl.col.value('@InvoiceDate', 'date'),
+        tbl.col.value('@InvoiceNumber', 'nvarchar(20)')
+    FROM @Invoice.nodes('/Invoice') AS tbl(col);
 
-    SELECT @NewStateID AS NewStateID;
+    -- Get the generated invoice ID
+    SET @NewInvoiceID = SCOPE_IDENTITY();
+
+    -- Insert all invoice items
+    INSERT INTO InvoiceItem
+    (
+        InvoiceID,
+        ProductID,
+        Quantity,
+        InitialPrice,
+        Discount,
+        TotalPrice
+    )
+    SELECT
+        @NewInvoiceID,
+        ProductID,
+        Quantity,
+        UnitPrice,
+        0,
+        Quantity * UnitPrice
+    FROM
+    (
+        SELECT
+            tbl.col.value('@ProductID', 'int') AS ProductID,
+            tbl.col.value('@Quantity', 'int') AS Quantity,
+            tbl.col.value('@UnitPrice', 'money') AS UnitPrice
+        FROM @Invoice.nodes('/Invoice/Lines/Line') AS tbl(col)
+    ) AS lines;
+
+    -- Return the generated invoice ID
+    SELECT @NewInvoiceID AS NewInvoiceID;
 END;
 GO
 ```
 
 Both inserts use the same pattern:
 
-- `@State.nodes('/State')` returns one row — the state — and `.value('@Name', ...)` reads its name.
-- `@State.nodes('/State/Cities/City')` returns one row per city, and `.value('@Name', ...)` reads each city's name.
+- `@Invoice.nodes('/Invoice')` returns one row — the header — and `.value()` reads its three attributes.
+- `@Invoice.nodes('/Invoice/Lines/Line')` returns one row per item. The inner query turns each item into typed columns, so the outer `SELECT` can compute `Quantity * UnitPrice` without repeating the `.value()` calls.
+- `SCOPE_IDENTITY()` returns the ID generated for the header, and every item receives it.
+
+In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
 
 ### Step 3 – Call the procedure
 
 ```sql
-EXEC dbo.usp_InsertStateWithCitiesFromXml
-    @State = N'
-<State Name="Norway">
-    <Cities>
-        <City Name="Oslo" />
-        <City Name="Bergen" />
-        <City Name="Trondheim" />
-    </Cities>
-</State>';
+EXEC dbo.usp_InvoiceInsertFromXml
+    @Invoice = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TEST-001">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
 
 -- Verify
 SELECT
-    s.IDState,
-    s.Name AS StateName,
-    c.IDCity,
-    c.Name AS CityName
-FROM State s
-JOIN City c ON c.StateID = s.IDState
-WHERE s.Name = N'Norway';
+    i.IDInvoice,
+    i.InvoiceNumber,
+    i.InvoiceDate,
+    ii.ProductID,
+    ii.Quantity,
+    ii.InitialPrice,
+    ii.TotalPrice
+FROM Invoice i
+JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceNumber = N'SO-TEST-001';
 ```
 
-The procedure inserts one state and three related cities in a single call.
+The procedure inserts one invoice header and three related items in a single call.
 
-As noted in Section 1.2, if inserting the cities fails, the state remains in the database; Lab 9 fixes this with a transaction.
+As noted in Section 1.2, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
 ## 4.5 Generating XML with FOR XML PATH
 
@@ -1255,7 +1285,7 @@ The procedure can handle a larger array without changing its SQL code.
 
 ## 5.5 Working with Nested JSON
 
-Real-world JSON documents often contain nested objects and arrays. Consider an invoice with several line items — the invoice problem from Section 1.2:
+Real-world JSON documents often contain nested objects and arrays. Consider the same invoice we inserted from XML in Section 4.4, now written as JSON:
 
 ```json
 {
@@ -1474,7 +1504,7 @@ JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
 WHERE i.InvoiceNumber = N'SO-TEST-002';
 ```
 
-The result should contain three items linked to the same invoice. As with the state and its cities in Section 4.4, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
+The result should contain three items linked to the same invoice. As in Section 4.4, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
 ## 5.7 Generating JSON with FOR JSON PATH
 
@@ -1758,7 +1788,7 @@ If we need to modify the data, we can copy it into a local table variable or tem
 
 ## 6.4 Practical Example – Inserting an Invoice with Multiple Items
 
-In Section 5.6, we inserted an invoice from one JSON document. Now we insert the same kind of invoice with a TVP, still in **one stored procedure call**.
+In Sections 4.4 and 5.6, we inserted the same invoice from an XML document and from a JSON document. Now we insert it with a TVP, still in **one stored procedure call**.
 
 For this example, we will use:
 
@@ -1877,17 +1907,17 @@ This inserts all invoice items using one SQL statement. The same `@NewInvoiceID`
 
 We do not need a loop.
 
-Compare it with `dbo.usp_InvoiceInsertFromJson` from Section 5.6. The structure is identical; only the source of the data changes:
+Compare it with the XML procedure from Section 4.4 and the JSON procedure from Section 5.6. All three insert the same invoice with the same structure — header, `SCOPE_IDENTITY()`, then all items with one `INSERT ... SELECT`. Only the envelope changes:
 
-| | Section 5.6 – JSON | Section 6.4 – TVP |
-|---|---|---|
-| Header | `JSON_VALUE` reads three properties | Three scalar parameters |
-| Items | `FROM OPENJSON(@Json, '$.Invoice.Lines') WITH (...)` | `FROM @Lines` |
-| Data types checked | When the procedure shreds the JSON | When the caller fills the TVP |
+| | 4.4 – XML | 5.6 – JSON | 6.4 – TVP |
+|---|---|---|---|
+| Header | `.value()` reads three attributes | `JSON_VALUE` reads three properties | Three scalar parameters |
+| Items | `.nodes('/Invoice/Lines/Line')` and `.value()` | `OPENJSON(@Json, '$.Invoice.Lines') WITH (...)` | `FROM @Lines` |
+| Data types checked | When the procedure shreds the XML | When the procedure shreds the JSON | When the caller fills the TVP |
 
-In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
+The same simplified mapping as in Section 4.4 applies: `UnitPrice` becomes `InitialPrice`, `Discount` is `0`, and `TotalPrice` is `Quantity * UnitPrice`.
 
-As with the JSON invoice in Section 5.6, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
+As in Sections 4.4 and 5.6, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
 ### Step 3 – Prepare the items and call the procedure
 
@@ -1903,9 +1933,9 @@ VALUES
     (3, 5, 9.99);
 
 EXEC dbo.usp_InvoiceInsert
-    @CustomerID = 1,
+    @CustomerID = 5,
     @InvoiceDate = '2026-11-04',
-    @InvoiceNumber = N'SO-TEST-001',
+    @InvoiceNumber = N'SO-TEST-003',
     @Lines = @InvoiceLines;
 ```
 
@@ -1930,7 +1960,7 @@ SELECT
     ii.TotalPrice
 FROM Invoice i
 JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceNumber = N'SO-TEST-001';
+WHERE i.InvoiceNumber = N'SO-TEST-003';
 ```
 
 The result should contain three items linked to the same invoice.
@@ -2127,7 +2157,7 @@ The choice depends on where data conversion should happen and how the applicatio
 1. What is the 1:N insert problem, and why is it hard without collection parameters?
 2. Why should untrusted values be passed as parameters, and why is a parameterized query in a loop still not enough for 100 IDs?
 3. What does `STRING_SPLIT` return, and what type is the `value` column?
-4. When you use XML, what does `@Name` mean in `.value('@Name', 'nvarchar(50)')`?
+4. When you use XML, what does `@ProductID` mean in `.value('@ProductID', 'int')`?
 5. When you use `FOR XML PATH`, how do you create nested elements in the output?
 6. In `OPENJSON(@Json, '$.Invoice')`, what does `'$.Invoice'` do?
 7. How would you use `FOR JSON PATH` to build nested JSON with dotted aliases?
@@ -2143,7 +2173,7 @@ The choice depends on where data conversion should happen and how the applicatio
 
 3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
 
-4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. To read the text of the current element, use `.`, as shown in Section 4.2.
+4. **`@ProductID` in XML** — It reads an **attribute** named `ProductID` on the current node. To read the text of the current element, use `.`, as shown in Section 4.2.
 
 5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 7.)
 

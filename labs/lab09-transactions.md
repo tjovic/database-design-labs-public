@@ -651,7 +651,21 @@ The second `UPDATE` is valid SQL. It found no row with `AccountID = 999`, so it 
 
 ## 4.2 Check @@ROWCOUNT immediately
 
-`@@ROWCOUNT` returns the number of rows affected by the previous statement. Check it directly after **each** `UPDATE` and raise an error yourself when the result is wrong. The source account can be missing just as easily as the destination.
+`@@ROWCOUNT` returns the number of rows affected by the previous statement. Check it directly after **each** `UPDATE`: the source account can be missing just as easily as the destination.
+
+When the count is wrong, SQL Server sees no error, so we must raise one ourselves. `THROW` with arguments creates a **new** error:
+
+```sql
+THROW 50001, 'Source account does not exist.', 1;
+```
+
+| Argument | Meaning |
+|---|---|
+| `50001` | Application error number; user-defined numbers start at `50000` |
+| Message | Explanation for the caller |
+| `1` | State value, which can help identify where an error was raised |
+
+Compare it with `THROW;` from 3.3: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one. [Lab 4](lab04-functions.md) used `RAISERROR` for the same purpose in a trigger; `THROW` is the newer way to do it.
 
 Reset the balances:
 
@@ -706,14 +720,6 @@ ORDER BY AccountID;
 ```
 
 The balances are `1000.00` and `500.00`: the custom error sent the transaction into `CATCH`, which rolled back the debit.
-
-`THROW` with arguments creates an application error:
-
-| Argument | Meaning |
-|---|---|
-| `50001` | Application error number; user-defined numbers start at `50000` |
-| Message | Explanation for the caller |
-| `1` | State value, which can help identify where an error was raised |
 
 Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other statements can change or reset its value.
 

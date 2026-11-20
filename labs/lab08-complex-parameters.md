@@ -6,10 +6,10 @@ In Labs 3 and 4, we learned that stored procedures and functions package databas
 
 But what happens when you need to pass **many** values in a single call? How do you insert an invoice header together with twenty line items? How do you delete multiple rows by ID? How do you accept the output of a web API that sends JSON?
 
-This lab compares five approaches to handling collections of data, starting with unsafe SQL concatenation and moving to delimited strings, XML, TVPs, and JSON. By the end, you will know how each approach works and which to consider in different situations.
+This lab compares five approaches to handling collections of data, starting with unsafe SQL concatenation and moving to delimited strings, XML, JSON, and TVPs. By the end, you will know how each approach works and which to consider in different situations.
 
 > [!IMPORTANT]
-> **Core idea:** A collection parameter is not a scalar. It needs structure. SQL Server provides multiple envelopes — some safer, some faster, some better suited to the format used by the application. This lab compares unsafe client-side SQL concatenation with four ways to pass collections or structured data: delimited strings, XML, Table-Valued Parameters, and JSON. TVPs pass typed relational rows; XML and JSON represent structured documents.
+> **Core idea:** A collection is not a scalar. It needs a structure that SQL Server can turn into rows. Each method in this lab is a different envelope for the same collection.
 
 ---
 
@@ -20,12 +20,10 @@ After completing this lab, you should be able to:
 - identify the two classic collection-parameter problems: the 1:N insert and the batch key operation;
 - explain the risks of unsafe SQL concatenation, the benefits of parameterization, and the overhead of separate database calls;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
-- pass hierarchical data as XML, shred it with `.nodes()` and `.value()`, and build it back with `FOR XML PATH`;
-- use XML to pass items with several fields, read both attributes and element text, and insert a parent row with its children from one XML document;
+- pass structured data as XML: shred it with `.nodes()` and `.value()`, read attributes and element text, insert a parent row with its children, and build XML back with `FOR XML PATH`;
+- pass JSON data: read single values with `JSON_VALUE`, shred arrays with `OPENJSON ... WITH (...)`, insert a parent row with its children, and build JSON back with `FOR JSON PATH`;
 - define a table type with `CREATE TYPE ... AS TABLE` and pass tables as parameters using Table-Valued Parameters (TVPs);
-- accept JSON data with `OPENJSON(@json) WITH (...)`, shred it into typed columns, and build JSON output with `FOR JSON PATH` and dotted aliases;
-- insert a parent row and its children from a single nested JSON document, using `JSON_VALUE` and `OPENJSON` together;
-- compare all five methods (client-side query, delimited string, XML, TVP, JSON) and know which to reach for in different situations.
+- compare all five methods (client-side query, delimited string, XML, JSON, TVP) and know which to reach for in different situations.
 
 ---
 
@@ -135,10 +133,7 @@ sequenceDiagram
 
 This type of operation is called a **batch operation**.
 
-The same concept applies when we want to update, delete, or retrieve multiple rows using a list of IDs.
-
-> [!NOTE]
-> A batch operation processes multiple items together. In SQL Server, we can often use a single set-based SQL statement instead of executing the same operation separately for each item.
+The same concept applies when we want to update, delete, or retrieve multiple rows using a list of IDs: one set-based SQL statement processes all items, instead of the same operation running separately for each item.
 
 ## 1.2 Problem 2 – Inserting Related Data
 
@@ -192,8 +187,7 @@ The procedure receives the invoice data, inserts the header, and uses its genera
 > [!IMPORTANT]
 > **One procedure call does not necessarily mean one SQL statement.**
 >
-> A procedure may execute several SQL statements. One call alone does not ensure that all changes succeed or fail together. In the next lab, we will use transactions to provide that behavior.
-
+> A procedure may execute several SQL statements. One call alone does not ensure that all changes succeed or fail together. [Lab 9 – Transactions](lab09-transactions.md) shows how to provide that behavior; the parent-child examples in this lab do not use transactions yet.
 
 ## 1.3 The Solution – Complex Parameters
 
@@ -217,16 +211,12 @@ In this lab, we will explore five approaches:
 | Client-side query building | `WHERE IDProduct IN (1, 2, 3)` | Construct SQL in application code |
 | Delimited string | `'1,2,3'` | Pass a string and split it into values |
 | XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` | Pass structured XML data |
-| Table-Valued Parameter (TVP) | A table containing three ID rows | Pass a collection of typed rows |
 | JSON | `[1, 2, 3]` | Pass structured JSON data |
+| Table-Valued Parameter (TVP) | A table containing three ID rows | Pass a collection of typed rows |
 
 All five approaches can represent the same list of product IDs, but they differ in how the data is prepared, transmitted, and processed.
 
-Some approaches are safer, more efficient, or better suited to particular applications than others.
-
 We will begin with SQL statements built by embedding values in application code, then explore parameterized alternatives.
-
-By the end of this lab, you should understand **how to pass collections of data to stored procedures and how to choose an appropriate method for a given situation**.
 
 ---
 
@@ -315,8 +305,7 @@ cursor.execute(sql, (first_name, last_name))
 
 The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
 
-> [!IMPORTANT]
-> Do not put quotes around the `?` placeholders. The database driver handles parameter values.
+Do not put quotes around the `?` placeholders: the database driver handles parameter values.
 
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
@@ -429,10 +418,7 @@ FROM STRING_SPLIT('1,2,5,7,11', ',');
 
 Now the result contains integer values that can be compared with integer columns in the database.
 
-> [!NOTE]
-> `STRING_SPLIT` is available in SQL Server 2016 and later, with database compatibility level 130 or higher.
->
-> The function does not guarantee the order of returned rows. If order matters, it must be handled explicitly.
+`STRING_SPLIT` is available in SQL Server 2016 and later, with database compatibility level 130 or higher.
 
 ## 3.3 Using STRING_SPLIT in a Query
 
@@ -504,7 +490,7 @@ We can also pass a different list without modifying the procedure:
 
 ```sql
 EXEC dbo.usp_GetProductsByIDList
-    @IDList = N'5,10,15,20';
+    @IDList = N'316,317,318,319';
 ```
 
 **One parameter. Multiple IDs. One procedure call.**
@@ -544,8 +530,7 @@ FROM Customer
 WHERE IDCustomer IN (55, 56, 57);
 ```
 
-> [!NOTE]
-> Use the training database. The selected customers must not be referenced by invoices or other records, otherwise a foreign key constraint may prevent deletion.
+These customers have no invoices or other dependent rows, so a foreign key does not prevent the deletion.
 
 ### Step 3 – Delete the customers
 
@@ -568,8 +553,6 @@ WHERE IDCustomer IN (55, 56, 57);
 
 The query should return no rows.
 
-**Three customer IDs. One parameter. One procedure call.**
-
 ## 3.6 Limitations of Delimited Strings
 
 Delimited strings are simple and convenient, but they have several limitations.
@@ -581,6 +564,15 @@ Delimited strings are simple and convenient, but they have several limitations.
 | Delimiter conflicts | A comma cannot safely separate values that may themselves contain commas without additional rules. |
 | Limited structure | A string such as `'1,2,3'` represents a flat list, not a collection of records with multiple fields. |
 | No guaranteed order | `STRING_SPLIT` does not guarantee that rows are returned in their original order. |
+
+The invalid-value problem is easy to see:
+
+```sql
+SELECT CAST(value AS int) AS ProductID
+FROM STRING_SPLIT('1,ABC,3', ',');
+```
+
+The query fails with *"Conversion failed when converting the varchar value 'ABC' to data type int."* Nothing in a delimited string prevents a caller from sending a value that is not a number.
 
 For example, consider an invoice containing several products.
 
@@ -655,12 +647,13 @@ SQL Server has a built-in `xml` data type for storing and processing XML documen
 
 ## 4.2 Reading XML in SQL Server
 
-SQL Server provides several methods for working with XML. In this lab, we will focus on two:
+SQL Server provides several methods for working with XML. In this lab, we use three:
 
 | Method | Purpose |
 |---|---|
 | `.nodes()` | Converts matching XML elements into rows |
 | `.value()` | Extracts one value from an XML element or attribute and converts it to a SQL type |
+| `.query()` | Returns part of an XML document as XML; we use it only to display what `.nodes()` produced |
 
 ### Step 1 – Convert XML elements into rows
 
@@ -831,8 +824,6 @@ WHERE Email IN (
 );
 ```
 
-**Three customers. Three fields each. One XML parameter. One procedure call.**
-
 ## 4.4 Inserting a Parent and Its Children
 
 In Section 1.2, we described the 1:N insert problem: one parent row together with several child rows. Because XML elements can contain other elements, one document can carry both.
@@ -849,7 +840,7 @@ We will insert a state together with its cities:
 </State>
 ```
 
-The `State` element is the parent. The `<Cities>` element groups the collection of child `City` elements, just as the `Cities` array does in the JSON example in Section 6.6.
+The `State` element is the parent. The `<Cities>` element groups the collection of child `City` elements.
 
 ### Step 1 – Read the nested XML
 
@@ -946,8 +937,7 @@ WHERE s.Name = N'Norway';
 
 The procedure inserts one state and three related cities in a single call.
 
-> [!NOTE]
-> If inserting the cities fails, the state may remain in the database. In the next lab, we will use a transaction to keep these operations together.
+As noted in Section 1.2, if inserting the cities fails, the state remains in the database; Lab 9 fixes this with a transaction.
 
 ## 4.5 Generating XML with FOR XML PATH
 
@@ -1032,23 +1022,566 @@ XML remains useful when integrating with systems that already exchange XML docum
 > [!TIP]
 > Additional practice: [Exercise 6 of the Complex Parameters Exercises](../exercises/lab08-complex-parameters.md#exercise-6--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
 
-In the next section, we will explore **Table-Valued Parameters (TVPs)**, which allow us to pass collections of typed rows directly to stored procedures without converting them into XML or delimited strings.
+In the next section, we will explore **JSON**, which represents the same kind of structured data in the format most web applications already use.
 
 ---
 
-# Section 5 – Method 4: Table-Valued Parameters (TVPs)
+# Section 5 – Method 4: JSON Parameters
 
-In the previous sections, we learned how to pass collections of data using delimited strings and XML.
+XML represents structured data, but it is verbose. Modern web applications usually exchange the same kind of data using **JSON (JavaScript Object Notation)**.
 
-Both approaches allow us to send multiple values through a single parameter.
+JSON is widely used by REST APIs, web applications, and mobile applications because it is relatively simple, compact, and easy to process.
 
-However, they require SQL Server to extract values from text before using them as relational data.
+SQL Server can read JSON, convert it into relational rows, and generate JSON from query results.
+
+In this section, we will learn how to use JSON as a stored procedure parameter.
+
+## 5.1 What Is JSON?
+
+JSON is a text-based format for representing structured data.
+
+It supports objects, arrays, strings, numbers, Boolean values, and `null`.
+
+Consider a customer represented as a JSON object:
+
+```json
+{
+    "FirstName": "Alice",
+    "LastName": "Anderson",
+    "Email": "alice@example.com"
+}
+```
+
+An **object** contains named properties and their values.
+
+We can also represent multiple customers using a JSON array:
+
+```json
+[
+    {
+        "FirstName": "Alice",
+        "LastName": "Anderson",
+        "Email": "alice@example.com"
+    },
+    {
+        "FirstName": "Bob",
+        "LastName": "Brown",
+        "Email": "bob@example.com"
+    }
+]
+```
+
+The square brackets `[]` represent an array, while curly brackets `{}` represent objects.
+
+In this example, the array contains two customer objects.
+
+In SQL Server 2016–2022, JSON is typically stored and passed as `nvarchar(max)`. The JSON functions in this lab work from SQL Server 2016, with database compatibility level 130 or higher.
+
+## 5.2 Reading a Single Value – JSON_VALUE
+
+Let's start with a simple JSON object.
+
+```sql
+DECLARE @Customer nvarchar(max) = N'
+{
+    "FirstName": "Alice",
+    "LastName": "Anderson",
+    "Email": "alice@example.com"
+}';
+
+SELECT
+    JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
+    JSON_VALUE(@Customer, '$.LastName') AS LastName,
+    JSON_VALUE(@Customer, '$.Email') AS Email;
+```
+
+Result:
+
+| FirstName | LastName | Email |
+|---|---|---|
+| Alice | Anderson | alice@example.com |
+
+The `JSON_VALUE` function extracts a single scalar value from a JSON document.
+
+Its basic syntax is:
+
+```sql
+JSON_VALUE(json_expression, path)
+```
+
+The path tells SQL Server which property to read.
+
+For example:
+
+| JSON path | Meaning |
+|---|---|
+| `$` | Root of the JSON document |
+| `$.FirstName` | Property `FirstName` |
+| `$.Email` | Property `Email` |
+| `$.Address.City` | Property `City` inside `Address` |
+
+The `$` symbol represents the root of the JSON document, and dots are used to navigate through nested objects.
+
+## 5.3 Converting JSON Arrays into Rows – OPENJSON
+
+`JSON_VALUE` reads one value. To turn a JSON **array** into rows, SQL Server provides the **`OPENJSON`** function.
+
+### Step 1 – Read a simple array
+
+Start with our familiar list of product IDs, written as a JSON array. Without specifying columns, `OPENJSON` returns three default columns:
+
+```sql
+DECLARE @IDs nvarchar(max) = N'[1, 2, 3]';
+
+SELECT *
+FROM OPENJSON(@IDs);
+```
+
+Result:
+
+| key | value | type |
+|---|---|---|
+| 0 | 1 | 2 |
+| 1 | 2 | 2 |
+| 2 | 3 | 2 |
+
+The columns represent:
+
+- `key` — the array index, starting at zero.
+- `value` — the value of the array element.
+- `type` — a numeric code describing the JSON value type (`2` means number).
+
+This is enough for a simple list, but an array of customer objects has several properties per element.
+
+### Step 2 – Define columns with WITH
+
+We can use `WITH (...)` to specify which properties should become SQL columns:
+
+```sql
+DECLARE @Customers nvarchar(max) = N'
+[
+    { "FirstName": "Ida", "LastName": "Ibsen", "Email": "ida@example.com" },
+    { "FirstName": "Jonas", "LastName": "Jensen", "Email": "jonas@example.com" },
+    { "FirstName": "Kari", "LastName": "Kristian", "Email": "kari@example.com" }
+]';
+
+SELECT *
+FROM OPENJSON(@Customers)
+WITH
+(
+    FirstName nvarchar(50) '$.FirstName',
+    LastName  nvarchar(50) '$.LastName',
+    Email     nvarchar(50) '$.Email'
+);
+```
+
+Result:
+
+| FirstName | LastName | Email |
+|---|---|---|
+| Ida | Ibsen | ida@example.com |
+| Jonas | Jensen | jonas@example.com |
+| Kari | Kristian | kari@example.com |
+
+The `WITH` clause defines, for every column:
+
+1. The SQL column name.
+2. The SQL data type.
+3. The JSON path containing the value.
+
+For example, `FirstName nvarchar(50) '$.FirstName'` means: create a column named `FirstName`, convert its value to `nvarchar(50)`, and read it from the `FirstName` property.
+
+**The JSON array has now become a relational result set.** This is the JSON counterpart of XML shredding with `.nodes()` and `.value()`.
+
+## 5.4 Passing JSON to a Stored Procedure
+
+Now we can use `OPENJSON` inside a stored procedure.
+
+Our goal is to insert multiple customers using one JSON parameter.
+
+### Step 1 – Create the procedure
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerBatchFromJson
+    @JsonCustomers nvarchar(max)
+AS
+BEGIN
+    INSERT INTO Customer (FirstName, LastName, Email)
+    SELECT FirstName, LastName, Email
+    FROM OPENJSON(@JsonCustomers)
+    WITH
+    (
+        FirstName nvarchar(50) '$.FirstName',
+        LastName  nvarchar(50) '$.LastName',
+        Email     nvarchar(50) '$.Email'
+    );
+END;
+GO
+```
+
+The procedure receives one string containing JSON data.
+
+`OPENJSON` converts the array into rows, and `INSERT INTO ... SELECT` inserts all customers using one SQL statement.
+
+### Step 2 – Call the procedure
+
+```sql
+EXEC dbo.usp_InsertCustomerBatchFromJson
+    @JsonCustomers = N'
+[
+    {
+        "FirstName": "Ruđer",
+        "LastName": "Bošković",
+        "Email": "rudjer.boskovic@example.com"
+    },
+    {
+        "FirstName": "Janica",
+        "LastName": "Kostelić",
+        "Email": "janica.kostelic@example.com"
+    }
+]';
+
+-- Verify the inserted customers
+SELECT IDCustomer, FirstName, LastName, Email
+FROM Customer
+WHERE Email IN
+(
+    N'rudjer.boskovic@example.com',
+    N'janica.kostelic@example.com'
+);
+```
+
+The procedure can handle a larger array without changing its SQL code.
+
+## 5.5 Working with Nested JSON
+
+Real-world JSON documents often contain nested objects and arrays. Consider an invoice with several line items — the invoice problem from Section 1.2:
+
+```json
+{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-11-04",
+        "InvoiceNumber": "SO-TEST-002",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
+            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
+        ]
+    }
+}
+```
+
+This document contains two levels of information:
+
+- **Invoice header** — customer ID, invoice date, and invoice number.
+- **Invoice lines** — an array of products, quantities, and prices.
+
+We read the header with `JSON_VALUE`, and the `Lines` array with `OPENJSON` and a path pointing directly to that array:
+
+```sql
+DECLARE @Json nvarchar(max) = N'
+{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-11-04",
+        "InvoiceNumber": "SO-TEST-002",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
+            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
+        ]
+    }
+}';
+
+SELECT
+    JSON_VALUE(@Json, '$.Invoice.CustomerID') AS CustomerID,
+    JSON_VALUE(@Json, '$.Invoice.InvoiceDate') AS InvoiceDate,
+    JSON_VALUE(@Json, '$.Invoice.InvoiceNumber') AS InvoiceNumber;
+
+SELECT *
+FROM OPENJSON(@Json, '$.Invoice.Lines')
+WITH
+(
+    ProductID int '$.ProductID',
+    Quantity  int '$.Quantity',
+    UnitPrice money '$.UnitPrice'
+);
+```
+
+The second result:
+
+| ProductID | Quantity | UnitPrice |
+|---|---|---|
+| 1 | 2 | 199.00 |
+| 2 | 1 | 49.90 |
+| 3 | 5 | 9.99 |
+
+The second argument of `OPENJSON`, `'$.Invoice.Lines'`, tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
+
+### Reading both levels with CROSS APPLY
+
+> [!TIP]
+> This is an optional advanced example. It uses `CROSS APPLY`, which earlier labs have not covered. For the core lab, reading the header with `JSON_VALUE` and the items with `OPENJSON`, as above, is enough.
+
+Sometimes we want the invoice header and line items in one result. We can use two `OPENJSON` operations connected by `CROSS APPLY`:
+
+```sql
+DECLARE @Json nvarchar(max) = N'
+{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-11-04",
+        "InvoiceNumber": "SO-TEST-002",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
+            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
+        ]
+    }
+}';
+
+SELECT
+    inv.CustomerID,
+    inv.InvoiceDate,
+    line.ProductID,
+    line.Quantity,
+    line.UnitPrice
+FROM OPENJSON(@Json, '$.Invoice')
+WITH
+(
+    CustomerID int '$.CustomerID',
+    InvoiceDate date '$.InvoiceDate',
+    LinesJson nvarchar(max) '$.Lines' AS JSON
+) AS inv
+CROSS APPLY OPENJSON(inv.LinesJson)
+WITH
+(
+    ProductID int '$.ProductID',
+    Quantity int '$.Quantity',
+    UnitPrice money '$.UnitPrice'
+) AS line;
+```
+
+Result:
+
+| CustomerID | InvoiceDate | ProductID | Quantity | UnitPrice |
+|---|---|---|---|---|
+| 5 | 2026-11-04 | 1 | 2 | 199.00 |
+| 5 | 2026-11-04 | 2 | 1 | 49.90 |
+| 5 | 2026-11-04 | 3 | 5 | 9.99 |
+
+Let's break down the process:
+
+1. The first `OPENJSON` reads the invoice header.
+2. `AS JSON` preserves the nested `Lines` array as JSON text.
+3. `CROSS APPLY` passes that array to the second `OPENJSON`, once for each row on its left.
+4. The second `OPENJSON` converts each line item into a row.
+5. The result combines the header values with each line item.
+
+Notice that the aliases `AS inv` and `AS line` appear **after** the `WITH (...)` clauses.
+
+## 5.6 Inserting Related Records from JSON
+
+Now we insert the invoice from Section 5.5: one row in `Invoice` and one row in `InvoiceItem` for every line. The whole invoice arrives as **one JSON document**: `JSON_VALUE` reads the header, and `OPENJSON` turns the lines into rows.
+
+### Step 1 – Create the procedure
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsertFromJson
+    @Json nvarchar(max)
+AS
+BEGIN
+    DECLARE @NewInvoiceID int;
+
+    -- Insert the invoice header
+    INSERT INTO Invoice (CustomerID, InvoiceDate, InvoiceNumber)
+    VALUES
+    (
+        JSON_VALUE(@Json, '$.Invoice.CustomerID'),
+        JSON_VALUE(@Json, '$.Invoice.InvoiceDate'),
+        JSON_VALUE(@Json, '$.Invoice.InvoiceNumber')
+    );
+
+    -- Get the generated invoice ID
+    SET @NewInvoiceID = SCOPE_IDENTITY();
+
+    -- Insert all invoice items
+    INSERT INTO InvoiceItem
+    (
+        InvoiceID,
+        ProductID,
+        Quantity,
+        InitialPrice,
+        Discount,
+        TotalPrice
+    )
+    SELECT
+        @NewInvoiceID,
+        ProductID,
+        Quantity,
+        UnitPrice,
+        0,
+        Quantity * UnitPrice
+    FROM OPENJSON(@Json, '$.Invoice.Lines')
+    WITH
+    (
+        ProductID int '$.ProductID',
+        Quantity  int '$.Quantity',
+        UnitPrice money '$.UnitPrice'
+    );
+
+    -- Return the generated invoice ID
+    SELECT @NewInvoiceID AS NewInvoiceID;
+END;
+GO
+```
+
+The structure follows the XML procedure from Section 4.4: insert the parent, read `SCOPE_IDENTITY()`, then insert all children with one `INSERT ... SELECT`.
+
+### Step 2 – Call the procedure
+
+```sql
+EXEC dbo.usp_InvoiceInsertFromJson
+    @Json = N'
+{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-11-04",
+        "InvoiceNumber": "SO-TEST-002",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
+            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
+        ]
+    }
+}';
+```
+
+Verify the invoice and its items:
+
+```sql
+SELECT
+    i.IDInvoice,
+    i.InvoiceNumber,
+    i.InvoiceDate,
+    ii.ProductID,
+    ii.Quantity,
+    ii.InitialPrice,
+    ii.TotalPrice
+FROM Invoice i
+JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceNumber = N'SO-TEST-002';
+```
+
+The result should contain three items linked to the same invoice. As with the state and its cities in Section 4.4, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
+
+## 5.7 Generating JSON with FOR JSON PATH
+
+So far, we have converted JSON into SQL rows. SQL Server can also do the opposite: **convert query results into JSON**. This is useful when sending data to REST APIs or other applications that expect JSON.
+
+### Building the same shape we read in Section 5.4
+
+```sql
+SELECT
+    c.FirstName,
+    c.LastName,
+    c.Email
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR JSON PATH;
+```
+
+Result:
+
+```json
+[
+    { "FirstName": "Gustavo", "LastName": "Achong", "Email": "gustavo0@adventure-works.com" },
+    { "FirstName": "Catherine", "LastName": "Abel", "Email": "catherine0@adventure-works.com" },
+    { "FirstName": "Kim", "LastName": "Abercrombie", "Email": "kim2@adventure-works.com" }
+]
+```
+
+Each row becomes one JSON object, and the column names become property names. This is exactly the shape that `dbo.usp_InsertCustomerBatchFromJson` accepts. `OPENJSON` turns JSON into rows; `FOR JSON PATH` turns rows back into JSON.
+
+### Nested objects
+
+A **dot** in a column alias creates a nested object, and `ROOT` wraps the array in a root object:
+
+```sql
+SELECT
+    c.IDCustomer,
+    c.FirstName,
+    c.LastName,
+    c.Email AS [Contact.Email],
+    c.PhoneNumber AS [Contact.Phone]
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR JSON PATH, ROOT('Customers');
+```
+
+The result contains one object for each row. The first one looks like this:
+
+```json
+{
+    "Customers": [
+        {
+            "IDCustomer": 1,
+            "FirstName": "Gustavo",
+            "LastName": "Achong",
+            "Contact": {
+                "Email": "gustavo0@adventure-works.com",
+                "Phone": "398-555-0132"
+            }
+        },
+        ...
+    ]
+}
+```
+
+| SQL syntax | JSON result |
+|---|---|
+| `c.FirstName` | Creates a property named `FirstName` |
+| `[Contact.Email]` | Creates a nested `Contact` object with an `Email` property |
+| `FOR JSON PATH` | Creates one object per row, all inside an array |
+| `ROOT('Customers')` | Wraps the array in a root object |
+
+This is the JSON counterpart of `FOR XML PATH`: JSON uses dots where XML uses slashes to create nested structures.
+
+## 5.8 Advantages and Limitations of JSON
+
+| Advantages | Limitations |
+|---|---|
+| Widely used by web applications and REST APIs | JSON input must be parsed |
+| Supports objects, arrays, and nested structures | Data types are checked during extraction and conversion |
+| No predefined type is required | Missing properties may produce `NULL` |
+| Can represent complex data in one parameter | Additional validation may be required |
+| Supports both input and output | Large JSON documents introduce parsing overhead |
+
+JSON is particularly useful when the application already works with JSON data.
+
+For example, a REST API can receive a JSON request and pass the relevant document to a stored procedure.
+
+However, JSON is not always the best choice: the procedure must parse the text and check every value.
+
+> [!TIP]
+> **Real-world example:** The optional [`OBP REST Demo`](../demos/obp-rest-demo/) demonstrates how a FastAPI application receives JSON through an HTTP request and uses a SQL Server stored procedure to insert an invoice with multiple items.
+
+All three methods so far — delimited strings, XML, and JSON — send text that SQL Server must take apart. In the next section, we will explore **Table-Valued Parameters (TVPs)**, which pass typed rows directly, without any parsing.
+
+---
+
+# Section 6 – Method 5: Table-Valued Parameters (TVPs)
+
+In the previous sections, we passed collections as delimited strings, XML, and JSON.
+
+All three approaches send **text**, and SQL Server must extract and convert the values before it can use them as relational data.
 
 What if we could pass a **table directly to a stored procedure**?
 
 SQL Server supports exactly this through **Table-Valued Parameters (TVPs)**.
 
-## 5.1 What Is a Table-Valued Parameter?
+## 6.1 What Is a Table-Valued Parameter?
 
 A Table-Valued Parameter allows a stored procedure to receive multiple rows and columns as one parameter.
 
@@ -1070,6 +1603,12 @@ With XML, we could pass:
 </IDs>
 ```
 
+With JSON, we passed:
+
+```json
+[1, 2, 3]
+```
+
 With a TVP, we pass the values as a table:
 
 | ID |
@@ -1080,14 +1619,9 @@ With a TVP, we pass the values as a table:
 
 The stored procedure can use this table directly in SQL queries, including `SELECT`, `JOIN`, and `WHERE`.
 
-There is no need for `STRING_SPLIT` or XML parsing.
+There is no need for `STRING_SPLIT`, XML methods, or `OPENJSON`.
 
-> [!IMPORTANT]
-> A TVP is a parameter whose value is a collection of typed rows.
->
-> Unlike a scalar parameter, which contains one value, a TVP can contain many rows and multiple columns.
-
-## 5.2 Defining a Table Type
+## 6.2 Defining a Table Type
 
 Before using a TVP, we must define its structure.
 
@@ -1120,22 +1654,11 @@ It defines the structure of a table containing one integer column.
 
 The `PRIMARY KEY` ensures that the same ID cannot appear more than once in a value of this type.
 
-> [!NOTE]
-> `CREATE TYPE ... AS TABLE` defines a reusable table structure.
->
-> It does not create a regular database table containing product IDs. Instead, it creates a type that can be used to declare table variables and procedure parameters.
+`CREATE TYPE ... AS TABLE` does not create a table that stores product IDs. It creates a reusable structure for declaring table variables and procedure parameters.
 
 ### Step 2 – Declare a variable of this type
 
-Now that the type exists, we can declare a variable:
-
-```sql
-DECLARE @MyIDs dbo.ProductIDList;
-```
-
-This creates a table variable based on our custom type.
-
-We can insert rows into it:
+Now that the type exists, we can declare a table variable of this type and insert rows into it:
 
 ```sql
 DECLARE @MyIDs dbo.ProductIDList;
@@ -1161,7 +1684,7 @@ We can insert rows, query its contents, and use it in joins.
 
 The important difference is that it is a **table variable**, not a permanent table stored under a name such as `dbo.Product`.
 
-## 5.3 Passing a Table to a Stored Procedure
+## 6.3 Passing a Table to a Stored Procedure
 
 Now let's create a procedure that receives our table variable.
 
@@ -1212,43 +1735,30 @@ EXEC dbo.usp_GetProductsByIDs
 
 The procedure receives all three IDs and joins them with the `Product` table.
 
-**Three IDs. One table parameter. One procedure call.**
-
 The procedure can accept any number of IDs without changing its definition.
 
 ### Why READONLY?
 
-Inside the procedure, we can read the TVP:
+Inside the procedure, we can read the TVP, as `dbo.usp_GetProductsByIDs` does. Try to create a procedure that changes it:
 
 ```sql
-SELECT *
-FROM @IDs;
+CREATE OR ALTER PROCEDURE dbo.usp_TryToChangeIDs
+    @IDs dbo.ProductIDList READONLY
+AS
+BEGIN
+    INSERT INTO @IDs (ID)
+    VALUES (4);
+END;
+GO
 ```
 
-However, we cannot modify it:
-
-```sql
--- Not allowed inside a procedure
-INSERT INTO @IDs (ID)
-VALUES (4);
-```
-
-SQL Server requires TVPs to be read-only.
-
-This means that the procedure can use the input data without changing the collection supplied by the caller.
+SQL Server refuses to create it: *"The table-valued parameter "@IDs" is READONLY and cannot be modified."* The procedure can use the input data, but it cannot change the collection supplied by the caller.
 
 If we need to modify the data, we can copy it into a local table variable or temporary table.
 
-## 5.4 Practical Example – Inserting an Invoice with Multiple Items
+## 6.4 Practical Example – Inserting an Invoice with Multiple Items
 
-Let's return to the invoice problem introduced in Section 1.
-
-An invoice contains:
-
-- One header with customer information, invoice date, and invoice number.
-- Multiple items containing products, quantities, and prices.
-
-We want to insert the entire invoice using **one stored procedure call**.
+In Section 5.6, we inserted an invoice from one JSON document. Now we insert the same kind of invoice with a TVP, still in **one stored procedure call**.
 
 For this example, we will use:
 
@@ -1291,8 +1801,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsert
     @Lines dbo.InvoiceLineInput READONLY
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @NewInvoiceID int;
 
     -- Insert the invoice header
@@ -1369,15 +1877,17 @@ This inserts all invoice items using one SQL statement. The same `@NewInvoiceID`
 
 We do not need a loop.
 
-> [!NOTE]
-> In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
->
-> The invoice number is supplied by the caller through a scalar parameter.
+Compare it with `dbo.usp_InvoiceInsertFromJson` from Section 5.6. The structure is identical; only the source of the data changes:
 
-> [!IMPORTANT]
-> One procedure call does not automatically make all statements succeed or fail together.
->
-> If inserting the items fails, the invoice header may remain in the database. In the next lab, we will use a transaction to keep these operations together.
+| | Section 5.6 – JSON | Section 6.4 – TVP |
+|---|---|---|
+| Header | `JSON_VALUE` reads three properties | Three scalar parameters |
+| Items | `FROM OPENJSON(@Json, '$.Invoice.Lines') WITH (...)` | `FROM @Lines` |
+| Data types checked | When the procedure shreds the JSON | When the caller fills the TVP |
+
+In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
+
+As with the JSON invoice in Section 5.6, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
 ### Step 3 – Prepare the items and call the procedure
 
@@ -1425,12 +1935,7 @@ WHERE i.InvoiceNumber = N'SO-TEST-001';
 
 The result should contain three items linked to the same invoice.
 
-> [!NOTE]
-> Use an invoice number that does not already exist in the training database.
-
-**One invoice header. Three items. One procedure call.**
-
-## 5.5 Advantages and Limitations of TVPs
+## 6.5 Advantages and Limitations of TVPs
 
 | Advantages | Limitations |
 |---|---|
@@ -1440,612 +1945,7 @@ The result should contain three items linked to the same invoice.
 | Avoids parsing XML or delimited strings | Client applications must support sending TVPs |
 | Useful for set-based operations | SQL Server does not maintain column statistics on TVPs |
 
-TVPs are particularly useful when an application needs to pass a collection of relational records directly to SQL Server.
-
-They are commonly used in SQL Server applications, including applications written in .NET.
-
-However, TVPs do not always guarantee the fastest execution plan. SQL Server does not maintain statistics on TVP columns, which can affect optimization for larger collections.
-
-For some workloads, copying TVP data into a temporary table may provide better query optimization.
-
-> [!TIP]
-> **When should you use a TVP?**
->
-> Use a TVP when you need to pass multiple typed rows to a stored procedure and your database client supports Table-Valued Parameters.
->
-> For example:
->
-> - Retrieving multiple products by ID.
-> - Updating many records in one operation.
-> - Inserting multiple invoice items.
-> - Passing structured data from a .NET application to SQL Server.
-
-In the next section, we will explore **JSON parameters**, which are especially useful when applications already exchange data in JSON format, such as REST APIs and web applications.
-
----
-
-# Section 6 – Method 5: JSON Parameters
-
-In the previous sections, we learned how to pass collections of data using delimited strings, XML, and Table-Valued Parameters (TVPs).
-
-These methods are useful when applications need to send multiple values to SQL Server.
-
-However, modern web applications frequently exchange data using **JSON (JavaScript Object Notation)**.
-
-JSON is widely used by REST APIs, web applications, and mobile applications because it is relatively simple, compact, and easy to process.
-
-SQL Server can read JSON, convert it into relational rows, and generate JSON from query results.
-
-In this section, we will learn how to use JSON as a stored procedure parameter.
-
-## 6.1 What Is JSON?
-
-JSON is a text-based format for representing structured data.
-
-It supports objects, arrays, strings, numbers, Boolean values, and `null`.
-
-Consider a customer represented as a JSON object:
-
-```json
-{
-    "FirstName": "Alice",
-    "LastName": "Anderson",
-    "Email": "alice@example.com"
-}
-```
-
-An **object** contains named properties and their values.
-
-We can also represent multiple customers using a JSON array:
-
-```json
-[
-    {
-        "FirstName": "Alice",
-        "LastName": "Anderson",
-        "Email": "alice@example.com"
-    },
-    {
-        "FirstName": "Bob",
-        "LastName": "Brown",
-        "Email": "bob@example.com"
-    }
-]
-```
-
-The square brackets `[]` represent an array, while curly brackets `{}` represent objects.
-
-In this example, the array contains two customer objects.
-
-> [!NOTE]
-> In SQL Server 2016–2022, JSON is typically stored and passed as `nvarchar(max)`.
->
-> SQL Server provides built-in functions for reading and generating JSON. The examples in this lab use these functions and are compatible with SQL Server 2016 or later, provided the database compatibility level supports `OPENJSON` (level 130 or higher).
-
-## 6.2 Reading a Single Value – JSON_VALUE
-
-Let's start with a simple JSON object.
-
-```sql
-DECLARE @Customer nvarchar(max) = N'
-{
-    "FirstName": "Alice",
-    "LastName": "Anderson",
-    "Email": "alice@example.com"
-}';
-
-SELECT
-    JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
-    JSON_VALUE(@Customer, '$.LastName') AS LastName,
-    JSON_VALUE(@Customer, '$.Email') AS Email;
-```
-
-Result:
-
-| FirstName | LastName | Email |
-|---|---|---|
-| Alice | Anderson | alice@example.com |
-
-The `JSON_VALUE` function extracts a single scalar value from a JSON document.
-
-Its basic syntax is:
-
-```sql
-JSON_VALUE(json_expression, path)
-```
-
-The path tells SQL Server which property to read.
-
-For example:
-
-| JSON path | Meaning |
-|---|---|
-| `$` | Root of the JSON document |
-| `$.FirstName` | Property `FirstName` |
-| `$.Email` | Property `Email` |
-| `$.Address.City` | Property `City` inside `Address` |
-
-The `$` symbol represents the root of the JSON document, and dots are used to navigate through nested objects.
-
-> [!IMPORTANT]
-> `JSON_VALUE` extracts **one scalar value**.
->
-> It is useful when we need a specific property, but it does not convert an entire JSON array into multiple SQL rows.
-
-## 6.3 Converting JSON Arrays into Rows – OPENJSON
-
-Now consider a JSON array containing several customers.
-
-We want to convert the array into a normal SQL result set.
-
-SQL Server provides the **`OPENJSON`** function for this purpose.
-
-### Step 1 – Declare a JSON array
-
-```sql
-DECLARE @Customers nvarchar(max) = N'
-[
-    { "FirstName": "Ida", "LastName": "Ibsen", "Email": "ida@example.com" },
-    { "FirstName": "Jonas", "LastName": "Jensen", "Email": "jonas@example.com" },
-    { "FirstName": "Kari", "LastName": "Kristian", "Email": "kari@example.com" }
-]';
-```
-
-### Step 2 – Read the array
-
-Without specifying columns, `OPENJSON` returns three default columns:
-
-```sql
-DECLARE @IDs nvarchar(max) = N'[1, 2, 3]';
-
-SELECT *
-FROM OPENJSON(@IDs);
-```
-
-Result:
-
-| key | value | type |
-|---|---|---|
-| 0 | 1 | 2 |
-| 1 | 2 | 2 |
-| 2 | 3 | 2 |
-
-The columns represent:
-
-- `key` — the array index, starting at zero.
-- `value` — the value of the array element.
-- `type` — a numeric code describing the JSON value type (`2` means number).
-
-This is useful for simple arrays, but our customer objects contain multiple properties.
-
-### Step 3 – Define columns with WITH
-
-We can use `WITH (...)` to specify which properties should become SQL columns.
-
-```sql
-DECLARE @Customers nvarchar(max) = N'
-[
-    { "FirstName": "Ida", "LastName": "Ibsen", "Email": "ida@example.com" },
-    { "FirstName": "Jonas", "LastName": "Jensen", "Email": "jonas@example.com" },
-    { "FirstName": "Kari", "LastName": "Kristian", "Email": "kari@example.com" }
-]';
-
-SELECT *
-FROM OPENJSON(@Customers)
-WITH
-(
-    FirstName nvarchar(50) '$.FirstName',
-    LastName  nvarchar(50) '$.LastName',
-    Email     nvarchar(100) '$.Email'
-);
-```
-
-Result:
-
-| FirstName | LastName | Email |
-|---|---|---|
-| Ida | Ibsen | ida@example.com |
-| Jonas | Jensen | jonas@example.com |
-| Kari | Kristian | kari@example.com |
-
-The `WITH` clause defines:
-
-1. The SQL column name.
-2. The SQL data type.
-3. The JSON path containing the value.
-
-For example:
-
-```sql
-FirstName nvarchar(50) '$.FirstName'
-```
-
-means: create a column named `FirstName`, convert its value to `nvarchar(50)`, and read it from the `FirstName` property.
-
-**The JSON array has now become a relational result set.**
-
-This process is similar to XML shredding using `.nodes()` and `.value()`.
-
-## 6.4 Passing JSON to a Stored Procedure
-
-Now we can use `OPENJSON` inside a stored procedure.
-
-Our goal is to insert multiple customers using one JSON parameter.
-
-### Step 1 – Create the procedure
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerBatchFromJson
-    @JsonCustomers nvarchar(max)
-AS
-BEGIN
-    INSERT INTO Customer (FirstName, LastName, Email)
-    SELECT FirstName, LastName, Email
-    FROM OPENJSON(@JsonCustomers)
-    WITH
-    (
-        FirstName nvarchar(50) '$.FirstName',
-        LastName  nvarchar(50) '$.LastName',
-        Email     nvarchar(100) '$.Email'
-    );
-END;
-GO
-```
-
-The procedure receives one string containing JSON data.
-
-`OPENJSON` converts the array into rows, and `INSERT INTO ... SELECT` inserts all customers using one SQL statement.
-
-### Step 2 – Call the procedure
-
-```sql
-EXEC dbo.usp_InsertCustomerBatchFromJson
-    @JsonCustomers = N'
-[
-    {
-        "FirstName": "Ruđer",
-        "LastName": "Bošković",
-        "Email": "rudjer.boskovic@example.com"
-    },
-    {
-        "FirstName": "Janica",
-        "LastName": "Kostelić",
-        "Email": "janica.kostelic@example.com"
-    }
-]';
-
--- Verify the inserted customers
-SELECT IDCustomer, FirstName, LastName, Email
-FROM Customer
-WHERE Email IN
-(
-    N'rudjer.boskovic@example.com',
-    N'janica.kostelic@example.com'
-);
-```
-
-**Two customers. One JSON parameter. One procedure call.**
-
-The procedure can handle a larger array without changing its SQL code.
-
-## 6.5 Working with Nested JSON
-
-Real-world JSON documents often contain nested objects and arrays.
-
-Consider an invoice with several line items:
-
-```json
-{
-    "Invoice": {
-        "CustomerID": 5,
-        "InvoiceDate": "2026-11-04",
-        "Lines": [
-            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
-            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
-            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
-        ]
-    }
-}
-```
-
-This document contains two levels of information:
-
-- **Invoice header** — customer ID and invoice date.
-- **Invoice lines** — an array of products, quantities, and prices.
-
-We can read the header using `JSON_VALUE`.
-
-```sql
-DECLARE @Json nvarchar(max) = N'
-{
-    "Invoice": {
-        "CustomerID": 5,
-        "InvoiceDate": "2026-11-04",
-        "Lines": [
-            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
-            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
-            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
-        ]
-    }
-}';
-
-SELECT
-    JSON_VALUE(@Json, '$.Invoice.CustomerID') AS CustomerID,
-    JSON_VALUE(@Json, '$.Invoice.InvoiceDate') AS InvoiceDate;
-```
-
-But what about the `Lines` array?
-
-We can use `OPENJSON` with a path pointing directly to that array:
-
-```sql
-SELECT *
-FROM OPENJSON(@Json, '$.Invoice.Lines')
-WITH
-(
-    ProductID int '$.ProductID',
-    Quantity  int '$.Quantity',
-    UnitPrice decimal(10,2) '$.UnitPrice'
-);
-```
-
-Result:
-
-| ProductID | Quantity | UnitPrice |
-|---|---|---|
-| 1 | 2 | 199.00 |
-| 2 | 1 | 49.90 |
-| 3 | 5 | 9.99 |
-
-Notice the second argument:
-
-```sql
-'$.Invoice.Lines'
-```
-
-It tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
-
-### Reading both levels with CROSS APPLY
-
-> [!TIP]
-> This is an optional advanced example. For the core lab, focus on reading the header with `JSON_VALUE` and the items with `OPENJSON`. Run the following query in the same batch as the declaration of `@Json`.
-
-Sometimes we want to combine the invoice header and line items in one result.
-
-We can use two `OPENJSON` operations connected by `CROSS APPLY`.
-
-```sql
-SELECT
-    inv.CustomerID,
-    inv.InvoiceDate,
-    line.ProductID,
-    line.Quantity,
-    line.UnitPrice
-FROM OPENJSON(@Json, '$.Invoice')
-WITH
-(
-    CustomerID int '$.CustomerID',
-    InvoiceDate date '$.InvoiceDate',
-    LinesJson nvarchar(max) '$.Lines' AS JSON
-) AS inv
-CROSS APPLY OPENJSON(inv.LinesJson)
-WITH
-(
-    ProductID int '$.ProductID',
-    Quantity int '$.Quantity',
-    UnitPrice decimal(10,2) '$.UnitPrice'
-) AS line;
-```
-
-Result:
-
-| CustomerID | InvoiceDate | ProductID | Quantity | UnitPrice |
-|---|---|---|---|---|
-| 5 | 2026-11-04 | 1 | 2 | 199.00 |
-| 5 | 2026-11-04 | 2 | 1 | 49.90 |
-| 5 | 2026-11-04 | 3 | 5 | 9.99 |
-
-Let's break down the process:
-
-1. The first `OPENJSON` reads the invoice header.
-2. `AS JSON` preserves the nested `Lines` array as JSON text.
-3. `CROSS APPLY` passes that array to the second `OPENJSON`.
-4. The second `OPENJSON` converts each line item into a row.
-5. The result combines the header values with each line item.
-
-> [!NOTE]
-> `CROSS APPLY` allows the right-hand expression to use values from the current row on the left.
->
-> In this example, it processes the `LinesJson` array belonging to each invoice row.
->
-> Also notice that the aliases `AS inv` and `AS line` appear **after** the `WITH (...)` clauses.
-
-## 6.6 Inserting Related Records from JSON
-
-We can also use JSON to insert a parent record together with its child records.
-
-Consider a state containing several cities:
-
-```json
-{
-    "StateName": "Sweden",
-    "Cities": [
-        "Stockholm",
-        "Gothenburg",
-        "Malmo"
-    ]
-}
-```
-
-We want to insert:
-
-- One record into the `State` table.
-- Three records into the `City` table, linked to the new state.
-
-The procedure inserts the state first, then uses its generated ID when inserting the cities.
-
-### Step 1 – Create the procedure
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertStateWithCities
-    @Json nvarchar(max)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @NewStateID int;
-    DECLARE @StateName nvarchar(50);
-
-    SET @StateName = JSON_VALUE(@Json, '$.StateName');
-
-    -- Insert the state
-    INSERT INTO State (Name)
-    VALUES (@StateName);
-
-    SET @NewStateID = SCOPE_IDENTITY();
-
-    -- Insert all cities
-    INSERT INTO City (Name, StateID)
-    SELECT value, @NewStateID
-    FROM OPENJSON(@Json, '$.Cities');
-
-    SELECT @NewStateID AS NewStateID;
-END;
-GO
-```
-
-The procedure uses:
-
-- `JSON_VALUE` to extract the state name.
-- `SCOPE_IDENTITY()` to retrieve the new state ID.
-- `OPENJSON` to convert the city array into rows.
-
-Notice that `OPENJSON` is used without `WITH` because the `Cities` array contains simple strings rather than objects.
-
-### Step 2 – Call the procedure
-
-```sql
-EXEC dbo.usp_InsertStateWithCities
-    @Json = N'
-{
-    "StateName": "Sweden",
-    "Cities": [
-        "Stockholm",
-        "Gothenburg",
-        "Malmo"
-    ]
-}';
-```
-
-Verify the inserted state and cities:
-
-```sql
-SELECT
-    s.IDState,
-    s.Name AS StateName,
-    c.IDCity,
-    c.Name AS CityName
-FROM State s
-JOIN City c ON c.StateID = s.IDState
-WHERE s.Name = N'Sweden';
-```
-
-The procedure inserts one state and three related cities in a single call.
-
-> [!NOTE]
-> If inserting the cities fails, the state may remain in the database. In the next lab, we will use a transaction to keep these operations together.
-
-This is the same parent-child pattern we previously used with XML and Table-Valued Parameters. The difference is that the data now arrives as JSON.
-
-## 6.7 Generating JSON with FOR JSON PATH
-
-So far, we have converted JSON into SQL rows.
-
-SQL Server can also perform the opposite operation: convert query results into JSON.
-
-This is useful when sending data to REST APIs or other applications that expect JSON.
-
-Consider this query:
-
-```sql
-SELECT
-    c.IDCustomer AS [Customer.IDCustomer],
-    c.FirstName AS [Customer.FirstName],
-    c.LastName AS [Customer.LastName],
-    c.Email AS [Customer.Email]
-FROM Customer c
-WHERE c.IDCustomer < 5
-FOR JSON PATH, ROOT('Customers');
-```
-
-The result has a structure similar to:
-
-```json
-{
-    "Customers": [
-        {
-            "Customer": {
-                "IDCustomer": 1,
-                "FirstName": "Gustavo",
-                "LastName": "Achong",
-                "Email": "gustavo0@adventure-works.com"
-            }
-        }
-    ]
-}
-```
-
-The important parts are:
-
-| SQL syntax | Purpose |
-|---|---|
-| `[Customer.IDCustomer]` | Creates a nested `Customer` object with an `IDCustomer` property |
-| `[Customer.FirstName]` | Adds `FirstName` to the nested object |
-| `FOR JSON PATH` | Converts query rows into JSON objects |
-| `ROOT('Customers')` | Wraps the resulting array in a root object |
-
-Notice that **dots in column aliases create nested JSON objects**.
-
-For example:
-
-```sql
-c.Email AS [Customer.Contact.Email]
-```
-
-produces a structure like:
-
-```json
-{
-    "Customer": {
-        "Contact": {
-            "Email": "alice@example.com"
-        }
-    }
-}
-```
-
-This is similar to `FOR XML PATH`, but JSON uses dots instead of slashes to define nested structures.
-
-## 6.8 Advantages and Limitations of JSON
-
-| Advantages | Limitations |
-|---|---|
-| Widely used by web applications and REST APIs | JSON input must be parsed |
-| Supports objects, arrays, and nested structures | Data types are checked during extraction and conversion |
-| No custom table type is required | Missing properties may produce `NULL` |
-| Can represent complex data in one parameter | Additional validation may be required |
-| Supports both input and output | Large JSON documents introduce parsing overhead |
-
-JSON is particularly useful when the application already works with JSON data.
-
-For example, a REST API can receive a JSON request and pass the relevant document to a stored procedure.
-
-However, JSON is not always the best choice.
-
-When an application can pass typed relational rows directly to SQL Server, **Table-Valued Parameters may be more appropriate**.
-
-> [!TIP]
-> **Real-world example:** The optional [`OBP REST Demo`](../demos/obp-rest-demo/) demonstrates how a FastAPI application receives JSON through an HTTP request and uses a SQL Server stored procedure to insert an invoice with multiple items.
+TVPs are particularly useful when an application needs to pass a collection of relational records directly to SQL Server, and they are commonly used from .NET applications. Because SQL Server keeps no statistics on TVP columns, copying a large TVP into a temporary table can sometimes give a better execution plan.
 
 In the next section, we will compare all five approaches and discuss when each method is most appropriate.
 
@@ -2063,21 +1963,7 @@ The goal is not to memorize five different solutions. It is to understand **whic
 
 ## 7.1 One List, Five Approaches
 
-Let's return to the example from Section 1.
-
-An application needs to retrieve products with IDs `1`, `2`, and `3`.
-
-We can represent the same collection in several ways:
-
-| Method | Example |
-|---|---|
-| Client-side query building | `WHERE IDProduct IN (1, 2, 3)` |
-| Delimited string | `'1,2,3'` |
-| XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` |
-| Table-Valued Parameter | A table containing three rows |
-| JSON | `[1, 2, 3]` |
-
-The values are identical. Only their representation changes.
+Section 1.3 showed the same list of product IDs — `1`, `2`, and `3` — in five representations. The values are identical; only their representation changes.
 
 For stored procedures, the corresponding parameter declarations are:
 
@@ -2086,17 +1972,12 @@ For stored procedures, the corresponding parameter declarations are:
 | Client-side query building | No collection parameter; values are embedded in SQL text |
 | Delimited string | `@IDList nvarchar(200)` |
 | XML | `@IDs xml` |
-| TVP | `@IDs dbo.ProductIDList READONLY` |
 | JSON | `@Json nvarchar(max)` |
+| TVP | `@IDs dbo.ProductIDList READONLY` |
 
 Delimited strings and JSON are both passed as text, but their contents have different structures. This lab uses `nvarchar(200)` for the ID lists and `nvarchar(max)` for JSON documents.
 
 XML has its own SQL Server data type, while TVPs use a user-defined table type.
-
-> [!NOTE]
-> Client-side query building is included for comparison, but unsafe concatenation of user input into SQL statements should be avoided.
->
-> Parameterized SQL can be generated dynamically when necessary. The important rule is to keep untrusted values separate from executable SQL code.
 
 ## 7.2 Comparing the Methods
 
@@ -2107,8 +1988,8 @@ The following table summarizes the main characteristics of each approach.
 | Client-side SQL concatenation | SQL text | None for concatenated values | Simple to construct | SQL injection risk with untrusted input |
 | Delimited string | Flat list | Values arrive as text | Simple for lists of IDs | Requires splitting and conversion |
 | XML | Hierarchical | XML type; extracted values require conversion | Supports complex nested structures | Verbose syntax and parsing overhead |
-| TVP | Relational rows and columns | Strong | Typed data can be used directly in SQL | Requires a predefined table type |
 | JSON | Objects and arrays | Values are converted during extraction | Natural format for web integration | Requires parsing and validation |
+| TVP | Relational rows and columns | Strong | Typed data can be used directly in SQL | Requires a predefined table type |
 
 There is no single method that is always best.
 
@@ -2131,14 +2012,14 @@ An application needs to retrieve several products.
 Input:
 
 ```text
-1,2,3,4,5
+316,317,318,319,320
 ```
 
 A delimited string can be sufficient:
 
 ```sql
 EXEC dbo.usp_GetProductsByIDList
-    @IDList = N'1,2,3,4,5';
+    @IDList = N'316,317,318,319,320';
 ```
 
 The procedure uses `STRING_SPLIT` to convert the string into rows.
@@ -2231,38 +2112,13 @@ The choice depends on where data conversion should happen and how the applicatio
 
 ## 7.5 Key Takeaways
 
-The most important concepts from this lab are:
-
-**1. Scalar parameters and collection parameters solve different problems.**
-
-A scalar parameter represents one value. A collection parameter can represent multiple values or records.
-
-**2. Avoid unsafe SQL concatenation.**
-
-Use parameterized queries or properly defined stored procedure parameters to keep data separate from executable SQL code.
-
-**3. Delimited strings are suitable for simple lists.**
-
-Use `STRING_SPLIT` to convert the string into rows. Remember that values may require type conversion.
-
-**4. XML supports structured and hierarchical data.**
-
-Use `.nodes()` and `.value()` to extract data and `FOR XML PATH` to generate XML output.
-
-**5. TVPs allow typed rows to be passed directly to procedures.**
-
-Define a table type using `CREATE TYPE ... AS TABLE` and use it as a `READONLY` parameter.
-
-**6. JSON is useful for modern application integration.**
-
-Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects, and `FOR JSON PATH` to generate JSON output.
-
-> [!IMPORTANT]
-> **Remember the principle, not just the syntax.**
->
-> When choosing a method, first consider the structure of the data and how it arrives at the database.
->
-> A simple list, a collection of relational rows, and a nested document may require different approaches.
+- **Choose by the data, not by the syntax.** First consider the structure of the data and how it arrives at the database: a simple list, a collection of relational rows, and a nested document may need different approaches.
+- **Keep untrusted values separate from SQL code.** Use parameterized queries or stored procedure parameters; never concatenate user input into SQL text.
+- **Delimited strings suit simple flat lists.** `STRING_SPLIT` turns the string into rows; the values are text and must be converted.
+- **XML handles nesting and structure.** `.nodes()` and `.value()` shred it into rows; `FOR XML PATH` builds it back.
+- **JSON fits applications that already exchange JSON.** `JSON_VALUE` reads single values, `OPENJSON ... WITH` shreds arrays, and `FOR JSON PATH` builds JSON back.
+- **TVPs pass typed relational rows.** Define the type with `CREATE TYPE ... AS TABLE` and use it as a `READONLY` parameter.
+- **One call is not one unit of work.** A parent-child insert runs several statements; Lab 9 makes them succeed or fail together.
 
 ---
 
@@ -2273,9 +2129,9 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 3. What does `STRING_SPLIT` return, and what type is the `value` column?
 4. When you use XML, what does `@Name` mean in `.value('@Name', 'nvarchar(50)')`?
 5. When you use `FOR XML PATH`, how do you create nested elements in the output?
-6. Why is `READONLY` mandatory on TVP parameters, and what do you do if you need to modify the input?
-7. In `OPENJSON(@Json, '$.Invoice')`, what does `'$.Invoice'` do?
-8. How would you use `FOR JSON PATH` to build nested JSON with dotted aliases?
+6. In `OPENJSON(@Json, '$.Invoice')`, what does `'$.Invoice'` do?
+7. How would you use `FOR JSON PATH` to build nested JSON with dotted aliases?
+8. Why is `READONLY` mandatory on TVP parameters, and what do you do if you need to modify the input?
 9. Compare TVP and JSON: when would you pick each one?
 
 <details>
@@ -2289,45 +2145,17 @@ Use `JSON_VALUE` for individual scalar values, `OPENJSON` for arrays and objects
 
 4. **`@Name` in XML** — It reads an **attribute** named `Name` on the current node. To read the text of the current element, use `.`, as shown in Section 4.2.
 
-5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 8.)
+5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 7.)
 
-6. **`READONLY` is required** — SQL Server requires TVPs to be input-only, read-only parameters. The procedure can query the rows but cannot insert, update, or delete rows in the parameter. If modifications are needed, copy the data into a local table variable or temporary table and modify the copy.
+6. **`'$.Invoice'` in OPENJSON** — It sets the **starting point** for shredding. Instead of starting at the document root (`$`), start at the `Invoice` property. All column paths in the `WITH` clause are then relative to each row starting from that point.
 
-7. **`'$.Invoice'` in OPENJSON** — It sets the **starting point** for shredding. Instead of starting at the document root (`$`), start at the `Invoice` property. All column paths in the `WITH` clause are then relative to each row starting from that point.
+7. **Dotted aliases in FOR JSON PATH** — A column alias such as `[Contact.Email]` creates a nested `Contact` object with an `Email` property. Each dot is one level of nesting: `[A.B.C]` produces `{ "A": { "B": { "C": ... } } }`.
 
-8. **Dotted aliases in FOR JSON PATH** — Column aliases like `[Invoice.IDCustomer]` or `[Invoice.Lines.ProductID]` create nested objects. Each dot is one level of nesting. `[A.B.C]` produces `{ "A": { "B": { "C": ... } } }`.
+8. **`READONLY` is required** — SQL Server requires TVPs to be input-only, read-only parameters. The procedure can query the rows but cannot insert, update, or delete rows in the parameter. If modifications are needed, copy the data into a local table variable or temporary table and modify the copy.
 
 9. **TVP** is a good choice for passing typed relational data when the database client supports it. **JSON** is useful when data already arrives in JSON format, particularly through web APIs. The best choice depends on the application architecture and workload.
 
 </details>
-
----
-
-# What You Should Know After This Lab
-
-**Collection parameters are not scalars.** A scalar is one value. A collection is many. SQL Server provides multiple envelopes for different situations.
-
-**Keep untrusted values separate from SQL code.** Use parameterized queries or properly implemented stored procedures. Dynamic SQL can be valid when values are passed as parameters rather than concatenated into the statement.
-
-**Delimited strings suit simple flat lists.** Use `STRING_SPLIT` to produce rows and convert values as needed. Avoid this approach if values may contain the delimiter and no escaping rules are defined.
-
-**XML handles nesting and structure.** Use `.nodes()` to shred, `.value()` to extract columns, `FOR XML PATH` to build it back. It is verbose on the wire but standard and self-documenting.
-
-**Table-Valued Parameters (TVPs)** pass typed relational rows. Define a type with `CREATE TYPE ... AS TABLE`, then use it as a `READONLY` parameter. TVPs are a natural choice for calls between T-SQL procedures and for clients that support them, including .NET. Performance depends on the workload.
-
-**JSON fits applications that already exchange JSON.** Use `OPENJSON ... WITH (...)` to extract typed rows and `FOR JSON PATH` with dotted aliases to generate nested objects. A backend can pass JSON to SQL Server or transform it into a TVP.
-
-## The Complete Comparison
-
-| Method | Use When | Why |
-|--------|----------|-----|
-| **Unsafe SQL concatenation** | Avoid embedding untrusted values in SQL text | Use parameterized statements instead. |
-| **Delimited string** | Flat list of IDs, simplicity over type safety | Simple, small on wire. No structure needed. |
-| **XML** | Hierarchical data; interop with XML systems | Standard, self-documenting. Verbose on wire. |
-| **TVP** | Typed relational data; client supports TVPs | Strong typing, multiple columns, direct use in SQL. |
-| **JSON** | Applications and services that already exchange JSON | Supports objects, arrays, and nested data without a custom table type. |
-
-Use the decision flowchart in Section 7 as a guide. Consider TVPs for typed relational rows, JSON or XML when the source already uses those formats, and delimited strings for simple flat lists. Choose according to the client, data structure, and workload.
 
 ---
 

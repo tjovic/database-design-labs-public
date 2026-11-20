@@ -2,7 +2,7 @@
 
 An educational FastAPI application that exposes a small invoicing API
 backed by SQL Server. It demonstrates the pattern taught in
-[Lab 8, Section 6 — JSON Parameters](../../labs/lab08-complex-parameters.md):
+[Lab 8, Section 5 — JSON Parameters](../../labs/lab08-complex-parameters.md):
 a REST client sends a JSON document over HTTP, and a stored procedure
 shreds it with `OPENJSON` and inserts it atomically.
 

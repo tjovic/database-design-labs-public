@@ -1,7 +1,7 @@
 # OBP REST Demo — Classroom Walkthrough
 
 Pairs with [Lab 8 – Complex Parameters](../../../labs/lab08-complex-parameters.md),
-**Section 6 (JSON Parameters)**.
+**Section 5 (JSON Parameters)**.
 
 For a detailed explanation of how the application works, with links to
 Labs 7, 8, and 9, see [How It Works](../how-it-works.md).
@@ -10,7 +10,7 @@ Labs 7, 8, and 9, see [How It Works](../how-it-works.md).
 
 Demonstration of how a modern application communicates with a SQL Server database.
 
-The project shows the same `OPENJSON` pattern taught in Lab 8, Section 6 —
+The project shows the same `OPENJSON` pattern taught in Lab 8, Section 5 —
 but driven by a real HTTP request instead of a JSON literal typed into SSMS.
 
 ```mermaid

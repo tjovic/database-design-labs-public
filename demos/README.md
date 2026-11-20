@@ -40,7 +40,7 @@ classroom walkthrough of each payload.
 
 ## [obp-rest-demo/](obp-rest-demo/) — JSON, REST, and Stored Procedures, Live
 
-Pairs with **Lab 8, Section 6** (Method 5 — JSON Parameters).
+Pairs with **Lab 8, Section 5** (Method 4 — JSON Parameters).
 
 A small FastAPI invoicing API. `POST /invoices` accepts the exact JSON
 shape taught in the lab — a customer, a date, and an array of line

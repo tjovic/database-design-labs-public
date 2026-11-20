@@ -84,10 +84,10 @@ The complex parameters collection is in [Complex Parameters Exercises](lab08-com
 
 1. **Delimited strings** — accept a comma-separated list, split it with `STRING_SPLIT`, and use it in an `IN` clause or `JOIN`.
 2. **XML shredding** — use `.nodes()` and `.value()` to turn XML into rows.
-3. **Building XML** — use `FOR XML PATH` with dotted aliases to create nested XML structures from queries.
-4. **Table-Valued Parameters** — define a table type and pass typed rows to a procedure.
-5. **JSON** — use `OPENJSON` to insert rows from a JSON document.
-6. **Choosing the right method** — reason about when to use delimited strings, XML, TVPs, or JSON.
+3. **Building XML** — use `FOR XML PATH` with slash-separated aliases to create nested XML structures from queries.
+4. **JSON** — use `OPENJSON` to insert rows from a JSON document.
+5. **Table-Valued Parameters** — define a table type and pass typed rows to a procedure.
+6. **Choosing the right method** — reason about when to use delimited strings, XML, JSON, or TVPs.
 
 These exercises range from direct SQL rewrites of Lab 08's core patterns to design scenarios where students must justify their method choice. They include building manual string splitters to understand why built-in functions matter, nested XML processing, finding or creating related records, and trade-off analysis across all five methods.
 

@@ -2,7 +2,7 @@
 
 **Database:** `AdventureWorksENG`
 
-These exercises build on [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md). They are grouped by method: delimited strings, reading XML, building XML with `FOR XML PATH`, Table-Valued Parameters, and JSON. The last exercise asks you to choose the right method for several scenarios.
+These exercises build on [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md). They are grouped by method: delimited strings, reading XML, building XML with `FOR XML PATH`, JSON, and Table-Valued Parameters. The last exercise asks you to choose the right method for several scenarios.
 
 Several exercises insert or delete rows in `State`, `City`, `Customer`, and `Product`. Run them in a fresh copy of `AdventureWorksENG`, and recreate the database when you are done.
 
@@ -736,9 +736,66 @@ Run it and inspect the XML. Notice:
 
 ---
 
+# JSON
+
+## Exercise 9 — JSON: Insert Customers from JSON [INTERMEDIATE]
+
+Write a procedure `dbo.usp_InsertCustomersFromJson` that:
+
+1. Accepts an `nvarchar(max)` parameter containing JSON.
+2. The JSON is an array of objects with `FirstName`, `LastName`, and `Email` fields.
+3. Uses `OPENJSON ... WITH (...)` to shred the JSON into rows.
+4. Inserts all rows into the `Customer` table.
+
+Call it with at least two customers in JSON format and verify they were inserted.
+
+### Hints
+
+- JSON array: `[ { "FirstName": "...", ... }, { "FirstName": "...", ... } ]`
+- `OPENJSON(@Json)` without a second argument shreds the root array.
+- `WITH (FirstName nvarchar(50) '$.FirstName', ...)`  — column name, type, and path.
+- Paths like `'$.FirstName'` mean "from the current row, read the FirstName property".
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomersFromJson
+    @JsonCustomers nvarchar(max)
+AS
+BEGIN
+    INSERT INTO Customer (FirstName, LastName, Email)
+    SELECT FirstName, LastName, Email
+    FROM OPENJSON(@JsonCustomers)
+    WITH
+    (
+        FirstName nvarchar(50)  '$.FirstName',
+        LastName  nvarchar(50)  '$.LastName',
+        Email     nvarchar(100) '$.Email'
+    );
+END
+GO
+
+-- Test
+EXEC dbo.usp_InsertCustomersFromJson @JsonCustomers = N'
+[
+    { "FirstName": "Xavier", "LastName": "Xavier", "Email": "xavier@example.com" },
+    { "FirstName": "Yolanda", "LastName": "Yates", "Email": "yolanda@example.com" }
+]';
+
+-- Verify
+SELECT FirstName, LastName, Email
+FROM Customer
+WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
+```
+
+</details>
+
+---
+
 # Table-Valued Parameters
 
-## Exercise 9 — TVP Fundamentals [INTERMEDIATE]
+## Exercise 10 — TVP Fundamentals [INTERMEDIATE]
 
 Create a **table type** `dbo.ProductIDsExercise` with a single `int` column called `ID` (primary key).
 
@@ -791,7 +848,7 @@ EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
 
 ---
 
-## Exercise 10 — TVP: Insert Multiple Products [INTERMEDIATE]
+## Exercise 11 — TVP: Insert Multiple Products [INTERMEDIATE]
 
 Create a **table type** `dbo.ProductInput` with columns `Name nvarchar(50)`, `ProductNumber nvarchar(25)`, and `PriceWithoutVAT money` (all `NOT NULL`).
 
@@ -848,68 +905,11 @@ WHERE Name LIKE N'ZZ_TestWidget%';
 
 ---
 
-# JSON
-
-## Exercise 11 — JSON: Insert Customers from JSON [INTERMEDIATE]
-
-Write a procedure `dbo.usp_InsertCustomersFromJson` that:
-
-1. Accepts an `nvarchar(max)` parameter containing JSON.
-2. The JSON is an array of objects with `FirstName`, `LastName`, and `Email` fields.
-3. Uses `OPENJSON ... WITH (...)` to shred the JSON into rows.
-4. Inserts all rows into the `Customer` table.
-
-Call it with at least two customers in JSON format and verify they were inserted.
-
-### Hints
-
-- JSON array: `[ { "FirstName": "...", ... }, { "FirstName": "...", ... } ]`
-- `OPENJSON(@Json)` without a second argument shreds the root array.
-- `WITH (FirstName nvarchar(50) '$.FirstName', ...)`  — column name, type, and path.
-- Paths like `'$.FirstName'` mean "from the current row, read the FirstName property".
-
-<details>
-<summary>Show solution</summary>
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomersFromJson
-    @JsonCustomers nvarchar(max)
-AS
-BEGIN
-    INSERT INTO Customer (FirstName, LastName, Email)
-    SELECT FirstName, LastName, Email
-    FROM OPENJSON(@JsonCustomers)
-    WITH
-    (
-        FirstName nvarchar(50)  '$.FirstName',
-        LastName  nvarchar(50)  '$.LastName',
-        Email     nvarchar(100) '$.Email'
-    );
-END
-GO
-
--- Test
-EXEC dbo.usp_InsertCustomersFromJson @JsonCustomers = N'
-[
-    { "FirstName": "Xavier", "LastName": "Xavier", "Email": "xavier@example.com" },
-    { "FirstName": "Yolanda", "LastName": "Yates", "Email": "yolanda@example.com" }
-]';
-
--- Verify
-SELECT FirstName, LastName, Email
-FROM Customer
-WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
-```
-
-</details>
-
----
-
 # Choosing a method
 
 ## Exercise 12 — Choose the Right Method [INTERMEDIATE]
 
-For each scenario below, decide which of the five methods from Lab 8 (client-side query, delimited string, XML, TVP, JSON) is most appropriate. Write one sentence defending your choice.
+For each scenario below, decide which of the five methods from Lab 8 (client-side query, delimited string, XML, JSON, TVP) is most appropriate. Write one sentence defending your choice.
 
 There is not one single "right" answer — the argument is what counts.
 
@@ -970,7 +970,7 @@ GO
 
 # References
 
-- [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md) — all five methods: client-side query building (the anti-example), delimited strings, XML, Table-Valued Parameters, and JSON.
+- [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md) — all five methods: client-side query building (the anti-example), delimited strings, XML, JSON, and Table-Valued Parameters.
 - **Microsoft Learn**: [STRING_SPLIT (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/string-split-transact-sql)
 - **Microsoft Learn**: [Nodes() Method (xml Data Type)](https://learn.microsoft.com/en-us/sql/t-sql/xml/nodes-method-xml-data-type)
 - **Microsoft Learn**: [FOR XML (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/xml/for-xml-sql-server)

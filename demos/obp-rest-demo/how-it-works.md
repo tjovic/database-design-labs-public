@@ -253,7 +253,7 @@ flowchart TD
 
 The procedure works in three steps:
 
-1. **Read the header** with `JSON_VALUE` — one scalar value per call ([Lab 8, Section 6.2](../../labs/lab08-complex-parameters.md#62-reading-a-single-value--json_value)):
+1. **Read the header** with `JSON_VALUE` — one scalar value per call ([Lab 8, Section 5.2](../../labs/lab08-complex-parameters.md#52-reading-a-single-value--json_value)):
 
    ```sql
    DECLARE @CustomerID AS INT = JSON_VALUE(@Json, '$.customerId');
@@ -267,7 +267,7 @@ The procedure works in three steps:
    SET @InvoiceID = SCOPE_IDENTITY();
    ```
 
-3. **Turn the `items` array into rows** with `OPENJSON ... WITH` and insert them all with one `INSERT ... SELECT` ([Lab 8, Section 6.3](../../labs/lab08-complex-parameters.md#63-converting-json-arrays-into-rows--openjson)):
+3. **Turn the `items` array into rows** with `OPENJSON ... WITH` and insert them all with one `INSERT ... SELECT` ([Lab 8, Section 5.3](../../labs/lab08-complex-parameters.md#53-converting-json-arrays-into-rows--openjson)):
 
    ```sql
    INSERT INTO InvoiceItem (InvoiceID, ProductID, Quantity, UnitPrice)
@@ -278,10 +278,10 @@ The procedure works in three steps:
           UnitPrice DECIMAL(10, 2) '$.unitPrice') AS j;
    ```
 
-This is the same pattern as [Lab 8, Section 6.6 – Inserting Related Records from JSON](../../labs/lab08-complex-parameters.md#66-inserting-related-records-from-json). The only difference is who calls the procedure: in the lab it is you in SSMS, here it is an HTTP request.
+This is the same pattern as [Lab 8, Section 5.6 – Inserting Related Records from JSON](../../labs/lab08-complex-parameters.md#56-inserting-related-records-from-json). The only difference is who calls the procedure: in the lab it is you in SSMS, here it is an HTTP request.
 
 > [!TIP]
-> [Lab 8, Section 5.4](../../labs/lab08-complex-parameters.md#54-practical-example--inserting-an-invoice-with-multiple-items) solves the **same invoice problem** with a Table-Valued Parameter. Compare the two procedures: the idea — header first, then all items with one `INSERT ... SELECT` — is identical. Only the envelope changes. [Lab 8, Section 7.3, Scenario 3](../../labs/lab08-complex-parameters.md#scenario-3--receiving-data-from-a-rest-api) explains why JSON is the natural choice when the data comes from a REST API.
+> [Lab 8, Section 6.4](../../labs/lab08-complex-parameters.md#64-practical-example--inserting-an-invoice-with-multiple-items) solves the **same invoice problem** with a Table-Valued Parameter. Compare the two procedures: the idea — header first, then all items with one `INSERT ... SELECT` — is identical. Only the envelope changes. [Lab 8, Section 7.3, Scenario 3](../../labs/lab08-complex-parameters.md#scenario-3--receiving-data-from-a-rest-api) explains why JSON is the natural choice when the data comes from a REST API.
 
 ## 4.3 All or nothing – the transaction
 
@@ -349,7 +349,7 @@ If the procedure returns no rows, the invoice does not exist, and the API answer
 
 ## 5.2 Another option – let SQL Server build the JSON
 
-The nesting can also happen in SQL Server, with `FOR JSON PATH` and dotted aliases from [Lab 8, Section 6.7](../../labs/lab08-complex-parameters.md#67-generating-json-with-for-json-path). This query returns the same document as above:
+The nesting can also happen in SQL Server, with `FOR JSON PATH` and dotted aliases from [Lab 8, Section 5.7](../../labs/lab08-complex-parameters.md#57-generating-json-with-for-json-path). This query returns the same document as above:
 
 ```sql
 SELECT i.InvoiceID   AS invoiceId,

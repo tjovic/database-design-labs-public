@@ -383,7 +383,7 @@ flowchart TD
 *Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error.*
 
 - `THROW;` without arguments rethrows the original error, so the caller knows the operation failed.
-- Some errors have already ended the transaction by the time `CATCH` runs. The `@@TRANCOUNT` check prevents a second error from a `ROLLBACK` with no transaction to roll back.
+- `@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). Some errors have already ended the transaction by the time `CATCH` runs, so the check prevents a second error from a `ROLLBACK` with no transaction to roll back.
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
@@ -425,13 +425,9 @@ The `CHECK` constraint error is expected. `THROW` stops the batch, so run this v
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT SUM(Balance) AS TotalBalance,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.BankAccount;
 ```
 
-Expected results: Account A `1000.00`, Account B `500.00`, total `1500.00`, transaction count `0`.
+Expected balances: Account A `1000.00`, Account B `500.00`.
 
 The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created.
 

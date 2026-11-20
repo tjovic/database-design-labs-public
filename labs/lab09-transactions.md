@@ -667,22 +667,18 @@ GO
 
 ```mermaid
 flowchart TD
-    P["Check parameters:<br/>NULL? amount <= 0? same account?"] -->|"invalid"| E1["THROW 50010 / 50011 / 50012"]
-    P -->|"valid"| B
+    P{"Parameters valid?"} -->|"no"| E1["THROW 50010–50012<br/>(no transaction started)"]
+    P -->|"yes"| B
     subgraph TRAN["Transaction"]
-        B["BEGIN TRANSACTION"] --> D["Debit source<br/>WHERE Balance >= @Amount"]
-        D --> R1{"@@ROWCOUNT = 1 ?"}
-        R1 -->|"yes"| C["Credit destination"]
-        C --> R2{"@@ROWCOUNT = 1 ?"}
-        R2 -->|"yes"| CM["COMMIT TRANSACTION"]
+        B["BEGIN TRANSACTION"] --> D{"Debit source:<br/>1 row changed?"}
+        D -->|"yes"| C{"Credit destination:<br/>1 row changed?"}
+        C -->|"yes"| CM["COMMIT TRANSACTION"]
+        D -->|"no: THROW 50013"| X["CATCH:<br/>ROLLBACK, then THROW;"]
+        C -->|"no: THROW 50014"| X
     end
-    R1 -->|"no: THROW 50013"| CATCH["CATCH: ROLLBACK, then THROW;"]
-    R2 -->|"no: THROW 50014"| CATCH
-    D -.->|"any SQL error"| CATCH
-    C -.->|"any SQL error"| CATCH
 ```
 
-*Diagram 3 – `usp_TransferFunds`. The parameter checks run before the transaction starts. Inside the transaction, every failure leads to the same place: a full rollback and an error for the caller.*
+*Diagram 3 – `usp_TransferFunds`. The parameter checks run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.*
 
 The parameter checks need no database data, so they run before the transaction opens. The transaction then contains only the work that must be atomic.
 

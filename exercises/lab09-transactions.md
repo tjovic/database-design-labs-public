@@ -422,7 +422,7 @@ The procedure printed `'Deletion succeeded'` and ran `COMMIT TRANSACTION`, but t
 
 # Part B – `TransactionsLab`
 
-Exercises 6–11 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 2.5), and the `dbo.usp_TransferFunds` procedure (Section 7). Do them after Lab 9, in the same database.
+Exercises 6–11 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
 
 > [!IMPORTANT]
 > Start each exercise with `@@TRANCOUNT = 0`. Every transaction you start must end with `COMMIT` or a full `ROLLBACK`.
@@ -505,7 +505,7 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 ## Exercise 7 — Keep one change, cancel another [INTERMEDIATE]
 
-Using `dbo.Note` from [Section 2.5 of Lab 9](../labs/lab09-transactions.md#25-rollback-and-identity-values):
+Using `dbo.Note` from [Section 7.1 of Lab 9](../labs/lab09-transactions.md#71-identity-values):
 
 1. Start a transaction.
 2. Insert the note `Exercise 7: keep this note`.
@@ -610,7 +610,7 @@ Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 4. a transfer amount of `0.00`;
 5. the same source and destination account.
 
-Cases 1–3 repeat scenarios from [Sections 7.3–7.5 of Lab 9](../labs/lab09-transactions.md#73-test-a-successful-transfer) — write them **from memory**, without looking back, as a quick retrieval check. Cases 4 and 5 are new: Lab 9 never actually triggered errors `50011` or `50012`, so this is the first time you confirm they fire.
+Cases 1–3 repeat scenarios from [Sections 5.3–5.5 of Lab 9](../labs/lab09-transactions.md#53-test-a-successful-transfer) — write them **from memory**, without looking back, as a quick retrieval check. Cases 4 and 5 are new: Lab 9 never actually triggered errors `50011` or `50012`, so this is the first time you confirm they fire.
 
 Verify the balances and transaction count after the successful call, then after each expected-error call. Use a separate `TRY/CATCH` for each expected error so verification still runs.
 
@@ -765,7 +765,7 @@ CREATE TABLE dbo.TransferHistory
 GO
 ```
 
-Create `dbo.usp_TransferFundsWithHistory` by adapting `dbo.usp_TransferFunds` from [Section 7 of Lab 9](../labs/lab09-transactions.md#section-7--a-complete-transfer-procedure).
+Create `dbo.usp_TransferFundsWithHistory` by adapting `dbo.usp_TransferFunds` from [Section 5 of Lab 9](../labs/lab09-transactions.md#section-5--a-complete-transfer-procedure).
 
 Requirements:
 
@@ -958,32 +958,6 @@ END CATCH;
 Preserve the tested table names, column names, and insert logic from Lab 8 when applying this structure to that database.
 
 </details>
-
----
-
-# Cleanup
-
-In Part A, each exercise's solution already cleans up its own rows and procedures; the first block is a safety net in case an exercise was interrupted partway through.
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteThreeStates;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteState;
-GO
-
-DELETE FROM dbo.Customer WHERE LastName IN (N'ExerciseTxDemo', N'ExerciseTxSavepoint');
-DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
-GO
-```
-
-For Part B, remove the objects created in Exercise 10. To reset the balances and notes as well, rerun the *Before you start* setup of Lab 9, which recreates `TransactionsLab`.
-
-```sql
-USE TransactionsLab;
-GO
-DROP PROCEDURE IF EXISTS dbo.usp_TransferFundsWithHistory;
-DROP TABLE IF EXISTS dbo.TransferHistory;
-GO
-```
 
 ---
 

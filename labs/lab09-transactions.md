@@ -358,7 +358,128 @@ Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs c
 
 [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
 
-## 3.1 The basic pattern
+## 3.1 A first attempt: TRY/CATCH with ROLLBACK
+
+Put the operation inside a transaction, and roll the transaction back if any statement fails:
+
+```sql
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- Execute all statements belonging to the operation.
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+END CATCH;
+```
+
+`@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). Some errors have already ended the transaction by the time `CATCH` runs, so the check prevents a second error from a `ROLLBACK` with no transaction to roll back.
+
+## 3.2 Repeat the failing transfer with protection
+
+Reset the balances:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
+```
+
+Then run the `600.00` transfer from 1.3 again, this time inside the pattern:
+
+```sql
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 600.00
+    WHERE AccountID = 1;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 600.00
+    WHERE AccountID = 2;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+END CATCH;
+
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+The balances are `1000.00` and `500.00`. The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created: the **data** is correct.
+
+But look at the *Messages* tab: there is **no error**. SSMS reports that the query completed successfully. The `CATCH` block handled the error and kept it to itself.
+
+The transfer did not happen, yet whoever started it is told that it did. Here you can see the balances, so no harm is done. The caller of a procedure, however — an application or another procedure — sees only whether an error came back. An application would tell the user *"Transfer completed"* for a transfer that never happened.
+
+## 3.3 THROW: tell the caller
+
+`THROW;` without arguments, placed inside `CATCH`, passes the original error on to the caller, with its original number and message. [Lab 7](lab07-crud-operations.md) met a weaker form of the same problem: a return code tells the caller *that* something failed, but not *what*.
+
+Reset the balances:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
+```
+
+Run the transfer again, now with `THROW;` after the rollback:
+
+```sql
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 600.00
+    WHERE AccountID = 1;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 600.00
+    WHERE AccountID = 2;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+This time the `CHECK` constraint error appears, as it should. `THROW` also ends the batch, so no statement after it runs. Check the balances in a **separate** block:
+
+```sql
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+The balances are again `1000.00` and `500.00`. The error you see is reported **after** the rollback, not instead of it.
+
+| Statement | Responsible for |
+|---|---|
+| `ROLLBACK TRANSACTION` | the **data**: undoes all changes of the transaction |
+| `THROW;` | the **caller**: reports that the operation failed, and why |
+
+The order matters: first `ROLLBACK`, then `THROW`. Together they give the basic pattern:
 
 ```sql
 BEGIN TRY
@@ -387,66 +508,13 @@ flowchart TD
     RB --> THROW
 ```
 
-*Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error.*
-
-- `THROW;` without arguments rethrows the original error, so the caller knows the operation failed.
-- `@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). Some errors have already ended the transaction by the time `CATCH` runs, so the check prevents a second error from a `ROLLBACK` with no transaction to roll back.
+*Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.*
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
-## 3.2 Repeat the failing transfer with protection
+## 3.4 When CATCH never runs: SET XACT_ABORT ON
 
-Reset the balances:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = 1000.00
-WHERE AccountID = 1;
-
-UPDATE dbo.BankAccount
-SET Balance = 500.00
-WHERE AccountID = 2;
-```
-
-Run the `600.00` transfer from 1.3 again, this time inside the pattern:
-
-```sql
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    UPDATE dbo.BankAccount
-    SET Balance = Balance + 600.00
-    WHERE AccountID = 1;
-
-    UPDATE dbo.BankAccount
-    SET Balance = Balance - 600.00
-    WHERE AccountID = 2;
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-
-    THROW;
-END CATCH;
-```
-
-The `CHECK` constraint error is expected. `THROW` stops the batch, so run this verification **separately**:
-
-```sql
-SELECT AccountID, AccountName, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-```
-
-Expected balances: Account A `1000.00`, Account B `500.00`.
-
-The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created.
-
-## 3.3 When CATCH never runs: SET XACT_ABORT ON
-
-In 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
+In 3.2 and 3.3, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
 Reset the balances:
 

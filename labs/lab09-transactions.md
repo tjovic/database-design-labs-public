@@ -124,10 +124,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer credits the destination first and debits the source second. Predict the final balances and the total before you run the block:
@@ -265,10 +267,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Predict the two balances after `COMMIT` before you run this. Then run the transfer:
@@ -396,10 +400,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Run the `600.00` transfer from 1.3 again, this time inside the pattern:
@@ -446,10 +452,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Now run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
@@ -694,10 +702,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Then call the procedure:
@@ -822,10 +832,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Based on 2.2 and 2.3, predict what `ROLLBACK TRANSACTION AfterFirstTransfer` will leave behind. Then run this block:
@@ -895,10 +907,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Then run this block:
@@ -958,10 +972,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Then run this block:
@@ -1128,10 +1144,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Run this complete example:
@@ -1252,10 +1270,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 The caller groups two calls:
@@ -1324,10 +1344,12 @@ Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
 Then run this complete block:

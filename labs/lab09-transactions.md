@@ -492,6 +492,11 @@ flowchart TD
     WORK -->|"any error"| CATCH["CATCH block"]
     CATCH --> RB["ROLLBACK TRANSACTION"]
     RB --> THROW["THROW;<br/>pass the original error to the caller"]
+
+    classDef committed fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef failed fill:#f8d7da,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    class COMMIT committed
+    class RB failed
 ```
 
 *Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.*
@@ -744,6 +749,11 @@ flowchart TD
         D -->|"no: THROW 50013"| X["CATCH:<br/>ROLLBACK, then THROW;"]
         C -->|"no: THROW 50014"| X
     end
+
+    classDef committed fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef failed fill:#f8d7da,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    class CM committed
+    class X failed
 ```
 
 *Diagram 3 – `usp_TransferFunds`. The parameter checks run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.*

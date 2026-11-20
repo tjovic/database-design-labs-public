@@ -709,12 +709,30 @@ The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer
 - Each row of that column holds one matching element.
 - We **must** name the table and its column with an alias: `AS tbl(col)` names the table `tbl` and its column `col`.
 
-For our document, the table `tbl` looks like this:
+For our document, `.nodes()` turns one XML value into a table with two rows:
 
-| col |
-|---|
-| `<Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />` |
-| `<Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />` |
+```mermaid
+flowchart LR
+    subgraph DOC["@Customers: one xml value"]
+        direction TB
+        ROOT["&lt;Customers&gt;"]
+        N1["&lt;Customer FirstName=&quot;Nina&quot; ... /&gt;"]
+        N2["&lt;Customer FirstName=&quot;Ivan&quot; ... /&gt;"]
+        ROOT --- N1
+        ROOT --- N2
+    end
+
+    DOC -->|".nodes('/Customers/Customer')"| TBL
+
+    subgraph TBL["table tbl, column col (xml)"]
+        direction TB
+        R1["row 1: &lt;Customer FirstName=&quot;Nina&quot; ... /&gt;"]
+        R2["row 2: &lt;Customer FirstName=&quot;Ivan&quot; ... /&gt;"]
+    end
+
+    classDef row fill:#dbeafe,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    class N1,N2,R1,R2 row
+```
 
 The names `tbl` and `col` are our choice — any valid names work.
 

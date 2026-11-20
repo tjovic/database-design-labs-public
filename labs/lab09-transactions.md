@@ -558,7 +558,7 @@ SET XACT_ABORT ON;
 
 This time `@@TRANCOUNT` is `0` and the debit has been rolled back.
 
-That completes the pattern. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`:
+That completes the pattern:
 
 ```sql
 SET XACT_ABORT ON;
@@ -577,6 +577,9 @@ BEGIN CATCH
     THROW;
 END CATCH;
 ```
+
+> [!NOTE]
+> From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`.
 
 `XACT_ABORT ON` is a safety net, not a replacement for the rest of the pattern:
 

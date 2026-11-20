@@ -601,36 +601,108 @@ This time the result is `0`: SQL Server rolled back the debit itself, even thoug
 
 Section 3 handled operations that fail with an **error**. This section is about the **C** in ACID: an operation can run without any SQL error and still break a business rule. The database cannot detect that by itself; your code must.
 
-## 4.1 Zero affected rows is not an SQL error
+## 4.1 A transfer to an account that does not exist
 
-The following statement is valid SQL:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = Balance + 200.00
-WHERE AccountID = 999;
+SET Balance = 1000.00
+WHERE AccountID = 1;
 
-SELECT @@ROWCOUNT AS RowsAffected;
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
-The result is `0` because account `999` does not exist.
+Transfer `200.00` from Account A to account `999`, which does not exist. The block uses the complete pattern from Section 3. Predict the result before you run it:
 
-If we had already debited another account, SQL Server would not automatically know that the intended transfer was incomplete.
+```sql
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 200.00
+    WHERE AccountID = 1;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 200.00
+    WHERE AccountID = 999;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+There is no error, and the transaction is committed. Account A is `800.00`, Account B is still `500.00`: `200.00` has disappeared.
+
+The second `UPDATE` is valid SQL. It found no row with `AccountID = 999`, so it changed **zero rows**, and that is not an error. `TRY/CATCH`, `THROW`, and `XACT_ABORT` all react to errors only, so none of them noticed.
 
 ## 4.2 Check @@ROWCOUNT immediately
 
-We must check the number of affected rows directly after the relevant statement:
+`@@ROWCOUNT` returns the number of rows affected by the previous statement. Check it directly after the `UPDATE` and raise an error yourself when the result is wrong.
+
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = Balance + 200.00
-WHERE AccountID = 999;
+SET Balance = 1000.00
+WHERE AccountID = 1;
 
-IF @@ROWCOUNT <> 1
-    THROW 50001, 'Destination account does not exist.', 1;
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 ```
 
-Run this as an independent example. The custom error is expected; no account is changed.
+Run the same transfer again. The block is the same as in 4.1, except for the new check after the second `UPDATE`; the verification `SELECT` is again a separate block:
+
+```sql
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 200.00
+    WHERE AccountID = 1;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 200.00
+    WHERE AccountID = 999;
+
+    IF @@ROWCOUNT <> 1 -- NEW: zero rows means the destination does not exist
+        THROW 50001, 'Destination account does not exist.', 1;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+Error `50001` is expected. Check the balances:
+
+```sql
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+The balances are `1000.00` and `500.00`: the custom error sent the transaction into `CATCH`, which rolled back the debit.
 
 `THROW` with arguments creates an application error:
 
@@ -639,8 +711,6 @@ Run this as an independent example. The custom error is expected; no account is 
 | `50001` | Application error number; user-defined numbers start at `50000` |
 | Message | Explanation for the caller |
 | `1` | State value, which can help identify where an error was raised |
-
-`THROW;` without arguments is used inside `CATCH` to rethrow the original error.
 
 Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other statements can change or reset its value.
 
@@ -661,6 +731,8 @@ IF @@ROWCOUNT <> 1
 ```
 
 Account A has less than `2000.00`, so no row is changed and the custom error is raised.
+
+The `CHECK` constraint from 1.1 would also stop a negative balance, but only with a technical constraint error. The condition in the `WHERE` clause turns the situation into a clear business error, `50002`, that the caller can understand, and the rule no longer depends on the constraint existing.
 
 This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
 
@@ -755,9 +827,7 @@ flowchart TD
     class X failed
 ```
 
-*Diagram 3 – `usp_TransferFunds`. The parameter checks run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.*
-
-The parameter checks need no database data, so they run before the transaction opens. The transaction then contains only the work that must be atomic.
+*Diagram 3 – `usp_TransferFunds`. The parameter checks need no database data, so they run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.*
 
 ## 5.3 Test a successful transfer
 
@@ -784,63 +854,49 @@ EXEC dbo.usp_TransferFunds
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT SUM(Balance) AS TotalBalance,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.BankAccount;
 ```
 
-Expected balances: `800.00` and `700.00`. Expected total: `1500.00`. Expected transaction count: `0`.
+Expected balances: `800.00` and `700.00`.
 
 ## 5.4 Test a missing destination
 
 The source update will succeed first. The procedure must undo it when the destination update affects zero rows.
 
-For an expected error, the test's outer `CATCH` displays the message and allows verification to continue:
+```sql
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 999,
+    @Amount = 100.00;
+```
+
+Error `50014` is expected. Check the balances:
 
 ```sql
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 999,
-        @Amount = 100.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-Expected error: `50014`. Balances remain `800.00` and `700.00`. The transaction count is `0`.
+The balances remain `800.00` and `700.00`: the debit was undone.
 
 ## 5.5 Test insufficient funds
 
 ```sql
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 2,
-        @Amount = 2000.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 2,
+    @Amount = 2000.00;
+```
 
+Error `50013` is expected. Check the balances:
+
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-Expected error: `50013`. Both balances remain unchanged, and no transaction remains open.
+Both balances remain unchanged.
 
 ## 5.6 Verify behavior, not only messages
 
@@ -852,8 +908,6 @@ Expected error: `50013`. Both balances remain unchanged, and no transaction rema
 | Zero or negative amount | Error `50011` | Neither balance changes |
 | Same source and destination | Error `50012` | Neither balance changes |
 | `NULL` parameter | Error `50010` | Neither balance changes |
-
-For these standalone calls, `@@TRANCOUNT` must be `0` after each test.
 
 > [!NOTE]
 > An error message is only part of the result. Always inspect the final data and transaction count. A procedure that reports an error but leaves half the operation committed is still incorrect.
@@ -957,7 +1011,7 @@ COMMIT TRANSACTION;
 
 After `ROLLBACK TRANSACTION AfterFirstTransfer`, the transaction is still open. We must still finish it with `COMMIT` or a full `ROLLBACK`.
 
-If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would be undone.
+If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would be undone; 6.3 shows this.
 
 > [!NOTE]
 > This example deliberately cancels valid work. Recovering from an actual SQL error using a savepoint is more complicated: some errors leave the transaction unable to commit, and a savepoint cannot repair that state. The main error-handling pattern in this lab rolls back the entire business operation.
@@ -978,7 +1032,7 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-Then run this block:
+The block is the same as in 6.1, except for the end: instead of rolling back to the savepoint and committing, it performs one **full** rollback:
 
 ```sql
 BEGIN TRANSACTION;
@@ -1007,13 +1061,11 @@ SELECT AccountID, Balance AS BeforeFullRollback
 FROM dbo.BankAccount
 ORDER BY AccountID;
 
-ROLLBACK TRANSACTION;
+ROLLBACK TRANSACTION; -- NEW: full rollback, no savepoint name
 
 SELECT AccountID, Balance AS AfterFullRollback
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
 | Point | Account A | Account B |
@@ -1043,11 +1095,14 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-Then run this block:
+The block starts like 6.1, adds a third transfer with a second savepoint, rolls back to the **first** savepoint, and then tries to roll back to the second one:
 
 ```sql
+SET XACT_ABORT ON;
+
 BEGIN TRANSACTION;
 
+-- First transfer.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 100.00
 WHERE AccountID = 1;
@@ -1058,6 +1113,7 @@ WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterFirstTransfer;
 
+-- Second transfer.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 50.00
 WHERE AccountID = 1;
@@ -1066,8 +1122,9 @@ UPDATE dbo.BankAccount
 SET Balance = Balance + 50.00
 WHERE AccountID = 2;
 
-SAVE TRANSACTION AfterSecondTransfer;
+SAVE TRANSACTION AfterSecondTransfer; -- NEW: a second savepoint
 
+-- NEW: third transfer.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 25.00
 WHERE AccountID = 1;
@@ -1076,40 +1133,38 @@ UPDATE dbo.BankAccount
 SET Balance = Balance + 25.00
 WHERE AccountID = 2;
 
-SELECT AccountID, Balance AS BeforeAnyRollback
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
--- Discards the third transfer AND the AfterSecondTransfer savepoint itself.
 ROLLBACK TRANSACTION AfterFirstTransfer;
 
 SELECT AccountID, Balance AS AfterSavepointRollback
 FROM dbo.BankAccount
 ORDER BY AccountID;
 
-SELECT @@TRANCOUNT AS StillOpen; -- 1
+-- AfterSecondTransfer was defined after AfterFirstTransfer.
+ROLLBACK TRANSACTION AfterSecondTransfer;
+```
 
-ROLLBACK TRANSACTION;
+The rollback to `AfterFirstTransfer` returns the balances to `900.00` and `600.00`. The last statement then fails:
 
-SELECT AccountID, Balance AS AfterFullRollback
+```text
+Msg 6401: Cannot roll back AfterSecondTransfer. No transaction or savepoint of that name was found.
+```
+
+Rolling back to `AfterFirstTransfer` undid everything after it, **including the savepoint `AfterSecondTransfer`**. That savepoint no longer exists.
+
+Because `XACT_ABORT` is `ON`, the error also rolled back the whole transaction. Check the balances:
+
+```sql
+SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS FinalCount; -- 0
 ```
 
 | Point | Account A | Account B |
 |---|---:|---:|
 | Initial state | 1000.00 | 500.00 |
-| After first transfer | 900.00 | 600.00 |
-| After second transfer | 850.00 | 650.00 |
-| After third transfer | 875.00 | 625.00 |
+| After third transfer | 825.00 | 675.00 |
 | After rollback to `AfterFirstTransfer` | 900.00 | 600.00 |
-| After full rollback | 1000.00 | 500.00 |
-
-After `ROLLBACK TRANSACTION AfterFirstTransfer`, the savepoint `AfterSecondTransfer` no longer exists. Running `ROLLBACK TRANSACTION AfterSecondTransfer` at that point would fail with an error, because that savepoint was defined after the point we already rolled back to.
-
-The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` is `1`). It must still be finished with `COMMIT` or a full `ROLLBACK`, exactly as in 6.2.
+| After error 6401 (`XACT_ABORT ON`) | 1000.00 | 500.00 |
 
 ---
 
@@ -1172,8 +1227,6 @@ This is one reason to keep a transaction focused on database work: do not send a
 `@@TRANCOUNT` reports the transaction nesting count for the **current connection**. Nesting looks like an exotic case, but it happens every time a procedure that starts its own transaction is called inside another transaction — the topic of Section 9.
 
 ## 8.1 How the counter changes
-
-Assuming an active, valid local transaction where required:
 
 | Statement | Effect on `@@TRANCOUNT` |
 |---|---|
@@ -1239,8 +1292,6 @@ ROLLBACK TRANSACTION;
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS AfterOuterRollback; -- 0
 ```
 
 The original balances, `1000.00` and `500.00`, are restored.
@@ -1293,16 +1344,9 @@ A transaction can be managed by the procedure or by its caller. The important qu
 
 ## 9.1 The procedure manages the transaction
 
-Our transfer procedure represents one complete operation. It starts a transaction, performs the work, and commits or rolls back.
+Our transfer procedure represents one complete operation. It starts a transaction, performs the work, and commits or rolls back. You have already used it this way in 5.3–5.5.
 
-```sql
-EXEC dbo.usp_TransferFunds
-    @SourceAccountID = 1,
-    @DestinationAccountID = 2,
-    @Amount = 50.00;
-```
-
-This is convenient when one call corresponds to the entire operation. This example changes the balances; later demonstrations reset them explicitly.
+This is convenient when one call corresponds to the entire operation.
 
 ## 9.2 The caller manages the transaction
 
@@ -1371,7 +1415,39 @@ ORDER BY AccountID;
 
 Expected balances: `900.00` and `600.00`.
 
-The helper participates in the caller's transaction without starting its own. If the caller does not start a transaction, its update runs in autocommit mode.
+The helper participates in the caller's transaction without starting its own. That only matters when something fails. Run the same block again, but let the second call fail. The block is the same as above, except for the account ID in the second call:
+
+```sql
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    EXEC dbo.usp_ChangeBalance
+        @AccountID = 1, @Change = -100.00;
+
+    EXEC dbo.usp_ChangeBalance
+        @AccountID = 999, @Change = 100.00; -- NEW: account does not exist
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+Error `50021` is expected. Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+The balances are still `900.00` and `600.00`. The first call had already debited Account A, but the caller's rollback undid it. Without the caller's transaction, each call would run in autocommit mode, and the debit would stay.
 
 This helper illustrates transaction ownership. It is a low-level building block: it does not itself enforce a complete transfer or preserve the combined account balance.
 
@@ -1397,7 +1473,7 @@ sequenceDiagram
         P->>P: CATCH: full ROLLBACK (count 2 → 0)
         Note over C,P: the caller's rename is undone too
         P-->>C: THROW 50014
-        C->>C: CATCH: count is already 0, nothing left to roll back
+        C->>C: CATCH: count is already 0, nothing to roll back, THROW
     end
 ```
 
@@ -1451,6 +1527,8 @@ The reverse is equally important. Our transfer procedure uses a **full rollback*
 If an outer transaction exists, that rollback also undoes earlier work in the outer transaction.
 
 ```sql
+SET XACT_ABORT ON;
+
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -1471,19 +1549,21 @@ BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
 
-    SELECT ERROR_MESSAGE() AS ErrorMessage;
+    THROW;
 END CATCH;
+```
 
+Error `50014` is expected. Check the accounts:
+
+```sql
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-The temporary name change is also undone. Account A is still named `Account A`, balances are `1000.00` and `500.00`, and the transaction count is `0`.
+The temporary name change is also undone. Account A is still named `Account A`, and the balances are `1000.00` and `500.00`.
 
-The caller's `CATCH` receives error `50014`. When it runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too. This is the case the `IF @@TRANCOUNT > 0` check in the pattern from Section 3 exists for: without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
+The caller's `CATCH` receives error `50014` and passes it on with `THROW`. When the `CATCH` runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too. This is the case the `IF @@TRANCOUNT > 0` check in the pattern from Section 3 exists for: without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
 
 **A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It ends the entire current transaction.** For this lab's transfer procedure, a failure means the complete enclosing operation fails. A caller must not continue toward a commit after that failure.
 
@@ -1856,7 +1936,9 @@ The transaction log does not replace backups. A log stored on a failed device ca
 
 - **A business operation can require several SQL statements.** Use a transaction when those changes must be kept or undone together — that is atomicity, the A in ACID.
 - **`COMMIT` confirms; `ROLLBACK` undoes.** A savepoint allows partial rollback without closing the transaction.
-- **Errors need a policy.** Detect missing rows and business failures, roll back the required scope, and report the error.
+- **ROLLBACK protects the data, THROW informs the caller.** A `CATCH` block that only rolls back hides the failure; it must also pass the error on.
+- **`SET XACT_ABORT ON` covers what `CATCH` cannot.** A cancelled query or timeout never reaches `CATCH`; with `XACT_ABORT ON`, SQL Server rolls the transaction back itself.
+- **Zero affected rows is not an error.** Check `@@ROWCOUNT` and raise an error yourself when a business rule is broken.
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
 

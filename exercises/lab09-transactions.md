@@ -203,7 +203,7 @@ Write a procedure `dbo.usp_DeleteState` that takes one parameter, `@StateID`, an
 
 - `SCOPE_IDENTITY()` immediately after each `INSERT` gives you the new `IDState`.
 - The procedure body is a single `DELETE` statement — no `BEGIN TRY`, no transaction commands.
-- The caller's `CATCH` block needs `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;` because the procedure itself never started or ended a transaction — the caller's is the only one open.
+- The caller uses the complete pattern from Lab 9, Section 3: `SET XACT_ABORT ON`, `ROLLBACK` in `CATCH`, then `THROW;`. The procedure never starts or ends a transaction — the caller's is the only one open.
 
 <details>
 <summary>Show solution</summary>
@@ -224,18 +224,19 @@ INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State A'); SET @ID1 = SCOPE_ID
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State B'); SET @ID2 = SCOPE_IDENTITY();
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State C'); SET @ID3 = SCOPE_IDENTITY();
 
+SET XACT_ABORT ON;
+
 BEGIN TRY
     BEGIN TRANSACTION;
     EXEC dbo.usp_DeleteState @StateID = @ID1;
     EXEC dbo.usp_DeleteState @StateID = @ID2;
     EXEC dbo.usp_DeleteState @StateID = @ID3;
     COMMIT TRANSACTION;
-    PRINT 'Deletion succeeded';
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
-    PRINT 'Deletion failed: ' + ERROR_MESSAGE();
+    THROW;
 END CATCH;
 
 SELECT COUNT(*) AS RemainingAfterSuccess
@@ -248,19 +249,21 @@ DECLARE @ID1 int, @ID2 int;
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State D'); SET @ID1 = SCOPE_IDENTITY();
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State E'); SET @ID2 = SCOPE_IDENTITY();
 
+SET XACT_ABORT ON;
+
 BEGIN TRY
     BEGIN TRANSACTION;
     EXEC dbo.usp_DeleteState @StateID = @ID1;
     EXEC dbo.usp_DeleteState @StateID = @ID2;
     EXEC dbo.usp_DeleteState @StateID = 1; -- Croatia: referenced by City, delete fails
     COMMIT TRANSACTION;
-    PRINT 'Deletion succeeded';
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
-    PRINT 'Deletion failed: ' + ERROR_MESSAGE();
+    THROW; -- the FK error is expected; THROW ends this batch
 END CATCH;
+GO
 
 SELECT COUNT(*) AS RemainingAfterFailure
 FROM dbo.State WHERE Name LIKE N'ExerciseTx State%'; -- 2: D and E both survive
@@ -287,7 +290,7 @@ Write a procedure `dbo.usp_DeleteThreeStates` that takes three parameters (`@Sta
 
 ### Hints
 
-- This is the same `BEGIN TRY / BEGIN TRANSACTION ... COMMIT / CATCH / ROLLBACK` pattern as Lab 9's `usp_TransferFunds`, just with three `DELETE` statements instead of two `UPDATE` statements.
+- This is the same pattern as Lab 9's `usp_TransferFunds` (`SET XACT_ABORT ON`, `BEGIN TRY / BEGIN TRANSACTION ... COMMIT`, `CATCH` with `ROLLBACK` and `THROW;`), just with three `DELETE` statements instead of two `UPDATE` statements.
 
 <details>
 <summary>Show solution</summary>
@@ -299,18 +302,19 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteThreeStates
     @StateID3 int
 AS
 BEGIN
+    SET XACT_ABORT ON;
+
     BEGIN TRY
         BEGIN TRANSACTION;
         DELETE FROM dbo.State WHERE IDState = @StateID1;
         DELETE FROM dbo.State WHERE IDState = @StateID2;
         DELETE FROM dbo.State WHERE IDState = @StateID3;
         COMMIT TRANSACTION;
-        PRINT 'Deletion succeeded';
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
-        PRINT 'Deletion failed: ' + ERROR_MESSAGE();
+        THROW;
     END CATCH;
 END;
 GO
@@ -333,6 +337,7 @@ INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State I'); SET @ID1 = SCOPE_ID
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State J'); SET @ID2 = SCOPE_IDENTITY();
 
 EXEC dbo.usp_DeleteThreeStates @StateID1 = @ID1, @StateID2 = @ID2, @StateID3 = 1;
+GO -- the FK error is expected; the procedure's THROW ends the batch above
 
 SELECT COUNT(*) AS RemainingAfterFailure
 FROM dbo.State WHERE Name LIKE N'ExerciseTx State%'; -- 2
@@ -367,18 +372,19 @@ CREATE OR ALTER PROCEDURE dbo.usp_DeleteThreeStates
     @StateID3 int
 AS
 BEGIN
+    SET XACT_ABORT ON;
+
     BEGIN TRY
         BEGIN TRANSACTION;
         DELETE FROM dbo.State WHERE IDState = @StateID1;
         DELETE FROM dbo.State WHERE IDState = @StateID2;
         DELETE FROM dbo.State WHERE IDState = @StateID3;
         COMMIT TRANSACTION;
-        PRINT 'Deletion succeeded';
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
-        PRINT 'Deletion failed: ' + ERROR_MESSAGE();
+        THROW;
     END CATCH;
 END;
 GO
@@ -388,6 +394,8 @@ INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State K'); SET @ID1 = SCOPE_ID
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State L'); SET @ID2 = SCOPE_IDENTITY();
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx State M'); SET @ID3 = SCOPE_IDENTITY();
 
+SET XACT_ABORT ON;
+
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -395,13 +403,12 @@ BEGIN TRY
 
     SELECT @@TRANCOUNT AS AfterProcedureReturns; -- 1: the procedure's COMMIT only reduced 2 -> 1
 
-    ROLLBACK TRANSACTION;
-    PRINT 'Outer transaction rolled back on purpose';
+    ROLLBACK TRANSACTION; -- the caller cancels on purpose
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
-    PRINT 'Unexpected error: ' + ERROR_MESSAGE();
+    THROW;
 END CATCH;
 
 SELECT COUNT(*) AS RemainingAfterOuterRollback
@@ -414,7 +421,7 @@ DROP PROCEDURE dbo.usp_DeleteThreeStates;
 DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
 ```
 
-The procedure printed `'Deletion succeeded'` and ran `COMMIT TRANSACTION`, but that commit only brought `@@TRANCOUNT` from `2` down to `1` — the caller's outer transaction was still open. The caller's own `ROLLBACK TRANSACTION` then undid all three deletes anyway. No individual `COMMIT` is final until the outermost one runs.
+The procedure returned without an error and ran `COMMIT TRANSACTION`, but that commit only brought `@@TRANCOUNT` from `2` down to `1` — the caller's outer transaction was still open. The caller's own `ROLLBACK TRANSACTION` then undid all three deletes anyway. No individual `COMMIT` is final until the outermost one runs.
 
 </details>
 
@@ -614,11 +621,11 @@ Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
 Cases 1–3 repeat scenarios from [Sections 5.3–5.5 of Lab 9](../labs/lab09-transactions.md#53-test-a-successful-transfer) — write them **from memory**, without looking back, as a quick retrieval check. Cases 4 and 5 are new: Lab 9 never actually triggered errors `50011` or `50012`, so this is the first time you confirm they fire.
 
-Verify the balances and transaction count after the successful call, then after each expected-error call. Use a separate `TRY/CATCH` for each expected error so verification still runs.
+Verify the balances after the successful call, then after each expected-error call.
 
 ### Hints
 
-- Give each expected-error call its own `BEGIN TRY ... END TRY BEGIN CATCH ... END CATCH`, and check the balances and `@@TRANCOUNT` after every call.
+- An expected error ends its batch, so statements after it in the same batch do not run. Put each expected-error call in its own batch (end it with `GO`), and check the balances in the next batch.
 
 <details>
 <summary>Show solution</summary>
@@ -642,98 +649,71 @@ EXEC dbo.usp_TransferFunds
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-Use this block for the missing destination:
+Expected balances: `750.00` and `750.00`.
+
+Then run the four expected-error tests. Each call is its own batch, followed by a batch that checks the balances:
 
 ```sql
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 999,
-        @Amount = 100.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
+-- Missing destination: expected error 50014.
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 999,
+    @Amount = 100.00;
+GO
 
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
+GO
 
-SELECT @@TRANCOUNT AS OpenTransactionCount;
+-- Insufficient funds: expected error 50013.
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 2,
+    @Amount = 5000.00;
+GO
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+GO
+
+-- Invalid amount: expected error 50011.
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 2,
+    @Amount = 0.00;
+GO
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+GO
+
+-- Same account: expected error 50012.
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 1,
+    @Amount = 100.00;
+GO
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+GO
 ```
 
-Repeat the same `TRY/CATCH` pattern, one call per test. Each call needs its **own** `TRY/CATCH` — an uncaught `THROW` ends the whole batch, so stacking bare `EXEC` calls without one each would skip the tests after the first failure. Run the balance and transaction-count `SELECT` statements after each call, as shown for the missing-destination case:
+Each test raises its expected error, and the balances remain `750.00` and `750.00` after every one.
 
-```sql
--- Insufficient funds.
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 2,
-        @Amount = 5000.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
-
--- Invalid amount.
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 2,
-        @Amount = 0.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
-
--- Same account.
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 1,
-        @Amount = 100.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
-```
-
-Expected balances remain `750.00` and `750.00`, and `@@TRANCOUNT` remains `0` after each test.
-
-| Test | Account 1 | Account 2 | Expected error | Final count |
-|---|---:|---:|---|---:|
-| Valid transfer | 750.00 | 750.00 | None | 0 |
-| Missing destination | 750.00 | 750.00 | 50014 | 0 |
-| Insufficient funds | 750.00 | 750.00 | 50013 | 0 |
-| Zero amount | 750.00 | 750.00 | 50011 | 0 |
-| Same account | 750.00 | 750.00 | 50012 | 0 |
+| Test | Account 1 | Account 2 | Expected error |
+|---|---:|---:|---|
+| Valid transfer | 750.00 | 750.00 | None |
+| Missing destination | 750.00 | 750.00 | 50014 |
+| Insufficient funds | 750.00 | 750.00 | 50013 |
+| Zero amount | 750.00 | 750.00 | 50011 |
+| Same account | 750.00 | 750.00 | 50012 |
 
 </details>
 
@@ -853,9 +833,6 @@ UPDATE dbo.BankAccount
 SET Balance = 500.00
 WHERE AccountID = 2;
 
-SELECT COUNT(*) AS HistoryRowsBefore
-FROM dbo.TransferHistory;
-
 EXEC dbo.usp_TransferFundsWithHistory
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
@@ -868,42 +845,32 @@ ORDER BY AccountID;
 SELECT TransferID, SourceAccountID, DestinationAccountID, Amount, CreatedAt
 FROM dbo.TransferHistory
 ORDER BY TransferID;
-
-SELECT COUNT(*) AS HistoryRowsAfterSuccess
-FROM dbo.TransferHistory;
 ```
 
-Balances become `900.00` and `600.00`. The number of history rows increases by one.
+Balances become `900.00` and `600.00`, and the history has a new row for the `100.00` transfer.
 
 Test failure:
 
 ```sql
-DECLARE @HistoryRowsBefore int;
+EXEC dbo.usp_TransferFundsWithHistory
+    @SourceAccountID = 1,
+    @DestinationAccountID = 999,
+    @Amount = 100.00;
+```
 
-SELECT @HistoryRowsBefore = COUNT(*)
-FROM dbo.TransferHistory;
+Error `50014` is expected. Check the balances and the history:
 
-BEGIN TRY
-    EXEC dbo.usp_TransferFundsWithHistory
-        @SourceAccountID = 1,
-        @DestinationAccountID = 999,
-        @Amount = 100.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
 
-SELECT @HistoryRowsBefore AS HistoryRowsBeforeFailure,
-       COUNT(*) AS HistoryRowsAfterFailure,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.TransferHistory;
+SELECT TransferID, SourceAccountID, DestinationAccountID, Amount, CreatedAt
+FROM dbo.TransferHistory
+ORDER BY TransferID;
 ```
 
-Balances remain `900.00` and `600.00`. The history count is unchanged, and the transaction count is `0`.
+Balances remain `900.00` and `600.00`, and the history has no new row: the history insert was never reached, and the debit was rolled back.
 
 This demonstration intentionally resets balances between tests, so the history table is a record of procedure calls, not a complete ledger of all lab changes.
 

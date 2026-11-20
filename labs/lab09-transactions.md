@@ -15,22 +15,19 @@ Consider a bank transfer: subtract money from one account, add it to another. Ke
 
 After completing this lab, you should be able to:
 
-- explain why several related SQL statements may need one transaction, and distinguish autocommit from explicit transactions;
+- explain why several related SQL statements may need one transaction, distinguish autocommit from explicit transactions, and name the four ACID properties;
 - use `BEGIN TRANSACTION`, `COMMIT TRANSACTION`, and `ROLLBACK TRANSACTION`, and inspect uncommitted changes;
-- use a savepoint to undo part of a transaction;
-- explain `@@TRANCOUNT` and why an inner `COMMIT` does not independently commit changes;
 - combine transactions with `TRY/CATCH`, `THROW`, and `SET XACT_ABORT ON`;
 - use `@@ROWCOUNT` to detect an operation that did not affect the expected row;
-- implement and verify a transaction inside a stored procedure, and distinguish a transaction managed by a procedure from one managed by its caller;
-- explain the ACID properties and, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep those promises after a crash.
+- implement and verify a transaction inside a stored procedure;
+- use a savepoint to undo part of a transaction;
+- explain `@@TRANCOUNT`, why an inner `COMMIT` does not independently commit changes, and distinguish a transaction managed by a procedure from one managed by its caller;
+- explain, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep its promises after a crash.
 
 > [!NOTE]
-> **Suggested route for a 90-minute lab:** prioritize Sections 1–2 and 5–7, then try Exercises 6 and 9 of the [Transaction Exercises](../exercises/lab09-transactions.md). Sections 3–4, the caller-managed examples in Section 8, and the detailed recovery material in Section 9 are extensions for instructor demonstration or self-study. The full document is a reference, so students do not need to complete every example during one lab session.
+> **Suggested route for a 90-minute lab:** Part A (Sections 1–2) and Part B (Sections 3–5) are the core, followed by Exercises 6 and 9 of the [Transaction Exercises](../exercises/lab09-transactions.md). Part C (Sections 6–10) goes deeper — savepoints, nesting, transaction ownership, and the transaction log — for instructor demonstration or self-study.
 
-> [!NOTE]
-> **Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`.
->
-> This lab uses **one SSMS query window**; concurrency, locking, isolation levels, and two-session demonstrations are covered in **Lab 10**.
+**Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`. This lab uses **one SSMS query window**; concurrency and two-session demonstrations are covered in **Lab 10**.
 
 ---
 
@@ -52,7 +49,7 @@ USE TransactionsLab;
 GO
 ```
 
-Rerun this any time you want a clean slate instead of resetting balances by hand.
+Run this once at the start. Within the lab, the examples reset the account balances with a short `UPDATE` instead of recreating the database.
 
 > [!IMPORTANT]
 > Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not finish it automatically.
@@ -104,12 +101,9 @@ The total balance is **1500.00**. A transfer between these accounts should chang
 
 The `CHECK` constraint prevents negative balances. It does not ensure that every subtraction has a matching addition. That rule belongs to the complete transfer operation.
 
-> [!NOTE]
-> Run the table creation once. To repeat later demonstrations, reset the balances using the supplied `UPDATE` statements. You do not need to recreate the table.
-
 ## 1.2 Two statements, one business operation
 
-A transfer of `200.00` requires two changes:
+A transfer of `200.00` from Account A to Account B requires two changes:
 
 ```sql
 -- Read this example first. The next subsection demonstrates the failure.
@@ -122,15 +116,11 @@ SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 ```
 
-The business operation succeeds only when **both** changes succeed.
-
-If the second statement fails after the first has been committed, we have an incomplete transfer.
+The business operation succeeds only when **both** changes succeed. If the second statement fails after the first has been committed, we have an incomplete transfer.
 
 ## 1.3 Demonstrate a partial operation
 
-We will deliberately make the second statement violate the balance constraint. This simulates a programming error after the first statement succeeds.
-
-Run this complete block:
+Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer credits the destination first and debits the source second. Predict the final balances and the total before you run the block:
 
 ```sql
 -- Reset before the demonstration.
@@ -141,13 +131,14 @@ SET Balance = CASE AccountID
               END;
 
 BEGIN TRY
+    -- Credit Account A.
     UPDATE dbo.BankAccount
-    SET Balance = Balance - 200.00
+    SET Balance = Balance + 600.00
     WHERE AccountID = 1;
 
-    -- Deliberate error: a negative balance violates CHECK.
+    -- Debit Account B: 500.00 - 600.00 would be negative, so CHECK fails.
     UPDATE dbo.BankAccount
-    SET Balance = -1.00
+    SET Balance = Balance - 600.00
     WHERE AccountID = 2;
 END TRY
 BEGIN CATCH
@@ -162,44 +153,73 @@ SELECT SUM(Balance) AS TotalBalance
 FROM dbo.BankAccount;
 ```
 
-Expected balances:
+The `CHECK` constraint error is expected. Results:
 
 | Account | Balance |
 |---|---:|
-| Account A | 800.00 |
+| Account A | 1600.00 |
 | Account B | 500.00 |
-| **Total** | **1300.00** |
+| **Total** | **2100.00** |
 
-The first `UPDATE` succeeded and was committed. The second `UPDATE` failed and its changes were undone. The `CATCH` block displayed the error, but it did not undo the first statement.
+The bank has just created `600.00` out of nothing. The credit succeeded and was committed. The debit failed and was undone. The `CATCH` block displayed the error, but it did not undo the credit.
 
 **Handling an error does not automatically make several statements atomic.**
 
 ## 1.4 Autocommit and explicit transactions
 
-In the normal **autocommit** mode, each individual SQL statement runs as a transaction.
+In the normal **autocommit** mode, each individual SQL statement runs as its own transaction. One `UPDATE` affecting many rows is therefore already one unit of work: if it fails, SQL Server undoes that whole statement.
 
-This means that one `UPDATE` statement affecting many rows is already one unit of work. For an ordinary constraint violation, SQL Server undoes that statement; it does not keep an arbitrary successful subset of its rows.
+Our problem is different: the transfer contains **two separate statements**, so autocommit gives it two separate transactions.
 
-Our problem is different: the transfer contains **two separate statements**.
+```mermaid
+flowchart LR
+    subgraph AUTO["Autocommit: one transaction per statement"]
+        direction TB
+        A1["UPDATE A: +600<br/>committed"] --> A2["UPDATE B: -600<br/>fails, undone"]
+        A2 --> A3["A = 1600, B = 500<br/>total 2100"]
+    end
+    subgraph EXPL["Explicit transaction: one boundary"]
+        direction TB
+        E1["BEGIN TRANSACTION"] --> E2["UPDATE A: +600"]
+        E2 --> E3["UPDATE B: -600<br/>fails"]
+        E3 --> E4["ROLLBACK: A = 1000, B = 500<br/>total 1500"]
+    end
+    AUTO ~~~ EXPL
+```
+
+*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3).*
 
 | Mode | Transaction boundary | Typical use |
 |---|---|---|
 | Autocommit | One statement | A single independent change |
 | Explicit transaction | Several statements, grouped under your control | Several changes that belong together |
 
+## 1.5 ACID: four promises of a transaction
+
+What went wrong in 1.3 has a name. A reliable transaction makes four promises, known by the acronym **ACID**:
+
+| Property | Promise | In our example | Where in this lab |
+|---|---|---|---|
+| **Atomicity** | All changes are kept together or undone together | The credit and the debit form one operation | Sections 2, 3, and 5 |
+| **Consistency** | A transaction takes the database from one valid state to another | Balances stay non-negative; a transfer preserves the total | Section 4 |
+| **Isolation** | Concurrent transactions do not interfere with each other | Two simultaneous transfers from the same account | Lab 10 |
+| **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Section 10 |
+
+Block 1.3 broke **atomicity**: half of the transfer stayed. That broke **consistency** as well: the total changed from `1500.00` to `2100.00`.
+
 > [!IMPORTANT]
-> SQL Server already uses transactions even when you write nothing extra — autocommit treats every statement as its own transaction. Section 2 introduces the commands for grouping several statements into one transaction yourself.
+> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements succeed and the transaction commits them. Consistency depends on correct constraints and business logic, not only on transaction boundaries.
 
 **Check your understanding**
 
-1. Why did the first account remain changed after the error?
+1. Why did Account A remain changed after the error?
 2. Does `TRY/CATCH` alone guarantee all-or-nothing execution?
 3. Why might a single procedure call still need an explicit transaction?
 
 <details>
 <summary>Show answers</summary>
 
-1. It was a separate, successful autocommit transaction.
+1. Its credit was a separate, successful autocommit transaction.
 2. No. `TRY/CATCH` controls error handling; it does not create a transaction around the statements.
 3. A procedure can execute several statements. Calling it once does not automatically group them into one transaction.
 
@@ -320,60 +340,451 @@ These two constructs have different purposes:
 
 A procedure's `BEGIN ... END` body does not create a transaction.
 
-## 2.5 ROLLBACK and IDENTITY values
+---
 
-Rolling back also interacts with other table features — not just with the data you changed on purpose.
-
-Create a separate demonstration table:
-
-```sql
-CREATE TABLE dbo.Note
-(
-    NoteID int IDENTITY(1, 1) NOT NULL
-        CONSTRAINT PK_Note PRIMARY KEY,
-    NoteText nvarchar(100) NOT NULL
-);
-GO
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'First committed note');
-
-BEGIN TRANSACTION;
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'This note will be rolled back');
-
-SELECT NoteID, NoteText
-FROM dbo.Note
-ORDER BY NoteID;
-
-ROLLBACK TRANSACTION;
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'Next committed note');
-
-SELECT NoteID, NoteText
-FROM dbo.Note
-ORDER BY NoteID;
-```
-
-On the first run against this newly created table, the final IDs are `1` and `3`. The row with ID `2` was rolled back, but its allocated identity value was consumed.
-
-> [!NOTE]
-> `IDENTITY` generates identifiers; it does not guarantee a gap-free sequence. Rollbacks, failed inserts, and other events can leave gaps. Do not use the largest identity value as a row count.
+# Part B – Transactions in Code
 
 ---
 
-# Section 3 – Savepoints: Undoing Part of a Transaction
+# Section 3 – Handling Errors Inside a Transaction
+
+Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs code that chooses the correct outcome when an operation fails.
+
+[Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
+
+## 3.1 The basic pattern
+
+```sql
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- Execute all statements belonging to the operation.
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+```mermaid
+flowchart TD
+    START["BEGIN TRANSACTION"] --> WORK["Run all statements of the operation"]
+    WORK -->|"all succeed"| COMMIT["COMMIT TRANSACTION"]
+    WORK -->|"any error"| CATCH["CATCH block"]
+    CATCH --> CHECK{"@@TRANCOUNT > 0 ?"}
+    CHECK -->|"yes"| RB["ROLLBACK TRANSACTION"]
+    CHECK -->|"no: already ended"| THROW["THROW;<br/>pass the original error to the caller"]
+    RB --> THROW
+```
+
+*Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error.*
+
+- `THROW;` without arguments rethrows the original error, so the caller knows the operation failed.
+- Some errors have already ended the transaction by the time `CATCH` runs. The `@@TRANCOUNT` check prevents a second error from a `ROLLBACK` with no transaction to roll back.
+- `SET XACT_ABORT ON` is explained in 3.3. Treat it as a fixed part of the pattern.
+
+The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
+
+## 3.2 Repeat the failing transfer with protection
+
+Run the `600.00` transfer from 1.3 again, this time inside the pattern:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = CASE AccountID
+                  WHEN 1 THEN 1000.00
+                  WHEN 2 THEN  500.00
+              END;
+
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 600.00
+    WHERE AccountID = 1;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 600.00
+    WHERE AccountID = 2;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+The `CHECK` constraint error is expected. `THROW` stops the batch, so run this verification **separately**:
+
+```sql
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT SUM(Balance) AS TotalBalance,
+       @@TRANCOUNT AS OpenTransactionCount
+FROM dbo.BankAccount;
+```
+
+Expected results: Account A `1000.00`, Account B `500.00`, total `1500.00`, transaction count `0`.
+
+The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created.
+
+## 3.3 Why SET XACT_ABORT ON?
+
+In 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
+
+Try it. Run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = CASE AccountID
+                  WHEN 1 THEN 1000.00
+                  WHEN 2 THEN  500.00
+              END;
+
+SET XACT_ABORT OFF;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 200.00
+    WHERE AccountID = 1;
+
+    WAITFOR DELAY '00:00:20'; -- Cancel the query during this wait.
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 200.00
+    WHERE AccountID = 2;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
+
+After cancelling, run:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+The result is `1`: the debit is still in an **open transaction** that nobody will finish. Locks it holds can block other sessions (Lab 10). Close it by hand:
+
+```sql
+ROLLBACK TRANSACTION;
+```
+
+Now change `SET XACT_ABORT OFF` to `SET XACT_ABORT ON`, run the block again, and cancel it again. This time `@@TRANCOUNT` is `0` and the balances are `1000.00` and `500.00`. With `XACT_ABORT ON`, SQL Server rolls back the whole transaction when the batch is aborted.
+
+`XACT_ABORT ON` is a safety net, not a replacement for the rest of the pattern:
+
+- an `UPDATE` that matches zero rows is not an error, so `XACT_ABORT` does not react to it (Section 4);
+- syntax errors are not affected by this setting;
+- `TRY/CATCH` is still needed to roll back and report the error in a controlled way.
+
+---
+
+# Section 4 – When SQL Succeeds but the Business Operation Fails
+
+Section 3 handled operations that fail with an **error**. This section is about the **C** in ACID: an operation can run without any SQL error and still break a business rule. The database cannot detect that by itself; your code must.
+
+## 4.1 Zero affected rows is not an SQL error
+
+The following statement is valid SQL:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = Balance + 200.00
+WHERE AccountID = 999;
+
+SELECT @@ROWCOUNT AS RowsAffected;
+```
+
+The result is `0` because account `999` does not exist.
+
+If we had already debited another account, SQL Server would not automatically know that the intended transfer was incomplete.
+
+## 4.2 Check @@ROWCOUNT immediately
+
+We must check the number of affected rows directly after the relevant statement:
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = Balance + 200.00
+WHERE AccountID = 999;
+
+IF @@ROWCOUNT <> 1
+    THROW 50001, 'Destination account does not exist.', 1;
+```
+
+Run this as an independent example. The custom error is expected; no account is changed.
+
+`THROW` with arguments creates an application error:
+
+| Argument | Meaning |
+|---|---|
+| `50001` | Application error number; user-defined numbers start at `50000` |
+| Message | Explanation for the caller |
+| `1` | State value, which can help identify where an error was raised |
+
+`THROW;` without arguments is used inside `CATCH` to rethrow the original error.
+
+Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other statements can change or reset its value.
+
+## 4.3 Detect insufficient funds in the update
+
+Instead of reading a balance and later deciding whether to subtract, we can include the condition in the update itself:
+
+```sql
+DECLARE @Amount decimal(12, 2) = 2000.00;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - @Amount
+WHERE AccountID = 1
+  AND Balance >= @Amount;
+
+IF @@ROWCOUNT <> 1
+    THROW 50002, 'Source account does not exist or has insufficient funds.', 1;
+```
+
+Account A has less than `2000.00`, so no row is changed and the custom error is raised.
+
+This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
+
+The next section puts the checks and both account updates into one procedure.
+
+---
+
+# Section 5 – A Complete Transfer Procedure
+
+## 5.1 Define the operation
+
+The procedure accepts a source account, a destination account, and an amount.
+
+It must:
+
+1. reject missing parameters, a non-positive amount, or equal account IDs;
+2. debit the source only if it exists and has sufficient funds;
+3. credit the destination only if it exists;
+4. commit both changes on success;
+5. roll back the operation and report the error on failure.
+
+For the first tests, call this procedure with **no transaction already open**. Section 9 deliberately calls it inside an outer transaction.
+
+## 5.2 Create the procedure
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_TransferFunds
+    @SourceAccountID int,
+    @DestinationAccountID int,
+    @Amount decimal(12, 2)
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    IF @SourceAccountID IS NULL
+       OR @DestinationAccountID IS NULL
+       OR @Amount IS NULL
+        THROW 50010, 'Account IDs and amount are required.', 1;
+
+    IF @Amount <= 0
+        THROW 50011, 'Transfer amount must be greater than zero.', 1;
+
+    IF @SourceAccountID = @DestinationAccountID
+        THROW 50012, 'Source and destination accounts must be different.', 1;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.BankAccount
+        SET Balance = Balance - @Amount
+        WHERE AccountID = @SourceAccountID
+          AND Balance >= @Amount;
+
+        IF @@ROWCOUNT <> 1
+            THROW 50013,
+                'Source account does not exist or has insufficient funds.', 1;
+
+        UPDATE dbo.BankAccount
+        SET Balance = Balance + @Amount
+        WHERE AccountID = @DestinationAccountID;
+
+        IF @@ROWCOUNT <> 1
+            THROW 50014, 'Destination account does not exist.', 1;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH;
+END;
+GO
+```
+
+```mermaid
+flowchart TD
+    P["Check parameters:<br/>NULL? amount <= 0? same account?"] -->|"invalid"| E1["THROW 50010 / 50011 / 50012"]
+    P -->|"valid"| B
+    subgraph TRAN["Transaction"]
+        B["BEGIN TRANSACTION"] --> D["Debit source<br/>WHERE Balance >= @Amount"]
+        D --> R1{"@@ROWCOUNT = 1 ?"}
+        R1 -->|"yes"| C["Credit destination"]
+        C --> R2{"@@ROWCOUNT = 1 ?"}
+        R2 -->|"yes"| CM["COMMIT TRANSACTION"]
+    end
+    R1 -->|"no: THROW 50013"| CATCH["CATCH: ROLLBACK, then THROW;"]
+    R2 -->|"no: THROW 50014"| CATCH
+    D -.->|"any SQL error"| CATCH
+    C -.->|"any SQL error"| CATCH
+```
+
+*Diagram 3 – `usp_TransferFunds`. The parameter checks run before the transaction starts. Inside the transaction, every failure leads to the same place: a full rollback and an error for the caller.*
+
+The parameter checks need no database data, so they run before the transaction opens. The transaction then contains only the work that must be atomic.
+
+## 5.3 Test a successful transfer
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = CASE AccountID
+                  WHEN 1 THEN 1000.00
+                  WHEN 2 THEN  500.00
+              END;
+
+EXEC dbo.usp_TransferFunds
+    @SourceAccountID = 1,
+    @DestinationAccountID = 2,
+    @Amount = 200.00;
+
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT SUM(Balance) AS TotalBalance,
+       @@TRANCOUNT AS OpenTransactionCount
+FROM dbo.BankAccount;
+```
+
+Expected balances: `800.00` and `700.00`. Expected total: `1500.00`. Expected transaction count: `0`.
+
+## 5.4 Test a missing destination
+
+The source update will succeed first. The procedure must undo it when the destination update affects zero rows.
+
+For an expected error, the test's outer `CATCH` displays the message and allows verification to continue:
+
+```sql
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 999,
+        @Amount = 100.00;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS ErrorNumber,
+           ERROR_MESSAGE() AS ErrorMessage;
+END CATCH;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+Expected error: `50014`. Balances remain `800.00` and `700.00`. The transaction count is `0`.
+
+## 5.5 Test insufficient funds
+
+```sql
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 2,
+        @Amount = 2000.00;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS ErrorNumber,
+           ERROR_MESSAGE() AS ErrorMessage;
+END CATCH;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+Expected error: `50013`. Both balances remain unchanged, and no transaction remains open.
+
+## 5.6 Verify behavior, not only messages
+
+| Test | Expected result | What to verify |
+|---|---|---|
+| Valid transfer | Success | Correct debit and credit; total unchanged |
+| Missing destination | Error `50014` | Earlier debit undone |
+| Insufficient funds | Error `50013` | Neither balance changes |
+| Zero or negative amount | Error `50011` | Neither balance changes |
+| Same source and destination | Error `50012` | Neither balance changes |
+| `NULL` parameter | Error `50010` | Neither balance changes |
+
+For these standalone calls, `@@TRANCOUNT` must be `0` after each test.
 
 > [!NOTE]
-> **Extension:** This section introduces savepoints. For the core transaction workflow, understand the single example in 3.1; Sections 3.3–3.4 show less common details and can be left for self-study.
+> An error message is only part of the result. Always inspect the final data and transaction count. A procedure that reports an error but leaves half the operation committed is still incorrect.
+
+---
+
+# Part C – Going Deeper
+
+Parts A and B cover what you need to write a correct transaction. Part C looks at less common tools (savepoints), at what happens when transactions meet procedures (nesting and ownership), and at how SQL Server keeps its promises after a crash.
+
+---
+
+# Section 6 – Savepoints: Undoing Part of a Transaction
 
 A full `ROLLBACK` undoes the complete transaction. Sometimes we want to undo only the work done after a particular point.
 
-A **savepoint** is a named marker inside an open transaction.
+A **savepoint** is a named marker inside an open transaction. The examples in this section build up to the following picture:
 
-## 3.1 Create a savepoint
+```mermaid
+flowchart LR
+    subgraph FULL["Full ROLLBACK TRANSACTION: undoes everything"]
+        direction LR
+        B["BEGIN<br/>TRANSACTION"] --> T1["Transfer 1<br/>100.00"]
+        T1 --> S1(["SAVE<br/>AfterFirstTransfer"])
+        S1 --> PART
+        subgraph PART["ROLLBACK TRANSACTION AfterFirstTransfer: undoes only this part"]
+            direction LR
+            T2["Transfer 2<br/>50.00"] --> S2(["SAVE<br/>AfterSecondTransfer"])
+            S2 --> T3["Transfer 3<br/>25.00"]
+        end
+    end
+```
+
+*Diagram 4 – Three transfers and two savepoints in one transaction. Rolling back to `AfterFirstTransfer` also discards the later savepoint `AfterSecondTransfer` (6.4). A full rollback ignores savepoints (6.3).*
+
+## 6.1 Create a savepoint
 
 Reset the account balances before this independent demonstration. Based on 2.2 and 2.3, predict what `ROLLBACK TRANSACTION AfterFirstTransfer` will leave behind before reading on.
 
@@ -433,7 +844,7 @@ COMMIT TRANSACTION;
 | After rollback to savepoint | 900.00 | 600.00 |
 | After final commit | 900.00 | 600.00 |
 
-## 3.2 What a savepoint does not do
+## 6.2 What a savepoint does not do
 
 `SAVE TRANSACTION` does not commit earlier work or start an independent transaction.
 
@@ -444,7 +855,7 @@ If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would b
 > [!NOTE]
 > This example deliberately cancels valid work. Recovering from an actual SQL error using a savepoint is more complicated: some errors leave the transaction unable to commit, and a savepoint cannot repair that state. The main error-handling pattern in this lab rolls back the entire business operation.
 
-## 3.3 A full rollback removes work recorded before the savepoint too
+## 6.3 A full rollback removes work recorded before the savepoint too
 
 A savepoint only protects work from a **partial** rollback. It does not protect that work from a **full** rollback.
 
@@ -501,12 +912,11 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 | After second transfer | 850.00 | 650.00 |
 | After full rollback | 1000.00 | 500.00 |
 
-Compare this with 3.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
+Compare this with 6.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
 
-> [!IMPORTANT]
-> A savepoint marks a point for a partial rollback. It does not create a boundary that a full rollback must respect. The number of savepoints inside a transaction has no effect on what a full `ROLLBACK` undoes.
+A savepoint marks a point for a partial rollback. It does not create a boundary that a full rollback must respect. The number of savepoints inside a transaction has no effect on what a full `ROLLBACK` undoes.
 
-## 3.4 Rolling back to an earlier savepoint invalidates later ones
+## 6.4 Rolling back to an earlier savepoint invalidates later ones
 
 A transaction can contain several savepoints. Rolling back to an earlier one also discards any savepoint defined after it.
 
@@ -584,18 +994,69 @@ SELECT @@TRANCOUNT AS FinalCount; -- 0
 
 After `ROLLBACK TRANSACTION AfterFirstTransfer`, the savepoint `AfterSecondTransfer` no longer exists. Running `ROLLBACK TRANSACTION AfterSecondTransfer` at that point would fail with an error, because that savepoint was defined after the point we already rolled back to.
 
-The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` is `1`). It must still be finished with `COMMIT` or a full `ROLLBACK`, exactly as in 4.2.
+The transaction itself is still open after a savepoint rollback (`@@TRANCOUNT` is `1`). It must still be finished with `COMMIT` or a full `ROLLBACK`, exactly as in 6.2.
 
 ---
 
-# Section 4 – @@TRANCOUNT and Nested Transactions
+# Section 7 – What ROLLBACK Does Not Undo
 
-> [!NOTE]
-> **Extension:** The key point is that nested `BEGIN` statements do not create independently committable transactions. Sections 4.1–4.2 are the essential example; 4.3 and the prediction table are optional practice.
+`ROLLBACK` undoes transactional changes to table data. It is not a universal undo button for everything that happened while the transaction was open.
 
-`@@TRANCOUNT` reports the transaction nesting count for the **current connection**.
+## 7.1 IDENTITY values
 
-## 4.1 How the counter changes
+Create a separate demonstration table:
+
+```sql
+CREATE TABLE dbo.Note
+(
+    NoteID int IDENTITY(1, 1) NOT NULL
+        CONSTRAINT PK_Note PRIMARY KEY,
+    NoteText nvarchar(100) NOT NULL
+);
+GO
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'First committed note');
+
+BEGIN TRANSACTION;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'This note will be rolled back');
+
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
+
+ROLLBACK TRANSACTION;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'Next committed note');
+
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
+```
+
+On the first run against this newly created table, the final IDs are `1` and `3`. The row with ID `2` was rolled back, but its allocated identity value was consumed.
+
+`IDENTITY` generates identifiers; it does not guarantee a gap-free sequence. Rollbacks, failed inserts, and other events can leave gaps. Do not use the largest identity value as a row count.
+
+## 7.2 Variables and the outside world
+
+Two more things stay as they are after a rollback:
+
+- **T-SQL variables.** A value assigned to a variable inside a transaction keeps that value after `ROLLBACK`.
+- **Actions outside the database.** An email that was sent or an external API that was called is not recalled by a database rollback.
+
+This is one reason to keep a transaction focused on database work: do not send an email or call an external service while the transaction is still open.
+
+---
+
+# Section 8 – @@TRANCOUNT and Nested Transactions
+
+`@@TRANCOUNT` reports the transaction nesting count for the **current connection**. Nesting looks like an exotic case, but it happens every time a procedure that starts its own transaction is called inside another transaction — the topic of Section 9.
+
+## 8.1 How the counter changes
 
 Assuming an active, valid local transaction where required:
 
@@ -623,7 +1084,7 @@ COMMIT TRANSACTION;
 SELECT @@TRANCOUNT AS AfterOuterCommit;  -- 0
 ```
 
-## 4.2 An inner COMMIT does not independently commit
+## 8.2 An inner COMMIT does not independently commit
 
 SQL Server does not provide independently committable nested transactions.
 
@@ -665,10 +1126,9 @@ The original balances, `1000.00` and `500.00`, are restored.
 
 The inner `COMMIT` reduced the counter from `2` to `1`. The changes were still part of the outer transaction and could be undone.
 
-> [!IMPORTANT]
-> An inner `COMMIT` does not make its changes independent of the outer transaction. Only the outermost successful `COMMIT` completes the transaction.
+**An inner `COMMIT` does not make its changes independent of the outer transaction. Only the outermost successful `COMMIT` completes the transaction.**
 
-## 4.3 Full rollback is different
+## 8.3 Full rollback is different
 
 ```sql
 BEGIN TRANSACTION;
@@ -704,376 +1164,13 @@ The second and fourth sequences leave a transaction open. If you run them, finis
 
 ---
 
-# Part B – Transactions and Stored Procedures
-
----
-
-# Section 5 – Handling Errors Inside a Transaction
-
-Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs code that chooses the correct outcome when an operation fails.
-
-[Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
-
-## 5.1 SET XACT_ABORT ON
-
-`SET XACT_ABORT ON` makes many execution errors abort the whole transaction rather than merely undoing the statement that failed.
-
-```sql
-SET XACT_ABORT ON;
-```
-
-Inside `TRY/CATCH`, an error can leave a transaction **uncommittable** when control reaches `CATCH`. We therefore keep the explicit rollback in the handler.
-
-It does not mean that every possible problem is automatically handled:
-
-- syntax and compilation errors are not controlled by this setting;
-- an `UPDATE` that matches zero rows is not automatically an error;
-- business-rule failures must be detected by your code.
-
-`THROW` honors `XACT_ABORT`. Use `THROW` for new error-handling examples in this lab.
-
-> [!IMPORTANT]
-> `XACT_ABORT` supports the error-handling pattern. It does not replace `TRY/CATCH`, validation, or a deliberate rollback policy.
-
-## 5.2 The basic pattern
-
-```sql
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    -- Execute all statements belonging to the operation.
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-
-    THROW;
-END CATCH;
-```
-
-This pattern assumes that the block owns the whole operation and that a full rollback is the required response to an error. Section 8 explains how an outer transaction changes that responsibility.
-
-| Element | Purpose |
-|---|---|
-| `SET XACT_ABORT ON` | Make execution errors abort the transaction instead of only the failing statement (5.1) |
-| `TRY` | Execute the operation and its successful commit |
-| `CATCH` | Handle execution errors caught by T-SQL |
-| `IF @@TRANCOUNT > 0` | Check that a transaction still exists before rolling it back |
-| `ROLLBACK` | Undo the complete operation |
-| `THROW;` | Pass the original error to the caller |
-
-Some errors may already have ended the transaction. The counter check avoids a second error from trying to roll back when no transaction exists.
-
-## 5.3 Repeat the failing example with protection
-
-Reset the balances, then run the protected operation:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
-
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    UPDATE dbo.BankAccount
-    SET Balance = Balance - 200.00
-    WHERE AccountID = 1;
-
-    -- Deliberate CHECK constraint violation.
-    UPDATE dbo.BankAccount
-    SET Balance = -1.00
-    WHERE AccountID = 2;
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-
-    THROW;
-END CATCH;
-```
-
-An error message is expected. After it appears, run this verification **separately**:
-
-```sql
-SELECT AccountID, AccountName, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT SUM(Balance) AS TotalBalance,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.BankAccount;
-```
-
-Expected results:
-
-- Account A: `1000.00`.
-- Account B: `500.00`.
-- Total: `1500.00`.
-- Transaction count: `0`.
-
-The first update succeeded initially, but the handler rolled it back when the second update failed.
-
-> [!NOTE]
-> The deliberate failure uses a constraint to produce a predictable error. There is no need to stop SQL Server or simulate a real crash.
-
----
-
-# Section 6 – When SQL Succeeds but the Business Operation Fails
-
-## 6.1 Zero affected rows is not an SQL error
-
-The following statement is valid SQL:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = Balance + 200.00
-WHERE AccountID = 999;
-
-SELECT @@ROWCOUNT AS RowsAffected;
-```
-
-The result is `0` because account `999` does not exist.
-
-If we had already debited another account, SQL Server would not automatically know that the intended transfer was incomplete.
-
-## 6.2 Check @@ROWCOUNT immediately
-
-We must check the number of affected rows directly after the relevant statement:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = Balance + 200.00
-WHERE AccountID = 999;
-
-IF @@ROWCOUNT <> 1
-    THROW 50001, 'Destination account does not exist.', 1;
-```
-
-Run this as an independent example. The custom error is expected; no account is changed.
-
-`THROW` with arguments creates an application error:
-
-| Argument | Meaning |
-|---|---|
-| `50001` | Application error number; user-defined numbers start at `50000` |
-| Message | Explanation for the caller |
-| `1` | State value, which can help identify where an error was raised |
-
-`THROW;` without arguments is used inside `CATCH` to rethrow the original error.
-
-> [!IMPORTANT]
-> Read `@@ROWCOUNT` immediately. Other statements can change or reset its value.
-
-## 6.3 Detect insufficient funds in the update
-
-Instead of reading a balance and later deciding whether to subtract, we can include the condition in the update itself:
-
-```sql
-DECLARE @Amount decimal(12, 2) = 2000.00;
-
-UPDATE dbo.BankAccount
-SET Balance = Balance - @Amount
-WHERE AccountID = 1
-  AND Balance >= @Amount;
-
-IF @@ROWCOUNT <> 1
-    THROW 50002, 'Source account does not exist or has insufficient funds.', 1;
-```
-
-The account currently has `1000.00`, so no row is changed and the custom error is raised.
-
-This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
-
-The next section puts the checks and both account updates into one procedure.
-
----
-
-# Section 7 – A Complete Transfer Procedure
-
-## 7.1 Define the operation
-
-The procedure accepts a source account, a destination account, and an amount.
-
-It must:
-
-1. reject missing parameters, a non-positive amount, or equal account IDs;
-2. debit the source only if it exists and has sufficient funds;
-3. credit the destination only if it exists;
-4. commit both changes on success;
-5. roll back the operation and report the error on failure.
-
-For the first tests, call this procedure with **no transaction already open**. Section 8 deliberately calls it inside an outer transaction to explore nesting.
-
-## 7.2 Create the procedure
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_TransferFunds
-    @SourceAccountID int,
-    @DestinationAccountID int,
-    @Amount decimal(12, 2)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    IF @SourceAccountID IS NULL
-       OR @DestinationAccountID IS NULL
-       OR @Amount IS NULL
-        THROW 50010, 'Account IDs and amount are required.', 1;
-
-    IF @Amount <= 0
-        THROW 50011, 'Transfer amount must be greater than zero.', 1;
-
-    IF @SourceAccountID = @DestinationAccountID
-        THROW 50012, 'Source and destination accounts must be different.', 1;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        UPDATE dbo.BankAccount
-        SET Balance = Balance - @Amount
-        WHERE AccountID = @SourceAccountID
-          AND Balance >= @Amount;
-
-        IF @@ROWCOUNT <> 1
-            THROW 50013,
-                'Source account does not exist or has insufficient funds.', 1;
-
-        UPDATE dbo.BankAccount
-        SET Balance = Balance + @Amount
-        WHERE AccountID = @DestinationAccountID;
-
-        IF @@ROWCOUNT <> 1
-            THROW 50014, 'Destination account does not exist.', 1;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        THROW;
-    END CATCH;
-END;
-GO
-```
-
-The parameter checks happen before the procedure opens its transaction, keeping the transaction focused on database work. If this procedure is invoked inside an outer transaction, its errors can still affect that transaction; see Section 8.
-
-## 7.3 Test a successful transfer
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
-
-EXEC dbo.usp_TransferFunds
-    @SourceAccountID = 1,
-    @DestinationAccountID = 2,
-    @Amount = 200.00;
-
-SELECT AccountID, AccountName, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT SUM(Balance) AS TotalBalance,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.BankAccount;
-```
-
-Expected balances: `800.00` and `700.00`. Expected total: `1500.00`. Expected transaction count: `0`.
-
-## 7.4 Test a missing destination
-
-The source update will succeed first. The procedure must undo it when the destination update affects zero rows.
-
-For an expected error, the test's outer `CATCH` displays the message and allows verification to continue:
-
-```sql
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 999,
-        @Amount = 100.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
-```
-
-Expected error: `50014`. Balances remain `800.00` and `700.00`. The transaction count is `0`.
-
-## 7.5 Test insufficient funds
-
-```sql
-BEGIN TRY
-    EXEC dbo.usp_TransferFunds
-        @SourceAccountID = 1,
-        @DestinationAccountID = 2,
-        @Amount = 2000.00;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_NUMBER() AS ErrorNumber,
-           ERROR_MESSAGE() AS ErrorMessage;
-END CATCH;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
-```
-
-Expected error: `50013`. Both balances remain unchanged, and no transaction remains open.
-
-## 7.6 Verify behavior, not only messages
-
-| Test | Expected result | What to verify |
-|---|---|---|
-| Valid transfer | Success | Correct debit and credit; total unchanged |
-| Missing destination | Error `50014` | Earlier debit undone |
-| Insufficient funds | Error `50013` | Neither balance changes |
-| Zero or negative amount | Error `50011` | Neither balance changes |
-| Same source and destination | Error `50012` | Neither balance changes |
-| `NULL` parameter | Error `50010` | Neither balance changes |
-
-For these standalone calls, `@@TRANCOUNT` must be `0` after each test.
-
-> [!NOTE]
-> An error message is only part of the result. Always inspect the final data and transaction count. A procedure that reports an error but leaves half the operation committed is still incorrect.
-
----
-
-# Section 8 – Who Manages the Transaction?
-
-> [!NOTE]
-> **Extension:** For the core lab, learn the ownership rule in 8.1 and the summary in 8.5. The caller-managed and nested examples in 8.2–8.4 are useful follow-up reading; they demonstrate advanced consequences of transaction ownership.
+# Section 9 – Who Manages the Transaction?
 
 A transaction can be managed by the procedure or by its caller. The important question is: **which code owns the complete business operation?**
 
 [Lab 7 – CRUD Operations](lab07-crud-operations.md), Section 6.3, asked the same ownership question about `TRY/CATCH` placement — inside a procedure or at its caller. Here it returns for transactions, and the stakes are higher: the wrong choice does not just mis-handle an error message, it can commit or roll back the wrong amount of work.
 
-## 8.1 The procedure manages the transaction
+## 9.1 The procedure manages the transaction
 
 Our transfer procedure represents one complete operation. It starts a transaction, performs the work, and commits or rolls back.
 
@@ -1086,7 +1183,7 @@ EXEC dbo.usp_TransferFunds
 
 This is convenient when one call corresponds to the entire operation. This example changes the balances; later demonstrations reset them explicitly.
 
-## 8.2 The caller manages the transaction
+## 9.2 The caller manages the transaction
 
 An application or another procedure may need to combine several operations into one transaction.
 
@@ -1098,8 +1195,6 @@ CREATE OR ALTER PROCEDURE dbo.usp_ChangeBalance
     @Change decimal(12, 2)
 AS
 BEGIN
-    SET NOCOUNT ON;
-
     IF @Change IS NULL
         THROW 50020, 'Balance change is required.', 1;
 
@@ -1151,10 +1246,35 @@ Expected balances: `900.00` and `600.00`.
 
 The helper participates in the caller's transaction without starting its own. If the caller does not start a transaction, its update runs in autocommit mode.
 
-> [!NOTE]
-> This helper illustrates transaction ownership. It is a low-level building block: it does not itself enforce a complete transfer or preserve the combined account balance.
+This helper illustrates transaction ownership. It is a low-level building block: it does not itself enforce a complete transfer or preserve the combined account balance.
 
-## 8.3 An outer transaction wraps our transfer procedure
+## 9.3 An outer transaction wraps our transfer procedure
+
+What happens when the caller starts a transaction and then calls `usp_TransferFunds`, which starts its own? Sections 9.3 and 9.4 run both outcomes. Follow `@@TRANCOUNT` in the diagram:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant P as usp_TransferFunds
+    C->>C: BEGIN TRANSACTION (count 0 → 1)
+    Note over C: 9.4 only: the caller also renames Account A
+    C->>P: EXEC
+    P->>P: BEGIN TRANSACTION (count 1 → 2)
+    P->>P: debit the source account
+    alt 9.3: destination exists
+        P->>P: credit the destination account
+        P->>P: COMMIT (count 2 → 1), nothing is committed yet
+        P-->>C: returns successfully
+        C->>C: ROLLBACK (count 1 → 0), the transfer is undone
+    else 9.4: destination does not exist
+        P->>P: CATCH: full ROLLBACK (count 2 → 0)
+        Note over C,P: the caller's rename is undone too
+        P-->>C: THROW 50014
+        C->>C: CATCH: count is already 0, nothing left to roll back
+    end
+```
+
+*Diagram 5 – One transaction shared by a caller and a procedure. Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.*
 
 Reset the balances and run this complete block:
 
@@ -1191,7 +1311,7 @@ The final balances are `1000.00` and `500.00`.
 
 The procedure returned successfully, but its inner `COMMIT` did not independently confirm the transfer. The caller's rollback undid it.
 
-## 8.4 A rollback inside a procedure can undo the caller's work
+## 9.4 A rollback inside a procedure can undo the caller's work
 
 The reverse is equally important. Our transfer procedure uses a **full rollback** when an execution error reaches its handler.
 
@@ -1230,14 +1350,11 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 The temporary name change is also undone. Account A is still named `Account A`, balances are `1000.00` and `500.00`, and the transaction count is `0`.
 
-SQL Server may also report a transaction-count mismatch because the procedure entered with an outer transaction and ended it through a full rollback. That is another reason to define transaction ownership clearly.
+The caller's `CATCH` receives error `50014`. When it runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too.
 
-> [!IMPORTANT]
-> A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It affects the entire current transaction.
->
-> For this lab's transfer procedure, a failure means the complete enclosing operation must fail. A caller must not continue toward a commit after that failure.
+**A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It ends the entire current transaction.** For this lab's transfer procedure, a failure means the complete enclosing operation fails. A caller must not continue toward a commit after that failure.
 
-## 8.5 Choose a clear convention
+## 9.5 Choose a clear convention
 
 | Approach | Appropriate when… | Responsibility |
 |---|---|---|
@@ -1249,34 +1366,13 @@ The third approach is discussed briefly in Additional Reading. It is not require
 
 ---
 
-# Section 9 – ACID, the Transaction Log, and Recovery
+# Section 10 – How SQL Server Keeps A and D: the Transaction Log
 
-> [!NOTE]
-> **Core reading:** 9.1–9.6 introduce ACID, the transaction log, write-ahead logging, and the basic ideas of UNDO and REDO. Sections 9.7–9.10 go deeper into recovery behavior and are optional. They are intended to connect this lab with physical storage, not as additional SQL programming tasks.
+Sections 1–9 relied on two of the ACID promises from 1.5: **atomicity** (`ROLLBACK` undoes everything) and **durability** (`COMMIT` is permanent). This section explains how SQL Server keeps them, even if the server stops unexpectedly. Nothing here changes how you write a transaction.
 
-By now you can write, verify, and troubleshoot transactions: `BEGIN/COMMIT/ROLLBACK`, savepoints, `@@TRANCOUNT`, and the `TRY/CATCH` pattern inside a procedure. This section steps back and explains **how SQL Server can keep the promises you have been relying on**, even if the server stops unexpectedly. Nothing here changes how you write a transaction — it explains why the commands from Sections 2–8 behave the way they do.
+The section builds on the data pages and buffer pool from Lab 5. It uses a **simplified model**: the real log format and recovery algorithm contain more detail, but they follow the same rules. Sections 10.1–10.5 are the core ideas; 10.6–10.9 go further into recovery.
 
-This section builds on the data pages and buffer pool introduced in Lab 5. It uses diagrams and conceptual examples; there is no need to shut down SQL Server or inspect its internal log format.
-
-## 9.1 Four transaction properties
-
-The acronym **ACID** describes four properties associated with reliable transaction processing.
-
-| Property | Meaning | Connection to our example |
-|---|---|---|
-| **Atomicity** | A transaction's changes are kept together or undone together | The debit and credit must form one operation |
-| **Consistency** | A correct transaction preserves defined rules | Balances stay non-negative and the transfer preserves the total |
-| **Isolation** | Rules control interactions between concurrent transactions | Two simultaneous operations must be handled appropriately |
-| **Durability** | Committed changes survive a system restart or crash | A confirmed transfer must not disappear after a restart |
-
-We focus on **Atomicity**, **Consistency**, and **Durability** here. Lab 10 explains isolation and the trade-offs between isolation levels.
-
-> [!IMPORTANT]
-> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements could succeed and be committed. Atomicity cannot correct the wrong calculation.
->
-> Consistency depends on correctly designed constraints and business logic as well as transaction boundaries.
-
-## 9.2 The missing link: memory is not permanent storage
+## 10.1 The missing link: memory is not permanent storage
 
 Recall the buffer pool from Lab 5. SQL Server reads data pages into memory and performs changes there. A modified page is called a **dirty page**. In this context, *dirty* means modified in memory and not yet written back to its data file.
 
@@ -1301,7 +1397,7 @@ flowchart TB
     LF -.->|"Required log records must be durable first"| DF
 ```
 
-*Diagram 1 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
+*Diagram 6 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
 
 | Component | Location | Purpose |
 |---|---|---|
@@ -1310,12 +1406,9 @@ flowchart TB
 | Data files | Durable storage | Store table and index pages |
 | Transaction log file | Durable storage | Stores log records used for recovery |
 
-A database has at least one data file and one log file. Common extensions are `.mdf` for the primary data file, `.ndf` for additional data files, and `.ldf` for log files.
+A database has at least one data file and one log file. Common extensions are `.mdf` for the primary data file, `.ndf` for additional data files, and `.ldf` for log files. A record in the **log buffer** is still in memory; a **log flush** writes it to durable storage.
 
-> [!NOTE]
-> The diagram separates logical roles. It does not require the data and log files to be on separate physical disks. A record in the **log buffer** is still in memory; a log flush writes records to durable storage.
-
-## 9.3 Follow one transfer into the log
+## 10.2 Follow one transfer into the log
 
 Use the same transfer as before, starting from these illustrative balances:
 
@@ -1327,7 +1420,7 @@ Use the same transfer as before, starting from these illustrative balances:
 The SQL operation contains two updates:
 
 ```sql
--- Illustration only: the executable examples are in Sections 2 and 9.
+-- Illustration only: the executable examples are in Sections 2 and 5.
 BEGIN TRANSACTION;
 
 UPDATE dbo.BankAccount
@@ -1357,14 +1450,9 @@ Two directions are now possible:
 - **UNDO:** restore the old values when the transaction must be rolled back.
 - **REDO:** reconstruct logged changes that need to be reapplied during recovery.
 
-> [!IMPORTANT]
-> This is a **teaching model**, not the physical format of SQL Server log records. Real records contain internal recovery information and are not simply a readable table of every column's old and new values.
->
-> The transaction log is also not a substitute for an application audit trail that records who performed a business action and why.
+The transaction log is not an audit trail: it does not record who performed a business action or why.
 
-The `BEGIN` row is a conceptual boundary. In SQL Server, executing `BEGIN TRANSACTION` alone does not necessarily write a log record immediately; the logged transaction begins when work requiring logging occurs.
-
-## 9.4 Write-ahead logging: which information must be written first?
+## 10.3 Write-ahead logging: which information must be written first?
 
 The rule is called **Write-Ahead Logging (WAL)**:
 
@@ -1399,11 +1487,9 @@ flowchart TD
     COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
 ```
 
-*Diagram 2 – WAL constrains page writes; fully durable commit also requires the commit record to be durable. These paths illustrate separate requirements, not the only times a log flush can occur.*
+*Diagram 7 – WAL constrains page writes; fully durable commit also requires the commit record to be durable.*
 
-All examples in this section assume normal fully durable commits and storage that honors durability guarantees. Delayed durability is outside this lab.
-
-## 9.5 ROLLBACK and UNDO: restore the previous values
+## 10.4 ROLLBACK and UNDO: restore the previous values
 
 Suppose both account updates have run, but the operation is canceled before commit.
 
@@ -1427,10 +1513,7 @@ The final outcome illustrates **Atomicity**: neither update remains.
 
 If a crash happens after only the first update, recovery must undo that incomplete transaction's effects. The second update never happened, so there is no second update to undo.
 
-> [!NOTE]
-> Rollback does not erase the transaction's history from the log. Recovery and rollback can generate additional log records. The illustration shows the restored values, not the full internal rollback algorithm.
-
-## 9.6 COMMIT, a crash, and REDO: preserve the confirmed operation
+## 10.5 COMMIT, a crash, and REDO: preserve the confirmed operation
 
 Now consider a different sequence:
 
@@ -1451,7 +1534,7 @@ flowchart TD
     REDO --> RESULT
 ```
 
-*Diagram 3 – A conceptual recovery decision for this committed transfer. The diagram shows the required result, not SQL Server's complete recovery algorithm.*
+*Diagram 8 – A conceptual recovery decision for this committed transfer.*
 
 The recovered result must preserve the confirmed transfer:
 
@@ -1463,11 +1546,9 @@ The recovered result must preserve the confirmed transfer:
 This illustrates **Durability**.
 
 > [!IMPORTANT]
-> **REDO does not mean calling the transfer procedure again.** Recovery uses internal log information to restore the required page changes. It must not subtract another `200.00` from the recovered balance.
->
-> Some page changes may already be present and need no reapplication. Recovery determines which work is necessary.
+> **REDO does not mean calling the transfer procedure again.** Recovery uses the log to restore the required page changes. It must not subtract another `200.00` from the recovered balance.
 
-## 9.7 Several transactions share the log
+## 10.6 Several transactions share the log
 
 A database normally has many transactions. Their log records can be interleaved in the same log stream.
 
@@ -1492,7 +1573,7 @@ This explains two important points:
 
 We are looking only at logging and recovery here. Which operations can proceed simultaneously, and when one session must wait, are questions for Lab 10.
 
-## 9.8 Checkpoints help recovery
+## 10.7 Checkpoints help recovery
 
 Over time, SQL Server writes dirty data pages to their files. A **checkpoint** coordinates page flushing and records recovery information, reducing the work needed after an unexpected shutdown.
 
@@ -1506,10 +1587,9 @@ A checkpoint is different from a commit:
 
 A transaction can begin before a checkpoint and still be active afterward. Relevant information before the checkpoint may therefore still be needed for recovery.
 
-> [!NOTE]
-> A checkpoint is not a backup and is not a promise that all transactions have completed. It does not remove the need to preserve committed work or undo incomplete work.
+A checkpoint is not a backup, and it does not mean that all transactions have completed.
 
-## 9.9 Recovery exercise: which outcomes must survive?
+## 10.8 Recovery exercise: which outcomes must survive?
 
 The following diagram shows five transactions, a checkpoint, and a later crash. Each bar starts when the transaction begins. Labels marked `COMMIT` indicate successful fully durable completion; labels marked `ACTIVE at crash` identify incomplete transactions. Read the labels rather than relying on colors, which depend on the GitHub theme.
 
@@ -1529,7 +1609,7 @@ gantt
     T5 - ACTIVE at crash :active, t5, 09:06, 4m
 ```
 
-*Diagram 4 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
+*Diagram 9 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
 
 **Questions**
 
@@ -1555,10 +1635,9 @@ The checkpoint does not commit T3. Its changes remain unconfirmed until that tra
 
 </details>
 
-> [!NOTE]
-> This exercise describes the required recovered outcome. Real recovery is not simply “redo only the committed transactions, then undo the others.” Traditional SQL Server recovery includes analysis, redo of needed logged modifications, and undo of incomplete work; redo can also involve changes from transactions later undone. Features such as Accelerated Database Recovery change implementation details. Those algorithms are outside this lab.
+This exercise asks for the required **outcome**. The real recovery algorithm (analysis, redo, undo) has more steps and is outside this lab.
 
-## 9.10 A system crash is different from losing the storage
+## 10.9 A system crash is different from losing the storage
 
 The examples above assume that the data and log storage remain usable after the server restarts.
 
@@ -1570,7 +1649,7 @@ The examples above assume that the data and log storage remain usable after the 
 
 The transaction log does not replace backups. A log stored on a failed device cannot be assumed to remain available for recovery.
 
-## 9.11 Check your understanding
+## 10.10 Check your understanding
 
 1. Which ACID property explains all-or-nothing behavior?
 2. Why is a log record in RAM insufficient for durability?
@@ -1597,9 +1676,9 @@ The transaction log does not replace backups. A log stored on a failed device ca
 
 ---
 
-# Section 10 – Common Mistakes and Final Review
+# Section 11 – Common Mistakes and Final Review
 
-## 10.1 Common mistakes
+## 11.1 Common mistakes
 
 | Mistake | Why it matters | Better approach |
 |---|---|---|
@@ -1610,11 +1689,12 @@ The transaction log does not replace backups. A log stored on a failed device ca
 | Reading `@@ROWCOUNT` after unrelated statements | Its value may have changed | Check it immediately after the relevant operation |
 | Catching an error and only printing a message | The caller may believe the operation succeeded | Roll back as required and propagate the error |
 | Forgetting to finish a transaction | It can retain resources and interfere with other work | Ensure all paths finish or transfer ownership explicitly |
+| Leaving out `SET XACT_ABORT ON` | A cancelled query or timeout skips `CATCH` and leaves the transaction open | Start transactional code with `SET XACT_ABORT ON` |
 | Expecting an inner `COMMIT` to be independent | An outer rollback can undo its changes | Understand the shared transaction boundary |
 | Expecting savepoint rollback to close the transaction | The transaction stays open | Finish it explicitly |
 | Expecting identity values to be gap-free | Allocations are not undone with the inserted rows | Treat IDs as identifiers |
 
-## 10.2 Final questions
+## 11.2 Final questions
 
 1. What does an explicit transaction add to autocommit behavior?
 2. What is the difference between full rollback and rollback to a savepoint?
@@ -1639,15 +1719,15 @@ The transaction log does not replace backups. A log stored on a failed device ca
 
 </details>
 
-## 10.3 Key takeaways
+## 11.3 Key takeaways
 
-- **A business operation can require several SQL statements.** Use a transaction when those changes must be kept or undone together.
+- **A business operation can require several SQL statements.** Use a transaction when those changes must be kept or undone together — that is atomicity, the A in ACID.
 - **`COMMIT` confirms; `ROLLBACK` undoes.** A savepoint allows partial rollback without closing the transaction.
 - **Errors need a policy.** Detect missing rows and business failures, roll back the required scope, and report the error.
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
 
-Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Section 9 explains, at a conceptual level, how SQL Server preserves committed work after a crash.
+Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Section 10 explains how SQL Server preserves committed work after a crash.
 
 **Looking ahead:** What happens if two sessions try to change the same data at the same time? Lab 10 introduces concurrency, locking, isolation levels, and deadlocks.
 
@@ -1655,7 +1735,7 @@ Back to the opening question: a transfer that subtracts from one account and add
 
 ## Additional practice
 
-Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md). Part A applies explicit transactions, savepoints, and caller-vs-procedure ownership to real `AdventureWorksENG` tables; Part B continues in `TransactionsLab` with the transfer procedure from Section 7.
+Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md). Part A applies explicit transactions, savepoints, and caller-vs-procedure ownership to real `AdventureWorksENG` tables; Part B continues in `TransactionsLab` with the transfer procedure from Section 5.
 
 ---
 
@@ -1731,19 +1811,7 @@ Avoid leaving a transaction open while waiting for a user, displaying a confirma
 
 The main procedure validates simple parameter rules before opening its transaction. Database-dependent checks need more care because other sessions can change the data; Lab 10 develops that topic.
 
-## D. Rollback Has a Scope
-
-Rollback undoes transactional database changes. It is not a universal undo mechanism for everything a program does.
-
-Examples:
-
-- allocated identity values may leave gaps;
-- ordinary T-SQL variable assignments are not reverted;
-- an email or external API request already sent is not automatically recalled by a database rollback.
-
-The scope of this lab is transactional changes to ordinary SQL Server tables.
-
-## E. References
+## D. References
 
 - [Database checkpoints](https://learn.microsoft.com/en-us/sql/relational-databases/logs/database-checkpoints-sql-server)
 - [Restore and recovery overview](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/restore-and-recovery-overview-sql-server)

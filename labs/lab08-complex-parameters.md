@@ -335,6 +335,21 @@ We need both: values passed **as parameters**, and many values passed **in one c
 
 We will begin with the simplest format: **delimited strings**.
 
+**Check your understanding**
+
+1. With the input `Achong' OR 1=1 --`, why does the concatenated query return all customers, while the parameterized query does not?
+2. Besides protection from SQL injection, what other benefit do parameters give?
+3. Why is a parameterized query inside a loop still not a good way to retrieve 100 products?
+
+<details>
+<summary>Show answers</summary>
+
+1. In the concatenated query, the input becomes part of the SQL text: `'` closes the string, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server searches for a last name that is literally `Achong' OR 1=1 --`.
+2. The query text stays the same, so SQL Server can reuse the cached execution plan.
+3. A scalar parameter carries one value, so 100 IDs still mean 100 calls. We need many values in one call.
+
+</details>
+
 ---
 
 # Section 3 – Method 2: Delimited String Parameters
@@ -602,6 +617,21 @@ This quickly becomes difficult to maintain.
 **Delimited strings work well for simple lists of values, but they are not ideal for structured data.**
 
 In the next section, we will introduce **XML**, which allows us to represent more complex information using elements, attributes, and nested structures.
+
+**Check your understanding**
+
+1. What does `STRING_SPLIT('1,2,5', ',')` return, and what type is the `value` column?
+2. A caller runs `EXEC dbo.usp_GetProductsByIDList @IDList = N'1,ABC,3';`. What happens?
+3. Why is a delimited string a poor fit for invoice items?
+
+<details>
+<summary>Show answers</summary>
+
+1. A table with one column named `value` and three rows: `1`, `2`, and `5`. The column is `nvarchar` if either argument is `nvarchar` or `nchar`; otherwise it is `varchar`. The values are strings until you convert them.
+2. `CAST('ABC' AS int)` fails with a conversion error. Nothing in a delimited string prevents a caller from sending a value that is not a number.
+3. Each item has several fields. We would need two delimiters and our own code to split and convert every value, and the values would have no names or types.
+
+</details>
 
 ---
 
@@ -1053,6 +1083,23 @@ XML remains useful when integrating with systems that already exchange XML docum
 > Additional practice: [Exercise 6 of the Complex Parameters Exercises](../exercises/lab08-complex-parameters.md#exercise-6--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
 
 In the next section, we will explore **JSON**, which represents the same kind of structured data in the format most web applications already use.
+
+**Check your understanding**
+
+1. In `.value('@ProductID', 'int')`, what does `@ProductID` read? How would you read the text of the element instead?
+2. In Section 4.4, the rows come from `/Invoice/Lines/Line`. Why does `../../@InvoiceNumber` need two `..` steps?
+3. You change the path in Section 4.4 to `/invoice/lines/line`. What happens?
+4. In `FOR XML PATH`, how do you create nested elements in the output?
+
+<details>
+<summary>Show answers</summary>
+
+1. The **attribute** `ProductID` of the current element. To read the element's text, use `.`, as in Section 4.2, Step 3.
+2. The parent of `Line` is `Lines`, and the parent of `Lines` is `Invoice`. The `InvoiceNumber` attribute belongs to `Invoice`.
+3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
+4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.
+
+</details>
 
 ---
 
@@ -1599,6 +1646,23 @@ However, JSON is not always the best choice: the procedure must parse the text a
 
 All three methods so far — delimited strings, XML, and JSON — send text that SQL Server must take apart. In the next section, we will explore **Table-Valued Parameters (TVPs)**, which pass typed rows directly, without any parsing.
 
+**Check your understanding**
+
+1. When do you use `JSON_VALUE`, and when `OPENJSON`?
+2. In `OPENJSON(@Json, '$.Invoice.Lines')`, what does the second argument do?
+3. In the `WITH` clause, what does `Quantity int '$.Quantity'` define? What do you get for a line that has no `Quantity` property?
+4. In `FOR JSON PATH`, how do you create a nested object? How does this differ from `FOR XML PATH`?
+
+<details>
+<summary>Show answers</summary>
+
+1. `JSON_VALUE` reads **one** scalar value, such as the invoice number. `OPENJSON` turns an **array** into rows, such as the invoice lines.
+2. It sets the starting point: `OPENJSON` returns one row for each element of the `Lines` array. The paths in `WITH` are relative to that element.
+3. A column named `Quantity`, of type `int`, read from the `Quantity` property. A missing property gives `NULL`, without an error.
+4. Use a **dot** in the column alias: `[Contact.Email]` creates a `Contact` object with an `Email` property. `FOR XML PATH` uses a slash for the same purpose.
+
+</details>
+
 ---
 
 # Section 6 – Method 5: Table-Valued Parameters (TVPs)
@@ -1979,6 +2043,21 @@ TVPs are particularly useful when an application needs to pass a collection of r
 
 In the next section, we will compare all five approaches and discuss when each method is most appropriate.
 
+**Check your understanding**
+
+1. Does `CREATE TYPE dbo.ProductIDList AS TABLE` create a table that stores product IDs?
+2. Why must a TVP be declared `READONLY`, and what do you do if you need to modify the input?
+3. In Section 6.4, why is the invoice header passed as scalar parameters and the items as a TVP?
+
+<details>
+<summary>Show answers</summary>
+
+1. No. It creates a reusable **structure** for declaring table variables and procedure parameters. No data is stored.
+2. SQL Server requires TVPs to be read-only: the procedure can query the rows but cannot change them, so the caller's data stays as it was sent. To modify the data, copy it into a local table variable or a temporary table.
+3. The header has a fixed number of values; the number of items varies.
+
+</details>
+
 ---
 
 # Section 7 – Choosing the Right Method
@@ -2154,36 +2233,18 @@ The choice depends on where data conversion should happen and how the applicatio
 
 ## Check your understanding
 
+These questions connect the whole lab. Questions about individual methods are at the end of Sections 2–6.
+
 1. What is the 1:N insert problem, and why is it hard without collection parameters?
-2. Why should untrusted values be passed as parameters, and why is a parameterized query in a loop still not enough for 100 IDs?
-3. What does `STRING_SPLIT` return, and what type is the `value` column?
-4. When you use XML, what does `@ProductID` mean in `.value('@ProductID', 'int')`?
-5. When you use `FOR XML PATH`, how do you create nested elements in the output?
-6. In `OPENJSON(@Json, '$.Invoice')`, what does `'$.Invoice'` do?
-7. How would you use `FOR JSON PATH` to build nested JSON with dotted aliases?
-8. Why is `READONLY` mandatory on TVP parameters, and what do you do if you need to modify the input?
-9. Compare TVP and JSON: when would you pick each one?
+2. Do the parent-child procedures in this lab guarantee that the invoice header and its items are inserted together or not at all?
+3. Which method would you consider first for each input: (a) a list of product IDs, (b) invoice items from an application that supports TVPs, (c) a JSON request received by a REST API, (d) a document from an external XML-based system?
 
 <details>
 <summary>Show answers</summary>
 
-1. **1:N insert** — An invoice header and its line items must be inserted together. A simple implementation using a separate procedure call for every row would require one call for the header and twenty calls for twenty items. A collection parameter allows one call to carry all items. Ensuring that all related inserts succeed or fail together is a separate concern, covered in the next lab.
-
-2. **Parameters and round-trips** — Passing untrusted values as parameters keeps data separate from executable SQL code and lets SQL Server reuse the execution plan. But a scalar parameter carries one value, so 100 IDs still mean 100 calls. A collection parameter sends all IDs in one call.
-
-3. **STRING_SPLIT returns** — With the two-argument syntax used in this lab, it returns a table with one column named `value`. The column is `nvarchar` if either input argument is `nvarchar` or `nchar`; otherwise it is `varchar`. For example, `STRING_SPLIT('1,2,5', ',')` returns three `varchar` values: `1`, `2`, and `5`. They are strings until converted to a numeric type.
-
-4. **`@ProductID` in XML** — It reads an **attribute** named `ProductID` on the current node. To read the text of the current element, use `.`, as shown in Section 4.2.
-
-5. **Nested elements in FOR XML PATH** — Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`. (This is different from `FOR JSON PATH`, which uses **dots** instead of slashes for the same purpose — see question 7.)
-
-6. **`'$.Invoice'` in OPENJSON** — It sets the **starting point** for shredding. Instead of starting at the document root (`$`), start at the `Invoice` property. All column paths in the `WITH` clause are then relative to each row starting from that point.
-
-7. **Dotted aliases in FOR JSON PATH** — A column alias such as `[Contact.Email]` creates a nested `Contact` object with an `Email` property. Each dot is one level of nesting: `[A.B.C]` produces `{ "A": { "B": { "C": ... } } }`.
-
-8. **`READONLY` is required** — SQL Server requires TVPs to be input-only, read-only parameters. The procedure can query the rows but cannot insert, update, or delete rows in the parameter. If modifications are needed, copy the data into a local table variable or temporary table and modify the copy.
-
-9. **TVP** is a good choice for passing typed relational data when the database client supports it. **JSON** is useful when data already arrives in JSON format, particularly through web APIs. The best choice depends on the application architecture and workload.
+1. **1:N insert** — An invoice header and its items must be inserted together. With one procedure call per row, an invoice with twenty items needs twenty-one calls. A collection parameter carries all items in one call.
+2. **No.** Each procedure runs several statements. If inserting the items fails, the header stays in the database. Lab 9 makes the statements succeed or fail together with a transaction.
+3. **(a)** A delimited string, or a TVP when type safety matters. **(b)** A TVP. **(c)** JSON, or a TVP if the backend converts the data first. **(d)** XML. Section 7.3 explains each choice.
 
 </details>
 

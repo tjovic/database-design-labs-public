@@ -687,18 +687,10 @@ SQL Server provides several methods for working with XML. In this lab, we use th
 
 ### Step 1 – Convert XML elements into rows
 
-We want one row for each `Customer` element:
+We want one row for each `Customer` element. The `.nodes()` method does that:
 
 ```sql
-DECLARE @Customers xml = N'
-<Customers>
-    <Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />
-    <Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />
-</Customers>';
-
-SELECT
-    tbl.col.query('.') AS CustomerXml
-FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
+FROM @Customers.nodes('/Customers/Customer') AS tbl(col)
 ```
 
 The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer` element inside the root `Customers` element.
@@ -708,6 +700,8 @@ The expression `@Customers.nodes('/Customers/Customer')` selects every `Customer
 - The table always has **one column** of type `xml`.
 - Each row of that column holds one matching element.
 - We **must** name the table and its column with an alias: `AS tbl(col)` names the table `tbl` and its column `col`.
+
+The names `tbl` and `col` are our choice — any valid names work.
 
 For our document, `.nodes()` turns one XML value into a table with two rows:
 
@@ -721,9 +715,38 @@ For our document, `.nodes()` turns one XML value into a table with two rows:
 </Customers>                               └───────────────────────────────────┘
 ```
 
-The names `tbl` and `col` are our choice — any valid names work.
+Let's look at these rows:
 
-In the `SELECT` list, `tbl.col` is the XML from the current row. `.query('.')` displays that element as XML, so we can see what each row contains.
+```sql
+DECLARE @Customers xml = N'
+<Customers>
+    <Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />
+    <Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />
+</Customers>';
+
+SELECT *
+FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
+```
+
+The query fails:
+
+*"The column 'col' that was returned from the nodes() method cannot be used directly. It can only be used with one of the four XML data type methods, exist(), nodes(), query(), and value(), or in IS NULL and IS NOT NULL checks."*
+
+`col` is not a standalone XML value: it points to one element inside `@Customers`. We can use it only through an XML method. To display the element, use `.query('.')`:
+
+```sql
+DECLARE @Customers xml = N'
+<Customers>
+    <Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />
+    <Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />
+</Customers>';
+
+SELECT
+    tbl.col.query('.') AS CustomerXml -- NEW: display the element as XML
+FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
+```
+
+Now we get the two rows from the diagram. In each row, `tbl.col` is one `Customer` element, and `.query('.')` returns that element (`.`) as XML.
 
 > [!NOTE]
 > The path `/Customers/Customer` uses **XQuery**, a language for navigating XML:

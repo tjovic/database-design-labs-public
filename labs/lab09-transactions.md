@@ -120,16 +120,19 @@ The business operation succeeds only when **both** changes succeed. If the secon
 
 ## 1.3 Demonstrate a partial operation
 
-Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer credits the destination first and debits the source second. Predict the final balances and the total before you run the block:
+Reset the balances:
 
 ```sql
--- Reset before the demonstration.
 UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer credits the destination first and debits the source second. Predict the final balances and the total before you run the block:
+
+```sql
 BEGIN TRY
     -- Credit Account A.
     UPDATE dbo.BankAccount
@@ -258,7 +261,7 @@ Alternatively, end the transaction with `ROLLBACK TRANSACTION` to discard the ch
 
 ## 2.2 Confirm a transfer
 
-First reset the balances:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -389,7 +392,7 @@ The pattern assumes that this block owns the whole operation. Section 9 explains
 
 ## 3.2 Repeat the failing transfer with protection
 
-Run the `600.00` transfer from 1.3 again, this time inside the pattern:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -397,7 +400,11 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Run the `600.00` transfer from 1.3 again, this time inside the pattern:
+
+```sql
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -435,7 +442,7 @@ The credit to Account A succeeded at first, but the handler rolled it back when 
 
 In 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
-Try it. Run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -443,7 +450,11 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Now run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
+
+```sql
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -490,7 +501,7 @@ Add this line before `BEGIN TRY` in the block above, run it again, and cancel it
 SET XACT_ABORT ON;
 ```
 
-This time `@@TRANCOUNT` is `0` and the balances are `1000.00` and `500.00`.
+This time `@@TRANCOUNT` is `0` and the debit has been rolled back.
 
 That completes the pattern. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`:
 
@@ -679,13 +690,19 @@ The parameter checks need no database data, so they run before the transaction o
 
 ## 5.3 Test a successful transfer
 
+Reset the balances:
+
 ```sql
 UPDATE dbo.BankAccount
 SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Then call the procedure:
+
+```sql
 EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
     @DestinationAccountID = 2,
@@ -801,7 +818,7 @@ flowchart LR
 
 ## 6.1 Create a savepoint
 
-Reset the account balances before this independent demonstration. Based on 2.2 and 2.3, predict what `ROLLBACK TRANSACTION AfterFirstTransfer` will leave behind before reading on.
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -811,7 +828,7 @@ SET Balance = CASE AccountID
               END;
 ```
 
-Run this block:
+Based on 2.2 and 2.3, predict what `ROLLBACK TRANSACTION AfterFirstTransfer` will leave behind. Then run this block:
 
 ```sql
 BEGIN TRANSACTION;
@@ -874,7 +891,7 @@ If we replaced the final `COMMIT` with a full `ROLLBACK`, both transfers would b
 
 A savepoint only protects work from a **partial** rollback. It does not protect that work from a **full** rollback.
 
-Reset the balances, then run this block:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -883,6 +900,8 @@ SET Balance = CASE AccountID
                   WHEN 2 THEN  500.00
               END;
 ```
+
+Then run this block:
 
 ```sql
 BEGIN TRANSACTION;
@@ -935,7 +954,7 @@ A savepoint marks a point for a partial rollback. It does not create a boundary 
 
 A transaction can contain several savepoints. Rolling back to an earlier one also discards any savepoint defined after it.
 
-Reset the balances, then run this block:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -944,6 +963,8 @@ SET Balance = CASE AccountID
                   WHEN 2 THEN  500.00
               END;
 ```
+
+Then run this block:
 
 ```sql
 BEGIN TRANSACTION;
@@ -1103,7 +1124,7 @@ SELECT @@TRANCOUNT AS AfterOuterCommit;  -- 0
 
 SQL Server does not provide independently committable nested transactions.
 
-Run this complete example:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -1111,7 +1132,11 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Run this complete example:
+
+```sql
 BEGIN TRANSACTION;
 
     BEGIN TRANSACTION;
@@ -1223,7 +1248,7 @@ END;
 GO
 ```
 
-The caller groups two calls:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -1231,7 +1256,11 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+The caller groups two calls:
+
+```sql
 SET XACT_ABORT ON;
 
 BEGIN TRY
@@ -1291,7 +1320,7 @@ sequenceDiagram
 
 *Diagram 5 – One transaction shared by a caller and a procedure. Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.*
 
-Reset the balances and run this complete block:
+Reset the balances:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -1299,7 +1328,11 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
+```
 
+Then run this complete block:
+
+```sql
 BEGIN TRANSACTION; -- count: 0 -> 1
 
 EXEC dbo.usp_TransferFunds

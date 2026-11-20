@@ -188,15 +188,15 @@ flowchart LR
 
     classDef committed fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
     classDef failed fill:#f8d7da,stroke:#c62828,stroke-width:2px,color:#b71c1c
-    classDef wrong fill:#ffffff,stroke:#c62828,stroke-width:3px,color:#b71c1c
-    classDef right fill:#ffffff,stroke:#2e7d32,stroke-width:3px,color:#1b5e20
+    classDef wrong color:#b71c1c
+    classDef right color:#1b5e20
     class A1 committed
     class A2,E3 failed
     class A3 wrong
     class E4 right
 ```
 
-*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green: committed. Red: failed. The bordered box is the final state: wrong (red) or correct (green).*
+*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green: committed. Red: failed. The last box shows the final state: wrong (red text) or correct (green text).*
 
 | Mode | Transaction boundary | Typical use |
 |---|---|---|

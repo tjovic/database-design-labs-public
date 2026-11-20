@@ -281,23 +281,14 @@ UPDATE dbo.BankAccount
 SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 
--- This session can read its own uncommitted changes.
-SELECT AccountID, AccountName, Balance
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
 COMMIT TRANSACTION;
 
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT SUM(Balance) AS TotalBalance,
-       @@TRANCOUNT AS OpenTransactionCount
-FROM dbo.BankAccount;
 ```
 
-Expected balances are `800.00` and `700.00`. The total is still `1500.00`, and the transaction count is `0`.
+Expected balances are `800.00` and `700.00`.
 
 ## 2.3 Undo a transfer
 
@@ -314,6 +305,7 @@ UPDATE dbo.BankAccount
 SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
+-- This session can read its own uncommitted changes.
 SELECT AccountID, Balance AS BalanceBeforeRollback
 FROM dbo.BankAccount
 ORDER BY AccountID;

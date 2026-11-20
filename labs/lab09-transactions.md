@@ -507,19 +507,7 @@ The pattern assumes that this block owns the whole operation. Section 9 explains
 
 In 3.2 and 3.3, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
-Reset the balances:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = 1000.00
-WHERE AccountID = 1;
-
-UPDATE dbo.BankAccount
-SET Balance = 500.00
-WHERE AccountID = 2;
-```
-
-Now run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
+Run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
 
 ```sql
 BEGIN TRY

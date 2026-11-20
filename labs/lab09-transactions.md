@@ -796,17 +796,20 @@ A **savepoint** is a named marker inside an open transaction. The examples in th
 
 ```mermaid
 flowchart LR
-    B["BEGIN<br/>TRANSACTION"] --> T1["Transfer 1<br/>100.00"]
-    T1 --> S1(["SAVE<br/>AfterFirstTransfer"])
-    S1 --> T2["Transfer 2<br/>50.00"]
-    T2 --> S2(["SAVE<br/>AfterSecondTransfer"])
-    S2 --> T3["Transfer 3<br/>25.00"]
-
-    classDef partial fill:#fff3cd,stroke:#b8860b,stroke-width:2px,color:#7a5900
-    class T2,S2,T3 partial
+    subgraph FULL["Full ROLLBACK TRANSACTION: undoes everything"]
+        direction LR
+        B["BEGIN<br/>TRANSACTION"] --> T1["Transfer 1<br/>100.00"]
+        T1 --> S1(["SAVE<br/>AfterFirstTransfer"])
+        S1 --> PART
+        subgraph PART["ROLLBACK TRANSACTION AfterFirstTransfer: undoes only this part"]
+            direction LR
+            T2["Transfer 2<br/>50.00"] --> S2(["SAVE<br/>AfterSecondTransfer"])
+            S2 --> T3["Transfer 3<br/>25.00"]
+        end
+    end
 ```
 
-*Diagram 4 – Three transfers and two savepoints in one transaction. `ROLLBACK TRANSACTION AfterFirstTransfer` undoes only the yellow part, including the later savepoint `AfterSecondTransfer` (6.4). A full `ROLLBACK TRANSACTION` undoes everything and ignores savepoints (6.3).*
+*Diagram 4 – Three transfers and two savepoints in one transaction. Rolling back to `AfterFirstTransfer` also discards the later savepoint `AfterSecondTransfer` (6.4). A full rollback ignores savepoints (6.3).*
 
 ## 6.1 Create a savepoint
 

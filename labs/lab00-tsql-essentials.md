@@ -1842,8 +1842,8 @@ Statement completes but affects zero rows
     -> check @@ROWCOUNT instead
 ```
 
-This lab only introduces the basic `TRY/CATCH` block. **Lab 9 – T-SQL
-Programming** goes further, including `THROW` and re-raising errors.
+This lab only introduces the basic `TRY/CATCH` block. **Lab 9 – Transactions** goes
+further, including `THROW` and re-raising errors.
 
 ### Check your understanding
 

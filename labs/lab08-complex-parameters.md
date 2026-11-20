@@ -755,7 +755,6 @@ Now we get the two rows from the diagram. In each row, `tbl.col` is one `Custome
 > - `/Customers/Customer` — all `Customer` elements inside `Customers`.
 > - `@FirstName` — the `FirstName` attribute of the current element.
 > - `.` — the current element. `.query('.')` returns it as XML; `.value('.', ...)` returns its text as a SQL value (Step 3).
-> - `..` — the parent of the current element (Section 4.4).
 
 ### Step 2 – Extract values using `.value()`
 
@@ -898,7 +897,7 @@ The `Invoice` element is the parent; its attributes hold the header values. The 
 
 ### Step 1 – Read the nested XML
 
-Before writing the procedure, let's read the items together with their invoice number:
+Before writing the procedure, let's read the items:
 
 ```sql
 DECLARE @Invoice xml = N'
@@ -911,7 +910,6 @@ DECLARE @Invoice xml = N'
 </Invoice>';
 
 SELECT
-    tbl.col.value('../../@InvoiceNumber', 'nvarchar(20)') AS InvoiceNumber,
     tbl.col.value('@ProductID', 'int') AS ProductID,
     tbl.col.value('@Quantity', 'int') AS Quantity,
     tbl.col.value('@UnitPrice', 'money') AS UnitPrice
@@ -920,17 +918,13 @@ FROM @Invoice.nodes('/Invoice/Lines/Line') AS tbl(col);
 
 Result:
 
-| InvoiceNumber | ProductID | Quantity | UnitPrice |
-|---|---|---|---|
-| SO-TEST-001 | 1 | 2 | 199.00 |
-| SO-TEST-001 | 2 | 1 | 49.90 |
-| SO-TEST-001 | 3 | 5 | 9.99 |
+| ProductID | Quantity | UnitPrice |
+|---|---|---|
+| 1 | 2 | 199.00 |
+| 2 | 1 | 49.90 |
+| 3 | 5 | 9.99 |
 
-Each row is one `Line` element. To reach the invoice number, we move up the tree with `..`:
-
-- `..` — the parent of `Line`, which is `Lines`.
-- `../..` — the parent of `Lines`, which is `Invoice`.
-- `../../@InvoiceNumber` — the invoice's `InvoiceNumber` attribute.
+The path `/Invoice/Lines/Line` follows the nesting of the document: `.nodes()` returns one row for each `Line` element.
 
 ### Step 2 – Create the procedure
 
@@ -1113,7 +1107,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 **Check your understanding**
 
 1. In `.value('@ProductID', 'int')`, what does `@ProductID` read? How would you read the text of the element instead?
-2. In Section 4.4, the rows come from `/Invoice/Lines/Line`. Why does `../../@InvoiceNumber` need two `..` steps?
+2. In the procedure in Section 4.4, how does each item get the ID of its invoice?
 3. You change the path in Section 4.4 to `/invoice/lines/line`. What happens?
 4. In `FOR XML PATH`, how do you create nested elements in the output?
 
@@ -1121,7 +1115,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 <summary>Show answers</summary>
 
 1. The **attribute** `ProductID` of the current element. To read the element's text, use `.`, as in Section 4.2, Step 3.
-2. The parent of `Line` is `Lines`, and the parent of `Lines` is `Invoice`. The `InvoiceNumber` attribute belongs to `Invoice`.
+2. The procedure inserts the header first. `SCOPE_IDENTITY()` returns the ID generated for it, and the `INSERT ... SELECT` puts that `@NewInvoiceID` into every item row.
 3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
 4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.
 

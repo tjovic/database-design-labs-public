@@ -172,31 +172,29 @@ In the normal **autocommit** mode, each individual SQL statement runs as its own
 Our problem is different: the transfer contains **two separate statements**, so autocommit gives it two separate transactions.
 
 ```mermaid
-flowchart LR
-    subgraph AUTO["Autocommit: one transaction per statement"]
-        direction TB
-        A1["UPDATE A: +600<br/>committed"] --> A2["UPDATE B: -600<br/>fails, undone"]
-        A2 --> A3["A = 1600, B = 500<br/>total 2100"]
-    end
-    subgraph EXPL["Explicit transaction: one boundary"]
-        direction TB
-        E1["BEGIN TRANSACTION"] --> E2["UPDATE A: +600<br/>not committed yet"]
-        E2 --> E3["UPDATE B: -600<br/>fails"]
-        E3 --> E4["ROLLBACK: A = 1000, B = 500<br/>total 1500"]
-    end
-    AUTO ~~~ EXPL
+flowchart TD
+    AT["Autocommit:<br/>one transaction per statement"] ~~~ A1
+    A1["UPDATE A: +600<br/>committed"] --> A2["UPDATE B: -600<br/>fails, undone"]
+    A2 --> A3["A = 1600, B = 500<br/>total 2100"]
 
+    ET["Explicit transaction:<br/>one boundary"] ~~~ E1
+    E1["BEGIN TRANSACTION"] --> E2["UPDATE A: +600<br/>not committed yet"]
+    E2 --> E3["UPDATE B: -600<br/>fails"]
+    E3 --> E4["ROLLBACK: A = 1000, B = 500<br/>total 1500"]
+
+    classDef title fill:none,stroke:none,font-weight:bold
     classDef committed fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
     classDef failed fill:#f8d7da,stroke:#c62828,stroke-width:2px,color:#b71c1c
-    classDef wrong color:#b71c1c
-    classDef right color:#1b5e20
+    classDef wrong fill:#ffffff,stroke:#c62828,stroke-width:3px,color:#b71c1c
+    classDef right fill:#ffffff,stroke:#2e7d32,stroke-width:3px,color:#1b5e20
+    class AT,ET title
     class A1 committed
     class A2,E3 failed
     class A3 wrong
     class E4 right
 ```
 
-*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green: committed. Red: failed. The last box shows the final state: wrong (red text) or correct (green text).*
+*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green: committed. Red: failed. The bordered box is the final state: wrong (red) or correct (green).*
 
 | Mode | Transaction boundary | Typical use |
 |---|---|---|

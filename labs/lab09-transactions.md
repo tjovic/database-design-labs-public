@@ -595,6 +595,23 @@ This time the result is `0`: SQL Server rolled back the debit itself, even thoug
 - syntax errors are not affected by this setting;
 - `TRY/CATCH` is still needed to roll back and report the error in a controlled way.
 
+**Check your understanding**
+
+1. In 3.2, the balances were correct. What was still wrong, and which statement fixes it?
+2. Why must `ROLLBACK` come before `THROW` in the `CATCH` block?
+3. After the cancelled query in 3.4, `@@TRANCOUNT` was `1`. Why did `CATCH` not roll the transaction back?
+4. With `SET XACT_ABORT ON`, why does the pattern still need its own `ROLLBACK` in `CATCH`?
+
+<details>
+<summary>Show answers</summary>
+
+1. The caller received no error, so it would report a transfer that never happened. `THROW;` passes the error on to the caller.
+2. `THROW` ends the batch, so a `ROLLBACK` placed after it would never run. In 3.3, without `XACT_ABORT`, the transaction would stay open.
+3. The client stopped the batch. No T-SQL code ran after that point, `CATCH` included.
+4. When `CATCH` runs, the transaction is still open; it just can no longer be committed. `CATCH` must roll it back before reporting the error.
+
+</details>
+
 ---
 
 # Section 4 – When SQL Succeeds but the Business Operation Fails

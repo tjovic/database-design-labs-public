@@ -550,13 +550,41 @@ The fix is one session setting. By default, `XACT_ABORT` is `OFF`. When it is `O
 - if `CATCH` never runs, as after a cancel, SQL Server rolls the transaction back itself;
 - if `CATCH` runs, the transaction can no longer be committed, so `CATCH` still rolls it back. That is why the pattern keeps its own `ROLLBACK`.
 
-Add this line before `BEGIN TRY` in the block above, run it again, and cancel it again:
+Run the same block again, now with `SET XACT_ABORT ON` at the start, and cancel it again during the wait:
 
 ```sql
-SET XACT_ABORT ON;
+SET XACT_ABORT ON; -- NEW: roll back the transaction if the batch is aborted
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance - 200.00
+    WHERE AccountID = 1;
+
+    WAITFOR DELAY '00:00:20'; -- Cancel the query during this wait.
+
+    UPDATE dbo.BankAccount
+    SET Balance = Balance + 200.00
+    WHERE AccountID = 2;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
 ```
 
-This time `@@TRANCOUNT` is `0` and the debit has been rolled back.
+After cancelling, check again:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+This time the result is `0`: SQL Server rolled back the debit itself, even though `CATCH` never ran.
 
 That completes the pattern:
 

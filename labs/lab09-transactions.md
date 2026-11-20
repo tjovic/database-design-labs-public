@@ -586,28 +586,8 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 This time the result is `0`: SQL Server rolled back the debit itself, even though `CATCH` never ran.
 
-That completes the pattern:
-
-```sql
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    -- Execute all statements belonging to the operation.
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-
-    THROW;
-END CATCH;
-```
-
 > [!NOTE]
-> From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`.
+> The block with `SET XACT_ABORT ON` is the complete pattern; the `WAITFOR` was only there to give you time to cancel. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`.
 
 `XACT_ABORT ON` is a safety net, not a replacement for the rest of the pattern:
 

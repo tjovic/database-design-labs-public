@@ -355,8 +355,6 @@ Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs c
 ## 3.1 The basic pattern
 
 ```sql
-SET XACT_ABORT ON;
-
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -387,7 +385,6 @@ flowchart TD
 
 - `THROW;` without arguments rethrows the original error, so the caller knows the operation failed.
 - Some errors have already ended the transaction by the time `CATCH` runs. The `@@TRANCOUNT` check prevents a second error from a `ROLLBACK` with no transaction to roll back.
-- `SET XACT_ABORT ON` is explained in 3.3. Treat it as a fixed part of the pattern.
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
@@ -401,8 +398,6 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
-
-SET XACT_ABORT ON;
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -441,7 +436,7 @@ Expected results: Account A `1000.00`, Account B `500.00`, total `1500.00`, tran
 
 The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created.
 
-## 3.3 Why SET XACT_ABORT ON?
+## 3.3 When CATCH never runs: SET XACT_ABORT ON
 
 In 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
@@ -453,8 +448,6 @@ SET Balance = CASE AccountID
                   WHEN 1 THEN 1000.00
                   WHEN 2 THEN  500.00
               END;
-
-SET XACT_ABORT OFF;
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -491,7 +484,38 @@ The result is `1`: the debit is still in an **open transaction** that nobody wil
 ROLLBACK TRANSACTION;
 ```
 
-Now change `SET XACT_ABORT OFF` to `SET XACT_ABORT ON`, run the block again, and cancel it again. This time `@@TRANCOUNT` is `0` and the balances are `1000.00` and `500.00`. With `XACT_ABORT ON`, SQL Server rolls back the whole transaction when the batch is aborted.
+The fix is one session setting. By default, `XACT_ABORT` is `OFF`. When it is `ON`, an error or a cancel aborts the whole transaction:
+
+- if `CATCH` never runs, as after a cancel, SQL Server rolls the transaction back itself;
+- if `CATCH` runs, the transaction can no longer be committed, so `CATCH` still rolls it back. That is why the pattern keeps its own `ROLLBACK`.
+
+Add this line before `BEGIN TRY` in the block above, run it again, and cancel it again:
+
+```sql
+SET XACT_ABORT ON;
+```
+
+This time `@@TRANCOUNT` is `0` and the balances are `1000.00` and `500.00`.
+
+That completes the pattern. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`:
+
+```sql
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- Execute all statements belonging to the operation.
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+```
 
 `XACT_ABORT ON` is a safety net, not a replacement for the rest of the pattern:
 

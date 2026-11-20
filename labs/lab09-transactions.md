@@ -428,19 +428,7 @@ The transfer did not happen, yet whoever started it is told that it did. Here yo
 
 `THROW;` without arguments, placed inside `CATCH`, passes the original error on to the caller, with its original number and message. [Lab 7](lab07-crud-operations.md) met a weaker form of the same problem: a return code tells the caller *that* something failed, but not *what*.
 
-Reset the balances:
-
-```sql
-UPDATE dbo.BankAccount
-SET Balance = 1000.00
-WHERE AccountID = 1;
-
-UPDATE dbo.BankAccount
-SET Balance = 500.00
-WHERE AccountID = 2;
-```
-
-Run the transfer again, now with `THROW;` after the rollback:
+The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again, now with `THROW;` after the rollback:
 
 ```sql
 BEGIN TRY

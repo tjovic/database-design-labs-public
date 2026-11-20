@@ -789,16 +789,11 @@ This process is sometimes called **XML shredding**.
 
 An element can store values in two ways — as **attributes** and as **element text**. It can also have both at the same time:
 
-```mermaid
-flowchart LR
-    EL["&lt;City PostalCode=&quot;10000&quot;&gt;Zagreb&lt;/City&gt;"]
-    EL -->|"read with '@PostalCode'"| ATTR["Attribute<br/>10000"]
-    EL -->|"read with '.'"| TEXT["Element text<br/>Zagreb"]
-
-    classDef attr fill:#dbeafe,stroke:#1565c0,stroke-width:2px,color:#0d47a1
-    classDef text fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
-    class ATTR attr
-    class TEXT text
+```text
+<City PostalCode="10000">Zagreb</City>
+      └───────┬────────┘ └─┬──┘
+              │            └── element text: read with .
+              └── attribute: read with @PostalCode
 ```
 
 ```sql

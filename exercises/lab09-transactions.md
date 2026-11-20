@@ -453,10 +453,12 @@ Predict the final balances before running the code.
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 
 BEGIN TRANSACTION;
 
@@ -625,10 +627,12 @@ Reset and run the successful test:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 
 EXEC dbo.usp_TransferFunds
     @SourceAccountID = 1,
@@ -842,10 +846,12 @@ Test success:
 
 ```sql
 UPDATE dbo.BankAccount
-SET Balance = CASE AccountID
-                  WHEN 1 THEN 1000.00
-                  WHEN 2 THEN  500.00
-              END;
+SET Balance = 1000.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = 500.00
+WHERE AccountID = 2;
 
 SELECT COUNT(*) AS HistoryRowsBefore
 FROM dbo.TransferHistory;

@@ -428,7 +428,7 @@ The transfer did not happen, yet whoever started it is told that it did. Here yo
 
 `THROW;` without arguments, placed inside `CATCH`, passes the original error on to the caller, with its original number and message. [Lab 7](lab07-crud-operations.md) met a weaker form of the same problem: a return code tells the caller *that* something failed, but not *what*.
 
-The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again, now with `THROW;` after the rollback:
+The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again. The block is the same as in 3.2, except for one new line, `THROW;`, after the rollback. The verification `SELECT` is no longer part of the block (see below):
 
 ```sql
 BEGIN TRY
@@ -448,7 +448,7 @@ BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
 
-    THROW;
+    THROW; -- NEW: pass the error on to the caller
 END CATCH;
 ```
 

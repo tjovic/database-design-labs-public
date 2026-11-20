@@ -665,7 +665,19 @@ THROW 50001, 'Source account does not exist.', 1;
 | Message | Explanation for the caller |
 | `1` | State value, which can help identify where an error was raised |
 
-Compare it with `THROW;` from 3.3: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one. [Lab 4](lab04-functions.md) used `RAISERROR` for the same purpose in a trigger; `THROW` is the newer way to do it.
+Compare it with `THROW;` from 3.3: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
+
+> [!NOTE]
+> **THROW vs RAISERROR.** [Lab 4](lab04-functions.md) used `RAISERROR` in a trigger to raise an error. Both statements raise an error, but they differ:
+>
+> | | `RAISERROR` | `THROW` |
+> |---|---|---|
+> | Severity | Passed as an argument | Always `16` for a new error |
+> | Pass on the original error in `CATCH` | Not directly | `THROW;` |
+> | `SET XACT_ABORT ON` | Ignored | Rolls back the transaction |
+> | Message text | Can contain placeholders such as `%s` and `%d` | Plain text |
+>
+> Microsoft recommends `THROW` for new code. One trap: the statement **before** `THROW` must end with a semicolon.
 
 Reset the balances:
 

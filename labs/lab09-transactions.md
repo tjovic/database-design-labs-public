@@ -651,7 +651,7 @@ The second `UPDATE` is valid SQL. It found no row with `AccountID = 999`, so it 
 
 ## 4.2 Check @@ROWCOUNT immediately
 
-`@@ROWCOUNT` returns the number of rows affected by the previous statement. Check it directly after the `UPDATE` and raise an error yourself when the result is wrong.
+`@@ROWCOUNT` returns the number of rows affected by the previous statement. Check it directly after **each** `UPDATE` and raise an error yourself when the result is wrong. The source account can be missing just as easily as the destination.
 
 Reset the balances:
 
@@ -665,7 +665,7 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-Run the same transfer again. The block is the same as in 4.1, except for the new check after the second `UPDATE`; the verification `SELECT` is again a separate block:
+Run the same transfer again. The block is the same as in 4.1, except for two new checks, one after each `UPDATE`; the verification `SELECT` is again a separate block:
 
 ```sql
 SET XACT_ABORT ON;
@@ -677,12 +677,15 @@ BEGIN TRY
     SET Balance = Balance - 200.00
     WHERE AccountID = 1;
 
+    IF @@ROWCOUNT <> 1 -- NEW: zero rows means the source does not exist
+        THROW 50001, 'Source account does not exist.', 1;
+
     UPDATE dbo.BankAccount
     SET Balance = Balance + 200.00
     WHERE AccountID = 999;
 
     IF @@ROWCOUNT <> 1 -- NEW: zero rows means the destination does not exist
-        THROW 50001, 'Destination account does not exist.', 1;
+        THROW 50002, 'Destination account does not exist.', 1;
 
     COMMIT TRANSACTION;
 END TRY
@@ -694,7 +697,7 @@ BEGIN CATCH
 END CATCH;
 ```
 
-Error `50001` is expected. Check the balances:
+The first check passes, because Account A exists. The second one raises error `50002`. Check the balances:
 
 ```sql
 SELECT AccountID, AccountName, Balance
@@ -716,7 +719,7 @@ Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other s
 
 ## 4.3 Detect insufficient funds in the update
 
-Instead of reading a balance and later deciding whether to subtract, we can include the condition in the update itself:
+The source check from 4.2 can do more. Instead of reading a balance and later deciding whether to subtract, we can include the funds condition in the update itself:
 
 ```sql
 DECLARE @Amount decimal(12, 2) = 2000.00;
@@ -727,12 +730,12 @@ WHERE AccountID = 1
   AND Balance >= @Amount;
 
 IF @@ROWCOUNT <> 1
-    THROW 50002, 'Source account does not exist or has insufficient funds.', 1;
+    THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
 ```
 
 Account A has less than `2000.00`, so no row is changed and the custom error is raised.
 
-The `CHECK` constraint from 1.1 would also stop a negative balance, but only with a technical constraint error. The condition in the `WHERE` clause turns the situation into a clear business error, `50002`, that the caller can understand, and the rule no longer depends on the constraint existing.
+The `CHECK` constraint from 1.1 would also stop a negative balance, but only with a technical constraint error. The condition in the `WHERE` clause turns the situation into a clear business error, `50001`, that the caller can understand, and the rule no longer depends on the constraint existing.
 
 This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
 

@@ -304,7 +304,7 @@ BEGIN CATCH
 END CATCH
 ```
 
-Either both inserts are saved (`COMMIT`), or neither is (`ROLLBACK`). Transactions are the topic of the next lab: this exact pattern is explained in [Lab 9, Section 5 – Handling Errors Inside a Transaction](../../labs/lab09-transactions.md#section-5--handling-errors-inside-a-transaction).
+Either both inserts are saved (`COMMIT`), or neither is (`ROLLBACK`). Transactions are the topic of the next lab: this exact pattern is explained in [Lab 9, Section 3 – Handling Errors Inside a Transaction](../../labs/lab09-transactions.md#section-3--handling-errors-inside-a-transaction).
 
 ## 4.4 `usp_UpdateInvoice` – replace the items
 
@@ -410,7 +410,7 @@ The demo is built to show the main path clearly, so it skips several things a re
 |---|---|---|---|
 | `DELETE /invoices/999` — the invoice does not exist | deletes 0 rows and still answers *"Invoice deleted."* | check `@@ROWCOUNT` or a return code and answer 404 | [Lab 7, Sections 2.5–2.7](../../labs/lab07-crud-operations.md#27-summary--how-does-the-caller-learn-what-happened) |
 | `POST /invoices` with an unknown `customerId` | error 547 (`FK_Invoice_Customer`) reaches Python as an exception — HTTP 500 | check the customer first and report a clear reason | [Lab 7, Section 1](../../labs/lab07-crud-operations.md#the-procedure-reports-the-outcome) and [Section 5](../../labs/lab07-crud-operations.md#section-5--error-handling-in-crud-operations) |
-| `PUT /invoices/999` — the invoice does not exist | the item insert fails with error 547 (`FK_InvoiceItem_Invoice`) — HTTP 500 | detect the missing invoice before changing anything | [Lab 7, Section 5.4](../../labs/lab07-crud-operations.md#54-which-mechanism-detects-which-outcome) and [Lab 9, Section 6](../../labs/lab09-transactions.md#section-6--when-sql-succeeds-but-the-business-operation-fails) |
+| `PUT /invoices/999` — the invoice does not exist | the item insert fails with error 547 (`FK_InvoiceItem_Invoice`) — HTTP 500 | detect the missing invoice before changing anything | [Lab 7, Section 5.4](../../labs/lab07-crud-operations.md#54-which-mechanism-detects-which-outcome) and [Lab 9, Section 4](../../labs/lab09-transactions.md#section-4--when-sql-succeeds-but-the-business-operation-fails) |
 | An item with `"quantity": 0` | the `CHECK` constraint rejects it, the transaction is rolled back — HTTP 500 | report which item is invalid | [Lab 7, Section 6.1](../../labs/lab07-crud-operations.md#61-database-constraints) |
 | The client sends `unitPrice` | the price from the request is stored as it is | read the current price from `Product` inside the procedure — a client must not choose its own price | [Lab 7, Section 6.3](../../labs/lab07-crud-operations.md#63-what-should-be-enforced-where) |
 | Who may call the API? | anyone who can open the page | authentication and permissions | — |

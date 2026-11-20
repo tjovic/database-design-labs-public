@@ -376,7 +376,7 @@ BEGIN CATCH
 END CATCH;
 ```
 
-`@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). Some errors have already ended the transaction by the time `CATCH` runs, so the check prevents a second error from a `ROLLBACK` with no transaction to roll back.
+`@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). In the examples of this section the count in `CATCH` is always `1`. The check matters when something has already ended the transaction before `CATCH` runs — you will see such a case in 9.4. A `ROLLBACK` without an open transaction would raise a second error and hide the original one.
 
 ## 3.2 Repeat the failing transfer with protection
 
@@ -490,10 +490,8 @@ flowchart TD
     START["BEGIN TRANSACTION"] --> WORK["Run all statements of the operation"]
     WORK -->|"all succeed"| COMMIT["COMMIT TRANSACTION"]
     WORK -->|"any error"| CATCH["CATCH block"]
-    CATCH --> CHECK{"@@TRANCOUNT > 0 ?"}
-    CHECK -->|"yes"| RB["ROLLBACK TRANSACTION"]
-    CHECK -->|"no: already ended"| THROW["THROW;<br/>pass the original error to the caller"]
-    RB --> THROW
+    CATCH --> RB["ROLLBACK TRANSACTION"]
+    RB --> THROW["THROW;<br/>pass the original error to the caller"]
 ```
 
 *Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.*
@@ -1476,7 +1474,7 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 
 The temporary name change is also undone. Account A is still named `Account A`, balances are `1000.00` and `500.00`, and the transaction count is `0`.
 
-The caller's `CATCH` receives error `50014`. When it runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too.
+The caller's `CATCH` receives error `50014`. When it runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too. This is the case the `IF @@TRANCOUNT > 0` check in the pattern from Section 3 exists for: without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
 
 **A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It ends the entire current transaction.** For this lab's transfer procedure, a failure means the complete enclosing operation fails. A caller must not continue toward a commit after that failure.
 

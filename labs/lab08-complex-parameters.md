@@ -1722,6 +1722,9 @@ The `PRIMARY KEY` ensures that the same ID cannot appear more than once in a val
 
 `CREATE TYPE ... AS TABLE` does not create a table that stores product IDs. It creates a reusable structure for declaring table variables and procedure parameters.
 
+> [!NOTE]
+> If you run this section again, `CREATE TYPE` fails because the type already exists. A type cannot be dropped while a procedure uses it: first drop the procedures that use the type, then the type itself with `DROP TYPE`.
+
 ### Step 2 – Declare a variable of this type
 
 Now that the type exists, we can declare a table variable of this type and insert rows into it:
@@ -1901,49 +1904,7 @@ END;
 GO
 ```
 
-Let's examine the important parts.
-
-**1. Scalar parameters**
-
-```sql
-@CustomerID int,
-@InvoiceDate date,
-@InvoiceNumber nvarchar(20)
-```
-
-These supply the values for the invoice header.
-
-**2. Table-Valued Parameter**
-
-```sql
-@Lines dbo.InvoiceLineInput READONLY
-```
-
-This supplies all invoice items as typed rows.
-
-**3. SCOPE_IDENTITY()**
-
-```sql
-SET @NewInvoiceID = SCOPE_IDENTITY();
-```
-
-This retrieves the ID generated when the invoice header was inserted.
-
-Every item needs this ID to reference the same invoice.
-
-**4. Set-based INSERT**
-
-```sql
-INSERT INTO InvoiceItem (...)
-SELECT ...
-FROM @Lines;
-```
-
-This inserts all invoice items using one SQL statement. The same `@NewInvoiceID` is assigned to every item.
-
-We do not need a loop.
-
-Compare it with the XML procedure from Section 4.4 and the JSON procedure from Section 5.6. All three insert the same invoice with the same structure — header, `SCOPE_IDENTITY()`, then all items with one `INSERT ... SELECT`. Only the envelope changes:
+The body of the procedure is the same as in Sections 4.4 and 5.6: insert the header, read `SCOPE_IDENTITY()`, then insert all items with one `INSERT ... SELECT`. Only the input is new: the header arrives as three scalar parameters, and the items arrive as typed rows in `@Lines`, so the procedure reads them with a plain `FROM @Lines`.
 
 | | 4.4 – XML | 5.6 – JSON | 6.4 – TVP |
 |---|---|---|---|
@@ -2008,7 +1969,7 @@ The result should contain three items linked to the same invoice.
 | Strong typing — columns have defined SQL data types | Requires a user-defined table type |
 | Supports multiple rows and columns | TVP parameters must be `READONLY` |
 | Can be used directly in joins and queries | Table types cannot be altered directly |
-| Avoids parsing XML or delimited strings | Client applications must support sending TVPs |
+| Avoids parsing delimited strings, XML, or JSON | Client applications must support sending TVPs |
 | Useful for set-based operations | SQL Server does not maintain column statistics on TVPs |
 
 TVPs are particularly useful when an application needs to pass a collection of relational records directly to SQL Server, and they are commonly used from .NET applications. Because SQL Server keeps no statistics on TVP columns, copying a large TVP into a temporary table can sometimes give a better execution plan.

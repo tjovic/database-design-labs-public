@@ -2019,7 +2019,7 @@ For stored procedures, the corresponding parameter declarations are:
 
 Delimited strings and JSON are both passed as text, but their contents have different structures. This lab uses `nvarchar(200)` for the ID lists and `nvarchar(max)` for JSON documents.
 
-XML has its own SQL Server data type, while TVPs use a user-defined table type.
+XML has its own SQL Server data type; JSON has one only from SQL Server 2025 (Section 5.1). TVPs use a user-defined table type.
 
 ## 7.2 Comparing the Methods
 
@@ -2027,7 +2027,7 @@ The following table summarizes the main characteristics of each approach.
 
 | Method | Data Structure | Type Safety | Main Advantage | Main Limitation |
 |---|---|---|---|---|
-| Client-side SQL concatenation | SQL text | None for concatenated values | Simple to construct | SQL injection risk with untrusted input |
+| Client-side query building | SQL text | None for concatenated values | Simple to construct | SQL injection risk with untrusted input |
 | Delimited string | Flat list | Values arrive as text | Simple for lists of IDs | Requires splitting and conversion |
 | XML | Hierarchical | XML type; extracted values require conversion | Supports complex nested structures | Verbose syntax and parsing overhead |
 | JSON | Objects and arrays | Values are converted during extraction | Natural format for web integration | Requires parsing and validation |
@@ -2035,122 +2035,62 @@ The following table summarizes the main characteristics of each approach.
 
 There is no single method that is always best.
 
-The appropriate choice depends on:
-
-- The structure of the data.
-- The application sending the data.
-- The need for type safety.
-- The database operations being performed.
-- Performance and integration requirements.
-
 ## 7.3 Common Use Cases
 
-Let's examine four practical situations.
+Let's look at four practical situations. Each one was solved earlier in this lab.
 
 ### Scenario 1 – A simple list of IDs
 
-An application needs to retrieve several products.
-
-Input:
-
-```text
-316,317,318,319,320
-```
-
-A delimited string can be sufficient:
+An application needs to retrieve several products:
 
 ```sql
 EXEC dbo.usp_GetProductsByIDList
     @IDList = N'316,317,318,319,320';
 ```
 
-The procedure uses `STRING_SPLIT` to convert the string into rows.
+A **delimited string** is sufficient: the procedure from Section 3 uses `STRING_SPLIT` to turn it into rows.
 
-**Why?** The input is a simple list, and the format is easy to process.
+**Why?** The input is a simple flat list. If the client supports TVPs, a TVP (Section 6.3) is another good option, particularly when type safety is important.
 
-If the client supports TVPs, a TVP is another good option, particularly when type safety is important.
+### Scenario 2 – Inserting invoice items from an application
 
-### Scenario 2 – Inserting multiple invoice items
+An application needs to insert an invoice with several items, each with a product ID, quantity, and unit price.
 
-An application needs to insert an invoice containing several products.
-
-Each item has:
-
-- Product ID.
-- Quantity.
-- Unit price.
-
-A **Table-Valued Parameter** is a natural choice when the client supports it.
-
-The application passes the invoice items as typed rows, and the procedure can insert them using `INSERT INTO ... SELECT`.
+A **TVP** is a natural choice when the client supports it: the items arrive as typed rows, and the procedure inserts them with one `INSERT ... SELECT` (Section 6.4).
 
 **Why?** The data is already relational and contains multiple columns.
 
 ### Scenario 3 – Receiving data from a REST API
 
-A web application sends a JSON document:
+A web application sends the invoice as a JSON document, like the one in Section 5.5.
 
-```json
-{
-    "CustomerID": 5,
-    "Items": [
-        { "ProductID": 1, "Quantity": 2 },
-        { "ProductID": 2, "Quantity": 1 }
-    ]
-}
-```
+A procedure with a **JSON** parameter reads the header with `JSON_VALUE` and the items with `OPENJSON` (Section 5.6).
 
-SQL Server can process this document using `JSON_VALUE` and `OPENJSON`.
-
-**Why?** JSON is already the format used by the API.
-
-Depending on the application architecture, the backend could also convert the JSON into a TVP before calling SQL Server.
-
-Both designs are valid.
+**Why?** JSON is already the format used by the API. Depending on the application architecture, the backend could also convert the JSON into a TVP before calling SQL Server. Both designs are valid.
 
 ### Scenario 4 – Integration with an XML-based system
 
-An external system sends:
+An external system sends documents in XML, like the invoice in Section 4.4.
 
-```xml
-<Products>
-    <Product ID="1" Quantity="2" />
-    <Product ID="2" Quantity="1" />
-</Products>
-```
+A procedure with an **XML** parameter extracts the data with `.nodes()` and `.value()` (Section 4.4).
 
-A stored procedure can accept an `xml` parameter and use `.nodes()` and `.value()` to extract the data.
-
-**Why?** The source system already uses XML, so SQL Server can process the existing format directly.
-
-This is particularly useful when integrating with XML-based services and legacy systems.
+**Why?** The source system already uses XML, so SQL Server can process the existing format directly. This is common when integrating with XML-based services and legacy systems.
 
 ## 7.4 How to Choose
 
-Use the following decision diagram as a general guide.
+Use the following decision diagram as a general guide. Each outcome matches one of the scenarios above.
 
 ```mermaid
 flowchart TD
-    A["Need to pass multiple values or records?"]
-    A --> B{"What format does the source use?"}
-
-    B -->|"XML"| C["Consider XML"]
-    B -->|"JSON"| D{"Can the backend transform the data?"}
-    B -->|"Typed rows"| E["Consider TVP"]
-    B -->|"Simple text list"| F{"Only a flat list?"}
-
-    D -->|"Yes"| G["JSON or TVP"]
-    D -->|"No / direct JSON input"| H["Use JSON"]
-
-    F -->|"Yes"| I["Delimited string or TVP"]
-    F -->|"No"| J["Use a structured format"]
+    A{"What does the data look like?"}
+    A -->|"A flat list of values"| B["Delimited string or TVP<br/>(Scenario 1)"]
+    A -->|"Rows with several columns"| C["TVP<br/>(Scenario 2)"]
+    A -->|"A document from another system"| D{"Which format?"}
+    D -->|"JSON"| E["JSON, or TVP if the backend converts it<br/>(Scenario 3)"]
+    D -->|"XML"| F["XML<br/>(Scenario 4)"]
 ```
 
-This diagram is a guideline, not a strict rule.
-
-For example, a REST API may receive JSON, convert it into typed objects, and pass those objects to SQL Server using a TVP.
-
-The choice depends on where data conversion should happen and how the application is designed.
+This diagram is a guideline, not a strict rule. The choice also depends on where data conversion should happen and how the application is designed.
 
 ## 7.5 Key Takeaways
 

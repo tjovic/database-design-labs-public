@@ -1685,6 +1685,8 @@ The stored procedure can use this table directly in SQL queries, including `SELE
 
 There is no need for `STRING_SPLIT`, XML methods, or `OPENJSON`.
 
+We start with a table that has one column. In Section 6.4, we pass a table with several columns: the items of an invoice.
+
 ## 6.2 Defining a Table Type
 
 Before using a TVP, we must define its structure.

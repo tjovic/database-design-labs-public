@@ -1179,7 +1179,7 @@ Unlike XML, JSON had no data type of its own before SQL Server 2025, so it is st
 
 ## 5.2 Reading a Single Value – JSON_VALUE
 
-Let's start with a JSON object. Its `Address` property is itself an object with one property, `City`.
+Let's start with a JSON object. Its `Address` property is itself an object, with its own properties `Street`, `City`, and `PostalCode`.
 
 ```sql
 DECLARE @Customer nvarchar(max) = N'
@@ -1187,21 +1187,28 @@ DECLARE @Customer nvarchar(max) = N'
     "FirstName": "Alice",
     "LastName": "Anderson",
     "Email": "alice@example.com",
-    "Address": { "City": "Zagreb" }
+    "Address": {
+        "Street": "Ilica 10",
+        "City": "Zagreb",
+        "PostalCode": "10000"
+    }
 }';
 
 SELECT
     JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
     JSON_VALUE(@Customer, '$.LastName') AS LastName,
     JSON_VALUE(@Customer, '$.Email') AS Email,
-    JSON_VALUE(@Customer, '$.Address.City') AS City; -- a property inside a nested object
+    -- properties inside the nested Address object
+    JSON_VALUE(@Customer, '$.Address.Street') AS Street,
+    JSON_VALUE(@Customer, '$.Address.City') AS City,
+    JSON_VALUE(@Customer, '$.Address.PostalCode') AS PostalCode;
 ```
 
 Result:
 
-| FirstName | LastName | Email | City |
-|---|---|---|---|
-| Alice | Anderson | alice@example.com | Zagreb |
+| FirstName | LastName | Email | Street | City | PostalCode |
+|---|---|---|---|---|---|
+| Alice | Anderson | alice@example.com | Ilica 10 | Zagreb | 10000 |
 
 The `JSON_VALUE` function extracts a single scalar value from a JSON document.
 

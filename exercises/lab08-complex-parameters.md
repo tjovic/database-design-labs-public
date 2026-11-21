@@ -73,7 +73,7 @@ Write a procedure `dbo.usp_GetProductsByIDListWithValidation` that:
    - **Valid products**: `IDProduct`, `Name`, `PriceWithoutVAT` for IDs that exist.
    - **Invalid IDs**: A list of IDs that were in the input but don't exist in the database.
 
-Test it with a list like `'1,2,999,5,888'` (where 999 and 888 don't exist).
+Test it with a list like `'1,2,316,9999,8888'` (where 9999 and 8888 don't exist).
 
 ### Hints
 
@@ -114,13 +114,10 @@ END
 GO
 
 -- Test
-EXEC dbo.usp_GetProductsByIDListWithValidation @IDList = '1,2,999,5,888';
+EXEC dbo.usp_GetProductsByIDListWithValidation @IDList = '1,2,316,9999,8888';
 
--- Result set 1: Valid products (1, 2, 5)
--- Result set 2: Invalid IDs (999, 888)
-
--- Cleanup
-DROP PROCEDURE dbo.usp_GetProductsByIDListWithValidation;
+-- Result set 1: Valid products (1, 2, 316)
+-- Result set 2: Invalid IDs (8888, 9999)
 ```
 
 </details>
@@ -199,9 +196,6 @@ SELECT * FROM dbo.fn_SplitInts('11,22,33,44', ',');
 SELECT CAST(value AS int) FROM STRING_SPLIT('11,22,33,44', ',');
 
 -- Both should return the same values: 11, 22, 33, 44
-
--- Cleanup
-DROP FUNCTION dbo.fn_SplitInts;
 ```
 
 This demonstrates why built-in functions like `STRING_SPLIT` are valuable — you avoid writing this code every time. On older SQL Server versions (before 2016), you had to write something like this for every string-splitting task.
@@ -236,7 +230,7 @@ Test it with at least three state names and verify the inserted rows.
 
 - Use `.nodes('/States/State')` to iterate over each `State` element.
 - Use `.value('@Name', 'nvarchar(50)')` to extract the `Name` attribute.
-- Remember: alias both the table and the column after `.nodes()` — `AS tbl(node)`.
+- Remember: alias both the table and the column after `.nodes()` — `AS tbl(col)`.
 
 <details>
 <summary>Show solution</summary>
@@ -248,8 +242,8 @@ AS
 BEGIN
     INSERT INTO State (Name)
     SELECT
-        tbl.node.value('@Name', 'nvarchar(50)')
-    FROM @States.nodes('/States/State') AS tbl(node);
+        tbl.col.value('@Name', 'nvarchar(50)')
+    FROM @States.nodes('/States/State') AS tbl(col);
 END
 GO
 
@@ -271,26 +265,21 @@ SELECT * FROM State WHERE Name LIKE N'NewCountry%';
 
 ## Exercise 5 — XML with Nested Structure [INTERMEDIATE]
 
-In Lab 8, we built XML with simple elements. Here, we handle a more complex nested structure.
+In Section 4.4 of Lab 8, we inserted an invoice and its items from one XML document. Here, we apply the same pattern to a department and its employees.
 
-Write a procedure `dbo.usp_InsertEmployeeHierarchy` that accepts an `xml` parameter of this shape:
+Write a procedure `dbo.usp_InsertDepartmentWithEmployees` that accepts an `xml` parameter of this shape:
 
 ```xml
-<Organization>
-    <Department Name="Sales">
-        <Employee FirstName="Alice" LastName="Anderson" />
-        <Employee FirstName="Bob" LastName="Brown" />
-    </Department>
-    <Department Name="Engineering">
-        <Employee FirstName="Charlie" LastName="Clark" />
-    </Department>
-</Organization>
+<Department Name="Sales">
+    <Employee FirstName="Alice" LastName="Anderson" />
+    <Employee FirstName="Bob" LastName="Brown" />
+</Department>
 ```
 
 The procedure must:
 
-1. Insert each department into a test table `dbo.TestDepartment`.
-2. Insert each employee into a test table `dbo.TestEmployee`, linked to the correct department by a `DepartmentID`.
+1. Insert the department into a test table `dbo.TestDepartment`.
+2. Insert each employee into a test table `dbo.TestEmployee`, linked to the department by a `DepartmentID`.
 3. Use `SCOPE_IDENTITY()` to link the rows.
 
 Before testing, create the tables:
@@ -312,96 +301,72 @@ CREATE TABLE dbo.TestEmployee
 GO
 ```
 
-Test the procedure, verify the inserts, clean up the tables and procedure.
+Call the procedure twice: once for `Sales` with the two employees above, and once for `Engineering` with one employee, Charlie Clark. Verify that every employee is linked to the correct department.
 
 ### Hints
 
-- You need two `.nodes()` calls: one for departments, one for employees within each department.
-- Use a `WHILE` loop or `INSERT ... SELECT` with an outer loop to process each department.
-- For each department, capture the inserted identity and pass it to the employee insert.
+- Read the department with `.nodes('/Department')` and the employees with `.nodes('/Department/Employee')`, as the procedure in Section 4.4 reads the invoice header and its items.
+- Insert the department first and save `SCOPE_IDENTITY()` in a variable.
+- Insert all employees with one `INSERT ... SELECT` that uses that variable.
 
 <details>
 <summary>Show solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_InsertEmployeeHierarchy
-    @Organization xml
+CREATE OR ALTER PROCEDURE dbo.usp_InsertDepartmentWithEmployees
+    @Department xml
 AS
 BEGIN
-    DECLARE @DeptID int;
-    DECLARE @DeptName nvarchar(50);
+    DECLARE @DepartmentID int;
 
-    -- Process each department
-    DECLARE @Departments TABLE
-    (
-        DeptName nvarchar(50),
-        EmployeeXml xml
-    );
+    -- Insert the department
+    INSERT INTO dbo.TestDepartment (Name)
+    SELECT tbl.col.value('@Name', 'nvarchar(50)')
+    FROM @Department.nodes('/Department') AS tbl(col);
 
-    INSERT INTO @Departments (DeptName, EmployeeXml)
+    SET @DepartmentID = SCOPE_IDENTITY();
+
+    -- Insert all employees of this department
+    INSERT INTO dbo.TestEmployee (DepartmentID, FirstName, LastName)
     SELECT
-        dept.node.value('@Name', 'nvarchar(50)'),
-        dept.node.query('.')
-    FROM @Organization.nodes('/Organization/Department') AS dept(node);
-
-    -- For each department
-    DECLARE dept_cursor CURSOR FOR
-    SELECT DeptName, EmployeeXml FROM @Departments;
-
-    OPEN dept_cursor;
-
-    FETCH NEXT FROM dept_cursor INTO @DeptName, @Organization;
-
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        -- Insert the department
-        INSERT INTO dbo.TestDepartment (Name)
-        VALUES (@DeptName);
-
-        SET @DeptID = SCOPE_IDENTITY();
-
-        -- Insert employees under this department
-        INSERT INTO dbo.TestEmployee (DepartmentID, FirstName, LastName)
-        SELECT
-            @DeptID,
-            emp.node.value('@FirstName', 'nvarchar(50)'),
-            emp.node.value('@LastName', 'nvarchar(50)')
-        FROM @Organization.nodes('/Department/Employee') AS emp(node);
-
-        FETCH NEXT FROM dept_cursor INTO @DeptName, @Organization;
-    END
-
-    CLOSE dept_cursor;
-    DEALLOCATE dept_cursor;
-END
+        @DepartmentID,
+        tbl.col.value('@FirstName', 'nvarchar(50)'),
+        tbl.col.value('@LastName', 'nvarchar(50)')
+    FROM @Department.nodes('/Department/Employee') AS tbl(col);
+END;
 GO
 
 -- Test
-EXEC dbo.usp_InsertEmployeeHierarchy @Organization = N'
-<Organization>
-    <Department Name="Sales">
-        <Employee FirstName="Alice" LastName="Anderson" />
-        <Employee FirstName="Bob" LastName="Brown" />
-    </Department>
-    <Department Name="Engineering">
-        <Employee FirstName="Charlie" LastName="Clark" />
-    </Department>
-</Organization>';
+EXEC dbo.usp_InsertDepartmentWithEmployees @Department = N'
+<Department Name="Sales">
+    <Employee FirstName="Alice" LastName="Anderson" />
+    <Employee FirstName="Bob" LastName="Brown" />
+</Department>';
+
+EXEC dbo.usp_InsertDepartmentWithEmployees @Department = N'
+<Department Name="Engineering">
+    <Employee FirstName="Charlie" LastName="Clark" />
+</Department>';
 
 -- Verify
-SELECT * FROM dbo.TestDepartment;
-SELECT * FROM dbo.TestEmployee;
-
--- Cleanup
-DROP PROCEDURE dbo.usp_InsertEmployeeHierarchy;
-DROP TABLE dbo.TestEmployee;
-DROP TABLE dbo.TestDepartment;
+SELECT d.Name AS Department, e.FirstName, e.LastName
+FROM dbo.TestEmployee e
+JOIN dbo.TestDepartment d ON d.DepartmentID = e.DepartmentID
+ORDER BY d.Name, e.LastName;
 ```
 
-> [!NOTE]
-> The cursor-based solution above is intentionally simple, not fast. For a production-quality version without a cursor, insert all departments first with `OUTPUT INSERTED.DepartmentID` into a table keyed by `Name`, then join that back to the original XML by department name to insert the employees in one set-based `INSERT ... SELECT`. The `OUTPUT` clause can only reference `INSERTED`/`DELETED` columns — not arbitrary expressions from the source `SELECT` — so the department name (not the raw XML fragment) is what you carry across the two inserts.
+Expected result:
+
+| Department | FirstName | LastName |
+|---|---|---|
+| Engineering | Charlie | Clark |
+| Sales | Alice | Anderson |
+| Sales | Bob | Brown |
 
 </details>
+
+> [!NOTE]
+> Each call inserts one department. To insert several departments in one call, the procedure would have to read every employee together with its own department, which needs XML techniques that Lab 8 does not cover.
 
 ---
 
@@ -516,11 +481,11 @@ BEGIN
 
     -- Read the customer's attributes
     SELECT
-        @FirstName = c.node.value('@FirstName', 'nvarchar(50)'),
-        @LastName = c.node.value('@LastName', 'nvarchar(50)'),
-        @CityName = c.node.value('@City', 'nvarchar(50)'),
-        @StateName = c.node.value('@State', 'nvarchar(50)')
-    FROM @Customer.nodes('/Customer') AS c(node);
+        @FirstName = tbl.col.value('@FirstName', 'nvarchar(50)'),
+        @LastName = tbl.col.value('@LastName', 'nvarchar(50)'),
+        @CityName = tbl.col.value('@City', 'nvarchar(50)'),
+        @StateName = tbl.col.value('@State', 'nvarchar(50)')
+    FROM @Customer.nodes('/Customer') AS tbl(col);
 
     -- Step 1: Find or create the state
     SELECT @StateID = IDState
@@ -771,7 +736,7 @@ BEGIN
     (
         FirstName nvarchar(50)  '$.FirstName',
         LastName  nvarchar(50)  '$.LastName',
-        Email     nvarchar(100) '$.Email'
+        Email     nvarchar(50)  '$.Email'
     );
 END
 GO
@@ -839,7 +804,7 @@ GO
 
 -- Test
 DECLARE @ProductList dbo.ProductIDsExercise;
-INSERT INTO @ProductList (ID) VALUES (1), (2), (5);
+INSERT INTO @ProductList (ID) VALUES (1), (2), (316);
 
 EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
 ```
@@ -934,7 +899,7 @@ There is not one single "right" answer — the argument is what counts.
 
 4. **JSON** — The partner is sending JSON over HTTP. Accept it as-is via `OPENJSON`. Zero translation overhead.
 
-5. **TVP** — The admin GUI is C# or VB.NET (desktop). The 30 IDs form a natural collection that the GUI can package as a TVP.
+5. **Delimited string or TVP** — The 30 IDs form a flat list, as in Lab 8, Section 7.3, Scenario 1. If the GUI's platform supports TVPs (for example .NET), a TVP adds type safety.
 
 </details>
 
@@ -949,7 +914,7 @@ DROP PROCEDURE IF EXISTS dbo.usp_DeleteProductsByNameList;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDListWithValidation;
 DROP FUNCTION IF EXISTS dbo.fn_SplitInts;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertEmployeeHierarchy;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertDepartmentWithEmployees;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerWithLocation;
 DROP PROCEDURE IF EXISTS dbo.usp_ListProductsByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertProducts;

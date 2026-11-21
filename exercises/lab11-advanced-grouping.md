@@ -353,5 +353,3 @@ For each request, write down the grouping levels it needs, for example `(Country
 ## References
 
 - [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md)
-- [SELECT – GROUP BY (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-group-by-transact-sql)
-- [GROUPING (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/grouping-transact-sql)

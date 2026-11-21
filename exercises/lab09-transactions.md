@@ -1332,7 +1332,3 @@ Preserve the tested table names, column names, and insert logic from Lab 8 when 
 # References
 
 - [Lab 9 – Transactions](../labs/lab09-transactions.md) — `BEGIN/COMMIT/ROLLBACK`, savepoints, `@@TRANCOUNT`, and transaction ownership between a caller and a procedure.
-- **Microsoft Learn**: [Transactions (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/transactions-transact-sql)
-- **Microsoft Learn**: [SAVE TRANSACTION](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/save-transaction-transact-sql)
-- **Microsoft Learn**: [@@TRANCOUNT](https://learn.microsoft.com/en-us/sql/t-sql/functions/trancount-transact-sql)
-- **Microsoft Learn**: [TRY...CATCH](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql)

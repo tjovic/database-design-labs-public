@@ -1037,12 +1037,6 @@ The main function calls the allowance function as an expression. Neither functio
 
 Rule sources (checked 24 October 2026):
 
-- [Personal allowance — Croatian Tax Administration](https://porezna-uprava.gov.hr/hr/osobni-odbitak/4134)
-- [Income tax and the tax threshold — gov.hr](https://gov.hr/hr/porez-na-dohodak/1466)
-- [Zagreb tax rates, NN 28/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/full/2025_02_28_291.html)
-- [Reduction of the pension contribution base — Croatian Tax Administration](https://porezna-uprava.gov.hr/en/brosura-umanjenje-mjesecne-osnovice/7618)
-- [Contribution bases for 2026, NN 150/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/2025_12_150_2237.html)
-
 Before returning to the other exercises, switch databases:
 
 ```sql
@@ -1207,10 +1201,6 @@ Both queries belong in the same batch as the table variable declaration.
 
 </details>
 
-Algorithm source: [OIB checksum procedure — REGOS](https://regos.hr/app/uploads/2018/07/KONTROLA-OIB-a.pdf).
-
 ## References
 
 - [Lab 04 – Functions](../labs/lab04-functions.md)
-- [Create user-defined functions — Microsoft Learn](https://learn.microsoft.com/en-us/sql/relational-databases/user-defined-functions/create-user-defined-functions-database-engine)
-- [Execute user-defined functions — Microsoft Learn](https://learn.microsoft.com/en-us/sql/relational-databases/user-defined-functions/execute-user-defined-functions)

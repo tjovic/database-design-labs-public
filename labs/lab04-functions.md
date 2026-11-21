@@ -674,14 +674,6 @@ GO
 
 </details>
 
-Payroll rule sources (checked 24 October 2026):
-
-- [Personal allowance — Croatian Tax Administration](https://porezna-uprava.gov.hr/hr/osobni-odbitak/4134)
-- [Income tax and the tax threshold — gov.hr](https://gov.hr/hr/porez-na-dohodak/1466)
-- [Zagreb tax rates, NN 28/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/full/2025_02_28_291.html)
-- [Reduction of the pension contribution base — Croatian Tax Administration](https://porezna-uprava.gov.hr/en/brosura-umanjenje-mjesecne-osnovice/7618)
-- [Contribution bases for 2026, NN 150/2025](https://narodne-novine.nn.hr/clanci/sluzbeni/2025_12_150_2237.html)
-
 ---
 
 # Section 4 – Scalar Functions That Read Data

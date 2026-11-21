@@ -824,7 +824,7 @@ The following topics extend the lab. They are not required for the exercises.
 
 ## A. Lock Escalation Thresholds
 
-SQL Server escalates row or page locks to a table lock once a single statement holds roughly 5,000 locks on one table, or under memory pressure. The exact thresholds are an internal heuristic, not a fixed contract — do not rely on a specific number in application logic. See [Lock Escalation](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide#lock-escalation) for the full behavior, including how to disable it per table with `ALTER TABLE ... SET (LOCK_ESCALATION = ...)`.
+SQL Server escalates row or page locks to a table lock once a single statement holds roughly 5,000 locks on one table, or under memory pressure. The exact thresholds are an internal heuristic, not a fixed contract — do not rely on a specific number in application logic. It can be disabled per table with `ALTER TABLE ... SET (LOCK_ESCALATION = ...)`.
 
 ## B. SNAPSHOT Isolation vs. READ_COMMITTED_SNAPSHOT
 
@@ -836,14 +836,3 @@ These are two different settings that are easy to confuse:
 | `SNAPSHOT` isolation | Per-transaction, opt-in | A transaction explicitly requests `SET TRANSACTION ISOLATION LEVEL SNAPSHOT`, giving it one fixed, consistent view of the database for its entire duration |
 
 Enabling `ALLOW_SNAPSHOT_ISOLATION` (Section 9.2) only makes the `SNAPSHOT` level *available* to request; it does not change the default. `READ_COMMITTED_SNAPSHOT` changes the default directly. A database can have either, both, or neither enabled.
-
----
-
-# References
-
-- [Transaction Locking and Row Versioning Guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide)
-- [SET TRANSACTION ISOLATION LEVEL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql)
-- [Lock Compatibility](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide#lock_compatibility)
-- [Deadlocking](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide#deadlocking)
-- [sys.dm_tran_locks](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql)
-- [ALTER DATABASE SET Options (READ_COMMITTED_SNAPSHOT, ALLOW_SNAPSHOT_ISOLATION)](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-transact-sql-set-options)

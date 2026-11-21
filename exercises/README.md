@@ -186,7 +186,7 @@ Difficulty describes the reasoning and SQL work expected. It does not indicate t
 - Hints should be optional and progressive: start with the relevant concept, then point to a useful table or logical step, and only then suggest a SQL structure.
 - Put hints and complete solutions in collapsible Markdown `<details>` sections so students can attempt the task first.
 - A solution should explain why it works, including how it handles zero, one, or many affected rows where relevant. Include a test statement and expected behavior when practical.
-- Add references beside the exercise or in a short reference list. Prefer links to the relevant course lab section and official SQL Server documentation. References support learning; they should not replace the exercise requirements.
+- Link to the relevant course lab section, not to external pages.
 - Give test objects plain, descriptive names without an `Exercise` prefix, but check that they do not collide with objects the lab creates. State clearly which test data is inserted or changed.
 - Do not add cleanup sections. Exercises are run in order on a freshly restored database, and later exercises may use objects from earlier ones. Keep a `DROP` or `DELETE` only when it is part of the task or when the next step needs a known starting state (for example, a row count).
 

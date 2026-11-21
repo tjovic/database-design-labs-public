@@ -706,5 +706,3 @@ GO
 ## References
 
 - [Lab 01 – Views](../labs/lab01-views.md)
-- [CREATE VIEW (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-view-transact-sql)
-- [Modify data through a view — Microsoft Learn](https://learn.microsoft.com/en-us/sql/relational-databases/views/modify-data-through-a-view)

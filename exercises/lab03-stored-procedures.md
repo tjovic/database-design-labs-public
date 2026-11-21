@@ -654,4 +654,3 @@ This script calls a procedure once for each card. The additional reading in [Lab
 ## References
 
 - [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md)
-- [CREATE PROCEDURE (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-procedure-transact-sql)

@@ -1023,5 +1023,3 @@ Running the same no-op update again now writes zero new audit rows, confirmed by
 ## References
 
 - [Lab 02 – Triggers](../labs/lab02-triggers.md)
-- [Create DML Triggers — Microsoft Learn](https://learn.microsoft.com/sql/relational-databases/triggers/create-dml-triggers)
-- [Create DML Triggers to Handle Multiple Rows of Data — Microsoft Learn](https://learn.microsoft.com/sql/relational-databases/triggers/create-dml-triggers-to-handle-multiple-rows-of-data)

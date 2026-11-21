@@ -530,6 +530,3 @@ Expected result: 35 rows. The leaders are `Kacige` (Accessories), `Road Bikes` (
 ## References
 
 - [Lab 12 – Window Functions](../labs/lab12-window-functions.md)
-- [OVER Clause (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-over-clause-transact-sql)
-- [Ranking Functions (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/ranking-functions-transact-sql)
-- [Analytic Functions (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/analytic-functions-transact-sql)

@@ -924,6 +924,3 @@ The parent rows are looked up by their business keys (`StudentNumber`, `Code`). 
 - [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md)
 - [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md)
 - [Lab 04 – Functions](../labs/lab04-functions.md)
-- [TRY...CATCH (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql)
-- [SCOPE_IDENTITY (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/scope-identity-transact-sql)
-- [@@ROWCOUNT (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/functions/rowcount-transact-sql)

@@ -598,6 +598,3 @@ message. With `'42'`, the `TRY` block completes successfully and the
 ## References
 
 - [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md)
-- [Variables (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/variables-transact-sql)
-- [Control-of-Flow — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/control-of-flow)
-- [TRY...CATCH (Transact-SQL) — Microsoft Learn](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/try-catch-transact-sql)

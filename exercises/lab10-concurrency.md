@@ -780,5 +780,3 @@ A team might avoid it if `tempdb` is already a bottleneck (it must hold every ro
 ## References
 
 - [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md) — dirty reads, non-repeatable reads, phantom reads, the four isolation levels, locking, and MVCC.
-- **Microsoft Learn**: [SET TRANSACTION ISOLATION LEVEL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql)
-- **Microsoft Learn**: [Transaction Locking and Row Versioning Guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide)

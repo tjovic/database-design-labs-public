@@ -62,7 +62,6 @@ EXEC dbo.usp_DeleteProductsByNameList @NameList = N'ZZ_TestProduct1,ZZ_TestProdu
 SELECT * FROM Product WHERE Name LIKE N'ZZ_TestProduct%';
 ```
 
-
 Expected result: the final `SELECT` returns no rows — all three test products were deleted by one call.
 
 </details>
@@ -273,7 +272,6 @@ EXEC dbo.usp_InsertStatesBatch @States = N'
 -- Verify
 SELECT * FROM State WHERE Name LIKE N'NewCountry%';
 ```
-
 
 Expected result: three rows, `NewCountry1`, `NewCountry2`, and `NewCountry3`. In a fresh database they get `IDState` values `4`, `5`, and `6`.
 
@@ -744,7 +742,6 @@ ORDER BY p.PriceWithoutVAT DESC
 FOR XML PATH('Product'), ROOT('PriceList');
 ```
 
-
 Expected result: one XML value that starts like this:
 
 ```xml
@@ -872,7 +869,6 @@ SELECT FirstName, LastName, Email
 FROM Customer
 WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
 ```
-
 
 Expected result: two rows, Xavier Xavier and Yolanda Yates.
 
@@ -1158,7 +1154,6 @@ INSERT INTO @ProductList (ID) VALUES (1), (2), (316);
 EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
 ```
 
-
 Expected result: three rows — `1` Adjustable Race, `2` Bearing Ball, and `316` Blade, each with price `0.00`. It is the same result as in Exercise 2, now passed as a table instead of a string.
 
 </details>
@@ -1221,7 +1216,6 @@ FROM Product
 WHERE Name LIKE N'ZZ_TestWidget%';
 ```
 
-
 Expected result: two rows, `ZZ_TestWidget1` (`19.99`) and `ZZ_TestWidget2` (`29.99`), each with a new `IDProduct`.
 
 </details>
@@ -1266,8 +1260,3 @@ There is not one single "right" answer — the argument is what counts.
 # References
 
 - [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md) — all five methods: client-side query building (the anti-example), delimited strings, XML, JSON, and Table-Valued Parameters.
-- **Microsoft Learn**: [STRING_SPLIT (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/string-split-transact-sql)
-- **Microsoft Learn**: [Nodes() Method (xml Data Type)](https://learn.microsoft.com/en-us/sql/t-sql/xml/nodes-method-xml-data-type)
-- **Microsoft Learn**: [FOR XML (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/xml/for-xml-sql-server)
-- **Microsoft Learn**: [OPENJSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/openjson-transact-sql)
-- **Microsoft Learn**: [Table-Valued Parameters](https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-table-valued-parameters-database-engine)

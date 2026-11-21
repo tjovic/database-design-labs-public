@@ -24,9 +24,6 @@ After completing this lab, you should be able to:
 - explain `@@TRANCOUNT`, why an inner `COMMIT` does not independently commit changes, and distinguish a transaction managed by a procedure from one managed by its caller;
 - explain, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep its promises after a crash.
 
-> [!NOTE]
-> **Suggested route for a 90-minute lab:** Part A (Sections 1–2) and Part B (Sections 3–5) are the core, followed by Exercises 9 and 12 of the [Transaction Exercises](../exercises/lab09-transactions.md). Part C (Sections 6–10) goes deeper — savepoints, nesting, transaction ownership, and the transaction log — for instructor demonstration or self-study.
-
 ---
 
 ## Before you start
@@ -1984,7 +1981,7 @@ Back to the opening question: a transfer that subtracts from one account and add
 
 ## Additional practice
 
-Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md). Part A applies explicit transactions, savepoints, and caller-vs-procedure ownership to real `AdventureWorksENG` tables; Part B continues in `TransactionsLab` with the transfer procedure from Section 5.
+Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md).
 
 ---
 

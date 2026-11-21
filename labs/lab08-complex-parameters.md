@@ -2127,4 +2127,4 @@ These questions connect the whole lab. Questions about individual methods are at
 
 ## Additional practice
 
-Exercises for this lab are in [Complex Parameters Exercises](../exercises/lab08-complex-parameters.md), grouped by method: delimited strings, XML, `FOR XML PATH`, JSON, and Table-Valued Parameters.
+Exercises for this lab are in [Complex Parameters Exercises](../exercises/lab08-complex-parameters.md).

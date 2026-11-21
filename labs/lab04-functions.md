@@ -1448,7 +1448,7 @@ And remember:
 
 ## Additional practice
 
-Exercises for this lab are in [Function Exercises](../exercises/lab04-functions.md). They cover scalar functions, inline TVFs, and multi-statement TVFs, from choosing the right function type to an advanced payroll calculation.
+Exercises for this lab are in [Function Exercises](../exercises/lab04-functions.md).
 
 ---
 

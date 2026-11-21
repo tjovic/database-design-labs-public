@@ -1490,4 +1490,4 @@ It can also reduce **network round-trips** by allowing those statements to execu
 
 ## Additional practice
 
-Exercises for this lab are in [Stored Procedure Exercises](../exercises/lab03-stored-procedures.md). They cover input parameters, `OUTPUT` parameters, return status codes, inserting related rows, and reusing the card-number validation procedure from Section 7.
+Exercises for this lab are in [Stored Procedure Exercises](../exercises/lab03-stored-procedures.md).

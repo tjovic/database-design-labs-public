@@ -1,17 +1,8 @@
 # Lab 06 – Indexes in SQL Server
 
-> [!TIP]
-> How to use this lab
->
-> Your instructor will demonstrate the main concepts and the indexing process during the laboratory session.
->
-> You are not expected to memorize every detail or complete every section during class. Use this manual to follow the demonstrations, explore the SQL examples independently, and review the explanations at your own pace.
->
-> You can also return to the exercises and detailed explanations after the laboratory session.
+**Database:** `IndexLab`
 
----
-
-# Learning goals
+## Learning objectives
 
 By the end of this lab, you should be able to:
 
@@ -2410,4 +2401,4 @@ Remember that an `Index Seek` is not automatically better than a `Scan`. The bes
 
 ## Additional practice
 
-Exercises for this lab are in [Index Exercises](../exercises/lab06-indexes.md). Part A practises index design on `AdventureWorksENG`; Part B continues in `IndexLab` with the indexes created in this lab.
+Exercises for this lab are in [Index Exercises](../exercises/lab06-indexes.md).

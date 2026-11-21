@@ -8,19 +8,7 @@ You will apply these concepts to implement **Create, Read, Update, and Delete (C
 
 Rather than introducing new T-SQL syntax, the focus is on **combining existing knowledge to solve practical database problems**. You will implement CRUD operations, compare different ways of organizing stored procedures, and handle situations involving missing records, business rules, and referential integrity.
 
-> [!IMPORTANT]
-> **This lab is mostly about stored procedures.**
->
-> Almost every example is a stored procedure, and it relies on the same building blocks: input and `OUTPUT` parameters, `RETURN` codes, `IF EXISTS` checks, `@@ROWCOUNT` ([Lab 0, Section 9](lab00-tsql-essentials.md#section-9---set-nocount-on-and-rowcount)), and `TRY/CATCH`. Solid knowledge of stored procedures is the key to this lab.
->
-> If any of these building blocks feel uncertain, review [Lab 3 – Stored Procedures](lab03-stored-procedures.md) before you start. Before you run each example, try to predict what it will return.
-
-> [!NOTE]
-> **This lab works on the real `AdventureWorksENG` data.**
->
-> Read operations query the actual catalog — real categories, cities, customers, and products. Deletions that a business rule or a foreign key rejects change nothing.
->
-> Several examples insert, change, or delete rows — for example, Section 7 deletes customer `16` (Lili Alameda, who has no invoices). The expected results, including the generated IDs, assume a freshly created `AdventureWorksENG`, so recreate the database before you start. On a database where the lab has already run, the results will differ.
+Several examples insert, change, or delete rows. The expected results, including generated IDs, assume a freshly restored `AdventureWorksENG`.
 
 ---
 
@@ -2602,4 +2590,4 @@ And remember:
 
 ## Additional practice
 
-Exercises for this lab are in [CRUD Operation Exercises](../exercises/lab07-crud-operations.md). They cover separate and combined procedures, reading through a function, error handling, and operations on related tables.
+Exercises for this lab are in [CRUD Operation Exercises](../exercises/lab07-crud-operations.md).

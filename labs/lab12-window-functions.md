@@ -471,7 +471,7 @@ Back to the opening comparison: `GROUP BY Color` loses every row but the aggrega
 
 ## Additional practice
 
-Exercises for this lab are in [Window Function Exercises](../exercises/lab12-window-functions.md). They practise ranking functions, aggregate window functions and running totals, and `LAG` and `LEAD`.
+Exercises for this lab are in [Window Function Exercises](../exercises/lab12-window-functions.md).
 
 ---
 

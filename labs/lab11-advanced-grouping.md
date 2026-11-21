@@ -374,7 +374,7 @@ Back to the opening question: a spreadsheet with subtotals for every category an
 
 ## Additional practice
 
-Exercises for this lab are in [Advanced Grouping Exercises](../exercises/lab11-advanced-grouping.md). They practise `ROLLUP`, `CUBE`, `GROUPING SETS`, and labeling subtotal rows with `GROUPING()`.
+Exercises for this lab are in [Advanced Grouping Exercises](../exercises/lab11-advanced-grouping.md).
 
 ---
 

@@ -814,7 +814,7 @@ Back to the opening question: two tellers looking at the same account at the sam
 
 ## Additional practice
 
-Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurrency.md). Part A reproduces the three anomalies and their fixes on `AdventureWorksENG`; Part B continues in `TransactionsLab` with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
+Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurrency.md).
 
 ---
 

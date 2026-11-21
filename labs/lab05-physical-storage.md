@@ -1,11 +1,8 @@
 # Lab 05 – Physical Storage in SQL Server
 
-> Database Design Laboratory  
-> Student Lab Manual
+**Database:** `IndexLab`
 
----
-
-# Learning goals
+## Learning objectives
 
 By the end of this lab, you should be able to:
 
@@ -35,20 +32,7 @@ This lab contains more than you need to know. Each section is marked with one of
 Some core sections also contain short collapsible deep-dive parts.
 
 > [!IMPORTANT]
-> **The core sections give you everything you need for Lab 06.** The one idea to take away: SQL Server stores and reads all data in **8 KB pages**, and the number of pages a query has to process largely determines how much work it does.
->
-> The hands-on sections are not required for Lab 06, but do not skip them: inspecting a table's pages with `DBCC IND` and `DBCC PAGE` is a skill you are expected to have.
-
-> [!NOTE]
-> **Demo Database – IndexLab**
->
-> In this lab, you will create a demonstration database called `IndexLab`, containing several tables with millions of records.
->
-> We will use this database to explore how SQL Server physically stores data, inspect data pages, and investigate disk I/O.
->
-> The database will be created using the [IndexLab setup script](setup/index-lab-data-setup.md). 
->
-> You will use this database again in **Lab 06 – Indexes** to investigate query performance and demonstrate how indexes can reduce the number of pages SQL Server needs to read.
+> **Core idea:** SQL Server stores and reads all data in **8 KB pages**, and the number of pages a query has to process largely determines how much work it does.
 
 ---
 
@@ -2756,4 +2740,4 @@ Understanding how SQL Server organizes and accesses database pages provides the 
 
 ## Additional practice
 
-Exercises for this lab are in [Physical Storage Exercises](../exercises/lab05-physical-storage.md). Part A inspects pages in `AdventureWorksENG`; Part B contains page calculations and two exercises on `IndexLab`.
+Exercises for this lab are in [Physical Storage Exercises](../exercises/lab05-physical-storage.md).

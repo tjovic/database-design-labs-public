@@ -1175,7 +1175,7 @@ In this example, the array contains two customer objects.
 Unlike XML, JSON had no data type of its own before SQL Server 2025, so it is stored and passed as `nvarchar(max)`. The examples in this lab use `nvarchar(max)`; the JSON functions work from SQL Server 2016, with database compatibility level 130 or higher.
 
 > [!NOTE]
-> SQL Server 2025 adds a native `json` data type. A `json` variable or column checks the document when the value is assigned, so `DECLARE @Json json = N'{"a": 1';` fails immediately. An `nvarchar(max)` variable accepts any text, and a malformed document is not always detected later: `JSON_VALUE` may still return a value from it. `JSON_VALUE`, `OPENJSON`, and the other functions in this lab work with both types.
+> SQL Server 2025 adds a native `json` data type, which checks the text when it is assigned. `DECLARE @Json json = N'{"a": 1';` fails at once because the closing `}` is missing. An `nvarchar(max)` variable accepts the same text without an error, because to SQL Server it is just a string. The JSON functions do not always catch the mistake later either: `JSON_VALUE(@Json, '$.a')` still returns `1`. All JSON functions in this lab work with both types.
 
 ## 5.2 Reading a Single Value – JSON_VALUE
 

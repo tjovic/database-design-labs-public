@@ -263,7 +263,77 @@ SELECT * FROM State WHERE Name LIKE N'NewCountry%';
 
 ---
 
-## Exercise 5 — XML with Nested Structure [INTERMEDIATE]
+## Exercise 5 — XML: Read Element Text and Attributes [INTERMEDIATE]
+
+Create a procedure `dbo.usp_InsertCitiesFromXml` that accepts an `xml` parameter of this shape:
+
+```xml
+<Cities>
+    <City StateID="1">ZZ_TestCity1</City>
+    <City StateID="1">ZZ_TestCity2</City>
+    <City StateID="2">ZZ_TestCity3</City>
+</Cities>
+```
+
+The city name is the **text** of each `City` element, and the state is an **attribute**.
+
+The procedure must:
+
+1. Accept `@Cities xml`.
+2. Insert all cities into the `City` table with one `INSERT ... SELECT`.
+
+Call it with the XML above and verify the inserted rows, including each city's state.
+
+### Hints
+
+- Read the element text with `.value('.', 'nvarchar(50)')`, as in Lab 8, Section 4.2, Step 3.
+- Read the attribute with `.value('@StateID', 'int')`.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCitiesFromXml
+    @Cities xml
+AS
+BEGIN
+    INSERT INTO City (Name, StateID)
+    SELECT
+        tbl.col.value('.', 'nvarchar(50)'),
+        tbl.col.value('@StateID', 'int')
+    FROM @Cities.nodes('/Cities/City') AS tbl(col);
+END;
+GO
+
+-- Test
+EXEC dbo.usp_InsertCitiesFromXml @Cities = N'
+<Cities>
+    <City StateID="1">ZZ_TestCity1</City>
+    <City StateID="1">ZZ_TestCity2</City>
+    <City StateID="2">ZZ_TestCity3</City>
+</Cities>';
+
+-- Verify
+SELECT c.Name AS City, s.Name AS State
+FROM City c
+JOIN State s ON s.IDState = c.StateID
+WHERE c.Name LIKE N'ZZ_TestCity%'
+ORDER BY c.Name;
+```
+
+Expected result:
+
+| City | State |
+|---|---|
+| ZZ_TestCity1 | Croatia |
+| ZZ_TestCity2 | Croatia |
+| ZZ_TestCity3 | Germany |
+
+</details>
+
+---
+
+## Exercise 6 — XML with Nested Structure [INTERMEDIATE]
 
 In Section 4.4 of Lab 8, we inserted an invoice and its items from one XML document. Here, we apply the same pattern to a department and its employees.
 
@@ -370,7 +440,7 @@ Expected result:
 
 ---
 
-## Exercise 6 — XML: Find or Create Related Records [ADVANCED]
+## Exercise 7 — XML: Find or Create Related Records [ADVANCED]
 
 > [!TIP]
 > Optional extension or homework: this exercise combines XML input with find-or-create logic across three related tables.
@@ -608,7 +678,7 @@ Running the procedure multiple times with the same input should not create addit
 
 # Building XML with `FOR XML PATH`
 
-## Exercise 7 — FOR XML PATH: Build a Price List [INTERMEDIATE]
+## Exercise 8 — FOR XML PATH: Build a Price List [INTERMEDIATE]
 
 Write a query (no procedure) that builds an XML price list from the `Product` table.
 
@@ -648,7 +718,7 @@ FOR XML PATH('Product'), ROOT('PriceList');
 
 ---
 
-## Exercise 8 — Generating Nested XML with FOR XML PATH [ADVANCED]
+## Exercise 9 — Generating Nested XML with FOR XML PATH [ADVANCED]
 
 Write a query (not a procedure) that:
 
@@ -703,7 +773,7 @@ Run it and inspect the XML. Notice:
 
 # JSON
 
-## Exercise 9 — JSON: Insert Customers from JSON [INTERMEDIATE]
+## Exercise 10 — JSON: Insert Customers from JSON [INTERMEDIATE]
 
 Write a procedure `dbo.usp_InsertCustomersFromJson` that:
 
@@ -758,9 +828,224 @@ WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
 
 ---
 
+## Exercise 11 — JSON: Insert a Parent and Its Children [INTERMEDIATE]
+
+In Lab 8, Section 5.6, we inserted an invoice and its items from one JSON document. Here, the children are a simple array of names.
+
+Create the test tables:
+
+```sql
+CREATE TABLE dbo.TestTeam
+(
+    TeamID int PRIMARY KEY IDENTITY,
+    Name nvarchar(50)
+);
+
+CREATE TABLE dbo.TestMember
+(
+    MemberID int PRIMARY KEY IDENTITY,
+    TeamID int,
+    Name nvarchar(50)
+);
+GO
+```
+
+Write a procedure `dbo.usp_InsertTeamFromJson` that accepts an `nvarchar(max)` parameter of this shape:
+
+```json
+{
+    "Team": "Blue",
+    "Members": ["Ana", "Ivan", "Marko"]
+}
+```
+
+The procedure must:
+
+1. Insert the team into `dbo.TestTeam`.
+2. Insert every member into `dbo.TestMember`, linked to the team by `TeamID`.
+
+Call it twice: once for team `Blue` with the members above, and once for team `Red` with members `Petra` and `Luka`. Verify that every member is linked to the correct team.
+
+### Hints
+
+- Read the team name with `JSON_VALUE(@Json, '$.Team')`.
+- Save `SCOPE_IDENTITY()` in a variable after inserting the team.
+- `OPENJSON(@Json, '$.Members')` turns the array into rows. The elements are plain values, not objects, so read the `value` column, as in Lab 8, Section 5.3, Step 1.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_InsertTeamFromJson
+    @Json nvarchar(max)
+AS
+BEGIN
+    DECLARE @TeamID int;
+
+    -- Insert the team
+    INSERT INTO dbo.TestTeam (Name)
+    VALUES (JSON_VALUE(@Json, '$.Team'));
+
+    SET @TeamID = SCOPE_IDENTITY();
+
+    -- Insert all members of this team
+    INSERT INTO dbo.TestMember (TeamID, Name)
+    SELECT @TeamID, value
+    FROM OPENJSON(@Json, '$.Members');
+END;
+GO
+
+-- Test
+EXEC dbo.usp_InsertTeamFromJson @Json = N'
+{
+    "Team": "Blue",
+    "Members": ["Ana", "Ivan", "Marko"]
+}';
+
+EXEC dbo.usp_InsertTeamFromJson @Json = N'
+{
+    "Team": "Red",
+    "Members": ["Petra", "Luka"]
+}';
+
+-- Verify
+SELECT t.TeamID, t.Name AS Team, m.Name AS Member
+FROM dbo.TestMember m
+JOIN dbo.TestTeam t ON t.TeamID = m.TeamID
+ORDER BY t.TeamID, m.Name;
+```
+
+Expected result:
+
+| TeamID | Team | Member |
+|---|---|---|
+| 1 | Blue | Ana |
+| 1 | Blue | Ivan |
+| 1 | Blue | Marko |
+| 2 | Red | Luka |
+| 2 | Red | Petra |
+
+</details>
+
+---
+
+## Exercise 12 — JSON: Delete by a List of IDs [INTERMEDIATE]
+
+This exercise uses the tables and rows from the previous exercise.
+
+Write a procedure `dbo.usp_DeleteTeamsFromJson` that accepts a JSON array of team IDs, such as `[1, 2]`, and deletes those teams **together with their members**.
+
+The procedure must:
+
+1. Accept `@TeamIDs nvarchar(max)`.
+2. Delete the members of the listed teams first, then the teams themselves.
+3. Use set-based `DELETE` statements, with no loop.
+
+Call it with the ID of team `Blue` (`[1]` if you ran the previous exercise once) and verify that team `Blue` and its three members are gone, while team `Red` remains.
+
+### Hints
+
+- `OPENJSON(@TeamIDs)` returns one row per ID in the `value` column. The values are text, so convert them with `CAST(value AS int)`, just as with `STRING_SPLIT`.
+- Delete the child rows (`TestMember`) before the parent rows (`TestTeam`).
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteTeamsFromJson
+    @TeamIDs nvarchar(max)
+AS
+BEGIN
+    -- Delete the members first
+    DELETE FROM dbo.TestMember
+    WHERE TeamID IN
+    (
+        SELECT CAST(value AS int)
+        FROM OPENJSON(@TeamIDs)
+    );
+
+    -- Then delete the teams
+    DELETE FROM dbo.TestTeam
+    WHERE TeamID IN
+    (
+        SELECT CAST(value AS int)
+        FROM OPENJSON(@TeamIDs)
+    );
+END;
+GO
+
+-- Test
+EXEC dbo.usp_DeleteTeamsFromJson @TeamIDs = N'[1]';
+
+-- Verify
+SELECT t.Name AS Team, m.Name AS Member
+FROM dbo.TestTeam t
+LEFT JOIN dbo.TestMember m ON m.TeamID = t.TeamID
+ORDER BY m.Name;
+```
+
+Expected result: only team `Red`, with `Luka` and `Petra`.
+
+If deleting the teams failed after the members were deleted, the members would already be gone. [Lab 9](../labs/lab09-transactions.md) shows how a transaction makes both deletes succeed or fail together.
+
+</details>
+
+---
+
+## Exercise 13 — FOR JSON PATH: Build a Product List [INTERMEDIATE]
+
+Write a query (no procedure) that returns the five most expensive products as JSON of this shape:
+
+```json
+{
+    "Products": [
+        {
+            "IDProduct": 749,
+            "Name": "Road-150 Red, 62",
+            "PriceWithoutVAT": 3578.2700,
+            "Subcategory": {
+                "ID": 2,
+                "Name": "Road Bikes"
+            }
+        },
+        ...
+    ]
+}
+```
+
+Order the products by `PriceWithoutVAT` descending, then by `IDProduct`.
+
+### Hints
+
+- Join `Product` with `Subcategory` to get the subcategory name.
+- A dot in the alias creates a nested object: `[Subcategory.Name]`.
+- Use `ROOT('Products')` to wrap the array.
+
+<details>
+<summary>Show solution</summary>
+
+```sql
+SELECT TOP 5
+    p.IDProduct,
+    p.Name,
+    p.PriceWithoutVAT,
+    s.IDSubcategory AS [Subcategory.ID],
+    s.Name AS [Subcategory.Name]
+FROM Product p
+JOIN Subcategory s ON s.IDSubcategory = p.SubcategoryID
+ORDER BY p.PriceWithoutVAT DESC, p.IDProduct
+FOR JSON PATH, ROOT('Products');
+```
+
+Compare it with Exercise 9: JSON uses a dot in the alias where XML uses a slash.
+
+</details>
+
+---
+
 # Table-Valued Parameters
 
-## Exercise 10 — TVP Fundamentals [INTERMEDIATE]
+## Exercise 14 — TVP Fundamentals [INTERMEDIATE]
 
 Create a **table type** `dbo.ProductIDsExercise` with a single `int` column called `ID` (primary key).
 
@@ -813,7 +1098,7 @@ EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
 
 ---
 
-## Exercise 11 — TVP: Insert Multiple Products [INTERMEDIATE]
+## Exercise 15 — TVP: Insert Multiple Products [INTERMEDIATE]
 
 Create a **table type** `dbo.ProductInput` with columns `Name nvarchar(50)`, `ProductNumber nvarchar(25)`, and `PriceWithoutVAT money` (all `NOT NULL`).
 
@@ -872,7 +1157,7 @@ WHERE Name LIKE N'ZZ_TestWidget%';
 
 # Choosing a method
 
-## Exercise 12 — Choose the Right Method [INTERMEDIATE]
+## Exercise 16 — Choose the Right Method [INTERMEDIATE]
 
 For each scenario below, decide which of the five methods from Lab 8 (client-side query, delimited string, XML, JSON, TVP) is most appropriate. Write one sentence defending your choice.
 
@@ -914,11 +1199,14 @@ DROP PROCEDURE IF EXISTS dbo.usp_DeleteProductsByNameList;
 DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDListWithValidation;
 DROP FUNCTION IF EXISTS dbo.fn_SplitInts;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertCitiesFromXml;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertDepartmentWithEmployees;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerWithLocation;
 DROP PROCEDURE IF EXISTS dbo.usp_ListProductsByIDList;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertProducts;
 DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomersFromJson;
+DROP PROCEDURE IF EXISTS dbo.usp_InsertTeamFromJson;
+DROP PROCEDURE IF EXISTS dbo.usp_DeleteTeamsFromJson;
 GO
 
 -- Table types can be dropped only after the procedures that use them.
@@ -928,6 +1216,8 @@ GO
 
 DROP TABLE IF EXISTS dbo.TestEmployee;
 DROP TABLE IF EXISTS dbo.TestDepartment;
+DROP TABLE IF EXISTS dbo.TestMember;
+DROP TABLE IF EXISTS dbo.TestTeam;
 GO
 ```
 

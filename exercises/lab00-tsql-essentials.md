@@ -2,7 +2,7 @@
 
 These exercises build on [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md) and use `AdventureWorksENG`. They practise batches, variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH` — the building blocks used throughout the later labs.
 
-Most exercises only read data. Exercises 7 and 8 insert a state and its cities and delete them again at the end of the solution. Exercise 12 updates a product that does not exist, so it changes no rows. No other setup or cleanup is needed.
+Most exercises only read data. Exercises 7 and 8 insert a state and its cities, and Exercise 12 updates a product that does not exist, so it changes no rows. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.
 
 ```sql
 USE AdventureWorksENG;
@@ -287,7 +287,6 @@ Insert a new state named `'India'`.
 2. Insert two cities, `'Agra'` and `'Delhi'`, that reference the new
     state.
 3. Select the two cities to verify the result.
-4. Clean up the inserted data.
 
 <details>
 <summary>Hint</summary>
@@ -315,13 +314,6 @@ VALUES
 SELECT *
 FROM City
 WHERE StateID = @StateID;
-
--- Cleanup
-DELETE FROM City
-WHERE StateID = @StateID;
-
-DELETE FROM State
-WHERE IDState = @StateID;
 GO
 ```
 
@@ -346,7 +338,6 @@ where `X` is the generated ID.
 
 5. Insert `'Lisbon'` into `City` using the new `@StateID`.
 6. Select the new state and city.
-7. Clean up.
 
 <details>
 <summary>Hint</summary>
@@ -383,13 +374,6 @@ FROM State AS s
 LEFT JOIN City AS c
     ON c.StateID = s.IDState
 WHERE s.IDState = @StateID;
-
--- Cleanup
-DELETE FROM City
-WHERE StateID = @StateID;
-
-DELETE FROM State
-WHERE IDState = @StateID;
 GO
 ```
 

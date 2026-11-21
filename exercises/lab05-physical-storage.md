@@ -9,7 +9,7 @@ Every number quoted in Part A (page counts, page IDs, record lengths, row IDs) w
 > [!WARNING]
 > `DBCC IND` and `DBCC PAGE` are **undocumented diagnostic commands** (same note as Lab 05). Use them only for learning in this training database.
 
-These exercises are read-only: `DBCC IND` and `DBCC PAGE` only inspect existing pages. No setup or cleanup is required, and nothing here creates objects or modifies data.
+These exercises are read-only: `DBCC IND` and `DBCC PAGE` only inspect existing pages. Nothing here creates objects or modifies data.
 
 ## Setup
 

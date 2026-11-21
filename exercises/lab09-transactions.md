@@ -4,7 +4,7 @@
 
 These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–5) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 6–11) continues in the lab's own `TransactionsLab` database.
 
-Part A inserts its own, clearly tagged rows and deletes only those rows during cleanup; no existing `AdventureWorksENG` data is changed or removed. Part B changes the fictional account balances and notes in `TransactionsLab`.
+Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Unlike most other collections, each Part A solution ends with a short cleanup that deletes its test rows, because the exercises compare row counts and the next exercise expects to start from zero. Part B changes the fictional account balances and notes in `TransactionsLab`.
 
 ---
 

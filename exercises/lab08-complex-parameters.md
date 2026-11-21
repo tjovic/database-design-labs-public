@@ -4,7 +4,7 @@
 
 These exercises build on [Lab 8 – Complex Parameters](../labs/lab08-complex-parameters.md). They are grouped by method: delimited strings, reading XML, building XML with `FOR XML PATH`, JSON, and Table-Valued Parameters. The last exercise asks you to choose the right method for several scenarios.
 
-Several exercises insert or delete rows in `State`, `City`, `Customer`, and `Product`. Run them in a fresh copy of `AdventureWorksENG`, and recreate the database when you are done.
+Several exercises insert or delete rows in `State`, `City`, `Customer`, and `Product`. Run them in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)); the solutions do not remove what they create. To start over, restore the database again.
 
 ---
 
@@ -1187,39 +1187,6 @@ There is not one single "right" answer — the argument is what counts.
 5. **Delimited string or TVP** — The 30 IDs form a flat list, as in Lab 8, Section 7.3, Scenario 1. If the GUI's platform supports TVPs (for example .NET), a TVP adds type safety.
 
 </details>
-
----
-
-# Cleanup
-
-Remove the procedures, functions, table types, and test tables created during these exercises. Rows inserted into `State`, `City`, `Customer`, and `Product` are not removed here; recreate `AdventureWorksENG` to return to the original data.
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteProductsByNameList;
-DROP PROCEDURE IF EXISTS dbo.usp_GetProductsByIDListWithValidation;
-DROP FUNCTION IF EXISTS dbo.fn_SplitInts;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertStatesBatch;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCitiesFromXml;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertDepartmentWithEmployees;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomerWithLocation;
-DROP PROCEDURE IF EXISTS dbo.usp_ListProductsByIDList;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertProducts;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertCustomersFromJson;
-DROP PROCEDURE IF EXISTS dbo.usp_InsertTeamFromJson;
-DROP PROCEDURE IF EXISTS dbo.usp_DeleteTeamsFromJson;
-GO
-
--- Table types can be dropped only after the procedures that use them.
-DROP TYPE IF EXISTS dbo.ProductIDsExercise;
-DROP TYPE IF EXISTS dbo.ProductInput;
-GO
-
-DROP TABLE IF EXISTS dbo.TestEmployee;
-DROP TABLE IF EXISTS dbo.TestDepartment;
-DROP TABLE IF EXISTS dbo.TestMember;
-DROP TABLE IF EXISTS dbo.TestTeam;
-GO
-```
 
 ---
 

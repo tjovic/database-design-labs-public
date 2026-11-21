@@ -2,7 +2,7 @@
 
 These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions and running totals, and the analytical functions `LAG` and `LEAD`.
 
-All exercises are plain `SELECT` statements, except Exercise 9, which creates a small table and drops it at the end of its solution.
+All exercises are plain `SELECT` statements, except Exercise 9, which creates a small table.
 
 ```sql
 USE AdventureWorksENG;
@@ -289,12 +289,6 @@ ORDER BY s.Departure;
 ```
 
 The last row's `MinutesToNext` is `NULL` — there is no next station. This is the same shape you'd use for "how long is each concert set", "how long between website events", or "how long between server heartbeats" — any time-series diff.
-
-Clean up the table once you're done with this exercise:
-
-```sql
-DROP TABLE dbo.Lab12TrainSchedule;
-```
 
 </details>
 

@@ -4,7 +4,7 @@
 
 These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–6) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. **Part B** (Exercises 7–11) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
 
-Part A inserts its own, clearly tagged rows and deletes only those rows during cleanup; no existing `AdventureWorksENG` data is changed or removed. Part B changes only the fictional data in `TransactionsLab`.
+Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Exercises 5 and 6 delete the phantom row they insert, so the range again has two rows when the next exercise starts. Run the setup only once; on a freshly restored database the counts match the expected results. Part B changes only the fictional data in `TransactionsLab`.
 
 > [!NOTE]
 > Every Part A exercise needs **two SSMS query windows**, both connected to `AdventureWorksENG` — exactly as in Lab 10. Label them **Session A** and **Session B** before starting.
@@ -455,18 +455,6 @@ Turn it on for a read-heavy application where long-running reports currently blo
 A team might avoid it if `tempdb` is already a bottleneck (it must hold every row version) or if write-heavy workloads cannot absorb the extra cost of maintaining versions on every write.
 
 </details>
-
----
-
-## Cleanup
-
-In Part A, each exercise's solution already cleans up the rows it changed; this is a safety net in case an exercise was interrupted partway through.
-
-```sql
-DELETE FROM dbo.State WHERE Name LIKE N'ExerciseConc%';
-```
-
-Part B needs no cleanup beyond the resets described in its introduction. To start over completely, rerun the *Before you start* setup of Lab 10.
 
 ---
 

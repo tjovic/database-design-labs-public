@@ -2,7 +2,7 @@
 
 These exercises build on [Lab 01 – Views](../labs/lab01-views.md) and use `AdventureWorksENG`. **Part A** (Exercises 1–6) practises creating, changing, and querying Views, reading metadata from system Views, and using an aggregate View in a query. **Part B** (Exercises 7–11) modifies data through Views and uses `WITH CHECK OPTION`, `WITH SCHEMABINDING`, and `WITH ENCRYPTION`.
 
-Exercises 7 and 8 change data only temporarily or not at all. Exercise 9 inserts one test credit card, and Exercise 10 creates a small test table. The cleanup section removes them together with the Views.
+Exercises 7 and 8 change data only temporarily or not at all. Exercise 9 inserts one test credit card, and Exercise 10 creates a small test table. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.
 
 ```sql
 USE AdventureWorksENG;
@@ -626,8 +626,6 @@ DROP COLUMN Description;
 
 With `WITH SCHEMABINDING`, SQL Server protects the columns the View depends on: the table cannot be changed in a way that would break the View. Without it, the change succeeds and the View fails later.
 
-The cleanup section removes the View and the table.
-
 </details>
 
 ---
@@ -702,28 +700,6 @@ GO
 </details>
 
 ---
-
-## Cleanup
-
-Remove the Views, the test card from Exercise 9, and the test table from Exercise 10:
-
-```sql
-DROP VIEW IF EXISTS dbo.vCustomers;
-DROP VIEW IF EXISTS dbo.vCustomerCities;
-DROP VIEW IF EXISTS dbo.vCategories;
-DROP VIEW IF EXISTS dbo.vCustomerLocations;
-DROP VIEW IF EXISTS dbo.vAcceptedCards;
-DROP VIEW IF EXISTS dbo.vSchemaExercise;
-DROP VIEW IF EXISTS dbo.vCustomerInvoiceCount;
-DROP VIEW IF EXISTS dbo.vProductsWithoutColor;
-GO
-
-DELETE FROM dbo.CreditCard
-WHERE CardNumber = '378282246310005';
-
-DROP TABLE IF EXISTS dbo.SchemaExercise;
-GO
-```
 
 ## References
 

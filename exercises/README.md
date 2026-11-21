@@ -38,7 +38,7 @@ The trigger collection is in [Trigger Exercises](lab02-triggers.md) and follows 
 4. **Business rules** — validate related values and decide when a trigger is an appropriate tool.
 5. **Review and debugging** — inspect trigger behavior, identify common mistakes, and explain side effects.
 
-Part A logs changes to `City` in a simple log table; Part B audits `Product` changes. Each exercise names the relevant tables or objects, describes the expected behavior, and explains how to test and clean up safely.
+Part A logs changes to `City` in a simple log table; Part B audits `Product` changes. Each exercise names the relevant tables or objects, describes the expected behavior, and explains how to test it.
 
 ### Stored procedures
 
@@ -51,7 +51,7 @@ The procedure collection is in [Stored Procedure Exercises](lab03-stored-procedu
 5. **Status values** — use `RETURN` to report which of several cases occurred, together with a value in an `OUTPUT` parameter.
 6. **Reusing a procedure** — call a validation procedure for every row in a `WHILE` loop.
 
-The exercises need no test data setup. Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; the cleanup section removes them. All other procedures only read data.
+The exercises need no test data setup. Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city. All other procedures only read data.
 
 ### Functions
 
@@ -76,7 +76,7 @@ The CRUD collection is in [CRUD Operation Exercises](lab07-crud-operations.md) a
 4. **Error handling** — catching a constraint violation outside and inside a procedure, and translating it into a return value.
 5. **Related tables** — deleting a parent together with its child rows, and inserting a child row while finding or creating its parents. These exercises do not use transactions yet; they point out where Lab 9 will make the operations safer.
 
-Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exercises use three small tables of their own (`Exercise_Student`, `Exercise_Course`, `Exercise_Enrollment`). The setup recreates them with the original data, so the exercises can be repeated, and the cleanup removes them together with every procedure and function created.
+Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exercises use three small tables of their own (`Student`, `Course`, `Enrollment`). The setup recreates them with the original data, so the exercises can be repeated.
 
 ### Complex Parameters
 
@@ -102,7 +102,7 @@ The transaction collection is in [Transaction Exercises](lab09-transactions.md) 
 5. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
 6. **`TransactionsLab` practice (Exercises 6–11)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, extend it with a history record, and plan a transaction for a Lab 8 procedure.
 
-Part A (Exercises 1–5) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows for safe, precise cleanup. Part B (Exercises 6–11) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
+Part A (Exercises 1–5) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows so they can be counted and removed precisely. Part B (Exercises 6–11) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
 
 ### Concurrency
 
@@ -113,7 +113,7 @@ The concurrency collection is in [Concurrency Exercises](lab10-concurrency.md) a
 3. **Phantom read** — reproduce it under `REPEATABLE READ`, then prevent it with `SERIALIZABLE`.
 4. **`TransactionsLab` practice (Exercises 7–11)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT`.
 
-Part A (Exercises 1–6) needs two SSMS query windows (Session A / Session B), like Lab 10, and applies the three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — cleaned up at the end, with the real `Croatia`/`Germany`/`Italy` rows never touched. Part B (Exercises 7–11) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
+Part A (Exercises 1–6) needs two SSMS query windows (Session A / Session B), like Lab 10, and applies the three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — with the real `Croatia`/`Germany`/`Italy` rows never touched. Part B (Exercises 7–11) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
 
 ### Physical storage
 
@@ -181,13 +181,14 @@ Difficulty describes the reasoning and SQL work expected. It does not indicate t
 - Put hints and complete solutions in collapsible Markdown `<details>` sections so students can attempt the task first.
 - A solution should explain why it works, including how it handles zero, one, or many affected rows where relevant. Include a test statement and expected behavior when practical.
 - Add references beside the exercise or in a short reference list. Prefer links to the relevant course lab section and official SQL Server documentation. References support learning; they should not replace the exercise requirements.
-- Keep object names and cleanup scoped to the exercise. State clearly which test data is inserted or changed and how it is restored.
+- Give test objects plain, descriptive names without an `Exercise` prefix, but check that they do not collide with objects the lab creates. State clearly which test data is inserted or changed.
+- Do not add cleanup sections. Exercises are run in order on a freshly restored database, and later exercises may use objects from earlier ones. Keep a `DROP` or `DELETE` only when it is part of the task or when the next step needs a known starting state (for example, a row count).
 
 ## Database safety note
 
-Start the exercises with a fresh `AdventureWorksENG`, so objects left over from a lab (for example, triggers on `dbo.City`) do not interfere. An exercise must not drop, replace, disable, or clear existing objects or data as part of setup or cleanup. Prefer isolated test objects or a dedicated database; if an exercise must use an existing object, document a safe, reversible procedure that preserves its original state.
+Start each exercise collection with a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)), so objects left over from a lab (for example, triggers on `dbo.City`) do not interfere. To start over, restore the database again. An exercise must not drop, replace, disable, or clear existing objects or data as part of its setup. Prefer isolated test objects or a dedicated database; if an exercise must use an existing object, document a safe, reversible procedure that preserves its original state.
 
-The index exercises are a deliberate, narrow exception to "prefer isolated test objects": by nature, an index exercise creates a real physical index on an existing table. Each one uses the `IX_Exercises_` naming prefix and is listed in that file's cleanup section — never leave one of these indexes in place after finishing, since it can change the execution plan observed by a later, unrelated exercise or lab.
+The index exercises are a deliberate, narrow exception to "prefer isolated test objects": by nature, an index exercise creates a real physical index on an existing table. Because such an index can change the execution plan observed by a later, unrelated exercise or lab, restore the database after finishing the index exercises.
 
 ## References
 

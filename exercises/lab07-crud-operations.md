@@ -2,7 +2,7 @@
 
 These exercises build on [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md). They progress from one procedure per operation to combined procedures, error handling, and operations that must also handle rows in related tables. They use only what Labs 03, 04 and 07 cover; transactions follow in Lab 9.
 
-The exercises do not touch existing `AdventureWorksENG` data. They use three small tables created in the setup below: `Exercise_Student`, `Exercise_Course`, and `Exercise_Enrollment`. Every object created here starts with `Exercise_`, `usp_Exercises_`, or `fn_Exercises_` and is removed in the cleanup section.
+The exercises do not touch existing `AdventureWorksENG` data. They use three small tables created in the setup below: `Student`, `Course`, and `Enrollment`. Run the exercises in order: later procedures build on earlier ones. They can run on the same `AdventureWorksENG` you used for Lab 07, but a freshly restored copy is the safest start (see [About the database](../README.md#about-the-database)).
 
 ## Setup
 
@@ -12,56 +12,56 @@ Run the setup once before the first exercise. It recreates the three exercise ta
 USE AdventureWorksENG;
 GO
 
-DROP TABLE IF EXISTS dbo.Exercise_Enrollment;
-DROP TABLE IF EXISTS dbo.Exercise_Student;
-DROP TABLE IF EXISTS dbo.Exercise_Course;
+DROP TABLE IF EXISTS dbo.Enrollment;
+DROP TABLE IF EXISTS dbo.Student;
+DROP TABLE IF EXISTS dbo.Course;
 GO
 
-CREATE TABLE dbo.Exercise_Student
+CREATE TABLE dbo.Student
 (
     IDStudent     int IDENTITY(1,1) NOT NULL
-        CONSTRAINT PK_Exercise_Student PRIMARY KEY,
+        CONSTRAINT PK_Student PRIMARY KEY,
     FirstName     nvarchar(50) NOT NULL,
     LastName      nvarchar(50) NOT NULL,
     StudentNumber char(10)     NOT NULL
-        CONSTRAINT UQ_Exercise_Student_StudentNumber UNIQUE
+        CONSTRAINT UQ_Student_StudentNumber UNIQUE
 );
 
-CREATE TABLE dbo.Exercise_Course
+CREATE TABLE dbo.Course
 (
     IDCourse int IDENTITY(1,1) NOT NULL
-        CONSTRAINT PK_Exercise_Course PRIMARY KEY,
+        CONSTRAINT PK_Course PRIMARY KEY,
     Code     nvarchar(10)  NOT NULL
-        CONSTRAINT UQ_Exercise_Course_Code UNIQUE,
+        CONSTRAINT UQ_Course_Code UNIQUE,
     Name     nvarchar(100) NOT NULL
 );
 
-CREATE TABLE dbo.Exercise_Enrollment
+CREATE TABLE dbo.Enrollment
 (
     IDEnrollment int IDENTITY(1,1) NOT NULL
-        CONSTRAINT PK_Exercise_Enrollment PRIMARY KEY,
+        CONSTRAINT PK_Enrollment PRIMARY KEY,
     StudentID    int NOT NULL
-        CONSTRAINT FK_Exercise_Enrollment_Student REFERENCES dbo.Exercise_Student (IDStudent),
+        CONSTRAINT FK_Enrollment_Student REFERENCES dbo.Student (IDStudent),
     CourseID     int NOT NULL
-        CONSTRAINT FK_Exercise_Enrollment_Course REFERENCES dbo.Exercise_Course (IDCourse),
-    CONSTRAINT UQ_Exercise_Enrollment_StudentCourse UNIQUE (StudentID, CourseID)
+        CONSTRAINT FK_Enrollment_Course REFERENCES dbo.Course (IDCourse),
+    CONSTRAINT UQ_Enrollment_StudentCourse UNIQUE (StudentID, CourseID)
 );
 GO
 
-INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
 VALUES
     (N'Ana',   N'Anić',   '0036511111'),
     (N'Ivan',  N'Horvat', '0036522222'),
     (N'Marko', N'Kovač',  '0036533333'),
     (N'Petra', N'Babić',  '0036544444');
 
-INSERT INTO dbo.Exercise_Course (Code, Name)
+INSERT INTO dbo.Course (Code, Name)
 VALUES
     (N'DBD', N'Database Design'),
     (N'PRG', N'Programming'),
     (N'NET', N'Computer Networks');
 
-INSERT INTO dbo.Exercise_Enrollment (StudentID, CourseID)
+INSERT INTO dbo.Enrollment (StudentID, CourseID)
 VALUES
     (1, 1),   -- Ana   – Database Design
     (1, 2),   -- Ana   – Programming
@@ -85,14 +85,14 @@ Exercises 1–6 work only on students they insert themselves, so the four studen
 
 ## Exercise 1 — One procedure per operation [BEGINNER]
 
-Create four procedures for `Exercise_Student`, one for each CRUD operation:
+Create four procedures for `Student`, one for each CRUD operation:
 
 | Procedure | Parameters | Behavior |
 | --- | --- | --- |
-| `dbo.usp_Exercises_InsertStudent` | `@FirstName`, `@LastName`, `@StudentNumber`, `@IDStudent OUTPUT` | Inserts a student and returns the new ID through `@IDStudent` |
-| `dbo.usp_Exercises_GetStudent` | `@IDStudent` | Returns the student's row |
-| `dbo.usp_Exercises_UpdateStudent` | `@IDStudent`, `@FirstName`, `@LastName`, `@StudentNumber` | Updates all columns; `RETURN 0` if the student was updated, `RETURN 1` if it does not exist |
-| `dbo.usp_Exercises_DeleteStudent` | `@IDStudent` | Deletes the student; `RETURN 0` if it was deleted, `RETURN 1` if it does not exist |
+| `dbo.usp_InsertStudent` | `@FirstName`, `@LastName`, `@StudentNumber`, `@IDStudent OUTPUT` | Inserts a student and returns the new ID through `@IDStudent` |
+| `dbo.usp_GetStudent` | `@IDStudent` | Returns the student's row |
+| `dbo.usp_UpdateStudent` | `@IDStudent`, `@FirstName`, `@LastName`, `@StudentNumber` | Updates all columns; `RETURN 0` if the student was updated, `RETURN 1` if it does not exist |
+| `dbo.usp_DeleteStudent` | `@IDStudent` | Deletes the student; `RETURN 0` if it was deleted, `RETURN 1` if it does not exist |
 
 Use the procedures to insert the student `Luka Perić` (`0036555555`), read it, change the last name to `Perić Horvat`, read it again, delete it, and read it once more. Finally, try to update a student with ID `999`.
 
@@ -114,38 +114,38 @@ Use `SCOPE_IDENTITY()` right after the `INSERT` to read the new identity value.
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertStudent
+CREATE OR ALTER PROCEDURE dbo.usp_InsertStudent
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
     @StudentNumber char(10),
     @IDStudent     int OUTPUT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+    INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
     VALUES (@FirstName, @LastName, @StudentNumber);
 
     SET @IDStudent = SCOPE_IDENTITY();
 END;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetStudent
+CREATE OR ALTER PROCEDURE dbo.usp_GetStudent
     @IDStudent int
 AS
 BEGIN
     SELECT IDStudent, FirstName, LastName, StudentNumber
-    FROM dbo.Exercise_Student
+    FROM dbo.Student
     WHERE IDStudent = @IDStudent;
 END;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_UpdateStudent
+CREATE OR ALTER PROCEDURE dbo.usp_UpdateStudent
     @IDStudent     int,
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
     @StudentNumber char(10)
 AS
 BEGIN
-    UPDATE dbo.Exercise_Student
+    UPDATE dbo.Student
     SET FirstName     = @FirstName,
         LastName      = @LastName,
         StudentNumber = @StudentNumber
@@ -158,11 +158,11 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_DeleteStudent
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteStudent
     @IDStudent int
 AS
 BEGIN
-    DELETE FROM dbo.Exercise_Student
+    DELETE FROM dbo.Student
     WHERE IDStudent = @IDStudent;
 
     IF @@ROWCOUNT = 0
@@ -178,7 +178,7 @@ Test all four operations in one batch, so every call can use the ID returned by 
 ```sql
 DECLARE @ID int, @Result int;
 
-EXEC dbo.usp_Exercises_InsertStudent
+EXEC dbo.usp_InsertStudent
     @FirstName = N'Luka',
     @LastName = N'Perić',
     @StudentNumber = '0036555555',
@@ -186,23 +186,23 @@ EXEC dbo.usp_Exercises_InsertStudent
 
 SELECT @ID AS NewStudentID;                       -- 5
 
-EXEC dbo.usp_Exercises_GetStudent @IDStudent = @ID;
+EXEC dbo.usp_GetStudent @IDStudent = @ID;
 
-EXEC @Result = dbo.usp_Exercises_UpdateStudent
+EXEC @Result = dbo.usp_UpdateStudent
     @IDStudent = @ID,
     @FirstName = N'Luka',
     @LastName = N'Perić Horvat',
     @StudentNumber = '0036555555';
 SELECT @Result AS UpdateResult;                   -- 0
 
-EXEC dbo.usp_Exercises_GetStudent @IDStudent = @ID;
+EXEC dbo.usp_GetStudent @IDStudent = @ID;
 
-EXEC @Result = dbo.usp_Exercises_DeleteStudent @IDStudent = @ID;
+EXEC @Result = dbo.usp_DeleteStudent @IDStudent = @ID;
 SELECT @Result AS DeleteResult;                   -- 0
 
-EXEC dbo.usp_Exercises_GetStudent @IDStudent = @ID;   -- empty result
+EXEC dbo.usp_GetStudent @IDStudent = @ID;   -- empty result
 
-EXEC @Result = dbo.usp_Exercises_UpdateStudent
+EXEC @Result = dbo.usp_UpdateStudent
     @IDStudent = 999,
     @FirstName = N'Nobody',
     @LastName = N'Nobody',
@@ -219,12 +219,12 @@ The `UPDATE` of student `999` is not an error: it simply affects zero rows. With
 
 ## Exercise 2 — Read through an inline table-valued function [BEGINNER]
 
-Create an inline table-valued function `dbo.fn_Exercises_GetStudent` that takes `@IDStudent` and returns that student's `IDStudent`, `FirstName`, `LastName`, and `StudentNumber`.
+Create an inline table-valued function `dbo.fn_GetStudent` that takes `@IDStudent` and returns that student's `IDStudent`, `FirstName`, `LastName`, and `StudentNumber`.
 
 Use the function to:
 
 1. read student `1`;
-2. list the courses of student `1` together with the student's name, by joining the function's result with `Exercise_Enrollment` and `Exercise_Course`.
+2. list the courses of student `1` together with the student's name, by joining the function's result with `Enrollment` and `Course`.
 
 <details>
 <summary>Hint</summary>
@@ -237,20 +237,20 @@ An inline table-valued function has a `RETURNS TABLE` header and a single `RETUR
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_GetStudent (@IDStudent int)
+CREATE OR ALTER FUNCTION dbo.fn_GetStudent (@IDStudent int)
 RETURNS TABLE
 AS
 RETURN
 (
     SELECT IDStudent, FirstName, LastName, StudentNumber
-    FROM dbo.Exercise_Student
+    FROM dbo.Student
     WHERE IDStudent = @IDStudent
 );
 GO
 
 -- 1. Read one student
 SELECT *
-FROM dbo.fn_Exercises_GetStudent(1);
+FROM dbo.fn_GetStudent(1);
 
 -- 2. Use the function in a larger query
 SELECT
@@ -258,16 +258,16 @@ SELECT
     s.LastName,
     c.Code,
     c.Name AS Course
-FROM dbo.fn_Exercises_GetStudent(1) AS s
-INNER JOIN dbo.Exercise_Enrollment AS e ON e.StudentID = s.IDStudent
-INNER JOIN dbo.Exercise_Course AS c ON c.IDCourse = e.CourseID
+FROM dbo.fn_GetStudent(1) AS s
+INNER JOIN dbo.Enrollment AS e ON e.StudentID = s.IDStudent
+INNER JOIN dbo.Course AS c ON c.IDCourse = e.CourseID
 ORDER BY c.Code;
 GO
 ```
 
 The second query returns two rows: Ana Anić with `DBD` and `PRG`.
 
-A procedure such as `usp_Exercises_GetStudent` returns the same row, but its result cannot be joined or filtered further. That is the main reason to choose a function for the Read operation.
+A procedure such as `usp_GetStudent` returns the same row, but its result cannot be joined or filtered further. That is the main reason to choose a function for the Read operation.
 
 </details>
 
@@ -275,7 +275,7 @@ A procedure such as `usp_Exercises_GetStudent` returns the same row, but its res
 
 ## Exercise 3 — Insert and update in one procedure [INTERMEDIATE]
 
-Create `dbo.usp_Exercises_SaveStudent` that inserts **or** updates a student, depending on `@IDStudent`:
+Create `dbo.usp_SaveStudent` that inserts **or** updates a student, depending on `@IDStudent`:
 
 | `@IDStudent` | Behavior | Return value |
 | --- | --- | --- |
@@ -296,7 +296,7 @@ Test all three cases. Use the student `Mia Jurić` (`0036566666`) for the insert
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_SaveStudent
+CREATE OR ALTER PROCEDURE dbo.usp_SaveStudent
     @IDStudent     int OUTPUT,
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
@@ -305,17 +305,17 @@ AS
 BEGIN
     IF @IDStudent IS NULL
     BEGIN
-        INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+        INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
         VALUES (@FirstName, @LastName, @StudentNumber);
 
         SET @IDStudent = SCOPE_IDENTITY();
         RETURN 0;
     END;
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
+    IF NOT EXISTS (SELECT 1 FROM dbo.Student WHERE IDStudent = @IDStudent)
         RETURN 1;   -- student does not exist
 
-    UPDATE dbo.Exercise_Student
+    UPDATE dbo.Student
     SET FirstName     = @FirstName,
         LastName      = @LastName,
         StudentNumber = @StudentNumber
@@ -328,7 +328,7 @@ GO
 DECLARE @ID int = NULL, @Result int;
 
 -- Insert
-EXEC @Result = dbo.usp_Exercises_SaveStudent
+EXEC @Result = dbo.usp_SaveStudent
     @IDStudent = @ID OUTPUT,
     @FirstName = N'Mia',
     @LastName = N'Jurić',
@@ -336,18 +336,18 @@ EXEC @Result = dbo.usp_Exercises_SaveStudent
 SELECT @Result AS Result, @ID AS IDStudent;       -- 0, new ID
 
 -- Update the same student
-EXEC @Result = dbo.usp_Exercises_SaveStudent
+EXEC @Result = dbo.usp_SaveStudent
     @IDStudent = @ID OUTPUT,
     @FirstName = N'Mia',
     @LastName = N'Jurić Kovač',
     @StudentNumber = '0036566666';
 SELECT @Result AS Result, @ID AS IDStudent;       -- 0, same ID
 
-SELECT * FROM dbo.fn_Exercises_GetStudent(@ID);
+SELECT * FROM dbo.fn_GetStudent(@ID);
 
 -- Nonexistent student
 DECLARE @Missing int = 999;
-EXEC @Result = dbo.usp_Exercises_SaveStudent
+EXEC @Result = dbo.usp_SaveStudent
     @IDStudent = @Missing OUTPUT,
     @FirstName = N'Nobody',
     @LastName = N'Nobody',
@@ -367,18 +367,18 @@ Note that the nonexistent ID does **not** become an insert. Treating an unknown 
 A colleague wrote this procedure. It should update an existing student or insert a new one, and always return the student's ID through `@IDStudent`.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_MergeStudent
+CREATE OR ALTER PROCEDURE dbo.usp_MergeStudent
     @IDStudent     int OUTPUT,
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
     @StudentNumber char(10)
 AS
-IF EXISTS (SELECT * FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
-    UPDATE dbo.Exercise_Student
+IF EXISTS (SELECT * FROM dbo.Student WHERE IDStudent = @IDStudent)
+    UPDATE dbo.Student
     SET FirstName = @FirstName, LastName = @LastName, StudentNumber = @StudentNumber
     WHERE IDStudent = @IDStudent
 ELSE
-    INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+    INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
     VALUES (@FirstName, @LastName, @StudentNumber)
     SET @IDStudent = SCOPE_IDENTITY()
 GO
@@ -389,10 +389,10 @@ Create the procedure and run this test:
 ```sql
 DECLARE @ID int = NULL;
 
-EXEC dbo.usp_Exercises_MergeStudent @ID OUTPUT, N'Nina', N'Lovrić', '0036577777';
+EXEC dbo.usp_MergeStudent @ID OUTPUT, N'Nina', N'Lovrić', '0036577777';
 SELECT @ID AS AfterInsert;
 
-EXEC dbo.usp_Exercises_MergeStudent @ID OUTPUT, N'Nina', N'Lovrić Babić', '0036577777';
+EXEC dbo.usp_MergeStudent @ID OUTPUT, N'Nina', N'Lovrić Babić', '0036577777';
 SELECT @ID AS AfterUpdate;
 GO
 ```
@@ -420,22 +420,22 @@ During the update call, no row was inserted in the procedure's scope, so `SCOPE_
 The fix is to group the `INSERT` and the `SET` with `BEGIN ... END`:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_MergeStudent
+CREATE OR ALTER PROCEDURE dbo.usp_MergeStudent
     @IDStudent     int OUTPUT,
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
     @StudentNumber char(10)
 AS
 BEGIN
-    IF EXISTS (SELECT 1 FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
+    IF EXISTS (SELECT 1 FROM dbo.Student WHERE IDStudent = @IDStudent)
     BEGIN
-        UPDATE dbo.Exercise_Student
+        UPDATE dbo.Student
         SET FirstName = @FirstName, LastName = @LastName, StudentNumber = @StudentNumber
         WHERE IDStudent = @IDStudent;
     END
     ELSE
     BEGIN
-        INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+        INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
         VALUES (@FirstName, @LastName, @StudentNumber);
 
         SET @IDStudent = SCOPE_IDENTITY();
@@ -447,13 +447,13 @@ GO
 Before running the test again, delete the student it created so the student number is free:
 
 ```sql
-DELETE FROM dbo.Exercise_Student WHERE StudentNumber = '0036577777';
+DELETE FROM dbo.Student WHERE StudentNumber = '0036577777';
 GO
 ```
 
 Now both `AfterInsert` and `AfterUpdate` return the same ID.
 
-Unlike `usp_Exercises_SaveStudent` in Exercise 3, this procedure turns an unknown ID into an insert. Compare the two designs: which one would you choose, and why?
+Unlike `usp_SaveStudent` in Exercise 3, this procedure turns an unknown ID into an insert. Compare the two designs: which one would you choose, and why?
 
 </details>
 
@@ -461,7 +461,7 @@ Unlike `usp_Exercises_SaveStudent` in Exercise 3, this procedure turns an unknow
 
 ## Exercise 5 — One procedure for several operations [INTERMEDIATE]
 
-Create `dbo.usp_Exercises_ChangeStudent` that performs insert, update, or delete on `Exercise_Student`, chosen by an action parameter. Reading stays in `fn_Exercises_GetStudent` from Exercise 2.
+Create `dbo.usp_ChangeStudent` that performs insert, update, or delete on `Student`, chosen by an action parameter. Reading stays in `fn_GetStudent` from Exercise 2.
 
 | `@Action` | Operation |
 | --- | --- |
@@ -493,7 +493,7 @@ For update and delete, check `@@ROWCOUNT` right after the statement to detect a 
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ChangeStudent
+CREATE OR ALTER PROCEDURE dbo.usp_ChangeStudent
     @Action        char(1),
     @IDStudent     int OUTPUT,
     @FirstName     nvarchar(50) = NULL,
@@ -503,7 +503,7 @@ AS
 BEGIN
     IF @Action = 'I'
     BEGIN
-        INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+        INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
         VALUES (@FirstName, @LastName, @StudentNumber);
 
         SET @IDStudent = SCOPE_IDENTITY();
@@ -511,7 +511,7 @@ BEGIN
     END
     ELSE IF @Action = 'U'
     BEGIN
-        UPDATE dbo.Exercise_Student
+        UPDATE dbo.Student
         SET FirstName     = @FirstName,
             LastName      = @LastName,
             StudentNumber = @StudentNumber
@@ -522,7 +522,7 @@ BEGIN
     END
     ELSE IF @Action = 'D'
     BEGIN
-        DELETE FROM dbo.Exercise_Student
+        DELETE FROM dbo.Student
         WHERE IDStudent = @IDStudent;
 
         IF @@ROWCOUNT = 0 RETURN 1;
@@ -535,19 +535,19 @@ GO
 
 DECLARE @ID int, @Result int;
 
-EXEC @Result = dbo.usp_Exercises_ChangeStudent 'I', @ID OUTPUT, N'Tea', N'Marić', '0036588888';
+EXEC @Result = dbo.usp_ChangeStudent 'I', @ID OUTPUT, N'Tea', N'Marić', '0036588888';
 SELECT @Result AS InsertResult, @ID AS IDStudent;     -- 0, new ID
-SELECT * FROM dbo.fn_Exercises_GetStudent(@ID);
+SELECT * FROM dbo.fn_GetStudent(@ID);
 
-EXEC @Result = dbo.usp_Exercises_ChangeStudent 'U', @ID OUTPUT, N'Tea', N'Marić Horvat', '0036588888';
+EXEC @Result = dbo.usp_ChangeStudent 'U', @ID OUTPUT, N'Tea', N'Marić Horvat', '0036588888';
 SELECT @Result AS UpdateResult;                       -- 0
-SELECT * FROM dbo.fn_Exercises_GetStudent(@ID);
+SELECT * FROM dbo.fn_GetStudent(@ID);
 
-EXEC @Result = dbo.usp_Exercises_ChangeStudent 'D', @ID OUTPUT;
+EXEC @Result = dbo.usp_ChangeStudent 'D', @ID OUTPUT;
 SELECT @Result AS DeleteResult;                       -- 0
-SELECT * FROM dbo.fn_Exercises_GetStudent(@ID);       -- empty
+SELECT * FROM dbo.fn_GetStudent(@ID);       -- empty
 
-EXEC @Result = dbo.usp_Exercises_ChangeStudent 'X', @ID OUTPUT;
+EXEC @Result = dbo.usp_ChangeStudent 'X', @ID OUTPUT;
 SELECT @Result AS UnknownActionResult;                -- 99
 GO
 ```
@@ -562,9 +562,9 @@ The delete call passes only the action and the ID, because the other parameters 
 
 `StudentNumber` has a `UNIQUE` constraint, so inserting a second student with the same number fails.
 
-**Part A.** Call `usp_Exercises_InsertStudent` from Exercise 1 with the existing student number `0036511111`. Catch the error **outside** the procedure and print the error number and message.
+**Part A.** Call `usp_InsertStudent` from Exercise 1 with the existing student number `0036511111`. Catch the error **outside** the procedure and print the error number and message.
 
-**Part B.** Create `dbo.usp_Exercises_InsertStudentSafe`, which has the same parameters but catches the error **inside**. It should return:
+**Part B.** Create `dbo.usp_InsertStudentSafe`, which has the same parameters but catches the error **inside**. It should return:
 
 | Return value | Meaning |
 | --- | --- |
@@ -592,7 +592,7 @@ Inside `BEGIN CATCH`, `ERROR_NUMBER()` returns `2627` for a violated `PRIMARY KE
 DECLARE @ID int;
 
 BEGIN TRY
-    EXEC dbo.usp_Exercises_InsertStudent
+    EXEC dbo.usp_InsertStudent
         @FirstName = N'Ana',
         @LastName = N'Duplicate',
         @StudentNumber = '0036511111',
@@ -607,12 +607,12 @@ END CATCH;
 GO
 ```
 
-The output shows error `2627` and a message about the violated `UQ_Exercise_Student_StudentNumber` constraint. `Student inserted.` is never printed: execution jumps to `CATCH` as soon as the error occurs.
+The output shows error `2627` and a message about the violated `UQ_Student_StudentNumber` constraint. `Student inserted.` is never printed: execution jumps to `CATCH` as soon as the error occurs.
 
 **Part B** – `TRY/CATCH` inside the procedure:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertStudentSafe
+CREATE OR ALTER PROCEDURE dbo.usp_InsertStudentSafe
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
     @StudentNumber char(10),
@@ -620,7 +620,7 @@ CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertStudentSafe
 AS
 BEGIN
     BEGIN TRY
-        INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+        INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
         VALUES (@FirstName, @LastName, @StudentNumber);
 
         SET @IDStudent = SCOPE_IDENTITY();
@@ -639,11 +639,11 @@ GO
 
 DECLARE @ID int, @Result int;
 
-EXEC @Result = dbo.usp_Exercises_InsertStudentSafe
+EXEC @Result = dbo.usp_InsertStudentSafe
     N'Ana', N'Duplicate', '0036511111', @ID OUTPUT;
 SELECT @Result AS Result, @ID AS IDStudent;       -- 2, NULL
 
-EXEC @Result = dbo.usp_Exercises_InsertStudentSafe
+EXEC @Result = dbo.usp_InsertStudentSafe
     N'Lana', N'Novak', '0036599999', @ID OUTPUT;
 SELECT @Result AS Result, @ID AS IDStudent;       -- 0, new ID
 GO
@@ -661,9 +661,9 @@ In Part B, the **procedure** handles the error and translates it into a simple, 
 
 ## Exercise 7 — Delete with related rows [ADVANCED]
 
-A student who is enrolled in courses cannot be deleted directly: the foreign key from `Exercise_Enrollment` rejects the `DELETE`.
+A student who is enrolled in courses cannot be deleted directly: the foreign key from `Enrollment` rejects the `DELETE`.
 
-Create `dbo.usp_Exercises_DeleteStudentWithEnrollments` with these parameters:
+Create `dbo.usp_DeleteStudentWithEnrollments` with these parameters:
 
 - `@IDStudent int`
 - `@DeleteEnrollments bit = 0`
@@ -703,7 +703,7 @@ The order of the two `DELETE` statements matters. Which rows does the foreign ke
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_DeleteStudentWithEnrollments
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteStudentWithEnrollments
     @IDStudent          int,
     @DeleteEnrollments  bit = 0,
     @DeletedEnrollments int OUTPUT
@@ -711,20 +711,20 @@ AS
 BEGIN
     SET @DeletedEnrollments = 0;
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Exercise_Student WHERE IDStudent = @IDStudent)
+    IF NOT EXISTS (SELECT 1 FROM dbo.Student WHERE IDStudent = @IDStudent)
         RETURN 1;   -- student does not exist
 
     IF @DeleteEnrollments = 0
-       AND EXISTS (SELECT 1 FROM dbo.Exercise_Enrollment WHERE StudentID = @IDStudent)
+       AND EXISTS (SELECT 1 FROM dbo.Enrollment WHERE StudentID = @IDStudent)
         RETURN 2;   -- student has enrollments
 
     BEGIN TRY
-        DELETE FROM dbo.Exercise_Enrollment
+        DELETE FROM dbo.Enrollment
         WHERE StudentID = @IDStudent;
 
         SET @DeletedEnrollments = @@ROWCOUNT;
 
-        DELETE FROM dbo.Exercise_Student
+        DELETE FROM dbo.Student
         WHERE IDStudent = @IDStudent;
 
         RETURN 0;
@@ -737,30 +737,30 @@ GO
 
 DECLARE @Result int, @Deleted int;
 
-EXEC @Result = dbo.usp_Exercises_DeleteStudentWithEnrollments
+EXEC @Result = dbo.usp_DeleteStudentWithEnrollments
     @IDStudent = 999, @DeletedEnrollments = @Deleted OUTPUT;
 SELECT 'Student 999' AS Test, @Result AS Result, @Deleted AS DeletedEnrollments;   -- 1, 0
 
-EXEC @Result = dbo.usp_Exercises_DeleteStudentWithEnrollments
+EXEC @Result = dbo.usp_DeleteStudentWithEnrollments
     @IDStudent = 1, @DeletedEnrollments = @Deleted OUTPUT;
 SELECT 'Ana, keep enrollments' AS Test, @Result AS Result, @Deleted AS DeletedEnrollments;   -- 2, 0
 
-EXEC @Result = dbo.usp_Exercises_DeleteStudentWithEnrollments
+EXEC @Result = dbo.usp_DeleteStudentWithEnrollments
     @IDStudent = 3, @DeletedEnrollments = @Deleted OUTPUT;
 SELECT 'Marko' AS Test, @Result AS Result, @Deleted AS DeletedEnrollments;   -- 0, 0
 
-EXEC @Result = dbo.usp_Exercises_DeleteStudentWithEnrollments
+EXEC @Result = dbo.usp_DeleteStudentWithEnrollments
     @IDStudent = 1, @DeleteEnrollments = 1, @DeletedEnrollments = @Deleted OUTPUT;
 SELECT 'Ana, delete enrollments' AS Test, @Result AS Result, @Deleted AS DeletedEnrollments;   -- 0, 2
 
-SELECT * FROM dbo.Exercise_Student WHERE IDStudent IN (1, 3);   -- empty
-SELECT * FROM dbo.Exercise_Enrollment WHERE StudentID = 1;      -- empty
+SELECT * FROM dbo.Student WHERE IDStudent IN (1, 3);   -- empty
+SELECT * FROM dbo.Enrollment WHERE StudentID = 1;      -- empty
 GO
 ```
 
 The checks run before any `DELETE`, so the "does not exist" and "has enrollments" cases return without changing anything.
 
-The deletion order matters: enrollments first, then the student. Deleting the student first would violate `FK_Exercise_Enrollment_Student`.
+The deletion order matters: enrollments first, then the student. Deleting the student first would violate `FK_Enrollment_Student`.
 
 The `@DeleteEnrollments` flag makes deleting related rows an explicit decision of the caller. A procedure that always deleted them would make it too easy to remove a student's whole history by accident.
 
@@ -773,7 +773,7 @@ The `@DeleteEnrollments` flag makes deleting related rows an explicit decision o
 
 ## Exercise 8 — Insert with related rows [ADVANCED]
 
-Create `dbo.usp_Exercises_EnrollStudent`, which enrolls a student in a course. The caller identifies both by their business keys, not by IDs:
+Create `dbo.usp_EnrollStudent`, which enrolls a student in a course. The caller identifies both by their business keys, not by IDs:
 
 - `@StudentNumber`, `@FirstName`, `@LastName`
 - `@CourseCode`, `@CourseName`
@@ -814,7 +814,7 @@ If a variable is still `NULL` after the lookup, insert the missing row and set t
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_EnrollStudent
+CREATE OR ALTER PROCEDURE dbo.usp_EnrollStudent
     @StudentNumber char(10),
     @FirstName     nvarchar(50),
     @LastName      nvarchar(50),
@@ -828,15 +828,15 @@ BEGIN
 
     -- 1. Look up the parents by their business keys
     SELECT @IDStudent = IDStudent
-    FROM dbo.Exercise_Student
+    FROM dbo.Student
     WHERE StudentNumber = @StudentNumber;
 
     SELECT @IDCourse = IDCourse
-    FROM dbo.Exercise_Course
+    FROM dbo.Course
     WHERE Code = @CourseCode;
 
     -- 2. Already enrolled? Check before inserting anything.
-    IF EXISTS (SELECT 1 FROM dbo.Exercise_Enrollment
+    IF EXISTS (SELECT 1 FROM dbo.Enrollment
                WHERE StudentID = @IDStudent AND CourseID = @IDCourse)
         RETURN 2;
 
@@ -844,7 +844,7 @@ BEGIN
         -- 3. Create the missing parents
         IF @IDStudent IS NULL
         BEGIN
-            INSERT INTO dbo.Exercise_Student (FirstName, LastName, StudentNumber)
+            INSERT INTO dbo.Student (FirstName, LastName, StudentNumber)
             VALUES (@FirstName, @LastName, @StudentNumber);
 
             SET @IDStudent = SCOPE_IDENTITY();
@@ -852,14 +852,14 @@ BEGIN
 
         IF @IDCourse IS NULL
         BEGIN
-            INSERT INTO dbo.Exercise_Course (Code, Name)
+            INSERT INTO dbo.Course (Code, Name)
             VALUES (@CourseCode, @CourseName);
 
             SET @IDCourse = SCOPE_IDENTITY();
         END;
 
         -- 4. Enrollment
-        INSERT INTO dbo.Exercise_Enrollment (StudentID, CourseID)
+        INSERT INTO dbo.Enrollment (StudentID, CourseID)
         VALUES (@IDStudent, @IDCourse);
 
         SET @IDEnrollment = SCOPE_IDENTITY();
@@ -875,24 +875,24 @@ GO
 DECLARE @Result int, @ID int;
 
 -- 1. Existing student, existing course
-EXEC @Result = dbo.usp_Exercises_EnrollStudent
+EXEC @Result = dbo.usp_EnrollStudent
     '0036522222', N'Ivan', N'Horvat', N'PRG', N'Programming', @ID OUTPUT;
 SELECT 'Ivan - PRG' AS Test, @Result AS Result, @ID AS IDEnrollment;   -- 0, new ID
 
 -- 2. New student, new course
-EXEC @Result = dbo.usp_Exercises_EnrollStudent
+EXEC @Result = dbo.usp_EnrollStudent
     '0036500001', N'Sara', N'Vuković', N'SEC', N'Information Security', @ID OUTPUT;
 SELECT 'Sara - SEC' AS Test, @Result AS Result, @ID AS IDEnrollment;   -- 0, new ID
 
 -- 3. The same enrollment again
-EXEC @Result = dbo.usp_Exercises_EnrollStudent
+EXEC @Result = dbo.usp_EnrollStudent
     '0036500001', N'Sara', N'Vuković', N'SEC', N'Information Security', @ID OUTPUT;
 SELECT 'Sara - SEC again' AS Test, @Result AS Result, @ID AS IDEnrollment;   -- 2, NULL
 
 SELECT s.FirstName, s.LastName, c.Code, c.Name AS Course
-FROM dbo.Exercise_Enrollment AS e
-INNER JOIN dbo.Exercise_Student AS s ON s.IDStudent = e.StudentID
-INNER JOIN dbo.Exercise_Course AS c ON c.IDCourse = e.CourseID
+FROM dbo.Enrollment AS e
+INNER JOIN dbo.Student AS s ON s.IDStudent = e.StudentID
+INNER JOIN dbo.Course AS c ON c.IDCourse = e.CourseID
 ORDER BY s.LastName, c.Code;
 GO
 ```
@@ -909,29 +909,6 @@ The parent rows are looked up by their business keys (`StudentNumber`, `Code`). 
 </details>
 
 ---
-
-## Cleanup
-
-Remove all objects created by this collection:
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_InsertStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_UpdateStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_DeleteStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_SaveStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_MergeStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ChangeStudent;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_InsertStudentSafe;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_DeleteStudentWithEnrollments;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_EnrollStudent;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_GetStudent;
-
-DROP TABLE IF EXISTS dbo.Exercise_Enrollment;
-DROP TABLE IF EXISTS dbo.Exercise_Student;
-DROP TABLE IF EXISTS dbo.Exercise_Course;
-GO
-```
 
 ## References
 

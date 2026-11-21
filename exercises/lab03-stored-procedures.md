@@ -2,11 +2,11 @@
 
 These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, `RETURN` status codes for several cases, and reusing one procedure from another script.
 
-Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; all other exercises only read table data. The cleanup section removes the procedures and these rows.
+Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; all other exercises only read table data. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.
 
 ## Exercise 1 — List categories [BEGINNER]
 
-Create a procedure named `dbo.usp_Exercises_ListCategories` that returns `IDCategory` and `Name` from `dbo.Category`, sorted by `Name` in ascending order.
+Create a procedure named `dbo.usp_ListCategories` that returns `IDCategory` and `Name` from `dbo.Category`, sorted by `Name` in ascending order.
 
 Execute the procedure. Then alter it to sort in descending order and execute it again.
 
@@ -21,7 +21,7 @@ The procedure body can contain the same `SELECT` you would run directly. Use `CR
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ListCategories
+CREATE OR ALTER PROCEDURE dbo.usp_ListCategories
 AS
 BEGIN
     SELECT
@@ -32,14 +32,14 @@ BEGIN
 END;
 GO
 
-EXEC dbo.usp_Exercises_ListCategories;
+EXEC dbo.usp_ListCategories;
 GO
 ```
 
 To change the sort direction, alter `ORDER BY Name ASC` to `ORDER BY Name DESC`, run the `CREATE OR ALTER PROCEDURE` batch again, and execute the procedure.
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ListCategories
+CREATE OR ALTER PROCEDURE dbo.usp_ListCategories
 AS
 BEGIN
     SELECT
@@ -50,7 +50,7 @@ BEGIN
 END;
 GO
 
-EXEC dbo.usp_Exercises_ListCategories;
+EXEC dbo.usp_ListCategories;
 GO
 ```
 
@@ -58,7 +58,7 @@ GO
 
 ## Exercise 2 — Search customers by last-name pattern [BEGINNER]
 
-Create `dbo.usp_Exercises_CustomersByLastName` with an input parameter named `@LastNamePattern` of type `nvarchar(50)`.
+Create `dbo.usp_CustomersByLastName` with an input parameter named `@LastNamePattern` of type `nvarchar(50)`.
 
 Return `IDCustomer`, `FirstName`, `LastName`, and `Email` for customers whose `LastName` matches the supplied `LIKE` pattern. Sort by `LastName`, then `FirstName`, then `IDCustomer`.
 
@@ -75,7 +75,7 @@ Pass the pattern itself as a parameter and use `LastName LIKE @LastNamePattern`.
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CustomersByLastName
+CREATE OR ALTER PROCEDURE dbo.usp_CustomersByLastName
     @LastNamePattern nvarchar(50)
 AS
 BEGIN
@@ -90,7 +90,7 @@ BEGIN
 END;
 GO
 
-EXEC dbo.usp_Exercises_CustomersByLastName
+EXEC dbo.usp_CustomersByLastName
     @LastNamePattern = N'%son%';
 GO
 ```
@@ -99,7 +99,7 @@ GO
 
 ## Exercise 3 — Find products in a price range [BEGINNER]
 
-Create `dbo.usp_Exercises_ProductsByPriceRange` with two input parameters, `@MinimumPrice money` and `@MaximumPrice money`. Return each matching product's `IDProduct`, `Name`, and `PriceWithoutVAT`. Include both endpoints of the range and sort by price, then product ID.
+Create `dbo.usp_ProductsByPriceRange` with two input parameters, `@MinimumPrice money` and `@MaximumPrice money`. Return each matching product's `IDProduct`, `Name`, and `PriceWithoutVAT`. Include both endpoints of the range and sort by price, then product ID.
 
 Call the procedure for the range from `0` to `100000`.
 
@@ -114,7 +114,7 @@ Use `BETWEEN` with the two parameters in the `WHERE` clause.
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_ProductsByPriceRange
+CREATE OR ALTER PROCEDURE dbo.usp_ProductsByPriceRange
     @MinimumPrice money,
     @MaximumPrice money
 AS
@@ -129,7 +129,7 @@ BEGIN
 END;
 GO
 
-EXEC dbo.usp_Exercises_ProductsByPriceRange
+EXEC dbo.usp_ProductsByPriceRange
     @MinimumPrice = 0,
     @MaximumPrice = 100000;
 GO
@@ -142,7 +142,7 @@ GO
 Create this procedure:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetProductColor
+CREATE OR ALTER PROCEDURE dbo.usp_ProductColor
     @IDProduct int,
     @Color     nvarchar(15) OUTPUT
 AS
@@ -161,7 +161,7 @@ A developer calls it like this:
 ```sql
 DECLARE @Color nvarchar(15);
 
-EXEC dbo.usp_Exercises_GetProductColor
+EXEC dbo.usp_ProductColor
     @IDProduct = 742,
     @Color     = @Color;
 
@@ -189,7 +189,7 @@ The caller forgot the `OUTPUT` keyword. It must appear both in the procedure dec
 ```sql
 DECLARE @Color nvarchar(15);
 
-EXEC dbo.usp_Exercises_GetProductColor
+EXEC dbo.usp_ProductColor
     @IDProduct = 742,
     @Color     = @Color OUTPUT;
 
@@ -200,7 +200,7 @@ SELECT @Color AS ProductColor;
 
 ## Exercise 5 — Return invoices and a match count [INTERMEDIATE]
 
-Create `dbo.usp_Exercises_CustomerInvoices` with these parameters:
+Create `dbo.usp_CustomerInvoices` with these parameters:
 
 | Parameter | Type | Direction | Purpose |
 |---|---|---|---|
@@ -224,7 +224,7 @@ Join `Invoice` to `Customer`, and use a `LEFT JOIN` to `InvoiceItem` so an invoi
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CustomerInvoices
+CREATE OR ALTER PROCEDURE dbo.usp_CustomerInvoices
     @IDCustomer int,
     @DateFrom date,
     @DateToExclusive date,
@@ -266,7 +266,7 @@ Use an existing customer who has an invoice to test it. This example selects one
 ```sql
 DECLARE @InvoiceCount int;
 
-EXEC dbo.usp_Exercises_CustomerInvoices
+EXEC dbo.usp_CustomerInvoices
     @IDCustomer = 1,
     @DateFrom = '20010101',
     @DateToExclusive = '20050101',
@@ -282,7 +282,7 @@ The result set contains that customer's invoices in the selected date interval. 
 
 ## Exercise 6 — Insert a city and its state [INTERMEDIATE]
 
-Create a procedure named `dbo.usp_Exercises_InsertCityInState` that accepts `@StateName` and `@CityName`.
+Create a procedure named `dbo.usp_InsertCityInState` that accepts `@StateName` and `@CityName`.
 
 The procedure must:
 
@@ -313,7 +313,7 @@ After `SELECT @StateID = IDState FROM dbo.State WHERE Name = @StateName`, the va
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_InsertCityInState
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCityInState
     @StateName nvarchar(50),
     @CityName  nvarchar(50)
 AS
@@ -337,11 +337,11 @@ BEGIN
 END;
 GO
 
-EXEC dbo.usp_Exercises_InsertCityInState
+EXEC dbo.usp_InsertCityInState
     @StateName = N'Canada',
     @CityName  = N'Toronto';
 
-EXEC dbo.usp_Exercises_InsertCityInState
+EXEC dbo.usp_InsertCityInState
     @StateName = N'Canada',
     @CityName  = N'Vancouver';
 
@@ -365,7 +365,7 @@ The first call inserts `Canada` and `Toronto`. The second call finds `Canada` an
 
 ## Exercise 7 — Check a city and count its customers [INTERMEDIATE]
 
-Create `dbo.usp_Exercises_CityCustomerCount` with an input parameter `@IDCity int` and an output parameter `@CustomerCount int OUTPUT`.
+Create `dbo.usp_CityCustomerCount` with an input parameter `@IDCity int` and an output parameter `@CustomerCount int OUTPUT`.
 
 The procedure distinguishes three cases:
 
@@ -395,7 +395,7 @@ Check first whether the city exists with `IF NOT EXISTS (...)` and `RETURN -1`. 
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CityCustomerCount
+CREATE OR ALTER PROCEDURE dbo.usp_CityCustomerCount
     @IDCity int,
     @CustomerCount int OUTPUT
 AS
@@ -425,17 +425,17 @@ DECLARE @EmptyCityID int =
     WHERE Name = N'Exercise Empty City'
 );
 
-EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+EXEC @ReturnCode = dbo.usp_CityCustomerCount
     @IDCity = 1,
     @CustomerCount = @CustomerCount OUTPUT;
 SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
 
-EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+EXEC @ReturnCode = dbo.usp_CityCustomerCount
     @IDCity = @EmptyCityID,
     @CustomerCount = @CustomerCount OUTPUT;
 SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
 
-EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+EXEC @ReturnCode = dbo.usp_CityCustomerCount
     @IDCity = -1,
     @CustomerCount = @CustomerCount OUTPUT;
 SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
@@ -448,7 +448,7 @@ The three calls return `1` and `1492`, `0` and `0`, and `-1` and `NULL`. The ret
 
 ## Exercise 8 — Return a product, price, and status [ADVANCED]
 
-Create `dbo.usp_Exercises_GetProduct` with an input parameter `@IDProduct int` and an output parameter `@Price money OUTPUT`.
+Create `dbo.usp_GetProductWithStatus` with an input parameter `@IDProduct int` and an output parameter `@Price money OUTPUT`.
 
 The procedure should:
 
@@ -469,7 +469,7 @@ Initialize the output parameter to `NULL`. Use one `SELECT` to assign the price,
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_Exercises_GetProduct
+CREATE OR ALTER PROCEDURE dbo.usp_GetProductWithStatus
     @IDProduct int,
     @Price money OUTPUT
 AS
@@ -501,7 +501,7 @@ GO
 DECLARE @Price money;
 DECLARE @ReturnCode int;
 
-EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
+EXEC @ReturnCode = dbo.usp_GetProductWithStatus
     @IDProduct = 782,
     @Price = @Price OUTPUT;
 
@@ -509,7 +509,7 @@ SELECT
     @ReturnCode AS ReturnCode,
     @Price AS Price;
 
-EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
+EXEC @ReturnCode = dbo.usp_GetProductWithStatus
     @IDProduct = -1,
     @Price = @Price OUTPUT;
 
@@ -640,34 +640,6 @@ Run the complete script as **one batch**. The table variable and local variables
 This script calls a procedure once for each card. The additional reading in [Lab 04 – Functions](../labs/lab04-functions.md) shows how to move the checksum calculation into a scalar function and call it directly from a `SELECT` statement.
 
 </details>
-
-## Cleanup
-
-Remove the procedures created for this collection. The last statements delete the test city from Exercise 7 and the cities and the state inserted by Exercise 6.
-
-```sql
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ListCategories;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomersByLastName;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ProductsByPriceRange;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProductColor;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomerInvoices;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_InsertCityInState;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProduct;
-DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CityCustomerCount;
-GO
-
-DELETE FROM dbo.City
-WHERE Name = N'Exercise Empty City';
-
-DELETE FROM dbo.City
-WHERE StateID IN (SELECT IDState FROM dbo.State WHERE Name = N'Canada');
-
-DELETE FROM dbo.State
-WHERE Name = N'Canada';
-GO
-```
-
-`dbo.usp_ValidateCardNumber` belongs to Lab 03, so this cleanup leaves it in place.
 
 ## References
 

@@ -5,72 +5,44 @@ These exercises build on [Lab 02 – Triggers](../labs/lab02-triggers.md) and us
 - **Part A (Exercises 1–6)** works on `dbo.City` and writes simple text messages to a log table. It covers a first trigger, set-based logging, multi-row safety, comparing old and new values, one trigger for all three events, and checking new rows against existing ones.
 - **Part B (Exercises 7–12)** works on `dbo.Product`. It progresses from auditing inserts, to comparing old and new values and classifying them with `CASE`, to flagging a business-rule condition for review, to debugging a flawed trigger someone else wrote.
 
-Start with a fresh `AdventureWorksENG`, so no triggers from Lab 02 are still attached to `dbo.City`. The exercises create two log tables, `dbo.Exercise_CityLog` and `dbo.Exercise_ProductTriggerAudit`, and triggers with the `trg_Exercises_` prefix. The test data remains in the database until you run the targeted cleanup section.
-
-> Run these exercises only in a training or isolated database. Their sample inserts, updates, and deletes are saved as you run them. Run the cleanup section before reusing the test names and product numbers.
+Start with a fresh `AdventureWorksENG`, so no triggers from Lab 02 are still attached to `dbo.City`. The exercises create two log tables, `dbo.CityLog` and `dbo.ProductTriggerAudit`, and several triggers. Run them in order. The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.
 
 ## Setup
 
-Create both log tables once before beginning. If an object with one of these names already exists and you did not create it for this collection, stop and choose an isolated database.
+Create both log tables once before beginning.
 
 ```sql
 USE AdventureWorksENG;
 GO
 
-CREATE TABLE dbo.Exercise_CityLog
+CREATE TABLE dbo.CityLog
 (
     IDLog    int IDENTITY(1,1) NOT NULL
-        CONSTRAINT PK_Exercise_CityLog PRIMARY KEY,
+        CONSTRAINT PK_CityLog PRIMARY KEY,
     Message  nvarchar(500) NOT NULL,
     LoggedAt datetime2(7) NOT NULL
-        CONSTRAINT DF_Exercise_CityLog_LoggedAt
+        CONSTRAINT DF_CityLog_LoggedAt
         DEFAULT SYSDATETIME()
 );
 GO
 
-CREATE TABLE dbo.Exercise_ProductTriggerAudit
+CREATE TABLE dbo.ProductTriggerAudit
 (
     AuditID   int IDENTITY(1,1) NOT NULL
-        CONSTRAINT PK_Exercise_ProductTriggerAudit PRIMARY KEY,
+        CONSTRAINT PK_ProductTriggerAudit PRIMARY KEY,
     ProductID     int NOT NULL,
     ProductNumber nvarchar(25) NOT NULL,
     Operation     nvarchar(20) NOT NULL,
     OldPrice      money NULL,
     NewPrice      money NULL,
     LoggedAt      datetime2(7) NOT NULL
-        CONSTRAINT DF_Exercise_ProductTriggerAudit_LoggedAt
+        CONSTRAINT DF_ProductTriggerAudit_LoggedAt
         DEFAULT SYSUTCDATETIME()
 );
 GO
 ```
 
-Part A inserts test cities whose names start with `Exercise City`. Before starting, confirm that no such cities exist:
-
-```sql
-SELECT IDCity, Name
-FROM dbo.City
-WHERE Name LIKE N'Exercise City%';
-```
-
-Part B uses distinct `ProductNumber` values beginning with `EX-TRG-`. The audit table stores that value so students can inspect and clean up test records after a product has been deleted. The table's identity column supplies `IDProduct`.
-
-Before starting, confirm that the reserved test product numbers are unused:
-
-```sql
-SELECT IDProduct, ProductNumber, Name
-FROM dbo.Product
-WHERE ProductNumber IN
-(
-    N'EX-TRG-I-001',
-    N'EX-TRG-U-001', N'EX-TRG-U-002',
-    N'EX-TRG-C-001', N'EX-TRG-C-002',
-    N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002',
-    N'EX-TRG-F-001', N'EX-TRG-F-002'
-);
-```
-
-If the query returns any rows, choose unused test numbers and update the test and cleanup statements to match.
+Part A inserts test cities whose names start with `Exercise City`. Part B inserts test products whose `ProductNumber` starts with `EX-TRG-`; the audit table stores that value, so you can still find a product's audit rows after the product has been deleted.
 
 ---
 
@@ -78,9 +50,9 @@ If the query returns any rows, choose unused test numbers and update the test an
 
 ## Exercise 1 — First logging trigger [BEGINNER]
 
-Create an `AFTER INSERT` trigger named `dbo.trg_Exercises_City_LogInsert` on `dbo.City`.
+Create an `AFTER INSERT` trigger named `dbo.trg_City_LogInsert` on `dbo.City`.
 
-Whenever a row is inserted into `City`, write this message to `Exercise_CityLog`:
+Whenever a row is inserted into `City`, write this message to `CityLog`:
 
 ```text
 A city was inserted.
@@ -91,7 +63,7 @@ Then insert one test city, `Exercise City 1` in state `1`, and check the log.
 <details>
 <summary>Hint</summary>
 
-The trigger body needs only one `INSERT INTO dbo.Exercise_CityLog (Message) VALUES (...)` statement. It does not need to read `inserted` yet.
+The trigger body needs only one `INSERT INTO dbo.CityLog (Message) VALUES (...)` statement. It does not need to read `inserted` yet.
 
 </details>
 
@@ -99,12 +71,12 @@ The trigger body needs only one `INSERT INTO dbo.Exercise_CityLog (Message) VALU
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_LogInsert
+CREATE OR ALTER TRIGGER dbo.trg_City_LogInsert
 ON dbo.City
 AFTER INSERT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     VALUES (N'A city was inserted.');
 END;
 GO
@@ -113,7 +85,7 @@ INSERT INTO dbo.City (Name, StateID)
 VALUES (N'Exercise City 1', 1);
 
 SELECT *
-FROM dbo.Exercise_CityLog
+FROM dbo.CityLog
 ORDER BY IDLog DESC;
 GO
 ```
@@ -124,7 +96,7 @@ The log contains one new row with the fixed message.
 
 ## Exercise 2 — Log inserted rows [BEGINNER]
 
-Modify `trg_Exercises_City_LogInsert`.
+Modify `trg_City_LogInsert`.
 
 Instead of a fixed message, write one log entry for every inserted city, containing its `IDCity` and `Name`.
 
@@ -141,12 +113,12 @@ Replace `VALUES` with `INSERT ... SELECT ... FROM inserted`. Convert `IDCity` to
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_LogInsert
+CREATE OR ALTER TRIGGER dbo.trg_City_LogInsert
 ON dbo.City
 AFTER INSERT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     SELECT
         N'City inserted: ID='
         + CAST(IDCity AS nvarchar(10))
@@ -162,7 +134,7 @@ VALUES
     (N'Exercise City 3', 1);
 
 SELECT *
-FROM dbo.Exercise_CityLog
+FROM dbo.CityLog
 ORDER BY IDLog DESC;
 GO
 ```
@@ -176,14 +148,14 @@ The trigger fires once, but writes two log rows: one for each row in `inserted`.
 First remove the trigger from Exercises 1–2, so its messages do not mix with this exercise:
 
 ```sql
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_LogInsert;
+DROP TRIGGER IF EXISTS dbo.trg_City_LogInsert;
 GO
 ```
 
 Look at this trigger:
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_BadExample
+CREATE OR ALTER TRIGGER dbo.trg_City_BadExample
 ON dbo.City
 AFTER INSERT
 AS
@@ -193,7 +165,7 @@ BEGIN
     SELECT @CityID = IDCity
     FROM inserted;
 
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     VALUES (
         N'Inserted city ID='
         + CAST(@CityID AS nvarchar(10))
@@ -235,12 +207,12 @@ The trigger fires **once**. `inserted` contains **three rows**. The trigger crea
 The design assumes one row per statement. A correct, set-based version reads every row of `inserted`:
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_BadExample
+CREATE OR ALTER TRIGGER dbo.trg_City_BadExample
 ON dbo.City
 AFTER INSERT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     SELECT
         N'Inserted city ID='
         + CAST(IDCity AS nvarchar(10))
@@ -255,7 +227,7 @@ Insert three more cities (`Exercise City D`, `E` and `F`) to confirm that the fi
 
 ## Exercise 4 — Log renamed cities [INTERMEDIATE]
 
-Create an `AFTER UPDATE` trigger named `dbo.trg_Exercises_City_LogRename` on `dbo.City` that logs every **actual** change to `City.Name`. The message should contain the old and the new name.
+Create an `AFTER UPDATE` trigger named `dbo.trg_City_LogNameChange` on `dbo.City` that logs every **actual** change to `City.Name`. The message should contain the old and the new name.
 
 Test it with:
 
@@ -273,12 +245,12 @@ Join `inserted` and `deleted` on the primary key. The old name is in `deleted`, 
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_LogRename
+CREATE OR ALTER TRIGGER dbo.trg_City_LogNameChange
 ON dbo.City
 AFTER UPDATE
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     SELECT
         N'City renamed from "'
         + d.Name
@@ -301,7 +273,7 @@ SET Name = Name
 WHERE Name LIKE N'Exercise City%';
 
 SELECT *
-FROM dbo.Exercise_CityLog
+FROM dbo.CityLog
 ORDER BY IDLog DESC;
 GO
 ```
@@ -317,12 +289,12 @@ The first update writes one log row. The second update fires the trigger as well
 First remove the `City` triggers from Exercises 3–4, so their messages do not mix with this exercise:
 
 ```sql
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_BadExample;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_LogRename;
+DROP TRIGGER IF EXISTS dbo.trg_City_BadExample;
+DROP TRIGGER IF EXISTS dbo.trg_City_LogNameChange;
 GO
 ```
 
-Create one trigger named `dbo.trg_Exercises_City_AllEvents` on `dbo.City` for `INSERT`, `UPDATE`, and `DELETE`. For every statement, it writes one log message with the event and the number of affected rows, for example:
+Create one trigger named `dbo.trg_City_AllEvents` on `dbo.City` for `INSERT`, `UPDATE`, and `DELETE`. For every statement, it writes one log message with the event and the number of affected rows, for example:
 
 ```text
 UPDATE: 2 row(s)
@@ -348,7 +320,7 @@ Count the rows in `inserted` and `deleted` and store the counts in variables. Wh
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_AllEvents
+CREATE OR ALTER TRIGGER dbo.trg_City_AllEvents
 ON dbo.City
 AFTER INSERT, UPDATE, DELETE
 AS
@@ -379,7 +351,7 @@ BEGIN
         SET @Rows = 0;
     END
 
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     VALUES (@Event + N': ' + CAST(@Rows AS nvarchar(10)) + N' row(s)');
 END;
 GO
@@ -401,7 +373,7 @@ SET Name = N'Nothing'
 WHERE IDCity = -1;
 
 SELECT TOP (4) Message
-FROM dbo.Exercise_CityLog
+FROM dbo.CityLog
 ORDER BY IDLog DESC;
 GO
 ```
@@ -414,7 +386,7 @@ The trigger fires once per statement, even when the statement affects no rows. T
 
 ## Exercise 6 — Detect duplicate cities [INTERMEDIATE]
 
-Create an `AFTER INSERT` trigger named `dbo.trg_Exercises_City_DuplicateCheck` on `dbo.City`. For every inserted city whose name **already exists in the same state**, it writes this message:
+Create an `AFTER INSERT` trigger named `dbo.trg_City_DuplicateCheck` on `dbo.City`. For every inserted city whose name **already exists in the same state**, it writes this message:
 
 ```text
 Duplicate city: Exercise City Dup (StateID=1)
@@ -435,12 +407,12 @@ Check the rows in `inserted` against `dbo.City` with `EXISTS`. In an `AFTER` tri
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_City_DuplicateCheck
+CREATE OR ALTER TRIGGER dbo.trg_City_DuplicateCheck
 ON dbo.City
 AFTER INSERT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_CityLog (Message)
+    INSERT INTO dbo.CityLog (Message)
     SELECT
         N'Duplicate city: '
         + i.Name
@@ -466,7 +438,7 @@ INSERT INTO dbo.City (Name, StateID)
 VALUES (N'Exercise City Dup', 1);
 
 SELECT Message
-FROM dbo.Exercise_CityLog
+FROM dbo.CityLog
 WHERE Message LIKE N'Duplicate city:%';
 GO
 ```
@@ -483,9 +455,9 @@ The trigger from Exercise 5 is still active, so the log also contains its `INSER
 
 ## Exercise 7 — Audit inserted products [BEGINNER]
 
-Create an `AFTER INSERT` trigger named `dbo.trg_Exercises_Product_InsertAudit` on `dbo.Product`.
+Create an `AFTER INSERT` trigger named `dbo.trg_Product_InsertAudit` on `dbo.Product`.
 
-For every inserted row, add one row to `dbo.Exercise_ProductTriggerAudit` with:
+For every inserted row, add one row to `dbo.ProductTriggerAudit` with:
 
 - the new product's `IDProduct` as `ProductID`;
 - its `ProductNumber` so the audit row can be matched after the product is deleted;
@@ -493,7 +465,7 @@ For every inserted row, add one row to `dbo.Exercise_ProductTriggerAudit` with:
 - `NULL` as `OldPrice`;
 - the inserted `PriceWithoutVAT` as `NewPrice`.
 
-Test it with one product, then query the audit row using its `ProductNumber`. The test row remains until the final cleanup.
+Test it with one product, then query the audit row using its `ProductNumber`.
 
 <details>
 <summary>Hint</summary>
@@ -506,12 +478,12 @@ An `AFTER INSERT` trigger can read all new rows from `inserted`. Insert into the
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_InsertAudit
+CREATE OR ALTER TRIGGER dbo.trg_Product_InsertAudit
 ON dbo.Product
 AFTER INSERT
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_ProductTriggerAudit
+    INSERT INTO dbo.ProductTriggerAudit
     (
         ProductID,
         ProductNumber,
@@ -551,18 +523,18 @@ VALUES
 );
 
 SELECT a.*
-FROM dbo.Exercise_ProductTriggerAudit AS a
+FROM dbo.ProductTriggerAudit AS a
 WHERE a.ProductNumber = N'EX-TRG-I-001';
 GO
 ```
 
-The query should show one `INSERT` audit row with a `NULL` old price and a new price of `25.00`. The test product and audit row remain until cleanup.
+The query should show one `INSERT` audit row with a `NULL` old price and a new price of `25.00`.
 
 </details>
 
 ## Exercise 8 — Audit actual price changes [INTERMEDIATE]
 
-Create an `AFTER UPDATE` trigger named `dbo.trg_Exercises_Product_PriceAudit` on `dbo.Product`.
+Create an `AFTER UPDATE` trigger named `dbo.trg_Product_PriceAudit` on `dbo.Product`.
 
 Write one audit row for each product whose `PriceWithoutVAT` actually changed. Record the old price from `deleted` and the new price from `inserted`. Do not log updates that change other columns or set the price to its existing value.
 
@@ -579,14 +551,14 @@ An `UPDATE` trigger can read the old and new versions from `deleted` and `insert
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceAudit
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
     IF UPDATE(PriceWithoutVAT)
     BEGIN
-        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        INSERT INTO dbo.ProductTriggerAudit
         (
             ProductID,
             ProductNumber,
@@ -628,19 +600,19 @@ SET PriceWithoutVAT = PriceWithoutVAT + 5.00
 WHERE ProductNumber IN (N'EX-TRG-U-001', N'EX-TRG-U-002');
 
 SELECT a.*
-FROM dbo.Exercise_ProductTriggerAudit AS a
+FROM dbo.ProductTriggerAudit AS a
 WHERE a.Operation = N'UPDATE'
   AND a.ProductNumber IN (N'EX-TRG-U-001', N'EX-TRG-U-002');
 GO
 ```
 
-The query should show two `UPDATE` rows, with old/new price pairs `10.00`/`15.00` and `20.00`/`25.00`. Both products are changed by one statement, so the trigger must handle multiple rows in `inserted` and `deleted`. The products and audit rows remain until cleanup.
+The query should show two `UPDATE` rows, with old/new price pairs `10.00`/`15.00` and `20.00`/`25.00`. Both products are changed by one statement, so the trigger must handle multiple rows in `inserted` and `deleted`.
 
 </details>
 
 ## Exercise 9 — Price up or down [INTERMEDIATE]
 
-Create an `AFTER UPDATE` trigger named `dbo.trg_Exercises_Product_PriceDirection` on `dbo.Product`. For every product whose price actually changed, write an audit row with `Operation`:
+Create an `AFTER UPDATE` trigger named `dbo.trg_Product_PriceDirection` on `dbo.Product`. For every product whose price actually changed, write an audit row with `Operation`:
 
 - `PRICE_UP` when the new price is higher;
 - `PRICE_DOWN` when the new price is lower.
@@ -660,12 +632,12 @@ Use a `CASE` expression in the `SELECT` list of `INSERT ... SELECT`, so each row
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceDirection
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceDirection
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_ProductTriggerAudit
+    INSERT INTO dbo.ProductTriggerAudit
     (
         ProductID,
         ProductNumber,
@@ -713,7 +685,7 @@ SET PriceWithoutVAT =
 WHERE ProductNumber IN (N'EX-TRG-C-001', N'EX-TRG-C-002');
 
 SELECT ProductNumber, Operation, OldPrice, NewPrice
-FROM dbo.Exercise_ProductTriggerAudit
+FROM dbo.ProductTriggerAudit
 WHERE Operation IN (N'PRICE_UP', N'PRICE_DOWN')
   AND ProductNumber IN (N'EX-TRG-C-001', N'EX-TRG-C-002');
 GO
@@ -726,17 +698,17 @@ Result:
 | EX-TRG-C-001 | PRICE_UP | 10.00 | 12.00 |
 | EX-TRG-C-002 | PRICE_DOWN | 20.00 | 15.00 |
 
-The price-audit trigger from Exercise 8 fires for the same statement and writes its own `UPDATE` rows; the query keeps only this trigger's rows. The products and audit rows remain until cleanup.
+The price-audit trigger from Exercise 8 fires for the same statement and writes its own `UPDATE` rows; the query keeps only this trigger's rows.
 
 </details>
 
 ## Exercise 10 — Audit deleted products [INTERMEDIATE]
 
-Create an `AFTER DELETE` trigger named `dbo.trg_Exercises_Product_DeleteAudit` on `dbo.Product`.
+Create an `AFTER DELETE` trigger named `dbo.trg_Product_DeleteAudit` on `dbo.Product`.
 
 For every deleted row, write an audit row containing its `IDProduct`, `DELETE`, the deleted `PriceWithoutVAT` as `OldPrice`, and `NULL` as `NewPrice`.
 
-Test it by inserting two test products and deleting both with one statement. Check the audit rows by `ProductNumber`; they remain until cleanup.
+Test it by inserting two test products and deleting both with one statement. Check the audit rows by `ProductNumber`.
 
 <details>
 <summary>Hint</summary>
@@ -749,12 +721,12 @@ Deleted rows are available in `deleted`. The trigger must use a set-based `INSER
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_DeleteAudit
+CREATE OR ALTER TRIGGER dbo.trg_Product_DeleteAudit
 ON dbo.Product
 AFTER DELETE
 AS
 BEGIN
-    INSERT INTO dbo.Exercise_ProductTriggerAudit
+    INSERT INTO dbo.ProductTriggerAudit
     (
         ProductID,
         ProductNumber,
@@ -791,20 +763,20 @@ DELETE FROM dbo.Product
 WHERE ProductNumber IN (N'EX-TRG-D-001', N'EX-TRG-D-002');
 
 SELECT a.*
-FROM dbo.Exercise_ProductTriggerAudit AS a
+FROM dbo.ProductTriggerAudit AS a
 WHERE a.Operation = N'DELETE'
   AND a.ProductNumber IN (N'EX-TRG-D-001', N'EX-TRG-D-002')
 ORDER BY a.AuditID DESC;
 GO
 ```
 
-The query should show two `DELETE` rows even though the products no longer exist. The test audit rows remain until cleanup.
+The query should show two `DELETE` rows even though the products no longer exist.
 
 </details>
 
 ## Exercise 11 — Flag large price reductions for review [ADVANCED]
 
-Create an `AFTER UPDATE` trigger named `dbo.trg_Exercises_Product_PriceReview` on `dbo.Product`.
+Create an `AFTER UPDATE` trigger named `dbo.trg_Product_PriceReview` on `dbo.Product`.
 
 When a product's `PriceWithoutVAT` is reduced by more than 25 percent, write an audit row with `PRICE_REVIEW` as `Operation`, the old price, and the new price. The trigger should:
 
@@ -812,7 +784,7 @@ When a product's `PriceWithoutVAT` is reduced by more than 25 percent, write an 
 - ignore updates that do not change `PriceWithoutVAT`;
 - write one audit row for every qualifying product in a multi-row update.
 
-Test the rule with two products updated together: reduce one price by 20 percent and the other by 30 percent. Check which change was flagged. These products remain until cleanup.
+Test the rule with two products updated together: reduce one price by 20 percent and the other by 30 percent. Check which change was flagged.
 
 <details>
 <summary>Hint</summary>
@@ -825,14 +797,14 @@ Join `inserted` and `deleted` on `IDProduct`. Search for rows where the new pric
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceReview
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceReview
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
     IF UPDATE(PriceWithoutVAT)
     BEGIN
-        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        INSERT INTO dbo.ProductTriggerAudit
         (
             ProductID,
             ProductNumber,
@@ -878,13 +850,13 @@ SET PriceWithoutVAT =
 WHERE ProductNumber IN (N'EX-TRG-R-001', N'EX-TRG-R-002');
 
 SELECT *
-FROM dbo.Exercise_ProductTriggerAudit
+FROM dbo.ProductTriggerAudit
 WHERE Operation = N'PRICE_REVIEW'
   AND ProductNumber IN (N'EX-TRG-R-001', N'EX-TRG-R-002');
 GO
 ```
 
-The query should show one `PRICE_REVIEW` row for `EX-TRG-R-002` with old/new prices `100.00`/`70.00`. The 20 percent reduction does not meet the review threshold. Both products remain until cleanup.
+The query should show one `PRICE_REVIEW` row for `EX-TRG-R-002` with old/new prices `100.00`/`70.00`. The 20 percent reduction does not meet the review threshold.
 
 This exercise records a review flag rather than rejecting the change. In a production design, consider whether a declarative constraint or validation in the application/procedure is a better fit. Triggers add automatic behavior that callers may not see.
 
@@ -895,14 +867,14 @@ This exercise records a review flag rather than rejecting the change. In a produ
 A teammate wrote this trigger, meant to do the same job as Exercise 8's trigger — log every update that changes a product's price:
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceAudit_Flawed
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
     IF UPDATE(PriceWithoutVAT)
     BEGIN
-        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        INSERT INTO dbo.ProductTriggerAudit
         (
             ProductID,
             ProductNumber,
@@ -951,14 +923,14 @@ Then create the trigger, test your prediction, and fix it.
 **Reproduce the bug:**
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceAudit_Flawed
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
     IF UPDATE(PriceWithoutVAT)
     BEGIN
-        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        INSERT INTO dbo.ProductTriggerAudit
         (
             ProductID,
             ProductNumber,
@@ -1000,7 +972,7 @@ SET PriceWithoutVAT = PriceWithoutVAT,
 WHERE ProductNumber IN (N'EX-TRG-F-001', N'EX-TRG-F-002');
 
 SELECT *
-FROM dbo.Exercise_ProductTriggerAudit
+FROM dbo.ProductTriggerAudit
 WHERE Operation = N'UPDATE'
   AND ProductNumber IN (N'EX-TRG-F-001', N'EX-TRG-F-002')
 ORDER BY AuditID;
@@ -1012,14 +984,14 @@ This returns two `UPDATE` rows with `OldPrice` equal to `NewPrice`, confirmed by
 **Fix:**
 
 ```sql
-CREATE OR ALTER TRIGGER dbo.trg_Exercises_Product_PriceAudit_Flawed
+CREATE OR ALTER TRIGGER dbo.trg_Product_PriceAudit_Flawed
 ON dbo.Product
 AFTER UPDATE
 AS
 BEGIN
     IF UPDATE(PriceWithoutVAT)
     BEGIN
-        INSERT INTO dbo.Exercise_ProductTriggerAudit
+        INSERT INTO dbo.ProductTriggerAudit
         (
             ProductID,
             ProductNumber,
@@ -1045,59 +1017,6 @@ GO
 Running the same no-op update again now writes zero new audit rows, confirmed by checking `AuditID` values added after the fix. A follow-up update that changes `EX-TRG-F-001`'s price from `50.00` to `55.00` still produces exactly one audit row, so the fix does not silently swallow real changes. This is the same trigger built in Exercise 8 — the point of this exercise is recognizing why the missing condition matters, not writing new logic from scratch.
 
 </details>
-
-## Cleanup
-
-Run this only after finishing the exercises. It deletes only the sample products identified by their reserved product numbers. The product delete trigger records those deletions; the next statement removes all audit rows for the sample numbers. Then it drops only this collection's trigger names and audit table. The Part A statements delete only the test cities whose names start with `Exercise City`, and drop only this collection's `City` triggers and log table.
-
-```sql
-DELETE FROM dbo.Product
-WHERE ProductNumber IN
-(
-    N'EX-TRG-I-001',
-    N'EX-TRG-U-001', N'EX-TRG-U-002',
-    N'EX-TRG-C-001', N'EX-TRG-C-002',
-    N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002',
-    N'EX-TRG-F-001', N'EX-TRG-F-002'
-);
-GO
-
-DELETE FROM dbo.Exercise_ProductTriggerAudit
-WHERE ProductNumber IN
-(
-    N'EX-TRG-I-001',
-    N'EX-TRG-U-001', N'EX-TRG-U-002',
-    N'EX-TRG-C-001', N'EX-TRG-C-002',
-    N'EX-TRG-D-001', N'EX-TRG-D-002',
-    N'EX-TRG-R-001', N'EX-TRG-R-002',
-    N'EX-TRG-F-001', N'EX-TRG-F-002'
-);
-GO
-
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_InsertAudit;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceAudit;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceDirection;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_DeleteAudit;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceReview;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_Product_PriceAudit_Flawed;
-DROP TABLE IF EXISTS dbo.Exercise_ProductTriggerAudit;
-GO
-
--- Part A
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_LogInsert;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_BadExample;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_LogRename;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_AllEvents;
-DROP TRIGGER IF EXISTS dbo.trg_Exercises_City_DuplicateCheck;
-GO
-
-DELETE FROM dbo.City
-WHERE Name LIKE N'Exercise City%';
-
-DROP TABLE IF EXISTS dbo.Exercise_CityLog;
-GO
-```
 
 ## References
 

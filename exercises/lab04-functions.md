@@ -2,11 +2,11 @@
 
 These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 13 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, inline table-valued functions (inline TVFs), and multi-statement table-valued functions (MSTVFs). Exercise 14 adds checksum validation using ISO 7064 MOD 11,10.
 
-The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–12 and 14 create only function definitions. Exercise 13 also creates a separate example database and two tables through its setup script; use the cleanup section when finished.
+The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–12 and 14 create only function definitions. Exercise 13 also creates a separate example database, `PayrollLab`, and two tables through its setup script. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.
 
 ## Exercise 1 — Classify a product price [BEGINNER]
 
-Create a scalar function named `dbo.fn_Exercises_PriceBand` that accepts `@Price money` and returns `nvarchar(20)` using these rules:
+Create a scalar function named `dbo.fn_PriceBand` that accepts `@Price money` and returns `nvarchar(20)` using these rules:
 
 - `NULL` returns `Unknown`;
 - a price below `100` returns `Budget`;
@@ -26,7 +26,7 @@ Use `IF / ELSE` to handle the `NULL` case and `RETURN` one string for each range
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_PriceBand
+CREATE OR ALTER FUNCTION dbo.fn_PriceBand
 (
     @Price money
 )
@@ -47,11 +47,11 @@ END;
 GO
 
 SELECT
-    dbo.fn_Exercises_PriceBand(99.99) AS BelowFirstBoundary,
-    dbo.fn_Exercises_PriceBand(100.00) AS AtFirstBoundary,
-    dbo.fn_Exercises_PriceBand(999.99) AS BelowSecondBoundary,
-    dbo.fn_Exercises_PriceBand(1000.00) AS AtSecondBoundary,
-    dbo.fn_Exercises_PriceBand(CAST(NULL AS money)) AS UnknownPrice;
+    dbo.fn_PriceBand(99.99) AS BelowFirstBoundary,
+    dbo.fn_PriceBand(100.00) AS AtFirstBoundary,
+    dbo.fn_PriceBand(999.99) AS BelowSecondBoundary,
+    dbo.fn_PriceBand(1000.00) AS AtSecondBoundary,
+    dbo.fn_PriceBand(CAST(NULL AS money)) AS UnknownPrice;
 GO
 ```
 
@@ -59,7 +59,7 @@ GO
 
 ## Exercise 2 — Shorten a product name [BEGINNER]
 
-Create a scalar function named `dbo.fn_Exercises_ShortName` that accepts `@Text nvarchar(max)` and returns `nvarchar(10)`. Return the original text when its length is at most 10 characters. For longer text, return its first 7 characters followed by `...`.
+Create a scalar function named `dbo.fn_ShortName` that accepts `@Text nvarchar(max)` and returns `nvarchar(10)`. Return the original text when its length is at most 10 characters. For longer text, return its first 7 characters followed by `...`.
 
 Call the function with one short value and one value longer than 10 characters. Then use it to list every product's name next to its shortened name.
 
@@ -74,7 +74,7 @@ Use `LEN` to check the input length and `LEFT` to take the first 7 characters.
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_ShortName
+CREATE OR ALTER FUNCTION dbo.fn_ShortName
 (
     @Text nvarchar(max)
 )
@@ -89,13 +89,13 @@ END;
 GO
 
 SELECT
-    dbo.fn_Exercises_ShortName(N'Bike') AS ShortName,
-    dbo.fn_Exercises_ShortName(N'Mountain-200 Black') AS LongName;
+    dbo.fn_ShortName(N'Bike') AS ShortName,
+    dbo.fn_ShortName(N'Mountain-200 Black') AS LongName;
 GO
 
 SELECT
     Name,
-    dbo.fn_Exercises_ShortName(Name) AS ShortName
+    dbo.fn_ShortName(Name) AS ShortName
 FROM dbo.Product;
 GO
 ```
@@ -147,7 +147,7 @@ Requirements 1, 2 and 4 are solved in Exercises 5, 7 and 2.
 
 ## Exercise 4 — Total quantity sold per product [INTERMEDIATE]
 
-Create a scalar function named `dbo.fn_Exercises_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`. If the product has never been sold, return `0` rather than `NULL`.
+Create a scalar function named `dbo.fn_ProductQuantitySold` that accepts `@IDProduct int` and returns the sum of `InvoiceItem.Quantity` for that product as an `int`. If the product has never been sold, return `0` rather than `NULL`.
 
 Use the function:
 
@@ -165,7 +165,7 @@ Assign `SUM(Quantity)` from `dbo.InvoiceItem` to a local `int` variable. `SUM` r
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_ProductQuantitySold
+CREATE OR ALTER FUNCTION dbo.fn_ProductQuantitySold
 (
     @IDProduct int
 )
@@ -184,14 +184,14 @@ END;
 GO
 
 -- 1. One product
-SELECT dbo.fn_Exercises_ProductQuantitySold(782) AS QuantitySold;
+SELECT dbo.fn_ProductQuantitySold(782) AS QuantitySold;
 GO
 
 -- 2. All products
 SELECT
     Name,
     Color,
-    dbo.fn_Exercises_ProductQuantitySold(IDProduct) AS QuantitySold
+    dbo.fn_ProductQuantitySold(IDProduct) AS QuantitySold
 FROM dbo.Product
 ORDER BY QuantitySold DESC;
 GO
@@ -205,7 +205,7 @@ Scalar functions are convenient for one value. The second query calls the functi
 
 ## Exercise 5 — Latest invoice date per customer [INTERMEDIATE]
 
-Create a scalar function named `dbo.fn_Exercises_LatestInvoiceDate` that accepts `@IDCustomer int` and returns the date of that customer's most recent invoice. Return `NULL` if the customer has no invoices.
+Create a scalar function named `dbo.fn_LatestInvoiceDate` that accepts `@IDCustomer int` and returns the date of that customer's most recent invoice. Return `NULL` if the customer has no invoices.
 
 Use the function:
 
@@ -225,7 +225,7 @@ Finally, consider what could happen if `Customer` contained 100,000 rows.
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_LatestInvoiceDate
+CREATE OR ALTER FUNCTION dbo.fn_LatestInvoiceDate
 (
     @IDCustomer int
 )
@@ -243,7 +243,7 @@ END;
 GO
 
 -- 1. One customer
-SELECT dbo.fn_Exercises_LatestInvoiceDate(1) AS LatestInvoiceDate;
+SELECT dbo.fn_LatestInvoiceDate(1) AS LatestInvoiceDate;
 GO
 
 -- 2. All customers
@@ -251,7 +251,7 @@ SELECT
     IDCustomer,
     FirstName,
     LastName,
-    dbo.fn_Exercises_LatestInvoiceDate(IDCustomer) AS LatestInvoiceDate
+    dbo.fn_LatestInvoiceDate(IDCustomer) AS LatestInvoiceDate
 FROM dbo.Customer;
 GO
 ```
@@ -262,7 +262,7 @@ The function is evaluated for every customer row. On a large table this can beco
 
 ## Exercise 6 — Look up a name, then change the function [INTERMEDIATE]
 
-Create a scalar function named `dbo.fn_Exercises_SalesmanName` that accepts `@IDSalesman int` and returns the salesman's first and last name, separated by a space, as `nvarchar(101)`.
+Create a scalar function named `dbo.fn_SalesmanName` that accepts `@IDSalesman int` and returns the salesman's first and last name, separated by a space, as `nvarchar(101)`.
 
 1. Call the function on its own for salesman `279`.
 2. Use it in a query that lists `IDInvoice`, `InvoiceNumber`, and the salesman name for the invoices of customers `1` and `705`.
@@ -280,7 +280,7 @@ Assign the name to a local variable with `SELECT @Name = FirstName + N' ' + Last
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_SalesmanName
+CREATE OR ALTER FUNCTION dbo.fn_SalesmanName
 (
     @IDSalesman int
 )
@@ -298,14 +298,14 @@ END;
 GO
 
 -- 1. One salesman
-SELECT dbo.fn_Exercises_SalesmanName(279) AS SalesmanName;
+SELECT dbo.fn_SalesmanName(279) AS SalesmanName;
 GO
 
 -- 2. Invoices of two customers
 SELECT
     IDInvoice,
     InvoiceNumber,
-    dbo.fn_Exercises_SalesmanName(SalesmanID) AS SalesmanName
+    dbo.fn_SalesmanName(SalesmanID) AS SalesmanName
 FROM dbo.Invoice
 WHERE CustomerID IN (1, 705)
 ORDER BY IDInvoice;
@@ -317,7 +317,7 @@ The first call returns `Hiraku Miyata`. In the query, the invoices of customer `
 Change the function:
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_SalesmanName
+CREATE OR ALTER FUNCTION dbo.fn_SalesmanName
 (
     @IDSalesman int
 )
@@ -338,7 +338,7 @@ GO
 Running the query again shows `No salesman` for `SO53647`. The query itself did not change: every caller sees the new behavior.
 
 ```sql
-DROP FUNCTION dbo.fn_Exercises_SalesmanName;
+DROP FUNCTION dbo.fn_SalesmanName;
 GO
 ```
 
@@ -346,7 +346,7 @@ GO
 
 ## Exercise 7 — Customers by last-name prefix [INTERMEDIATE]
 
-Create an inline TVF named `dbo.fn_Exercises_CustomersByLastNamePrefix` that accepts `@Prefix nvarchar(50)` and returns `IDCustomer`, `FirstName`, and `LastName` of customers whose last name begins with the supplied prefix.
+Create an inline TVF named `dbo.fn_CustomersWithLastNamePrefix` that accepts `@Prefix nvarchar(50)` and returns `IDCustomer`, `FirstName`, and `LastName` of customers whose last name begins with the supplied prefix.
 
 Test the function using `'Zhu'`.
 
@@ -363,7 +363,7 @@ Build the pattern with `@Prefix + '%'` and use `LIKE`. Use the function in the `
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_CustomersByLastNamePrefix
+CREATE OR ALTER FUNCTION dbo.fn_CustomersWithLastNamePrefix
 (
     @Prefix nvarchar(50)
 )
@@ -381,7 +381,7 @@ RETURN
 GO
 
 SELECT *
-FROM dbo.fn_Exercises_CustomersByLastNamePrefix('Zhu');
+FROM dbo.fn_CustomersWithLastNamePrefix('Zhu');
 GO
 
 SELECT
@@ -390,7 +390,7 @@ SELECT
     i.IDInvoice,
     i.InvoiceDate,
     i.InvoiceNumber
-FROM dbo.fn_Exercises_CustomersByLastNamePrefix('Zhu') AS c
+FROM dbo.fn_CustomersWithLastNamePrefix('Zhu') AS c
 LEFT JOIN dbo.Invoice AS i
     ON i.CustomerID = c.IDCustomer
 ORDER BY
@@ -404,7 +404,7 @@ GO
 
 ## Exercise 8 — Invoices between two dates [INTERMEDIATE]
 
-Create an inline TVF named `dbo.fn_Exercises_InvoicesBetween` with two parameters, `@DateFrom date` and `@DateTo date`. Return the invoice number, invoice date, and the customer's first and last name for every invoice issued from `@DateFrom` to `@DateTo`, including both days.
+Create an inline TVF named `dbo.fn_InvoicesBetween` with two parameters, `@DateFrom date` and `@DateTo date`. Return the invoice number, invoice date, and the customer's first and last name for every invoice issued from `@DateFrom` to `@DateTo`, including both days.
 
 Test it using a date range that exists in the database, for example from `2004-06-01` to `2004-06-03`.
 
@@ -419,7 +419,7 @@ Test it using a date range that exists in the database, for example from `2004-0
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_InvoicesBetween
+CREATE OR ALTER FUNCTION dbo.fn_InvoicesBetween
 (
     @DateFrom date,
     @DateTo date
@@ -442,7 +442,7 @@ RETURN
 GO
 
 SELECT *
-FROM dbo.fn_Exercises_InvoicesBetween('20040601', '20040603');
+FROM dbo.fn_InvoicesBetween('20040601', '20040603');
 GO
 ```
 
@@ -452,7 +452,7 @@ The exclusive upper boundary includes the entire final day even if `InvoiceDate`
 
 ## Exercise 9 — Return a customer's invoices [INTERMEDIATE]
 
-Create an inline TVF named `dbo.fn_Exercises_CustomerInvoices` with these input parameters:
+Create an inline TVF named `dbo.fn_CustomerInvoices` with these input parameters:
 
 | Parameter | Type | Purpose |
 |---|---|---|
@@ -475,7 +475,7 @@ An inline TVF returns one query in parentheses after `RETURN`. Use a `LEFT JOIN`
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_CustomerInvoices
+CREATE OR ALTER FUNCTION dbo.fn_CustomerInvoices
 (
     @IDCustomer int,
     @DateFrom date,
@@ -506,7 +506,7 @@ GO
 
 ```sql
 SELECT *
-FROM dbo.fn_Exercises_CustomerInvoices
+FROM dbo.fn_CustomerInvoices
 (
     1,
     '20010101',
@@ -522,7 +522,7 @@ The sample selects a customer with an invoice and uses a date range covering the
 
 ## Exercise 10 — Filter products by price [INTERMEDIATE]
 
-Create an MSTVF named `dbo.fn_Exercises_ProductsFilter` that accepts `@MinPrice money` and returns a table with the columns `Name nvarchar(50)` and `PriceWithoutVAT money`:
+Create an MSTVF named `dbo.fn_FilterProducts` that accepts `@MinPrice money` and returns a table with the columns `Name nvarchar(50)` and `PriceWithoutVAT money`:
 
 - if `@MinPrice` is `NULL`, return all products;
 - otherwise, return only products where `PriceWithoutVAT > @MinPrice`.
@@ -531,10 +531,10 @@ Test both cases:
 
 ```sql
 SELECT *
-FROM dbo.fn_Exercises_ProductsFilter(NULL);
+FROM dbo.fn_FilterProducts(NULL);
 
 SELECT *
-FROM dbo.fn_Exercises_ProductsFilter(3000);
+FROM dbo.fn_FilterProducts(3000);
 ```
 
 <details>
@@ -548,7 +548,7 @@ Declare the return table in the `RETURNS @Result TABLE (...)` header. Use `IF / 
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_ProductsFilter
+CREATE OR ALTER FUNCTION dbo.fn_FilterProducts
 (
     @MinPrice money
 )
@@ -578,11 +578,11 @@ END;
 GO
 
 SELECT *
-FROM dbo.fn_Exercises_ProductsFilter(NULL);
+FROM dbo.fn_FilterProducts(NULL);
 GO
 
 SELECT *
-FROM dbo.fn_Exercises_ProductsFilter(3000);
+FROM dbo.fn_FilterProducts(3000);
 GO
 ```
 
@@ -590,7 +590,7 @@ GO
 
 ## Exercise 11 — Inline vs multi-statement [INTERMEDIATE]
 
-Rewrite `dbo.fn_Exercises_InvoicesBetween` from Exercise 8 as a multi-statement TVF named `dbo.fn_Exercises_InvoicesBetween_Multi`.
+Rewrite `dbo.fn_InvoicesBetween` from Exercise 8 as a multi-statement TVF named `dbo.fn_InvoicesBetween_Multi`.
 
 Compare the two versions:
 
@@ -610,7 +610,7 @@ The return table needs one column for each value the inline version returns. Its
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_InvoicesBetween_Multi
+CREATE OR ALTER FUNCTION dbo.fn_InvoicesBetween_Multi
 (
     @DateFrom date,
     @DateTo date
@@ -641,7 +641,7 @@ END;
 GO
 
 SELECT *
-FROM dbo.fn_Exercises_InvoicesBetween_Multi('20040601', '20040603');
+FROM dbo.fn_InvoicesBetween_Multi('20040601', '20040603');
 GO
 ```
 
@@ -651,7 +651,7 @@ Both functions return the same rows. The **inline TVF** is the better choice her
 
 ## Exercise 12 — Filter products by quantity sold [ADVANCED]
 
-Create an MSTVF named `dbo.fn_Exercises_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
+Create an MSTVF named `dbo.fn_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
 
 - `IDProduct`;
 - `ProductName`;
@@ -672,7 +672,7 @@ Start from `dbo.Product` and use a `LEFT JOIN` to `dbo.InvoiceItem`. Group by pr
 <summary>Solution</summary>
 
 ```sql
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_ProductsByQuantitySold
+CREATE OR ALTER FUNCTION dbo.fn_ProductsByQuantitySold
 (
     @MinimumQuantitySold int
 )
@@ -731,11 +731,11 @@ GO
 
 ```sql
 SELECT COUNT(*) AS ProductCount
-FROM dbo.fn_Exercises_ProductsByQuantitySold(NULL)
+FROM dbo.fn_ProductsByQuantitySold(NULL)
 ;
 
 SELECT TOP (5) *
-FROM dbo.fn_Exercises_ProductsByQuantitySold(100)
+FROM dbo.fn_ProductsByQuantitySold(100)
 ORDER BY QuantitySold DESC, ProductName;
 GO
 ```
@@ -820,7 +820,7 @@ GO
 
 ### Part A – Calculate the personal allowance
 
-Create `dbo.fn_Exercises_PersonalAllowance` with parameters `@ChildCount tinyint` and `@OtherDependentCount tinyint`. Return `decimal(12,2)`.
+Create `dbo.fn_PersonalAllowance` with parameters `@ChildCount tinyint` and `@OtherDependentCount tinyint`. Return `decimal(12,2)`.
 
 The basic monthly allowance is EUR 600. Add EUR 300 for each eligible other dependent. For children, multiply EUR 600 by the **sum** of the coefficients of the claimed children:
 
@@ -842,7 +842,7 @@ For example, two children and one other dependent give `(1 + 1.2 + 0.5) * 600 = 
 
 ### Part B – Calculate net salary
 
-Create `dbo.fn_Exercises_NetSalary` with these parameters:
+Create `dbo.fn_NetSalary` with these parameters:
 
 | Parameter | Type |
 | --- | --- |
@@ -902,7 +902,7 @@ Start with the allowance function. Track the current child number, its individua
 ```sql
 USE PayrollLab;
 GO
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_PersonalAllowance
+CREATE OR ALTER FUNCTION dbo.fn_PersonalAllowance
 (
     @ChildCount tinyint,
     @OtherDependentCount tinyint
@@ -928,7 +928,7 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_NetSalary
+CREATE OR ALTER FUNCTION dbo.fn_NetSalary
 (
     @GrossSalary decimal(10,2),
     @LowerRate decimal(5,2),
@@ -965,7 +965,7 @@ BEGIN
     DECLARE @PensionII decimal(10,2) = ROUND(@GrossSalary * 0.05, 2);
 
     DECLARE @Allowance decimal(12,2) =
-        dbo.fn_Exercises_PersonalAllowance(@ChildCount, @OtherDependentCount);
+        dbo.fn_PersonalAllowance(@ChildCount, @OtherDependentCount);
 
     DECLARE @TaxBase decimal(12,2) =
         @GrossSalary - @PensionI - @PensionII - @Allowance;
@@ -996,9 +996,9 @@ SELECT
     e.GrossSalary,
     e.ChildCount,
     e.OtherDependentCount,
-    dbo.fn_Exercises_PersonalAllowance(e.ChildCount, e.OtherDependentCount)
+    dbo.fn_PersonalAllowance(e.ChildCount, e.OtherDependentCount)
         AS PersonalAllowance,
-    dbo.fn_Exercises_NetSalary
+    dbo.fn_NetSalary
     (
         e.GrossSalary, t.LowerRate, t.HigherRate,
         e.ChildCount, e.OtherDependentCount
@@ -1017,7 +1017,7 @@ SELECT
     e.IDEmployee,
     e.GrossSalary,
     dbo.fn_NetSalarySimple(e.GrossSalary, t.LowerRate) AS SimpleNetSalary,
-    dbo.fn_Exercises_NetSalary
+    dbo.fn_NetSalary
     (
         e.GrossSalary, t.LowerRate, t.HigherRate,
         e.ChildCount, e.OtherDependentCount
@@ -1052,7 +1052,7 @@ GO
 
 An OIB is a Croatian personal identification number containing 11 digits. Its last digit checks the preceding ten using **ISO 7064 MOD 11,10**. This is a different checksum algorithm from Luhn.
 
-Create a scalar function named `dbo.fn_Exercises_IsValidOIB` that accepts `@OIB varchar(50)` and returns `bit`:
+Create a scalar function named `dbo.fn_IsValidOIB` that accepts `@OIB varchar(50)` and returns `bit`:
 
 - return `1` when the input has exactly 11 ASCII digits and the last digit matches the calculated check digit;
 - return `0` for `NULL`, an incorrect length, any non-digit character, or an incorrect check digit.
@@ -1112,7 +1112,7 @@ Use `WHILE` with positions 1 through 10, `SUBSTRING` to read a character, `CAST`
 ```sql
 USE AdventureWorksENG;
 GO
-CREATE OR ALTER FUNCTION dbo.fn_Exercises_IsValidOIB
+CREATE OR ALTER FUNCTION dbo.fn_IsValidOIB
 (
     @OIB varchar(50)
 )
@@ -1192,12 +1192,12 @@ SELECT
     CaseName,
     OIB,
     ExpectedResult,
-    dbo.fn_Exercises_IsValidOIB(OIB) AS ActualResult
+    dbo.fn_IsValidOIB(OIB) AS ActualResult
 FROM @Candidates;
 
 SELECT CaseName, OIB
 FROM @Candidates
-WHERE dbo.fn_Exercises_IsValidOIB(OIB) = 0;
+WHERE dbo.fn_IsValidOIB(OIB) = 0;
 GO
 ```
 
@@ -1206,42 +1206,6 @@ Both queries belong in the same batch as the table variable declaration.
 </details>
 
 Algorithm source: [OIB checksum procedure — REGOS](https://regos.hr/app/uploads/2018/07/KONTROLA-OIB-a.pdf).
-
-## Cleanup
-
-The functions do not change table data. Select `AdventureWorksENG` and remove the definitions for Exercises 1–11 and 13:
-
-```sql
-USE AdventureWorksENG;
-GO
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_PriceBand;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductQuantitySold;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_LatestInvoiceDate;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_SalesmanName;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomersByLastNamePrefix;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_InvoicesBetween;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomerInvoices;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsFilter;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_InvoicesBetween_Multi;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductsByQuantitySold;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_IsValidOIB;
-GO
-```
-
-For Exercise 13, run the following only if you created `PayrollLab`. Drop the main function before its helper. Keep the payroll tables for later practice.
-
-```sql
-USE PayrollLab;
-GO
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_NetSalary;
-DROP FUNCTION IF EXISTS dbo.fn_Exercises_PersonalAllowance;
-GO
-USE AdventureWorksENG;
-GO
-```
-
-The `fn_NetSalarySimple` function from Lab 04 also lives in `PayrollLab`. This exercise does not need it, so you can leave it in place.
 
 ## References
 

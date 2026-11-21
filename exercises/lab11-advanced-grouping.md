@@ -41,6 +41,8 @@ The Adams total is the row where `LastName = 'Adams'` and `FirstName IS NULL` �
 
 A common mistake: grouping by `(c.FirstName, c.LastName)` instead of `(c.LastName, c.FirstName)` — this changes which column rolls up first. Forgetting the `WHERE` clause would also give subtotals for every family, not just these two.
 
+Expected result: the first row is the grand total, `314` invoices for both families. The Adams family has `134` invoices (the row `Adams` / `NULL`).
+
 </details>
 
 ---
@@ -75,6 +77,8 @@ The Lydia total is the row where `FirstName = 'Lydia'` and `LastName IS NULL`.
 
 Compare with Exercise 1: there, `LastName` was the outer (leftmost) level; here, `FirstName` is. Order matters in `ROLLUP` — whichever column comes first is the one that gets a "grand total for that value" subtotal.
 
+Expected result: `39` invoices in total, `29` of them for customers named Lydia (the row `Lydia` / `NULL`).
+
 </details>
 
 ---
@@ -106,6 +110,8 @@ ORDER BY s.LastName, s.FirstName;
 ```
 
 Compare with what `ROLLUP` would give for the same query: the extra rows, where `FirstName` is `NULL` and `LastName` is filled in, are "per-surname across all first names" subtotals. `ROLLUP` would not produce those, because `LastName` is the second column in the list; `CUBE` gets them because it explores every combination.
+
+Expected result: 10 rows for three salespeople — Santi Ajello (`450`), Romano Arnolfi (`109`), and Marino Alessi (`48`) — with `607` invoices in total. Each salesperson appears in three rows: by first and last name together, by first name alone, and by last name alone.
 
 </details>
 
@@ -143,6 +149,8 @@ ORDER BY p.Color, p.Name;
 ```
 
 `(p.Name, p.Color)` is deliberately absent from the grouping sets list. Neither `ROLLUP` nor `CUBE` could produce this shape without also giving you the detail rows — `GROUPING SETS` is the only tool that cleanly cuts them out.
+
+Expected result: one row per product name, one row per color, and a grand total of about `108,747,062.49`. On name rows the color is `NULL`, on color rows the name is `NULL`.
 
 </details>
 
@@ -186,6 +194,8 @@ ORDER BY p.Color;
 
 Same result either way. When you only need one column plus a grand total, `ROLLUP` is the shortest to write. When you need more columns or want to skip levels, `GROUPING SETS` wins.
 
+Expected result: both queries return the same 9 rows — 8 colors and a grand total of about `108,747,062.49` (the `NULL` row). `Crna` has the highest revenue, about `38.2` million.
+
 </details>
 
 ---
@@ -219,6 +229,54 @@ ORDER BY GROUPING(s.Name), s.Name, GROUPING(c.Name), c.Name;
 ```
 
 This is the kind of query that ends up wrapped in a stored procedure and called directly by a dashboard — with the `GROUPING()` labels in place, the result is renderable with no post-processing needed in the application.
+
+Expected result: 16 rows — the cities of Croatia, Germany, and Italy, an `ALL CITIES` row after each country, and `ALL COUNTRIES` / `ALL CITIES` at the end. Croatia has the highest revenue, about `45.7` million.
+
+</details>
+
+---
+
+## Exercise 7 — Salesman revenue by year, one name column [INTERMEDIATE]
+
+For salespeople whose `LastName` starts with `'A'`, show revenue (`SUM(InvoiceItem.TotalPrice)`) by salesperson and invoice year. Write the first and last name in **one** column, the year in the second, and the revenue in the third. The result must also show each salesperson's total for all years and the grand total for all three salespeople. Label the subtotal rows with `GROUPING()`.
+
+<details>
+<summary>Hint 1</summary>
+
+`ROLLUP` works on expressions too: `ROLLUP (s.FirstName + ' ' + s.LastName, YEAR(i.InvoiceDate))`.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+`GROUPING()` takes the same expression as the `ROLLUP` list. The year is a number, so convert it to text before you put `'ALL YEARS'` in the same column.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    CASE WHEN GROUPING(s.FirstName + ' ' + s.LastName) = 1 THEN 'ALL SALESMEN'
+         ELSE s.FirstName + ' ' + s.LastName END AS Salesman,
+    CASE WHEN GROUPING(YEAR(i.InvoiceDate)) = 1 THEN 'ALL YEARS'
+         ELSE CAST(YEAR(i.InvoiceDate) AS varchar(4)) END AS InvoiceYear,
+    SUM(ii.TotalPrice) AS Revenue
+FROM Salesman s
+JOIN Invoice i ON i.SalesmanID = s.IDSalesman
+JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
+WHERE s.LastName LIKE 'A%'
+GROUP BY ROLLUP (s.FirstName + ' ' + s.LastName, YEAR(i.InvoiceDate))
+ORDER BY
+    GROUPING(s.FirstName + ' ' + s.LastName), Salesman,
+    GROUPING(YEAR(i.InvoiceDate)), InvoiceYear;
+```
+
+Expected result: 14 rows. Each of the three salespeople (Marino Alessi, Romano Arnolfi, and Santi Ajello) has one row per year and an `ALL YEARS` row. Romano Arnolfi has invoices only in 2003 and 2004. The last row, `ALL SALESMEN` / `ALL YEARS`, shows about `11,807,837.78`.
+
+These are the same three salespeople as in Exercise 3, so you can compare: `CUBE` counted invoices; here `ROLLUP` adds up revenue.
 
 </details>
 

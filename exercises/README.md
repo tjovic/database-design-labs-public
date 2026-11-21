@@ -98,11 +98,13 @@ The transaction collection is in [Transaction Exercises](lab09-transactions.md) 
 1. **Commit or cancel** — confirm or undo a multi-row insert with an explicit transaction.
 2. **Savepoints in practice** — a staged exercise covering rollback-to-savepoint, a full rollback that reaches past the savepoint, an unused savepoint, and a cascading two-savepoint rollback.
 3. **Caller-managed transactions** — a procedure with no transaction of its own, wrapped by a caller that commits on success and rolls back on a real constraint-violation error.
-4. **Procedure-managed transactions** — a procedure that owns its transaction across three related deletes.
-5. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
-6. **`TransactionsLab` practice (Exercises 6–11)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, extend it with a history record, and plan a transaction for a Lab 8 procedure.
+4. **Parent and children for the caller** — a procedure deletes a state with its cities and their customers, and the caller prints `Success` or `Failure` for the whole operation.
+5. **Procedure-managed transactions** — a procedure that owns its transaction across three related deletes.
+6. **Update one row or report a failure** — a procedure checks `@@ROWCOUNT`, because an `UPDATE` of a missing row is not an error.
+7. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
+8. **`TransactionsLab` practice (Exercises 8–13)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, extend it with a history record, and plan a transaction for a Lab 8 procedure.
 
-Part A (Exercises 1–5) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted `Customer` rows so they can be counted and removed precisely. Part B (Exercises 6–11) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
+Part A (Exercises 1–7) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted test rows so they can be counted and removed precisely. Part B (Exercises 8–13) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
 
 ### Concurrency
 
@@ -111,9 +113,10 @@ The concurrency collection is in [Concurrency Exercises](lab10-concurrency.md) a
 1. **Dirty read** — reproduce it under `READ UNCOMMITTED`, then prevent it with `READ COMMITTED`.
 2. **Non-repeatable read** — reproduce it under `READ COMMITTED`, then prevent it with `REPEATABLE READ`.
 3. **Phantom read** — reproduce it under `REPEATABLE READ`, then prevent it with `SERIALIZABLE`.
-4. **`TransactionsLab` practice (Exercises 7–11)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT`.
+4. **Your own demonstrations (Exercises 7–9)** — plan and mark each anomaly yourself on `Product`, `Customer`, and `Subcategory`, as the exam asks.
+5. **`TransactionsLab` practice (Exercises 10–14)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT`.
 
-Part A (Exercises 1–6) needs two SSMS query windows (Session A / Session B), like Lab 10, and applies the three anomalies to tagged, temporary rows in `AdventureWorksENG`'s `State` table — with the real `Croatia`/`Germany`/`Italy` rows never touched. Part B (Exercises 7–11) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
+Part A (Exercises 1–9) needs two SSMS query windows (Session A / Session B), like Lab 10. Exercises 1–6 use tagged, temporary rows in `AdventureWorksENG`'s `State` table; Exercises 7–9 change real rows only inside transactions they roll back, or test rows they delete. Part B (Exercises 10–14) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
 
 ### Physical storage
 
@@ -150,7 +153,7 @@ The grouping collection is in [Advanced Grouping Exercises](lab11-advanced-group
 1. **ROLLUP** — subtotals up a hierarchy, and why the column order matters.
 2. **CUBE** — subtotals for every combination of columns.
 3. **GROUPING SETS** — exactly the grouping levels you need, and rewriting `ROLLUP` as `GROUPING SETS`.
-4. **GROUPING()** — readable labels for subtotal and grand-total rows.
+4. **GROUPING()** — readable labels for subtotal and grand-total rows, also when the grouped column is an expression such as a full name or a year.
 
 All exercises are plain `SELECT` statements on `AdventureWorksENG`.
 
@@ -158,11 +161,11 @@ All exercises are plain `SELECT` statements on `AdventureWorksENG`.
 
 The window function collection is in [Window Function Exercises](lab12-window-functions.md) and follows the learning goals in [Lab 12 – Window Functions](../labs/lab12-window-functions.md):
 
-1. **Ranking functions** — `ROW_NUMBER`, `RANK`, and fixed-size buckets.
-2. **Aggregate window functions** — running totals and values that are constant per partition.
-3. **Analytical functions** — `LAG` and `LEAD` for differences between neighbouring rows.
+1. **Ranking functions** — `ROW_NUMBER`, `RANK`, `DENSE_RANK`, fixed-size buckets, and ranking the result of a `GROUP BY`.
+2. **Aggregate window functions** — running totals, values that are constant per partition, and moving averages with a `ROWS` frame.
+3. **Analytical functions** — `LAG` and `LEAD` (also more than one row away) and `FIRST_VALUE` per partition.
 
-All exercises are plain `SELECT` statements on `AdventureWorksENG`, except one that creates and drops a small test table.
+All exercises are plain `SELECT` statements on `AdventureWorksENG`, except one that creates a small test table.
 
 ## Difficulty labels
 

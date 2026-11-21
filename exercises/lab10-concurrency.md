@@ -2,7 +2,7 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–6) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. **Part B** (Exercises 7–11) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
+These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–9) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. In Exercises 7–9 you plan the steps yourself, as on the exam. **Part B** (Exercises 10–14) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
 
 Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Exercises 5 and 6 delete the phantom row they insert, so the range again has two rows when the next exercise starts. Run the setup only once; on a freshly restored database the counts match the expected results. Part B changes only the fictional data in `TransactionsLab`.
 
@@ -57,13 +57,16 @@ FROM dbo.State
 WHERE Name LIKE N'ExerciseConc Base%';
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's `SELECT` should return immediately with `ExerciseConc Base [DIRTY]`, even though Session A never confirmed that change.
 - After Session A rolls back, re-run Session B's query (still at `READ UNCOMMITTED`) and compare.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A** (finish the transaction):
 
@@ -107,13 +110,16 @@ FROM dbo.State
 WHERE Name LIKE N'ExerciseConc Base%';
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's query should **hang** this time — do not cancel it.
 - It is waiting for the exclusive lock Session A is holding on that row.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A:**
 
@@ -150,13 +156,16 @@ SET Name = N'ExerciseConc Base [CHANGED]'
 WHERE Name = N'ExerciseConc Base';
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's `UPDATE` should complete immediately — `READ COMMITTED` does not hold a lock past the instant of a `SELECT`.
 - Re-run Session A's query a second time, in the same transaction, before committing.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A:**
 
@@ -204,13 +213,16 @@ SET Name = N'ExerciseConc Base [CHANGED]'
 WHERE Name = N'ExerciseConc Base';
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's `UPDATE` should **hang** this time.
 - `REPEATABLE READ` holds its shared lock on a read row until the transaction ends, instead of releasing it immediately.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A:**
 
@@ -259,13 +271,16 @@ WHERE Name LIKE N'ExerciseConc Range%';
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseConc Range C');
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's `INSERT` should complete immediately — `REPEATABLE READ` only locks rows it has already read, not rows that don't exist yet.
 - Re-run Session A's range query a second time before committing.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A:**
 
@@ -311,13 +326,16 @@ WHERE Name LIKE N'ExerciseConc Range%';
 INSERT INTO dbo.State (Name) VALUES (N'ExerciseConc Range C');
 ```
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Session B's `INSERT` should **hang** this time.
 - `SERIALIZABLE` locks the whole range implied by the predicate, including the gap a new matching row would fall into.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **Session A:**
 
@@ -343,9 +361,270 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
 ---
 
+## Exercise 7 — Your Own Demonstration: Dirty Read [INTERMEDIATE]
+
+In Exercises 1–6 the steps were given. Now plan them yourself, as you would on the exam.
+
+Describe and demonstrate how a dirty read arises on the `Product` table. Use the price of product `707` (`Sport-100 Helmet, Red`, `34.99`). Mark in a comment the exact place where the problem occurs, then show how and in which session you solve it.
+
+Write the steps for **Session A** and **Session B** in the order you run them. Session A must not change the price permanently.
+
+<details>
+<summary>Hint 1</summary>
+
+Who changes the data, and who reads it? The writer keeps its transaction open and rolls back at the end. The reader is the session whose isolation level matters.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Follow the shape of Exercises 1 and 2: the same steps twice, first with the reader at `READ UNCOMMITTED`, then at `READ COMMITTED`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+/* PROBLEM – dirty read
+   Session B reads a price that Session A changed but never committed. */
+
+-- Session A
+BEGIN TRANSACTION;
+
+UPDATE dbo.Product
+SET PriceWithoutVAT = 0.01
+WHERE IDProduct = 707;
+-- Keep the transaction open.
+
+-- Session B
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT IDProduct, Name, PriceWithoutVAT
+FROM dbo.Product
+WHERE IDProduct = 707;
+-- 0.01  <-- THE PROBLEM OCCURS HERE (dirty read)
+
+-- Session A
+ROLLBACK TRANSACTION;
+-- The price is 34.99 again: Session B used a price that never existed.
+
+/* SOLUTION – in Session B (the reader): READ COMMITTED */
+
+-- Session A
+BEGIN TRANSACTION;
+
+UPDATE dbo.Product
+SET PriceWithoutVAT = 0.01
+WHERE IDProduct = 707;
+
+-- Session B
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+SELECT IDProduct, Name, PriceWithoutVAT
+FROM dbo.Product
+WHERE IDProduct = 707;
+-- Waits: Session A holds an exclusive lock on the row.
+
+-- Session A
+ROLLBACK TRANSACTION;
+-- Session B now returns 34.99, the committed price.
+```
+
+The problem appears in Session B, so the fix is also in Session B. Session A does nothing wrong: it is allowed to change data and roll back.
+
+</details>
+
+---
+
+## Exercise 8 — Your Own Demonstration: Non-Repeatable Read [INTERMEDIATE]
+
+Describe and demonstrate how a non-repeatable read arises on the `Customer` table. Mark where the problem occurs, then show how and in which session you solve it.
+
+So that no real customer is changed, first insert one test customer, `ExerciseConc Customer`, with the email `before@example.com`. Delete it at the end.
+
+<details>
+<summary>Hint 1</summary>
+
+One session reads the same row twice in one transaction. The other session changes that row and commits in between.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+The fix belongs to the session that reads twice: `REPEATABLE READ` keeps the shared lock on the row until its transaction ends (Exercises 3 and 4).
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+-- Test data (either session)
+INSERT INTO dbo.Customer (FirstName, LastName, Email)
+VALUES (N'ExerciseConc', N'Customer', N'before@example.com');
+
+/* PROBLEM – non-repeatable read
+   Session A reads the same row twice and gets two different values. */
+
+-- Session A
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+BEGIN TRANSACTION;
+
+SELECT Email
+FROM dbo.Customer
+WHERE FirstName = N'ExerciseConc';
+-- before@example.com. Keep the transaction open.
+
+-- Session B
+UPDATE dbo.Customer
+SET Email = N'after@example.com'
+WHERE FirstName = N'ExerciseConc';
+-- Runs immediately: READ COMMITTED releases the read lock after the SELECT.
+
+-- Session A
+SELECT Email
+FROM dbo.Customer
+WHERE FirstName = N'ExerciseConc';
+-- after@example.com  <-- THE PROBLEM OCCURS HERE (non-repeatable read)
+
+COMMIT TRANSACTION;
+
+/* SOLUTION – in Session A (the transaction that reads twice): REPEATABLE READ */
+
+-- Session A
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+BEGIN TRANSACTION;
+
+SELECT Email
+FROM dbo.Customer
+WHERE FirstName = N'ExerciseConc';
+-- after@example.com
+
+-- Session B
+UPDATE dbo.Customer
+SET Email = N'before@example.com'
+WHERE FirstName = N'ExerciseConc';
+-- Waits until Session A ends.
+
+-- Session A
+SELECT Email
+FROM dbo.Customer
+WHERE FirstName = N'ExerciseConc';
+-- Still after@example.com: both reads agree.
+
+COMMIT TRANSACTION;
+-- Session B's UPDATE completes now.
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+-- Clean up (either session)
+DELETE FROM dbo.Customer
+WHERE FirstName = N'ExerciseConc';
+```
+
+</details>
+
+---
+
+## Exercise 9 — Your Own Demonstration: Phantom Read [ADVANCED]
+
+Describe and demonstrate how a phantom read arises on the `Subcategory` table. Use the subcategories of category `4` (`Accessories`, 12 subcategories). Mark where the problem occurs, then show how and in which session you solve it. Delete the row you insert at the end.
+
+<details>
+<summary>Hint 1</summary>
+
+A phantom is a **new** row that appears in a range that was already read. Which statement creates such a row?
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+`REPEATABLE READ` is not enough: it locks only rows that already exist (Exercise 5). Session A needs `SERIALIZABLE` (Exercise 6).
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+/* PROBLEM – phantom read
+   Session A runs the same range query twice and gets a new row the second time. */
+
+-- Session A
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+BEGIN TRANSACTION;
+
+SELECT COUNT(*) AS Subcategories
+FROM dbo.Subcategory
+WHERE CategoryID = 4;
+-- 12. Keep the transaction open.
+
+-- Session B
+INSERT INTO dbo.Subcategory (CategoryID, Name)
+VALUES (4, N'ExerciseConc Subcategory');
+-- Runs immediately: REPEATABLE READ locks only the rows already read.
+
+-- Session A
+SELECT COUNT(*) AS Subcategories
+FROM dbo.Subcategory
+WHERE CategoryID = 4;
+-- 13  <-- THE PROBLEM OCCURS HERE (phantom read)
+
+COMMIT TRANSACTION;
+
+-- Session B
+DELETE FROM dbo.Subcategory
+WHERE Name = N'ExerciseConc Subcategory';
+
+/* SOLUTION – in Session A (the transaction that reads the range twice): SERIALIZABLE */
+
+-- Session A
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+BEGIN TRANSACTION;
+
+SELECT COUNT(*) AS Subcategories
+FROM dbo.Subcategory
+WHERE CategoryID = 4;
+-- 12
+
+-- Session B
+INSERT INTO dbo.Subcategory (CategoryID, Name)
+VALUES (4, N'ExerciseConc Subcategory');
+-- Waits until Session A ends.
+
+-- Session A
+SELECT COUNT(*) AS Subcategories
+FROM dbo.Subcategory
+WHERE CategoryID = 4;
+-- Still 12
+
+COMMIT TRANSACTION;
+-- Session B's INSERT completes now.
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+-- Session B: clean up
+DELETE FROM dbo.Subcategory
+WHERE Name = N'ExerciseConc Subcategory';
+```
+
+In all three anomalies, the fix goes to the session that **reads**: the reader chooses how much it is protected from other sessions' changes.
+
+</details>
+
+---
+
 # Part B – `TransactionsLab`
 
-Exercises 7–11 use the `dbo.BankAccount` and `dbo.Branch` tables that [Lab 10](../labs/lab10-concurrency.md) prepares in the `TransactionsLab` database. Do them after Lab 10, in the same database. Exercises 8 and 10 need two SSMS windows; the others are questions you answer on paper and then check.
+Exercises 10–14 use the `dbo.BankAccount` and `dbo.Branch` tables that [Lab 10](../labs/lab10-concurrency.md) prepares in the `TransactionsLab` database. Do them after Lab 10, in the same database. Exercises 11 and 13 need two SSMS windows; the others are questions you answer on paper and then check.
 
 Use your two SSMS windows for every exercise below. Reset `AccountID = 1`'s values (`AccountName = 'Account A'`, `Balance = 1000.00`) and `dbo.Branch` to its three seed rows between exercises if a previous one changed them.
 
@@ -354,7 +633,7 @@ USE TransactionsLab;
 GO
 ```
 
-## Exercise 7 — Classify the anomaly [BEGINNER]
+## Exercise 10 — Classify the anomaly [BEGINNER]
 
 Read this transcript:
 
@@ -367,12 +646,15 @@ Session A: COMMIT;
 
 Which of the three concurrency problems does this show? Which isolation level would have prevented it?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Compare the two `SELECT` results in Session A. Did a value change, or did a new row appear?
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 A non-repeatable read: Session A's `SELECT` returned two different values for the same row within one transaction. `REPEATABLE READ` (or stricter) would have blocked Session B's `UPDATE` until Session A finished.
 
@@ -380,7 +662,7 @@ A non-repeatable read: Session A's `SELECT` returned two different values for th
 
 ---
 
-## Exercise 8 — Predict the blocking [INTERMEDIATE]
+## Exercise 11 — Predict the blocking [INTERMEDIATE]
 
 Session A runs `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRAN; SELECT * FROM dbo.Branch WHERE BranchName LIKE N'West%';` and does not commit. Predict the outcome of each of these, run in Session B, **before** you test it:
 
@@ -388,12 +670,15 @@ Session A runs `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRAN; SELECT
 2. `INSERT INTO dbo.Branch (BranchName) VALUES (N'West Pazin');`
 3. `UPDATE dbo.Branch SET BranchName = N'Central Osijek 2' WHERE BranchName = N'Central Osijek';`
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `SERIALIZABLE` locks the rows Session A read **and** the range its `WHERE` condition covers. Ask whether each Session B statement touches that range.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 1. Succeeds immediately — outside the locked range.
 2. Blocks — falls inside the `West%` range Session A locked.
@@ -405,16 +690,19 @@ Finish by rolling back Session A: `ROLLBACK TRANSACTION;`.
 
 ---
 
-## Exercise 9 — Fix a given anomaly [INTERMEDIATE]
+## Exercise 12 — Fix a given anomaly [INTERMEDIATE]
 
 A reporting procedure must read the total balance across all accounts twice in one transaction (for a before/after comparison) and must not see a different total the second time, even if another session commits a transfer in between. Which isolation level is the minimum sufficient choice, and why not a stricter one?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - First name the anomaly the procedure must avoid, then pick the weakest isolation level that prevents it.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 `REPEATABLE READ`. The procedure only re-reads existing rows — it needs protection against a non-repeatable read, not against new rows appearing (no phantom risk, since it is not filtering a growing range). `SERIALIZABLE` would also work but costs more blocking for no extra benefit here.
 
@@ -422,16 +710,19 @@ A reporting procedure must read the total balance across all accounts twice in o
 
 ---
 
-## Exercise 10 — Trigger and explain a deadlock [ADVANCED]
+## Exercise 13 — Trigger and explain a deadlock [ADVANCED]
 
 Reproduce the deadlock from [Section 8.1 of Lab 10](../labs/lab10-concurrency.md#81-two-sessions-opposite-order), but swap which account each session updates first (Session A starts with account 2, Session B starts with account 1). Confirm a deadlock still occurs, and explain in your own words why swapping the starting account did not fix it.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - A deadlock needs two sessions that each hold one lock and wait for the other's. Look at the order in which each session takes its locks.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 A deadlock still occurs. What matters is that the two sessions acquire the two locks in **opposite order relative to each other** — it does not matter which specific account each one starts with, only that A then wants what B holds and B then wants what A holds. The fix from [Section 8.2](../labs/lab10-concurrency.md#82-avoiding-deadlocks) (always touch accounts in the same, e.g. ascending, ID order, in every transaction) is still required.
 
@@ -439,16 +730,19 @@ A deadlock still occurs. What matters is that the two sessions acquire the two l
 
 ---
 
-## Exercise 11 — READ_COMMITTED_SNAPSHOT, costs and benefits [INTERMEDIATE]
+## Exercise 14 — READ_COMMITTED_SNAPSHOT, costs and benefits [INTERMEDIATE]
 
 `READ_COMMITTED_SNAPSHOT` removes the blocking you saw in [Section 2.2 of Lab 10](../labs/lab10-concurrency.md#22-fix-read-committed-blocks-instead-of-lying). List one scenario where you would turn it on, and one reason a team might deliberately choose not to.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Row versions are kept in `tempdb`. Think about who gains from readers not waiting for writers, and who pays for the versions.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 Turn it on for a read-heavy application where long-running reports currently block, or get blocked by, ordinary transactional writes — the version-based reads stop that contention with no application code changes.
 

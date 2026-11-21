@@ -2,9 +2,9 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–5) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 6–11) continues in the lab's own `TransactionsLab` database.
+These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–7) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 8–13) continues in the lab's own `TransactionsLab` database.
 
-Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Unlike most other collections, each Part A solution ends with a short cleanup that deletes its test rows, because the exercises compare row counts and the next exercise expects to start from zero. Part B changes the fictional account balances and notes in `TransactionsLab`.
+Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Unlike most other collections, each Part A solution ends with a short cleanup that deletes its test rows and procedure, because the exercises compare row counts and the next exercise expects to start from zero. Part B changes the fictional account balances and notes in `TransactionsLab`.
 
 ---
 
@@ -20,13 +20,16 @@ Using `dbo.Customer`, insert three temporary customers tagged with a distinctive
 4. Repeat the three inserts in a new transaction and commit.
 5. Confirm the count is `3`, then clean up.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `FirstName` and `LastName` are the only required columns; leave `CityID` and the other nullable columns out of the `INSERT` list.
 - Query the count **inside** the transaction too, so you can see the rows exist there even before `COMMIT` confirms them.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 SELECT COUNT(*) AS BeforeAnything
@@ -83,14 +86,17 @@ This is a staged exercise: run each part in order against `dbo.Customer`, taggin
 
 **(d) [ADVANCED] Two savepoints, then a cascade.** Insert `Keep5`, create savepoint `SP1`, insert `Cancel5a`, create savepoint `SP2`, insert `Cancel5b`. Roll back to `SP1`, then issue a full `ROLLBACK TRANSACTION`. At each stage, check the row count and `@@TRANCOUNT`. What happens if you try to roll back to `SP2` *after* already rolling back to `SP1`?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `SAVE TRANSACTION <name>` and `ROLLBACK TRANSACTION <name>` do not change `@@TRANCOUNT`. A full `ROLLBACK TRANSACTION` (no name) always resets it to `0`.
 - A savepoint only protects earlier work from a **partial** rollback. It does not protect that work from a **full** rollback — see (b).
 - Rolling back to an earlier savepoint discards any savepoint defined after it — see (d).
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 **(a)**
 
@@ -199,14 +205,17 @@ Write a procedure `dbo.usp_DeleteState` that takes one parameter, `@StateID`, an
 3. Insert two more new states (`'D'`, `'E'`). Repeat the caller pattern, but this time delete `D`, then `E`, then state `1` (`Croatia` — referenced by existing cities).
 4. What happened to `D` and `E` after the third call failed?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `SCOPE_IDENTITY()` immediately after each `INSERT` gives you the new `IDState`.
 - The procedure body is a single `DELETE` statement — no `BEGIN TRY`, no transaction commands.
 - The caller uses the complete pattern from Lab 9, Section 3: `SET XACT_ABORT ON`, `ROLLBACK` in `CATCH`, then `THROW;`. The procedure never starts or ends a transaction — the caller's is the only one open.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteState
@@ -281,19 +290,151 @@ DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
 
 ---
 
-## Exercise 4 — A Procedure That Manages Its Own Transaction [INTERMEDIATE]
+## Exercise 4 — Delete a Parent and Its Children for the Caller [INTERMEDIATE]
+
+A state cannot be deleted while it has cities, and a city cannot be deleted while it has customers. To remove a state completely, you have to delete from the bottom up: customers, then cities, then the state.
+
+Write a procedure `dbo.usp_DeleteStateWithCities` with one parameter, `@IDState`, that deletes the state, all its cities, and all customers in those cities. As in Exercise 3, **the caller owns the transaction**.
+
+1. If the state does not exist, the procedure raises an error with `THROW`.
+2. Create test data: two states, `'ExerciseTx Cascade A'` and `'ExerciseTx Cascade B'`, each with one city and one customer in that city.
+3. In one transaction, delete both test states. Print `Success` after `COMMIT`, or `Failure:` and the error message in `CATCH`.
+4. Create a third test state, `'ExerciseTx Cascade C'`, with one city. In one transaction, delete state `C` and then state `1` (`Croatia`). What is printed, and does state `C` still exist?
+
+<details>
+<summary>Hint 1</summary>
+
+Draw the chain of foreign keys first: `Customer → City → State`. The `DELETE` statements must run in the opposite direction.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Customers of a state are the customers whose `CityID` is in `(SELECT IDCity FROM City WHERE StateID = @IDState)`.
+
+The caller uses the pattern from Exercise 3, but prints a message instead of rethrowing the error: `PRINT 'Success';` after `COMMIT`, and `PRINT 'Failure: ' + ERROR_MESSAGE();` after `ROLLBACK`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_DeleteStateWithCities
+    @IDState int
+AS
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM dbo.State WHERE IDState = @IDState)
+        THROW 50001, 'State does not exist.', 1;
+
+    DELETE FROM dbo.Customer
+    WHERE CityID IN
+    (
+        SELECT IDCity
+        FROM dbo.City
+        WHERE StateID = @IDState
+    );
+
+    DELETE FROM dbo.City
+    WHERE StateID = @IDState;
+
+    DELETE FROM dbo.State
+    WHERE IDState = @IDState;
+END;
+GO
+
+-- Test data: two states, each with one city and one customer
+DECLARE @StateA int, @StateB int, @CityA int, @CityB int;
+
+INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx Cascade A'); SET @StateA = SCOPE_IDENTITY();
+INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx Cascade B'); SET @StateB = SCOPE_IDENTITY();
+
+INSERT INTO dbo.City (Name, StateID) VALUES (N'ExerciseTx City A', @StateA); SET @CityA = SCOPE_IDENTITY();
+INSERT INTO dbo.City (Name, StateID) VALUES (N'ExerciseTx City B', @StateB); SET @CityB = SCOPE_IDENTITY();
+
+INSERT INTO dbo.Customer (FirstName, LastName, CityID)
+VALUES
+    (N'Test', N'ExerciseTxCascade', @CityA),
+    (N'Test', N'ExerciseTxCascade', @CityB);
+
+-- 1. Both deletes succeed
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    EXEC dbo.usp_DeleteStateWithCities @IDState = @StateA;
+    EXEC dbo.usp_DeleteStateWithCities @IDState = @StateB;
+
+    COMMIT TRANSACTION;
+    PRINT 'Success';
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+GO
+
+-- 2. The second delete fails, so the first one is undone as well
+DECLARE @StateC int;
+
+INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx Cascade C'); SET @StateC = SCOPE_IDENTITY();
+INSERT INTO dbo.City (Name, StateID) VALUES (N'ExerciseTx City C', @StateC);
+
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    EXEC dbo.usp_DeleteStateWithCities @IDState = @StateC;
+    EXEC dbo.usp_DeleteStateWithCities @IDState = 1;   -- Croatia: its customers have invoices
+
+    COMMIT TRANSACTION;
+    PRINT 'Success';
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+GO
+
+SELECT Name
+FROM dbo.State
+WHERE Name LIKE N'ExerciseTx Cascade%';   -- ExerciseTx Cascade C
+
+-- Cleanup
+DELETE FROM dbo.City WHERE Name LIKE N'ExerciseTx City%';
+DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
+DROP PROCEDURE dbo.usp_DeleteStateWithCities;
+```
+
+Expected output: the first test prints `Success`. The second prints `Failure:` followed by the foreign key error on `FK_Invoice_Customer`: Croatia's customers have invoices, so they cannot be deleted. Because the caller rolls back the whole transaction, state `C` and its city are still there, even though the first call had already deleted them.
+
+</details>
+
+---
+
+## Exercise 5 — A Procedure That Manages Its Own Transaction [INTERMEDIATE]
 
 Write a procedure `dbo.usp_DeleteThreeStates` that takes three parameters (`@StateID1`, `@StateID2`, `@StateID3`), deletes all three states, and **owns its transaction**: it starts it, commits on success, and rolls back and reports failure on error.
 
 1. Insert three new, unreferenced states and call the procedure with their IDs. Confirm all three are gone.
 2. Insert two more new states. Call the procedure with their IDs plus state `1` (`Croatia`) as the third argument. Confirm the two new states survive.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - This is the same pattern as Lab 9's `usp_TransferFunds` (`SET XACT_ABORT ON`, `BEGIN TRY / BEGIN TRANSACTION ... COMMIT`, `CATCH` with `ROLLBACK` and `THROW;`), just with three `DELETE` statements instead of two `UPDATE` statements.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteThreeStates
@@ -351,11 +492,107 @@ DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
 
 ---
 
-## Exercise 5 — An Outer Transaction Overrides an Inner Commit [ADVANCED]
+## Exercise 6 — Update One Row or Report a Failure [INTERMEDIATE]
 
-Using `dbo.usp_DeleteThreeStates` from Exercise 4, wrap a call to it in an **outer** transaction that the caller then deliberately rolls back — even though the procedure itself reports success and runs its own `COMMIT`.
+An `UPDATE` that matches no row is not an error: it simply changes `0` rows. If the business operation requires exactly one changed row, the procedure has to check that itself.
 
-1. If you already ran Exercise 4's cleanup, recreate `dbo.usp_DeleteThreeStates` first.
+Write a procedure `dbo.usp_ExtendCardExpiry` with one parameter, `@IDCreditCard`, that adds one year to the card's `ExpirationYear`. **The procedure owns its transaction**, as in Exercise 5. If no card was changed, it raises an error.
+
+1. Insert one test credit card: type `Visa`, number `4111111111111111`, expiring `12/2030`.
+2. Call the procedure with the test card's ID, then with ID `-1`. Wrap each call in `TRY/CATCH` and print `Success` or `Failure:` with the error message.
+3. Check the test card's `ExpirationYear`.
+
+<details>
+<summary>Hint 1</summary>
+
+Check `@@ROWCOUNT` right after the `UPDATE` (Lab 9, Section 4.2). Any statement in between resets it.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Inside the transaction: `UPDATE`, then `IF @@ROWCOUNT <> 1 THROW ...;`, then `COMMIT`. The `CATCH` block rolls back and rethrows, so the caller's own `CATCH` can print the message.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_ExtendCardExpiry
+    @IDCreditCard int
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.CreditCard
+        SET ExpirationYear = ExpirationYear + 1
+        WHERE IDCreditCard = @IDCreditCard;
+
+        IF @@ROWCOUNT <> 1
+            THROW 50001, 'Credit card does not exist.', 1;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH;
+END;
+GO
+
+DECLARE @CardID int;
+
+INSERT INTO dbo.CreditCard (Type, CardNumber, ExpirationMonth, ExpirationYear)
+VALUES (N'Visa', N'4111111111111111', 12, 2030);
+
+SET @CardID = SCOPE_IDENTITY();
+
+-- Existing card
+BEGIN TRY
+    EXEC dbo.usp_ExtendCardExpiry @IDCreditCard = @CardID;
+    PRINT 'Success';
+END TRY
+BEGIN CATCH
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+
+-- Card that does not exist
+BEGIN TRY
+    EXEC dbo.usp_ExtendCardExpiry @IDCreditCard = -1;
+    PRINT 'Success';
+END TRY
+BEGIN CATCH
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+
+SELECT ExpirationMonth, ExpirationYear
+FROM dbo.CreditCard
+WHERE IDCreditCard = @CardID;   -- 12, 2031
+GO
+
+-- Cleanup
+DELETE FROM dbo.CreditCard WHERE CardNumber = N'4111111111111111';
+DROP PROCEDURE dbo.usp_ExtendCardExpiry;
+```
+
+Expected output: `Success`, then `Failure: Credit card does not exist.` The test card now expires in `2031`. Without the `@@ROWCOUNT` check, the second call would also print `Success`, even though it changed nothing.
+
+</details>
+
+---
+
+## Exercise 7 — An Outer Transaction Overrides an Inner Commit [ADVANCED]
+
+Using `dbo.usp_DeleteThreeStates` from Exercise 5, wrap a call to it in an **outer** transaction that the caller then deliberately rolls back — even though the procedure itself reports success and runs its own `COMMIT`.
+
+1. Recreate `dbo.usp_DeleteThreeStates` from Exercise 5; the solution of Exercise 5 drops it at the end.
 2. Insert three new, unreferenced states.
 3. Start an outer transaction, call `dbo.usp_DeleteThreeStates` with all three IDs, then issue a full `ROLLBACK TRANSACTION` in the caller — not because of an error, just because the caller decided to cancel.
 4. Check `@@TRANCOUNT` right after the procedure call returns, and check the row count after the outer rollback.
@@ -363,7 +600,7 @@ Using `dbo.usp_DeleteThreeStates` from Exercise 4, wrap a call to it in an **out
 Predict the outcome before running it: does the procedure's own `COMMIT` protect the deletions from the caller's rollback?
 
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteThreeStates
@@ -429,7 +666,7 @@ The procedure returned without an error and ran `COMMIT TRANSACTION`, but that c
 
 # Part B – `TransactionsLab`
 
-Exercises 6–11 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
+Exercises 8–13 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
 
 > [!IMPORTANT]
 > Start each exercise with `@@TRANCOUNT = 0`. Every transaction you start must end with `COMMIT` or a full `ROLLBACK`.
@@ -439,7 +676,7 @@ USE TransactionsLab;
 GO
 ```
 
-## Exercise 6 — Predict COMMIT and ROLLBACK [BEGINNER]
+## Exercise 8 — Predict COMMIT and ROLLBACK [BEGINNER]
 
 Reset the two balances to `1000.00` and `500.00`.
 
@@ -451,12 +688,15 @@ Reset the two balances to `1000.00` and `500.00`.
 
 Predict the final balances before running the code.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Run the two `UPDATE` statements between `BEGIN TRANSACTION` and `ROLLBACK TRANSACTION`, then repeat them with `COMMIT TRANSACTION`. Query the balances inside and after each transaction.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 UPDATE dbo.BankAccount
@@ -512,35 +752,38 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 ---
 
-## Exercise 7 — Keep one change, cancel another [INTERMEDIATE]
+## Exercise 9 — Keep one change, cancel another [INTERMEDIATE]
 
 Using `dbo.Note` from [Section 7.1 of Lab 9](../labs/lab09-transactions.md#71-identity-values):
 
 1. Start a transaction.
-2. Insert the note `Exercise 7: keep this note`.
+2. Insert the note `Exercise 9: keep this note`.
 3. Create a savepoint.
-4. Insert the note `Exercise 7: cancel this note`.
+4. Insert the note `Exercise 9: cancel this note`.
 5. Roll back to the savepoint.
 6. Commit the transaction.
 7. Verify which note was kept and inspect `@@TRANCOUNT`.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `SAVE TRANSACTION <name>` records a point inside the transaction; `ROLLBACK TRANSACTION <name>` undoes only the work after it. The transaction stays open until `COMMIT`.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 7: keep this note');
+VALUES (N'Exercise 9: keep this note');
 
 SAVE TRANSACTION KeepFirstNote;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 7: cancel this note');
+VALUES (N'Exercise 9: cancel this note');
 
 ROLLBACK TRANSACTION KeepFirstNote;
 
@@ -550,7 +793,7 @@ COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
 FROM dbo.Note
-WHERE NoteText LIKE N'Exercise 7:%'
+WHERE NoteText LIKE N'Exercise 9:%'
 ORDER BY NoteID;
 
 SELECT @@TRANCOUNT AS AfterCommit; -- 0
@@ -562,42 +805,45 @@ Only the first exercise note is stored. Repeating the exercise adds another copy
 
 ---
 
-## Exercise 8 — An unused savepoint [BEGINNER]
+## Exercise 10 — An unused savepoint [BEGINNER]
 
 Using `dbo.Note`:
 
 1. Start a transaction.
-2. Insert the note `Exercise 8: first note`.
+2. Insert the note `Exercise 10: first note`.
 3. Create a savepoint.
-4. Insert the note `Exercise 8: second note`.
+4. Insert the note `Exercise 10: second note`.
 5. Commit the transaction **without** rolling back to the savepoint.
 6. Verify which notes were kept.
 
 Predict the result before running the code: does creating a savepoint that is never rolled back to change anything?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Ask what `COMMIT` confirms: everything done inside the transaction that was not rolled back.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 8: first note');
+VALUES (N'Exercise 10: first note');
 
 SAVE TRANSACTION FirstNoteDone;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 8: second note');
+VALUES (N'Exercise 10: second note');
 
 COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
 FROM dbo.Note
-WHERE NoteText LIKE N'Exercise 8:%'
+WHERE NoteText LIKE N'Exercise 10:%'
 ORDER BY NoteID;
 
 SELECT @@TRANCOUNT AS AfterCommit; -- 0
@@ -609,7 +855,7 @@ Both notes are stored. A savepoint that is never used in a `ROLLBACK TRANSACTION
 
 ---
 
-## Exercise 9 — Test the transfer procedure [INTERMEDIATE]
+## Exercise 11 — Test the transfer procedure [INTERMEDIATE]
 
 Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
@@ -623,12 +869,15 @@ Cases 1–3 repeat scenarios from [Sections 5.3–5.5 of Lab 9](../labs/lab09-tr
 
 Verify the balances after the successful call, then after each expected-error call.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - An expected error ends its batch, so statements after it in the same batch do not run. Put each expected-error call in its own batch (end it with `GO`), and check the balances in the next batch.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 Reset and run the successful test:
 
@@ -719,7 +968,7 @@ Each test raises its expected error, and the balances remain `750.00` and `750.0
 
 ---
 
-## Exercise 10 — Add a transfer record [ADVANCED]
+## Exercise 12 — Add a transfer record [ADVANCED]
 
 Extend the transfer operation so that it also stores a record of the successful transfer.
 
@@ -759,12 +1008,15 @@ Requirements:
 - Test a successful transfer and a missing destination.
 - Verify that a failed transfer creates no history row.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Start from `dbo.usp_TransferFunds` and insert the history row after both `UPDATE` statements, inside the same `TRY` block and before `COMMIT`.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_TransferFundsWithHistory
@@ -878,7 +1130,7 @@ This demonstration intentionally resets balances between tests, so the history t
 
 ---
 
-## Exercise 11 — Connect transactions to Lab 8 [INTERMEDIATE]
+## Exercise 13 — Connect transactions to Lab 8 [INTERMEDIATE]
 
 In Lab 8, one procedure inserted a parent row and related child rows from structured input.
 
@@ -890,12 +1142,15 @@ Without changing its original code yet, explain:
 4. Should JSON/XML parsing and basic input validation always happen inside the transaction?
 5. If a generated parent identity is rolled back, must the next insert reuse it?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Think about which statements must succeed or fail together, and which work does not depend on the database at all.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 1. One call can contain several independently committed statements unless a transaction groups them.
 2. The transaction must cover all related writes: the parent insert and all child inserts. Commit only after every required write and check succeeds.

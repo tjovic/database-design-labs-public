@@ -131,6 +131,13 @@ Answer:
 4. What is the length (in bytes) of the first, second, and third row on that page?
 
 <details>
+<summary>Hint</summary>
+
+Count only the rows with `PageType = 1`. For question 3, run `DBCC PAGE` on the first data page with print option `3`, as in Exercise 1, and read `m_slotCnt` in the page header: it is the number of record slots, that is, the number of rows on the page (Lab 05).
+
+</details>
+
+<details>
 <summary>Solution for (a)</summary>
 
 1. **338** data pages.
@@ -199,6 +206,13 @@ Answer:
 2. For `Product`, how does `logical reads` compare to the total page count from Exercise 2 — 6 data pages, 1 root page, and 1 IAM page?
 3. For `Customer`, how does `logical reads` compare to the total page count implied by Exercise 3 — 338 data pages, 1 root page, and 1 IAM page?
 4. Based on these three results, does `logical reads` count only the data (leaf) pages, or every page type SQL Server has to touch to satisfy the query?
+
+<details>
+<summary>Hint</summary>
+
+Add up **all** pages that `DBCC IND` listed for each table, not only the data pages, and compare that sum with `logical reads`.
+
+</details>
 
 <details>
 <summary>Solution</summary>

@@ -2,9 +2,9 @@
 
 **Database:** `AdventureWorksENG`
 
-These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions and running totals, and the analytical functions `LAG` and `LEAD`.
+These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions with running totals and frames, and the analytical functions `LAG`, `LEAD`, and `FIRST_VALUE`.
 
-All exercises are plain `SELECT` statements, except Exercise 9, which creates a small table.
+All exercises are plain `SELECT` statements, except Exercise 11, which creates a small table.
 
 ```sql
 USE AdventureWorksENG;
@@ -37,6 +37,8 @@ FROM Customer c
 ORDER BY c.LastName, c.FirstName;
 ```
 
+Expected result: one row for each of the `19,972` customers. The first is Syed Abbas; customers with the same name, such as the three Kim Abercrombies, still get different numbers.
+
 </details>
 
 ---
@@ -67,6 +69,8 @@ ORDER BY ci.Name, c.LastName, c.FirstName;
 
 `PARTITION BY` is the entire trick — everything else is identical to Exercise 1.
 
+Expected result: the same `19,972` customers, but the numbering starts again at `1` in each city. Berlin comes first alphabetically, starting with Syed Abbas.
+
 </details>
 
 ---
@@ -92,6 +96,8 @@ SELECT
 FROM InvoiceItem ii
 ORDER BY QuantityRank, ii.InvoiceID, ii.ProductID;
 ```
+
+Expected result: one row for each of the `121,317` invoice items. The highest quantity is `44`. Two items share rank `3` with quantity `40`, so the next rank is `5`: `RANK` leaves a gap after a tie.
 
 </details>
 
@@ -123,13 +129,55 @@ ORDER BY i.InvoiceDate, i.InvoiceNumber;
 
 `NTILE(n)` also looks tempting here, but it only works if you know `n` up front, and it distributes rows as evenly as possible across `n` buckets rather than making fixed-size buckets of 3. For "buckets of exactly 3 rows", the `ROW_NUMBER` plus integer-division trick is the direct tool.
 
+Expected result: `39` invoices in `13` groups of 3. Group 1 holds the three invoices from 1 August 2002, and group 2 starts with `SO47969`.
+
+</details>
+
+---
+
+## Exercise 5 — Rank colors by quantity sold [INTERMEDIATE]
+
+Show each product color with the total quantity sold (`SUM(InvoiceItem.Quantity)`), ranked so that the best-selling color is first. Show products without a color as `(no color)`. Ties should share a rank without gaps.
+
+<details>
+<summary>Hint 1</summary>
+
+First write the `GROUP BY p.Color` query with the total. Then add the ranking column.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+A window function can order by an aggregate: `DENSE_RANK() OVER (ORDER BY SUM(ii.Quantity) DESC)`. Window functions run after `GROUP BY` (Lab 12, Section 1.3).
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    ISNULL(p.Color, N'(no color)') AS Color,
+    SUM(ii.Quantity) AS QuantitySold,
+    DENSE_RANK() OVER (ORDER BY SUM(ii.Quantity) DESC) AS ColorRank
+FROM InvoiceItem ii
+JOIN Product p ON p.IDProduct = ii.ProductID
+GROUP BY p.Color
+ORDER BY ColorRank;
+```
+
+Expected result: 9 rows. `Crna` is first with `81,937`, `(no color)` is second with `48,289`, and `Srebrna/Crna` is last with `3,931`.
+
+`RANK` or `ROW_NUMBER` would give the same numbers here, because no two colors have the same total.
+
 </details>
 
 ---
 
 # Part B – Aggregate window functions
 
-## Exercise 5 — Running total of revenue per year [INTERMEDIATE]
+## Exercise 6 — Running total of revenue per year [INTERMEDIATE]
 
 Invoice items with a running total that resets every calendar year.
 
@@ -156,11 +204,13 @@ JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
 ORDER BY i.InvoiceDate, i.IDInvoice, ii.ProductID;
 ```
 
+Expected result: the running total starts again at the first invoice item of each year. The last row of 2001 shows the whole year's revenue, about `11,331,808.96`.
+
 </details>
 
 ---
 
-## Exercise 6 — Products with a count of same-color products [BEGINNER]
+## Exercise 7 — Products with a count of same-color products [BEGINNER]
 
 Every product, with a count of how many products share its color.
 
@@ -184,11 +234,13 @@ ORDER BY p.Color, p.Name;
 
 No `ORDER BY` inside `OVER`, so `COUNT(*)` is computed across the whole partition — every product of a given color gets the same count. This is the "constant per partition" case from [Section 3.1 of Lab 12](../labs/lab12-window-functions.md#31-two-shapes).
 
+Expected result: one row per product (504). Products without a color show `248` in `ProductsInColor`; black (`Crna`) products show `93`.
+
 </details>
 
 ---
 
-## Exercise 7 — Distance from the most expensive product [INTERMEDIATE]
+## Exercise 8 — Distance from the most expensive product [INTERMEDIATE]
 
 For every product with a price greater than zero, show how much cheaper it is than the single most expensive product overall.
 
@@ -213,13 +265,55 @@ ORDER BY CheaperThanMaxBy;
 
 The empty `OVER ()` computes the `MAX` across the whole result; every row's `CheaperThanMaxBy` is `(global max) - (this row's price)`. The most expensive product's own row shows `0`.
 
+Expected result: the five Road-150 Red bikes come first with `0.00`, because they are the most expensive (`3,578.27`).
+
+</details>
+
+---
+
+## Exercise 9 — Moving average with a frame [INTERMEDIATE]
+
+Show the touring bikes (`SubcategoryID = 3`) from cheapest to most expensive. Add a column with the average price of the current bike, the 2 bikes before it, and the 2 bikes after it.
+
+<details>
+<summary>Hint 1</summary>
+
+The third part of `OVER` is the frame (Lab 12, Section 5): `ROWS BETWEEN ... PRECEDING AND ... FOLLOWING`.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Many bikes have the same price. Add `IDProduct` to the `ORDER BY` inside `OVER`, so that "the previous 2 rows" always means the same rows.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    p.Name,
+    p.PriceWithoutVAT,
+    AVG(p.PriceWithoutVAT) OVER (
+        ORDER BY p.PriceWithoutVAT, p.IDProduct
+        ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+    ) AS MovingAvg
+FROM Product p
+WHERE p.SubcategoryID = 3
+ORDER BY p.PriceWithoutVAT, p.IDProduct;
+```
+
+Expected result: 22 rows. While the window contains only `742.35` prices, the average is also `742.35`. Where the price jumps to `1214.85`, the average starts to rise a few rows early (`836.85`, `931.35`, ...), because the window already sees the more expensive bikes after the current one. At the first and last rows the window is smaller: there are no rows before the first one.
+
 </details>
 
 ---
 
 # Part C – Analytical functions
 
-## Exercise 8 — Delta from the previous product [INTERMEDIATE]
+## Exercise 10 — Delta from the previous product [INTERMEDIATE]
 
 Products with a price greater than zero, cheapest first. Show how much more expensive each one is than the previous.
 
@@ -243,11 +337,13 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
 
+Expected result: `304` products. The first row, Patch Kit/8 Patches (`2.29`), has `NULL` in `DeltaFromPrev`: there is no previous product. Products with the same price as the one before show `0.00`.
+
 </details>
 
 ---
 
-## Exercise 9 — A train schedule with LEAD [INTERMEDIATE]
+## Exercise 11 — A train schedule with LEAD [INTERMEDIATE]
 
 Create a small table and show, next to each station, how many minutes until the next station's departure.
 
@@ -291,6 +387,95 @@ ORDER BY s.Departure;
 ```
 
 The last row's `MinutesToNext` is `NULL` — there is no next station. This is the same shape you'd use for "how long is each concert set", "how long between website events", or "how long between server heartbeats" — any time-series diff.
+
+</details>
+
+---
+
+## Exercise 12 — Days since the customer's first invoice [INTERMEDIATE]
+
+For customers `1` and `2`, show every invoice with its date, the date of that customer's **first** invoice, and the number of days between them.
+
+<details>
+<summary>Hint 1</summary>
+
+`FIRST_VALUE(column) OVER (PARTITION BY ... ORDER BY ...)` returns the value from the first row of each partition (Lab 12, Section 4.4).
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Partition by customer and order by date. `DATEDIFF(day, first, current)` gives the number of days.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    i.CustomerID,
+    i.InvoiceNumber,
+    i.InvoiceDate,
+    FIRST_VALUE(i.InvoiceDate) OVER (
+        PARTITION BY i.CustomerID
+        ORDER BY i.InvoiceDate, i.IDInvoice
+    ) AS FirstInvoiceDate,
+    DATEDIFF(day,
+        FIRST_VALUE(i.InvoiceDate) OVER (
+            PARTITION BY i.CustomerID
+            ORDER BY i.InvoiceDate, i.IDInvoice
+        ),
+        i.InvoiceDate) AS DaysSinceFirst
+FROM Invoice i
+WHERE i.CustomerID IN (1, 2)
+ORDER BY i.CustomerID, i.InvoiceDate, i.IDInvoice;
+```
+
+Expected result: 11 rows, 7 for customer `1` and 4 for customer `2`. `DaysSinceFirst` starts at `0` again for customer `2`, because `PARTITION BY` restarts the window. Customer `1`'s last invoice is `638` days after the first one.
+
+`FIRST_VALUE` is safe with the default frame, because the first row is always inside it. `LAST_VALUE` is not (Lab 12, Section 4.4).
+
+</details>
+
+---
+
+## Exercise 13 — Revenue compared with two years earlier [ADVANCED]
+
+Show the total revenue (`SUM(InvoiceItem.TotalPrice)`) for each invoice year. Add the revenue from **two years earlier** and the difference between the two.
+
+<details>
+<summary>Hint 1</summary>
+
+`LAG` has a second argument: how many rows back to look. `LAG(x, 2)` looks two rows back.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+As in Exercise 5, the window function can use an aggregate: `LAG(SUM(ii.TotalPrice), 2) OVER (ORDER BY YEAR(i.InvoiceDate))`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    YEAR(i.InvoiceDate) AS InvoiceYear,
+    SUM(ii.TotalPrice) AS Revenue,
+    LAG(SUM(ii.TotalPrice), 2) OVER (ORDER BY YEAR(i.InvoiceDate)) AS RevenueTwoYearsEarlier,
+    SUM(ii.TotalPrice)
+      - LAG(SUM(ii.TotalPrice), 2) OVER (ORDER BY YEAR(i.InvoiceDate)) AS Change
+FROM Invoice i
+JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
+GROUP BY YEAR(i.InvoiceDate)
+ORDER BY InvoiceYear;
+```
+
+Expected result: 4 rows, 2001–2004. The first two years have `NULL` in the last two columns: there is no year two rows earlier. 2003 is about `30.7` million higher than 2001, and 2004 is about `4.8` million lower than 2002.
 
 </details>
 

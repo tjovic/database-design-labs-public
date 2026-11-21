@@ -10,7 +10,7 @@ Several exercises insert or delete rows in `State`, `City`, `Customer`, and `Pro
 
 # Delimited strings
 
-## Exercise 1 — Delimited String: Delete by Name List [INTERMEDIATE]
+## Exercise 1 — Delimited String: Delete by Name List [BEGINNER]
 
 Create a procedure `dbo.usp_DeleteProductsByNameList` that takes one `nvarchar(max)` parameter — a comma-separated list of product names.
 
@@ -22,15 +22,18 @@ The procedure must:
 
 Insert three throwaway test products first (do not delete real `AdventureWorksENG` products — see the [database safety note](../exercises/README.md#database-safety-note)). Test the procedure against your own test products. Verify they are gone.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Use `STRING_SPLIT(@NameList, ',')` to get a table.
 - Use `IN (SELECT value FROM STRING_SPLIT(...))` to match the names.
 - Remember: `value` is `nvarchar`, and the `Product.Name` column is also `nvarchar`, so no `CAST` is needed.
 - `Product.ProductNumber` and `Product.MinimumQuantityInStock` are `NOT NULL` — supply a value for each when inserting test rows.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteProductsByNameList
@@ -59,6 +62,9 @@ EXEC dbo.usp_DeleteProductsByNameList @NameList = N'ZZ_TestProduct1,ZZ_TestProdu
 SELECT * FROM Product WHERE Name LIKE N'ZZ_TestProduct%';
 ```
 
+
+Expected result: the final `SELECT` returns no rows — all three test products were deleted by one call.
+
 </details>
 
 ---
@@ -75,14 +81,17 @@ Write a procedure `dbo.usp_GetProductsByIDListWithValidation` that:
 
 Test it with a list like `'1,2,316,9999,8888'` (where 9999 and 8888 don't exist).
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Split the input into a `@IDList` table variable.
 - Use `LEFT JOIN` with `Product` to identify missing IDs.
 - Return two separate result sets (two `SELECT` statements).
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_GetProductsByIDListWithValidation
@@ -140,7 +149,8 @@ Test your function against the built-in `STRING_SPLIT` for the input `'11,22,33,
 
 Reflect: how much code did you write to replicate one built-in function?
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Start with `@Position = 1`.
 - In each iteration, find the next separator with `CHARINDEX(@Separator, @Input, @Position)`.
@@ -148,8 +158,10 @@ Reflect: how much code did you write to replicate one built-in function?
 - Convert to `int` with `CAST` and `INSERT` into the result table.
 - Stop when `CHARINDEX` returns 0 (separator not found).
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER FUNCTION dbo.fn_SplitInts
@@ -206,7 +218,7 @@ This demonstrates why built-in functions like `STRING_SPLIT` are valuable — yo
 
 # XML
 
-## Exercise 4 — XML: Insert a Batch of States [INTERMEDIATE]
+## Exercise 4 — XML: Insert a Batch of States [BEGINNER]
 
 Create a procedure `dbo.usp_InsertStatesBatch` that accepts an `xml` parameter of this shape:
 
@@ -226,14 +238,17 @@ The procedure must:
 
 Test it with at least three state names and verify the inserted rows.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Use `.nodes('/States/State')` to iterate over each `State` element.
 - Use `.value('@Name', 'nvarchar(50)')` to extract the `Name` attribute.
 - Remember: alias both the table and the column after `.nodes()` — `AS tbl(col)`.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertStatesBatch
@@ -258,6 +273,9 @@ EXEC dbo.usp_InsertStatesBatch @States = N'
 -- Verify
 SELECT * FROM State WHERE Name LIKE N'NewCountry%';
 ```
+
+
+Expected result: three rows, `NewCountry1`, `NewCountry2`, and `NewCountry3`. In a fresh database they get `IDState` values `4`, `5`, and `6`.
 
 </details>
 
@@ -284,13 +302,16 @@ The procedure must:
 
 Call it with the XML above and verify the inserted rows, including each city's state.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Read the element text with `.value('.', 'nvarchar(50)')`, as in Lab 8, Section 4.2, Step 3.
 - Read the attribute with `.value('@StateID', 'int')`.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCitiesFromXml
@@ -373,14 +394,17 @@ GO
 
 Call the procedure twice: once for `Sales` with the two employees above, and once for `Engineering` with one employee, Charlie Clark. Verify that every employee is linked to the correct department.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Read the department with `.nodes('/Department')` and the employees with `.nodes('/Department/Employee')`, as the procedure in Section 4.4 reads the invoice header and its items.
 - Insert the department first and save `SCOPE_IDENTITY()` in a variable.
 - Insert all employees with one `INSERT ... SELECT` that uses that variable.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertDepartmentWithEmployees
@@ -520,7 +544,8 @@ After the second call, no additional records should be inserted.
 
 Both calls should return the same customer ID.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Use `.nodes('/Customer')` and `.value()` to read the attributes into variables with `SELECT @Variable = ...`.
 - Use `SELECT @Variable = Column FROM Table` to find existing IDs.
@@ -533,8 +558,10 @@ Both calls should return the same customer ID.
 >
 > XML is simply the format used to pass the input data.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerWithLocation
@@ -678,7 +705,7 @@ Running the procedure multiple times with the same input should not create addit
 
 # Building XML with `FOR XML PATH`
 
-## Exercise 8 — FOR XML PATH: Build a Price List [INTERMEDIATE]
+## Exercise 8 — FOR XML PATH: Build a Price List [BEGINNER]
 
 Write a query (no procedure) that builds an XML price list from the `Product` table.
 
@@ -694,14 +721,17 @@ The output should be:
 
 Include only products where `PriceWithoutVAT > 0`. Order by `PriceWithoutVAT` descending.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Use `FOR XML PATH('Product')` to wrap each row.
 - Use `ROOT('PriceList')` to wrap the whole thing.
 - Use column aliases with `[@ID]` for attributes.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 SELECT
@@ -713,6 +743,19 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT DESC
 FOR XML PATH('Product'), ROOT('PriceList');
 ```
+
+
+Expected result: one XML value that starts like this:
+
+```xml
+<PriceList>
+  <Product ID="749" Name="Road-150 Red, 62" Price="3578.2700" />
+  <Product ID="750" Name="Road-150 Red, 44" Price="3578.2700" />
+  ...
+</PriceList>
+```
+
+SSMS shows it as a single link; click it to open the formatted XML.
 
 </details>
 
@@ -740,15 +783,18 @@ Write a query (not a procedure) that:
 
 Use `FOR XML PATH` with slash-separated aliases to create the nested structure.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `[@IDCustomer]` in the `SELECT` becomes an XML attribute.
 - `[FirstName]` becomes a simple element.
 - `[Emails/Email]` with a slash creates a nested element.
 - Use `FOR XML PATH('Customer'), ROOT('Customers')` to set the structure.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 SELECT
@@ -784,15 +830,18 @@ Write a procedure `dbo.usp_InsertCustomersFromJson` that:
 
 Call it with at least two customers in JSON format and verify they were inserted.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - JSON array: `[ { "FirstName": "...", ... }, { "FirstName": "...", ... } ]`
 - `OPENJSON(@Json)` without a second argument shreds the root array.
 - `WITH (FirstName nvarchar(50) '$.FirstName', ...)`  — column name, type, and path.
 - Paths like `'$.FirstName'` mean "from the current row, read the FirstName property".
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomersFromJson
@@ -823,6 +872,9 @@ SELECT FirstName, LastName, Email
 FROM Customer
 WHERE Email IN ('xavier@example.com', 'yolanda@example.com');
 ```
+
+
+Expected result: two rows, Xavier Xavier and Yolanda Yates.
 
 </details>
 
@@ -866,14 +918,17 @@ The procedure must:
 
 Call it twice: once for team `Blue` with the members above, and once for team `Red` with members `Petra` and `Luka`. Verify that every member is linked to the correct team.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Read the team name with `JSON_VALUE(@Json, '$.Team')`.
 - Save `SCOPE_IDENTITY()` in a variable after inserting the team.
 - `OPENJSON(@Json, '$.Members')` turns the array into rows. The elements are plain values, not objects, so read the `value` column, as in Lab 8, Section 5.3, Step 1.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InsertTeamFromJson
@@ -943,13 +998,16 @@ The procedure must:
 
 Call it with the ID of team `Blue` (`[1]` if you ran the previous exercise once) and verify that team `Blue` and its three members are gone, while team `Red` remains.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `OPENJSON(@TeamIDs)` returns one row per ID in the `value` column. The values are text, so convert them with `CAST(value AS int)`, just as with `STRING_SPLIT`.
 - Delete the child rows (`TestMember`) before the parent rows (`TestTeam`).
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_DeleteTeamsFromJson
@@ -1015,14 +1073,17 @@ Write a query (no procedure) that returns the five most expensive products as JS
 
 Order the products by `PriceWithoutVAT` descending, then by `IDProduct`.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - Join `Product` with `Subcategory` to get the subcategory name.
 - A dot in the alias creates a nested object: `[Subcategory.Name]`.
 - Use `ROOT('Products')` to wrap the array.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 SELECT TOP 5
@@ -1045,36 +1106,39 @@ Compare it with Exercise 9: JSON uses a dot in the alias where XML uses a slash.
 
 # Table-Valued Parameters
 
-## Exercise 14 — TVP Fundamentals [INTERMEDIATE]
+## Exercise 14 — TVP Fundamentals [BEGINNER]
 
-Create a **table type** `dbo.ProductIDsExercise` with a single `int` column called `ID` (primary key).
+Create a **table type** `dbo.IDList` with a single `int` column called `ID` (primary key).
 
 Write a procedure `dbo.usp_ListProductsByIDList` that:
 
-1. Accepts one `dbo.ProductIDsExercise READONLY` parameter.
+1. Accepts one `dbo.IDList READONLY` parameter.
 2. Returns `IDProduct`, `Name`, and `PriceWithoutVAT` for all products in the list.
 3. Joins the TVP against the `Product` table.
 
 Call it with three product IDs and verify the results.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `CREATE TYPE ... AS TABLE` defines the type; `CREATE OR ALTER PROCEDURE` uses it as a parameter type.
 - Remember `READONLY` is mandatory.
-- After `DECLARE @List dbo.ProductIDsExercise;`, you can `INSERT INTO @List (ID) VALUES (...), (...);`
+- After `DECLARE @List dbo.IDList;`, you can `INSERT INTO @List (ID) VALUES (...), (...);`
+
+</details>
 
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
-CREATE TYPE dbo.ProductIDsExercise AS TABLE
+CREATE TYPE dbo.IDList AS TABLE
 (
     ID int PRIMARY KEY
 );
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_ListProductsByIDList
-    @IDs dbo.ProductIDsExercise READONLY
+    @IDs dbo.IDList READONLY
 AS
 BEGIN
     SELECT
@@ -1088,11 +1152,14 @@ END
 GO
 
 -- Test
-DECLARE @ProductList dbo.ProductIDsExercise;
+DECLARE @ProductList dbo.IDList;
 INSERT INTO @ProductList (ID) VALUES (1), (2), (316);
 
 EXEC dbo.usp_ListProductsByIDList @IDs = @ProductList;
 ```
+
+
+Expected result: three rows — `1` Adjustable Race, `2` Bearing Ball, and `316` Blade, each with price `0.00`. It is the same result as in Exercise 2, now passed as a table instead of a string.
 
 </details>
 
@@ -1109,13 +1176,16 @@ Write a procedure `dbo.usp_InsertProducts` that:
 
 Call it with at least two test products and verify they were inserted with a query.
 
-### Hints
+<details>
+<summary>Hint</summary>
 
 - `Product.MinimumQuantityInStock` is `NOT NULL` with no default — supply a value (e.g. `0`) in the `INSERT`, even though the TVP itself doesn't carry that column.
 - Use a distinctive name prefix (e.g. `ZZ_Test`) to make your test products easy to find.
 
+</details>
+
 <details>
-<summary>Show solution</summary>
+<summary>Solution</summary>
 
 ```sql
 CREATE TYPE dbo.ProductInput AS TABLE
@@ -1150,6 +1220,9 @@ SELECT IDProduct, Name, ProductNumber, PriceWithoutVAT
 FROM Product
 WHERE Name LIKE N'ZZ_TestWidget%';
 ```
+
+
+Expected result: two rows, `ZZ_TestWidget1` (`19.99`) and `ZZ_TestWidget2` (`29.99`), each with a new `IDProduct`.
 
 </details>
 

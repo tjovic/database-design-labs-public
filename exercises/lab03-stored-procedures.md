@@ -56,6 +56,8 @@ EXEC dbo.usp_ListCategories;
 GO
 ```
 
+Expected result: four categories — `Accessories`, `Bicycles`, `Clothes`, `Parts` — and after the change the same four in reverse order.
+
 </details>
 
 ## Exercise 2 — Search customers by last-name pattern [BEGINNER]
@@ -97,6 +99,8 @@ EXEC dbo.usp_CustomersByLastName
 GO
 ```
 
+Expected result for `N'%son%'`: `1,255` customers, starting with Greg Alderson.
+
 </details>
 
 ## Exercise 3 — Find products in a price range [BEGINNER]
@@ -136,6 +140,8 @@ EXEC dbo.usp_ProductsByPriceRange
     @MaximumPrice = 100000;
 GO
 ```
+
+Expected result: all `504` products, starting with the products priced `0.00`.
 
 </details>
 
@@ -197,6 +203,8 @@ EXEC dbo.usp_ProductColor
 
 SELECT @Color AS ProductColor;
 ```
+
+Expected result after the fix: `Srebrna` (silver).
 
 </details>
 

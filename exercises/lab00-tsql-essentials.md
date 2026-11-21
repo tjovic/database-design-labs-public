@@ -45,6 +45,8 @@ PRINT @LastName;
 GO
 ```
 
+Expected output: `Gustavo` and `Achong`, each on its own line in the **Messages** tab.
+
 </details>
 
 ---
@@ -230,6 +232,8 @@ FROM @Products;
 GO
 ```
 
+Expected result: `93` rows, all with `Color = 'Crna'`.
+
 </details>
 
 ---
@@ -277,6 +281,8 @@ END
 GO
 ```
 
+Expected output: `Still growing`. A fresh `AdventureWorksENG` has `19,972` customers, just under the limit.
+
 </details>
 
 ---
@@ -318,6 +324,8 @@ FROM City
 WHERE StateID = @StateID;
 GO
 ```
+
+Expected result: two rows, `Agra` and `Delhi`, both with the new `StateID`. In a fresh database the new state gets ID `4`.
 
 </details>
 
@@ -379,6 +387,8 @@ WHERE s.IDState = @StateID;
 GO
 ```
 
+Expected output: `New state ID: 5` in a fresh database after Exercise 7, followed by one row: `Portugal` and `Lisbon`.
+
 </details>
 
 ---
@@ -408,6 +418,8 @@ BEGIN
 END
 GO
 ```
+
+Expected output: `1`, `4`, `9`, `16`, and `25`, each on its own line.
 
 </details>
 
@@ -445,6 +457,8 @@ SELECT
 FROM Product;
 GO
 ```
+
+Expected result: all `504` products. Black and silver products are `Neutral`, red and blue ones are `Bold`, and everything else, including products without a color, is `Other`.
 
 </details>
 
@@ -534,6 +548,8 @@ END
 SET NOCOUNT OFF;
 GO
 ```
+
+Expected output: `No product was updated.` There is no product `99999`, so `@@ROWCOUNT` is `0`.
 
 </details>
 

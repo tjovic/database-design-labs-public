@@ -1428,68 +1428,6 @@ The second result:
 
 The second argument of `OPENJSON`, `'$.Invoice.Lines'`, tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
 
-### Reading both levels with CROSS APPLY
-
-> [!TIP]
-> This is an optional advanced example. It uses `CROSS APPLY`, which earlier labs have not covered. For the core lab, reading the header with `JSON_VALUE` and the items with `OPENJSON`, as above, is enough.
-
-Sometimes we want the invoice header and line items in one result. We can use two `OPENJSON` operations connected by `CROSS APPLY`:
-
-```sql
-DECLARE @Json nvarchar(max) = N'
-{
-    "Invoice": {
-        "CustomerID": 5,
-        "InvoiceDate": "2026-11-04",
-        "InvoiceNumber": "SO-TEST-002",
-        "Lines": [
-            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
-            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
-            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
-        ]
-    }
-}';
-
-SELECT
-    inv.CustomerID,
-    inv.InvoiceDate,
-    line.ProductID,
-    line.Quantity,
-    line.UnitPrice
-FROM OPENJSON(@Json, '$.Invoice')
-WITH
-(
-    CustomerID int '$.CustomerID',
-    InvoiceDate date '$.InvoiceDate',
-    LinesJson nvarchar(max) '$.Lines' AS JSON
-) AS inv
-CROSS APPLY OPENJSON(inv.LinesJson)
-WITH
-(
-    ProductID int '$.ProductID',
-    Quantity int '$.Quantity',
-    UnitPrice money '$.UnitPrice'
-) AS line;
-```
-
-Result:
-
-| CustomerID | InvoiceDate | ProductID | Quantity | UnitPrice |
-|---|---|---|---|---|
-| 5 | 2026-11-04 | 1 | 2 | 199.00 |
-| 5 | 2026-11-04 | 2 | 1 | 49.90 |
-| 5 | 2026-11-04 | 3 | 5 | 9.99 |
-
-Let's break down the process:
-
-1. The first `OPENJSON` reads the invoice header.
-2. `AS JSON` preserves the nested `Lines` array as JSON text.
-3. `CROSS APPLY` passes that array to the second `OPENJSON`, once for each row on its left.
-4. The second `OPENJSON` converts each line item into a row.
-5. The result combines the header values with each line item.
-
-Notice that the aliases `AS inv` and `AS line` appear **after** the `WITH (...)` clauses.
-
 ## 5.6 Inserting Related Records from JSON
 
 Now we insert the invoice from Section 5.5: one row in `Invoice` and one row in `InvoiceItem` for every line. The whole invoice arrives as **one JSON document**: `JSON_VALUE` reads the header, and `OPENJSON` turns the lines into rows.

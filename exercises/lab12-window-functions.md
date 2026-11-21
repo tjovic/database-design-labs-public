@@ -1,5 +1,7 @@
 # Lab 12 – Window Function Exercises
 
+**Database:** `AdventureWorksENG`
+
 These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions and running totals, and the analytical functions `LAG` and `LEAD`.
 
 All exercises are plain `SELECT` statements, except Exercise 9, which creates a small table.

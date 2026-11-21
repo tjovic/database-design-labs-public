@@ -1,12 +1,21 @@
 # Lab 07 – CRUD Operation Exercises
 
+**Database:** `AdventureWorksENG`, but only three exercise tables created in [Setup](#setup): `Student`, `Course`, and `Enrollment`
+
 These exercises build on [Lab 07 – CRUD Operations](../labs/lab07-crud-operations.md). They progress from one procedure per operation to combined procedures, error handling, and operations that must also handle rows in related tables. They use only what Labs 03, 04 and 07 cover; transactions follow in Lab 9.
 
-The exercises do not touch existing `AdventureWorksENG` data. They use three small tables created in the setup below: `Student`, `Course`, and `Enrollment`. Run the exercises in order: later procedures build on earlier ones. They can run on the same `AdventureWorksENG` you used for Lab 07, but a freshly restored copy is the safest start (see [About the database](../README.md#about-the-database)).
+These tables are not part of the original `AdventureWorksENG`: the [Setup](#setup) script below creates them and fills them with a few students and courses. No existing `AdventureWorksENG` table is read or changed. Run the setup first, then the exercises in order, because later procedures build on earlier ones. To start over, run the setup again.
 
 ## Setup
 
 Run the setup once before the first exercise. It recreates the three exercise tables, so you can also run it again to start over with the original data.
+
+```text
+Student 1 ───< Enrollment >─── 1 Course
+               (StudentID, CourseID)
+```
+
+A student can enroll in many courses, and a course can have many students. `Enrollment` stores one row per student–course pair.
 
 ```sql
 USE AdventureWorksENG;
@@ -678,7 +687,7 @@ Behavior:
 | Otherwise | Delete the student's enrollments (if any) and then the student | `0` |
 | An error occurs | Catch it | `3` |
 
-Test the procedure in this order:
+Test the procedure in this order (the students are listed in the table after [Setup](#setup)):
 
 1. student `999`;
 2. student `1` (Ana) without `@DeleteEnrollments`;

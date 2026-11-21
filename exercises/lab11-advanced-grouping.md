@@ -1,5 +1,7 @@
 # Lab 11 – Advanced Grouping Exercises
 
+**Database:** `AdventureWorksENG`
+
 These exercises build on [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md) and use `AdventureWorksENG`. They practise `ROLLUP`, `CUBE`, `GROUPING SETS`, and `GROUPING()`. Every exercise is a plain `SELECT`: nothing is created or changed, so no setup or cleanup is needed.
 
 ```sql

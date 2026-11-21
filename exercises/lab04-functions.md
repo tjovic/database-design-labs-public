@@ -1,5 +1,7 @@
 # Lab 04 – Function Exercises
 
+**Databases:** `AdventureWorksENG` (Exercises 1–12 and 14), `PayrollLab` (Exercise 13, created by its own setup script)
+
 These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 13 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, inline table-valued functions (inline TVFs), and multi-statement table-valued functions (MSTVFs). Exercise 14 adds checksum validation using ISO 7064 MOD 11,10.
 
 The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–12 and 14 create only function definitions. Exercise 13 also creates a separate example database, `PayrollLab`, and two tables through its setup script. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.

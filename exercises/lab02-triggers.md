@@ -1,5 +1,7 @@
 # Lab 02 – Trigger Exercises
 
+**Database:** `AdventureWorksENG`, plus two log tables created in [Setup](#setup)
+
 These exercises build on [Lab 02 – Triggers](../labs/lab02-triggers.md) and use DML `AFTER` triggers in `AdventureWorksENG`. They are in two parts:
 
 - **Part A (Exercises 1–6)** works on `dbo.City` and writes simple text messages to a log table. It covers a first trigger, set-based logging, multi-row safety, comparing old and new values, one trigger for all three events, and checking new rows against existing ones.

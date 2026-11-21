@@ -1,5 +1,7 @@
 # Lab 03 – Stored Procedure Exercises
 
+**Database:** `AdventureWorksENG`
+
 These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, `RETURN` status codes for several cases, and reusing one procedure from another script.
 
 Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; all other exercises only read table data. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.

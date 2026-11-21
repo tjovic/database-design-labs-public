@@ -1,5 +1,7 @@
 # Lab 00 – T-SQL Essentials Exercises
 
+**Database:** `AdventureWorksENG`
+
 These exercises build on [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md) and use `AdventureWorksENG`. They practise batches, variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH` — the building blocks used throughout the later labs.
 
 Most exercises only read data. Exercises 7 and 8 insert a state and its cities, and Exercise 12 updates a product that does not exist, so it changes no rows. Run the exercises in order on a freshly restored `AdventureWorksENG` (see [About the database](../README.md#about-the-database)). The solutions do not remove the objects and rows they create, and later exercises may rely on earlier ones; to start over, restore the database again.

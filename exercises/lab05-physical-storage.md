@@ -1,5 +1,7 @@
 # Lab 05 – Physical Storage Exercises
 
+**Databases:** `AdventureWorksENG` (Exercises 1–5), `IndexLab` (Exercises 8–9); Exercises 6–7 are calculations only
+
 These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md). **Part A** (Exercises 1–5) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 6–9) contains page calculations and two exercises on the lab's `IndexLab` database.
 
 In Part A, `AdventureWorksENG` is much smaller than `IndexLab`, which is exactly the point: `State` has 3 rows, `Product` has 504, and `Customer` has 19,972. That range lets you see, on real tables of very different sizes, the same two questions Lab 05 asks about `Category`, `Product`, and `Customer`: how many pages does a table use, and what determines the physical order of rows on those pages?

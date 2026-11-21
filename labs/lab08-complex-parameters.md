@@ -287,9 +287,18 @@ FROM Customer
 WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
 ```
 
-1. The first `'` closes the original string.
-2. `OR 1=1` adds a condition that is always true.
-3. `--` starts a comment, so SQL Server ignores the closing quote added by the application.
+The input is pasted into the application's SQL text, and part of it becomes SQL code:
+
+```text
+Application's SQL text:  ... LastName = '{last_name}'
+User input:                              Achong' OR 1=1 --
+SQL sent to the server:  ... LastName = 'Achong' OR 1=1 --'
+                                         └──┬─┘│└──┬──┘ └┬┘
+                                            │  │   │     └─ comment: the application's closing ' is ignored
+                                            │  │   └─ a new condition that is always true
+                                            │  └─ closes the string early
+                                            └─ the value the application expected
+```
 
 Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
 
@@ -304,6 +313,15 @@ cursor.execute(sql, (first_name, last_name))
 ```
 
 The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
+
+```text
+Concatenation – the input becomes part of the SQL text
+  Application ── "SELECT … LastName = 'Achong' OR 1=1 --'" ──► SQL Server parses all of it as SQL
+
+Parameters – the SQL text and the values travel separately
+  Application ─┬─ "SELECT … LastName = ?"   ──► SQL Server parses only this as SQL
+               └─ "Achong' OR 1=1 --"        ──► used only as a value
+```
 
 Do not put quotes around the `?` placeholders: the database driver handles parameter values.
 
@@ -381,15 +399,6 @@ DECLARE @IDList nvarchar(200) = N'1,2,3';
 Although it contains three numbers, SQL Server sees it as a single string.
 
 We need to convert it into a collection of values that can be used in a SQL query.
-
-```mermaid
-flowchart TD
-    A["String parameter: 1,2,3"] --> B["STRING_SPLIT"]
-    B --> C["Table with three rows"]
-    C --> D["1"]
-    C --> E["2"]
-    C --> F["3"]
-```
 
 SQL Server provides a built-in function called **`STRING_SPLIT`** for this purpose.
 

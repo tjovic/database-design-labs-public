@@ -1100,7 +1100,7 @@ The result contains one `Customer` element for each row. The first one looks lik
 XML remains useful when integrating with systems that already exchange XML documents, such as certain SOAP-based services.
 
 > [!TIP]
-> Additional practice: [Exercise 6 of the Complex Parameters Exercises](../exercises/lab08-complex-parameters.md#exercise-6--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
+> Additional practice: [Exercise 7 of the Complex Parameters Exercises](../exercises/lab08-complex-parameters.md#exercise-7--xml-find-or-create-related-records-advanced) demonstrates a more advanced XML procedure that finds or creates related records across multiple tables.
 
 In the next section, we will explore **JSON**, which represents the same kind of structured data in the format most web applications already use.
 

@@ -1,8 +1,8 @@
 # Lab 00 – T-SQL Essentials Exercises
 
-These exercises build on [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md) and use `AdventureWorksENG`. They practise variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH` — the building blocks used throughout the later labs.
+These exercises build on [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md) and use `AdventureWorksENG`. They practise batches, variables, table variables, `IF / ELSE`, `SCOPE_IDENTITY()`, `WHILE`, `CASE`, `@@ROWCOUNT`, and `TRY/CATCH` — the building blocks used throughout the later labs.
 
-Most exercises only read data. Exercises 6 and 7 insert a state and its cities and delete them again at the end of the solution. Exercise 10 updates a product that does not exist, so it changes no rows. No other setup or cleanup is needed.
+Most exercises only read data. Exercises 7 and 8 insert a state and its cities and delete them again at the end of the solution. Exercise 12 updates a product that does not exist, so it changes no rows. No other setup or cleanup is needed.
 
 ```sql
 USE AdventureWorksENG;
@@ -47,7 +47,53 @@ GO
 
 ---
 
-## Exercise 2 — The no-row trap [BEGINNER]
+## Exercise 2 — Variables and batches [BEGINNER]
+
+What happens when you run the following script?
+
+```sql
+DECLARE @City nvarchar(50) = N'Zagreb';
+
+PRINT @City;
+GO
+
+PRINT @City;
+GO
+```
+
+Try to predict the result, then fix the script so that both `PRINT` statements work.
+
+<details>
+<summary>Hint</summary>
+
+Count the batches. In which batch is `@City` declared?
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+The first `PRINT` prints `Zagreb`. The second batch fails:
+
+```text
+Must declare the scalar variable "@City".
+```
+
+A variable exists only in the batch in which it is declared, and `GO` ends that batch. Remove the `GO` between the two statements:
+
+```sql
+DECLARE @City nvarchar(50) = N'Zagreb';
+
+PRINT @City;
+PRINT @City;
+GO
+```
+
+</details>
+
+---
+
+## Exercise 3 — The no-row trap [BEGINNER]
 
 What will the following script print if no customer has
 `IDCustomer = -1`?
@@ -88,7 +134,7 @@ kept its previous value.
 
 ---
 
-## Exercise 3 — The multi-row trap [BEGINNER]
+## Exercise 4 — The multi-row trap [BEGINNER]
 
 Modify Exercise 1 by removing the `WHERE` clause so that the query reads
 all customers.
@@ -132,7 +178,7 @@ write the query so that it identifies that row explicitly.
 
 ---
 
-## Exercise 4 — Table variable [BEGINNER]
+## Exercise 5 — Table variable [BEGINNER]
 
 Declare a table variable named `@Products`.
 
@@ -186,7 +232,7 @@ GO
 
 ---
 
-## Exercise 5 — IF / ELSE [BEGINNER]
+## Exercise 6 — IF / ELSE [BEGINNER]
 
 Count the rows in `Customer`.
 
@@ -233,7 +279,7 @@ GO
 
 ---
 
-## Exercise 6 — SCOPE_IDENTITY() [INTERMEDIATE]
+## Exercise 7 — SCOPE_IDENTITY() [INTERMEDIATE]
 
 Insert a new state named `'India'`.
 
@@ -283,7 +329,7 @@ GO
 
 ---
 
-## Exercise 7 — Put it together [INTERMEDIATE]
+## Exercise 8 — Put it together [INTERMEDIATE]
 
 Create a small script that combines several concepts from this lab.
 
@@ -305,7 +351,7 @@ where `X` is the generated ID.
 <details>
 <summary>Hint</summary>
 
-Combine the pattern from Exercise 6 with an `IF @StateID IS NOT NULL` block. Use `CAST` to join the number to the text.
+Combine the pattern from Exercise 7 with an `IF @StateID IS NOT NULL` block. Use `CAST` to join the number to the text.
 
 </details>
 
@@ -351,7 +397,7 @@ GO
 
 ---
 
-## Exercise 8 — WHILE loop [BEGINNER]
+## Exercise 9 — WHILE loop [BEGINNER]
 
 Use a `WHILE` loop to print the square of each number from 1 to 5
 (`1, 4, 9, 16, 25`).
@@ -381,7 +427,7 @@ GO
 
 ---
 
-## Exercise 9 — CASE WHEN [BEGINNER]
+## Exercise 10 — CASE WHEN [BEGINNER]
 
 Write a query against `Product` that returns `IDProduct`, `Name`, and
 `Color`, together with a new column `ColorGroup`:
@@ -418,12 +464,53 @@ GO
 
 ---
 
-## Exercise 10 — @@ROWCOUNT and SET NOCOUNT ON [INTERMEDIATE]
+## Exercise 11 — CASE with aggregate functions [INTERMEDIATE]
+
+Write **one** query against `Product` that returns a single row with four columns:
+
+- `TotalProducts` — all products;
+- `BlackProducts` — products with `Color = 'Crna'`;
+- `RedProducts` — products with `Color = 'Crvena'`;
+- `ProductsWithoutColor` — products whose `Color` is `NULL`.
+
+<details>
+<summary>Hint</summary>
+
+Combine `SUM()` with a `CASE` that returns `1` or `0`, as in Lab 0, Section 8.4. A missing color is checked with `IS NULL`: the condition `Color = NULL` is never true.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    COUNT(*) AS TotalProducts,
+    SUM(CASE WHEN Color = N'Crna' THEN 1 ELSE 0 END) AS BlackProducts,
+    SUM(CASE WHEN Color = N'Crvena' THEN 1 ELSE 0 END) AS RedProducts,
+    SUM(CASE WHEN Color IS NULL THEN 1 ELSE 0 END) AS ProductsWithoutColor
+FROM Product;
+GO
+```
+
+Result:
+
+| TotalProducts | BlackProducts | RedProducts | ProductsWithoutColor |
+|---:|---:|---:|---:|
+| 504 | 93 | 38 | 248 |
+
+With `WHEN Color = NULL`, the last column would be `0`, because a comparison with `NULL` is never true.
+
+</details>
+
+---
+
+## Exercise 12 — @@ROWCOUNT and SET NOCOUNT ON [INTERMEDIATE]
 
 Write a script that:
 
 1. Turns off row-count messages for the session.
-2. Updates `MinimumQuantityInStock` for the product with `IDProduct = 999`,
+2. Updates `MinimumQuantityInStock` for the product with `IDProduct = 99999`,
     increasing it by 1.
 3. Immediately saves the number of affected rows into a variable.
 4. Prints `'Rows updated: '` followed by that number.
@@ -445,7 +532,7 @@ SET NOCOUNT ON;
 
 UPDATE Product
 SET MinimumQuantityInStock = MinimumQuantityInStock + 1
-WHERE IDProduct = 999;
+WHERE IDProduct = 99999;
 
 DECLARE @RowsUpdated int = @@ROWCOUNT;
 
@@ -466,7 +553,7 @@ GO
 
 ---
 
-## Exercise 11 — TRY/CATCH [INTERMEDIATE]
+## Exercise 13 — TRY/CATCH [INTERMEDIATE]
 
 Write a script that:
 

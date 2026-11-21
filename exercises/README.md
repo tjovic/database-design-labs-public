@@ -14,8 +14,8 @@ Exercises are grouped by topic and arranged from introductory concepts to more i
 
 The T-SQL collection is in [T-SQL Essentials Exercises](lab00-tsql-essentials.md) and follows the learning goals in [Lab 00 – T-SQL Essentials](../labs/lab00-tsql-essentials.md):
 
-1. **Variables** — load values from a table and recognize the no-row and multi-row traps.
-2. **Table variables and control flow** — fill a table variable and use `IF / ELSE`, `WHILE`, and `CASE`.
+1. **Variables** — load values from a table, keep them within one batch, and recognize the no-row and multi-row traps.
+2. **Table variables and control flow** — fill a table variable and use `IF / ELSE`, `WHILE`, and `CASE`, including `CASE` inside aggregate functions.
 3. **Identity values** — capture `SCOPE_IDENTITY()` and use it for a related insert.
 4. **Row counts and errors** — use `@@ROWCOUNT` and a basic `TRY/CATCH` block.
 
@@ -23,17 +23,17 @@ The T-SQL collection is in [T-SQL Essentials Exercises](lab00-tsql-essentials.md
 
 The View collection is in [View Exercises](lab01-views.md) and follows the learning goals in [Lab 01 – Views](../labs/lab01-views.md):
 
-1. **View fundamentals** — create, change, and query Views, and hide a `JOIN` inside a View.
+1. **View fundamentals** — create, change, and query Views, hide a `JOIN` inside a View, and use an aggregate View in a query.
 2. **System Views** — read table and column metadata from `sys.tables` and `sys.columns`.
 3. **Modifying data through Views** — insert, update, and delete through a simple View, and recognize the restrictions of a `JOIN` View.
-4. **View options** — use `WITH CHECK OPTION` and `WITH SCHEMABINDING`.
+4. **View options** — use `WITH CHECK OPTION`, `WITH SCHEMABINDING`, and `WITH ENCRYPTION`.
 
 ### Triggers
 
 The trigger collection is in [Trigger Exercises](lab02-triggers.md) and follows the learning goals in [Lab 02 – Triggers](../labs/lab02-triggers.md):
 
-1. **Trigger fundamentals** — recognize DML events and create an `AFTER` trigger.
-2. **Auditing changes** — use `inserted` and `deleted` to record inserts, updates, or deletes.
+1. **Trigger fundamentals** — recognize DML events, create an `AFTER` trigger, and detect in one trigger whether an `INSERT`, `UPDATE`, or `DELETE` fired it.
+2. **Auditing changes** — use `inserted` and `deleted` to record inserts, updates, or deletes, classify changes with `CASE`, and check new rows against existing ones.
 3. **Multi-row operations** — write set-based trigger logic that handles every affected row.
 4. **Business rules** — validate related values and decide when a trigger is an appropriate tool.
 5. **Review and debugging** — inspect trigger behavior, identify common mistakes, and explain side effects.
@@ -48,10 +48,10 @@ The procedure collection is in [Stored Procedure Exercises](lab03-stored-procedu
 2. **Input parameters** — filter results using values supplied by the caller.
 3. **Returning information** — return result sets and use `OUTPUT` parameters, including finding a missing `OUTPUT` keyword.
 4. **Changing data** — insert a row and its missing parent row, using `SCOPE_IDENTITY()`.
-5. **Status values** — use `RETURN` to report a simple outcome to the caller.
+5. **Status values** — use `RETURN` to report which of several cases occurred, together with a value in an `OUTPUT` parameter.
 6. **Reusing a procedure** — call a validation procedure for every row in a `WHILE` loop.
 
-The exercises need no test data setup. Exercise 6 inserts a state and two cities, which the cleanup section removes; all other procedures only read data.
+The exercises need no test data setup. Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; the cleanup section removes them. All other procedures only read data.
 
 ### Functions
 
@@ -59,7 +59,7 @@ The function collection is in [Function Exercises](lab04-functions.md) and follo
 
 1. **Scalar calculations** — accept input and return one value.
 2. **Choosing a function type** — decide between a scalar function, an inline TVF, and a multi-statement TVF.
-3. **Data-reading functions** — calculate a value from existing rows and use it in a query.
+3. **Data-reading functions** — calculate or look up a value from existing rows, use it in a query, and change the function's behavior for missing values.
 4. **Inline table-valued functions** — return a table from one query and join it with other tables.
 5. **Multi-statement table-valued functions** — populate a returned table using variables and conditional logic, and compare them with inline TVFs.
 6. **Real-world calculations** — a payroll calculation split into two functions, and an OIB checksum.
@@ -83,9 +83,9 @@ Unlike Lab 07, which works on the real `AdventureWorksENG` catalog, these exerci
 The complex parameters collection is in [Complex Parameters Exercises](lab08-complex-parameters.md) and follows the learning goals in [Lab 08 – Complex Parameters](../labs/lab08-complex-parameters.md):
 
 1. **Delimited strings** — accept a comma-separated list, split it with `STRING_SPLIT`, and use it in an `IN` clause or `JOIN`.
-2. **XML shredding** — use `.nodes()` and `.value()` to turn XML into rows.
+2. **XML shredding** — use `.nodes()` and `.value()` to turn XML attributes and element text into rows, including a parent with its children.
 3. **Building XML** — use `FOR XML PATH` with slash-separated aliases to create nested XML structures from queries.
-4. **JSON** — use `OPENJSON` to insert rows from a JSON document.
+4. **JSON** — use `JSON_VALUE` and `OPENJSON` to insert a parent with its children and to delete by a list of IDs, and build JSON with `FOR JSON PATH`.
 5. **Table-Valued Parameters** — define a table type and pass typed rows to a procedure.
 6. **Choosing the right method** — reason about when to use delimited strings, XML, JSON, or TVPs.
 
@@ -123,8 +123,10 @@ The physical storage collection is in [Physical Storage Exercises](lab05-physica
 2. **Page boundaries on a medium table** — identify data vs. root pages, and confirm that a clustered key's value stays consecutive across a page boundary.
 3. **A larger table, two ways** — compare listing every page with `DBCC IND` against summarizing page counts with `sys.dm_db_partition_stats`, motivating why the latter scales to very large tables.
 4. **Pages and logical reads** — connect the page counts from the first three exercises to `STATISTICS IO`'s `logical reads`, showing it counts every page type touched, not just leaf data pages.
+5. **Finding one row** — count data and index pages, then use the root page to find which data page holds a given row and how long its record is.
+6. **Page math and `IndexLab`** — estimate page counts by calculation, compare logical and physical reads, and summarize a very large table.
 
-Like the index exercises, these intentionally use `AdventureWorksENG` instead of the large generated `IndexLab` database, so results are small enough to read in full while still showing real, non-trivial numbers.
+Part A intentionally uses `AdventureWorksENG`, so results are small enough to read in full while still showing real, non-trivial numbers. Part B uses the large `IndexLab` database from the lab.
 
 ### Indexes
 
@@ -136,9 +138,10 @@ The index collection is in [Index Exercises](lab06-indexes.md) and follows the l
 4. **Selectivity** — judge when a low-cardinality column is still a good index candidate, including covering a `GROUP BY` column.
 5. **Evaluating suggestions** — decide whether a "Missing Index" recommendation is worth creating, given indexes that already exist.
 6. **The same pattern, a different table** — repeat Exercise 1's staged `INCLUDE` walkthrough on `Invoice` instead of `Product`, then connect the result back to Exercise 5's missing-index suggestion.
-7. **Large-table practice (Exercises 7–10)** — design an index for a filtered, sorted query, and revisit column order, covering, and Missing Index suggestions on `IndexLab`.
+7. **Optimizing a query from start to finish** — drop existing nonclustered indexes, rewrite a non-SARGable condition, create a filtered covering index, and prove the improvement with `STATISTICS IO`.
+8. **Large-table practice (Exercises 8–11)** — design an index for a filtered, sorted query, and revisit column order, covering, and Missing Index suggestions on `IndexLab`.
 
-Part A (Exercises 1–6) intentionally uses `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Part B (Exercises 7–10) continues in Lab 06's large `IndexLab` database, where performance differences are obvious, and relies on the indexes the lab creates. Each exercise creates at most one real index on an existing table (see the database safety note below) rather than an isolated new object.
+Part A (Exercises 1–7) intentionally uses `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Part B (Exercises 8–11) continues in Lab 06's large `IndexLab` database, where performance differences are obvious, and relies on the indexes the lab creates. Each exercise creates at most one real index on an existing table (see the database safety note below) rather than an isolated new object.
 
 ### Advanced grouping
 

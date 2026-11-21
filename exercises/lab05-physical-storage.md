@@ -1,6 +1,6 @@
 # Lab 05 – Physical Storage Exercises
 
-These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md). **Part A** (Exercises 1–4) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 5–8) contains page calculations and two exercises on the lab's `IndexLab` database.
+These exercises build on [Lab 05 – Physical Storage](../labs/lab05-physical-storage.md). **Part A** (Exercises 1–5) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 6–9) contains page calculations and two exercises on the lab's `IndexLab` database.
 
 In Part A, `AdventureWorksENG` is much smaller than `IndexLab`, which is exactly the point: `State` has 3 rows, `Product` has 504, and `Customer` has 19,972. That range lets you see, on real tables of very different sizes, the same two questions Lab 05 asks about `Category`, `Product`, and `Customer`: how many pages does a table use, and what determines the physical order of rows on those pages?
 
@@ -210,11 +210,62 @@ Answer:
 
 ---
 
+## Exercise 5 — The `Invoice` table: index pages and one specific row [INTERMEDIATE]
+
+This exercise asks the questions you need when you have to find one particular row on disk.
+
+```sql
+DBCC IND('AdventureWorksENG', 'dbo.Invoice', -1);
+GO
+```
+
+Answer:
+
+1. How many data pages (`PageType = 1`) and how many index pages (`PageType = 2`) does `Invoice` use?
+2. What are the `IDInvoice` values of the first and the last row on the first data page, and how many rows does that page hold?
+3. Open the root page with `DBCC PAGE`. On which data page is the invoice with `IDInvoice = 60000`?
+4. Open that data page. What is the length of the record with `IDInvoice = 60000`?
+
+<details>
+<summary>Hint</summary>
+
+If a table has nonclustered indexes, their pages also appear in the `DBCC IND` output, with `IndexID` 2 or higher. Count only the rows with `IndexID = 1`. The root page has `PageType = 2` and the highest `IndexLevel`. Each of its rows points to one child page (`ChildPageId`) and holds the smallest key on that page, as in Lab 05, Section 14.3; the first row has `NULL` because it covers all smaller keys.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+1. **200** data pages and **1** index page, the root. `Invoice` has 31,465 rows; its clustered index has two levels: the root and the leaf data pages.
+2. On the first data page (`PagePID = 928` in the reference database): the first row has `IDInvoice = 43659`, the last `43816`, and the page holds **158** rows.
+3. Open the root page (`PagePID = 929` in the reference database):
+
+   ```sql
+   DBCC PAGE('AdventureWorksENG', 1, 929, 3);
+   GO
+   ```
+
+   Find the last row whose key is not greater than `60000`. The row with key `59933` points to child page **1032**; the next row starts at `60091`. So invoice `60000` is on page `1032`.
+4. Open the data page:
+
+   ```sql
+   DBCC PAGE('AdventureWorksENG', 1, 1032, 3) WITH TABLERESULTS;
+   GO
+   ```
+
+   Invoice `60000` is in slot `67`, and its record is **49 bytes** long (`Slot 67 Offset 0xd33 Length 49`).
+
+The root page lets you jump straight to the right data page instead of opening all 200 of them. This is the same path SQL Server takes when it seeks a row by its key.
+
+</details>
+
+---
+
 # Part B – Page math and `IndexLab`
 
-Exercises 5 and 6 are calculations; you need no database for them. Exercises 7 and 8 use the large `IndexLab` database from [Lab 05](../labs/lab05-physical-storage.md) and only read from it.
+Exercises 6 and 7 are calculations; you need no database for them. Exercises 8 and 9 use the large `IndexLab` database from [Lab 05](../labs/lab05-physical-storage.md) and only read from it.
 
-## Exercise 5 — Page math [BEGINNER]
+## Exercise 6 — Page math [BEGINNER]
 
 A table contains **2,000,000 rows** and fits **40 rows per page**.
 
@@ -233,7 +284,7 @@ A table contains **2,000,000 rows** and fits **40 rows per page**.
 
 ---
 
-## Exercise 6 — Predict the effect of wider rows [BEGINNER]
+## Exercise 7 — Predict the effect of wider rows [BEGINNER]
 
 A table contains **1,000,000 rows** and currently fits **16 rows per page**. After adding a populated variable-length column, it fits only **10 rows per page**.
 
@@ -254,7 +305,7 @@ A table contains **1,000,000 rows** and currently fits **16 rows per page**. Aft
 
 ---
 
-## Exercise 7 — Logical versus physical reads [BEGINNER]
+## Exercise 8 — Logical versus physical reads [BEGINNER]
 
 In SSMS, execute the following batch **once**. It runs the same query twice. Compare the two outputs in the **Messages** tab:
 
@@ -293,7 +344,7 @@ GO
 
 ---
 
-## Exercise 8 — Investigate `SalesOrder` without listing every page [INTERMEDIATE]
+## Exercise 9 — Investigate `SalesOrder` without listing every page [INTERMEDIATE]
 
 `SalesOrder` is much larger than the `IndexLab` tables inspected with `DBCC IND` in Lab 05. Producing an individual row for every allocated page could overwhelm the SSMS result window.
 

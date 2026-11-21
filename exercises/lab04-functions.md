@@ -1,8 +1,8 @@
 # Lab 04 – Function Exercises
 
-These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 12 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, inline table-valued functions (inline TVFs), and multi-statement table-valued functions (MSTVFs). Exercise 13 adds checksum validation using ISO 7064 MOD 11,10.
+These exercises build on [Lab 04 – Functions](../labs/lab04-functions.md) and use verified tables in `AdventureWorksENG`. Exercise 13 uses a separate fictional `PayrollLab` database. They cover scalar user-defined functions, inline table-valued functions (inline TVFs), and multi-statement table-valued functions (MSTVFs). Exercise 14 adds checksum validation using ISO 7064 MOD 11,10.
 
-The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–11 and 13 create only function definitions. Exercise 12 also creates a separate example database and two tables through its setup script; use the cleanup section when finished.
+The functions read existing data and do not modify application tables. The MSTVFs insert rows only into their local return tables. Exercises 1–12 and 14 create only function definitions. Exercise 13 also creates a separate example database and two tables through its setup script; use the cleanup section when finished.
 
 ## Exercise 1 — Classify a product price [BEGINNER]
 
@@ -260,7 +260,91 @@ The function is evaluated for every customer row. On a large table this can beco
 
 </details>
 
-## Exercise 6 — Customers by last-name prefix [INTERMEDIATE]
+## Exercise 6 — Look up a name, then change the function [INTERMEDIATE]
+
+Create a scalar function named `dbo.fn_Exercises_SalesmanName` that accepts `@IDSalesman int` and returns the salesman's first and last name, separated by a space, as `nvarchar(101)`.
+
+1. Call the function on its own for salesman `279`.
+2. Use it in a query that lists `IDInvoice`, `InvoiceNumber`, and the salesman name for the invoices of customers `1` and `705`.
+3. Some invoices have no salesman. Change the function so that it returns `No salesman` instead of `NULL`, and run the query again.
+4. Drop the function.
+
+<details>
+<summary>Hint</summary>
+
+Assign the name to a local variable with `SELECT @Name = FirstName + N' ' + LastName ...`. When `@IDSalesman` is `NULL` or matches no row, the variable stays `NULL`. To change the function, run its definition again with `CREATE OR ALTER FUNCTION`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_SalesmanName
+(
+    @IDSalesman int
+)
+RETURNS nvarchar(101)
+AS
+BEGIN
+    DECLARE @Name nvarchar(101);
+
+    SELECT @Name = FirstName + N' ' + LastName
+    FROM dbo.Salesman
+    WHERE IDSalesman = @IDSalesman;
+
+    RETURN @Name;
+END;
+GO
+
+-- 1. One salesman
+SELECT dbo.fn_Exercises_SalesmanName(279) AS SalesmanName;
+GO
+
+-- 2. Invoices of two customers
+SELECT
+    IDInvoice,
+    InvoiceNumber,
+    dbo.fn_Exercises_SalesmanName(SalesmanID) AS SalesmanName
+FROM dbo.Invoice
+WHERE CustomerID IN (1, 705)
+ORDER BY IDInvoice;
+GO
+```
+
+The first call returns `Hiraku Miyata`. In the query, the invoices of customer `1` show `Hiraku Miyata`, and invoice `SO53647` of customer `705` shows `NULL`: it has no salesman.
+
+Change the function:
+
+```sql
+CREATE OR ALTER FUNCTION dbo.fn_Exercises_SalesmanName
+(
+    @IDSalesman int
+)
+RETURNS nvarchar(101)
+AS
+BEGIN
+    DECLARE @Name nvarchar(101);
+
+    SELECT @Name = FirstName + N' ' + LastName
+    FROM dbo.Salesman
+    WHERE IDSalesman = @IDSalesman;
+
+    RETURN COALESCE(@Name, N'No salesman');
+END;
+GO
+```
+
+Running the query again shows `No salesman` for `SO53647`. The query itself did not change: every caller sees the new behavior.
+
+```sql
+DROP FUNCTION dbo.fn_Exercises_SalesmanName;
+GO
+```
+
+</details>
+
+## Exercise 7 — Customers by last-name prefix [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_CustomersByLastNamePrefix` that accepts `@Prefix nvarchar(50)` and returns `IDCustomer`, `FirstName`, and `LastName` of customers whose last name begins with the supplied prefix.
 
@@ -318,7 +402,7 @@ GO
 
 </details>
 
-## Exercise 7 — Invoices between two dates [INTERMEDIATE]
+## Exercise 8 — Invoices between two dates [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_InvoicesBetween` with two parameters, `@DateFrom date` and `@DateTo date`. Return the invoice number, invoice date, and the customer's first and last name for every invoice issued from `@DateFrom` to `@DateTo`, including both days.
 
@@ -366,7 +450,7 @@ The exclusive upper boundary includes the entire final day even if `InvoiceDate`
 
 </details>
 
-## Exercise 8 — Return a customer's invoices [INTERMEDIATE]
+## Exercise 9 — Return a customer's invoices [INTERMEDIATE]
 
 Create an inline TVF named `dbo.fn_Exercises_CustomerInvoices` with these input parameters:
 
@@ -436,7 +520,7 @@ The sample selects a customer with an invoice and uses a date range covering the
 
 </details>
 
-## Exercise 9 — Filter products by price [INTERMEDIATE]
+## Exercise 10 — Filter products by price [INTERMEDIATE]
 
 Create an MSTVF named `dbo.fn_Exercises_ProductsFilter` that accepts `@MinPrice money` and returns a table with the columns `Name nvarchar(50)` and `PriceWithoutVAT money`:
 
@@ -504,9 +588,9 @@ GO
 
 </details>
 
-## Exercise 10 — Inline vs multi-statement [INTERMEDIATE]
+## Exercise 11 — Inline vs multi-statement [INTERMEDIATE]
 
-Rewrite `dbo.fn_Exercises_InvoicesBetween` from Exercise 7 as a multi-statement TVF named `dbo.fn_Exercises_InvoicesBetween_Multi`.
+Rewrite `dbo.fn_Exercises_InvoicesBetween` from Exercise 8 as a multi-statement TVF named `dbo.fn_Exercises_InvoicesBetween_Multi`.
 
 Compare the two versions:
 
@@ -565,7 +649,7 @@ Both functions return the same rows. The **inline TVF** is the better choice her
 
 </details>
 
-## Exercise 11 — Filter products by quantity sold [ADVANCED]
+## Exercise 12 — Filter products by quantity sold [ADVANCED]
 
 Create an MSTVF named `dbo.fn_Exercises_ProductsByQuantitySold` that accepts `@MinimumQuantitySold int` and returns:
 
@@ -660,7 +744,7 @@ The `NULL` call includes every product. The second call returns products with at
 
 </details>
 
-## Exercise 12 — Extended net salary calculation [ADVANCED]
+## Exercise 13 — Extended net salary calculation [ADVANCED]
 
 Extend the simplified payroll example from Section 3 of [Lab 04](../labs/lab04-functions.md). This is a real-world-inspired calculation split into two scalar functions: one calculates a personal allowance, and the other uses that result to calculate net salary.
 
@@ -964,7 +1048,7 @@ USE AdventureWorksENG;
 GO
 ```
 
-## Exercise 13 — Validate an OIB checksum [ADVANCED]
+## Exercise 14 — Validate an OIB checksum [ADVANCED]
 
 An OIB is a Croatian personal identification number containing 11 digits. Its last digit checks the preceding ten using **ISO 7064 MOD 11,10**. This is a different checksum algorithm from Luhn.
 
@@ -1134,6 +1218,7 @@ DROP FUNCTION IF EXISTS dbo.fn_Exercises_PriceBand;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ShortName;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_ProductQuantitySold;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_LatestInvoiceDate;
+DROP FUNCTION IF EXISTS dbo.fn_Exercises_SalesmanName;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomersByLastNamePrefix;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_InvoicesBetween;
 DROP FUNCTION IF EXISTS dbo.fn_Exercises_CustomerInvoices;
@@ -1144,7 +1229,7 @@ DROP FUNCTION IF EXISTS dbo.fn_Exercises_IsValidOIB;
 GO
 ```
 
-For Exercise 12, run the following only if you created `PayrollLab`. Drop the main function before its helper. Keep the payroll tables for later practice.
+For Exercise 13, run the following only if you created `PayrollLab`. Drop the main function before its helper. Keep the payroll tables for later practice.
 
 ```sql
 USE PayrollLab;

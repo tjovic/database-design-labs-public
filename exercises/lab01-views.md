@@ -1,8 +1,8 @@
 # Lab 01 – View Exercises
 
-These exercises build on [Lab 01 – Views](../labs/lab01-views.md) and use `AdventureWorksENG`. **Part A** (Exercises 1–5) practises creating, changing, and querying Views and reading metadata from system Views. **Part B** (Exercises 6–9) modifies data through Views and uses `WITH CHECK OPTION` and `WITH SCHEMABINDING`.
+These exercises build on [Lab 01 – Views](../labs/lab01-views.md) and use `AdventureWorksENG`. **Part A** (Exercises 1–6) practises creating, changing, and querying Views, reading metadata from system Views, and using an aggregate View in a query. **Part B** (Exercises 7–11) modifies data through Views and uses `WITH CHECK OPTION`, `WITH SCHEMABINDING`, and `WITH ENCRYPTION`.
 
-Exercises 6 and 7 change data only temporarily or not at all. Exercise 8 inserts one test credit card, and Exercise 9 creates a small test table. The cleanup section removes them together with the Views.
+Exercises 7 and 8 change data only temporarily or not at all. Exercise 9 inserts one test credit card, and Exercise 10 creates a small test table. The cleanup section removes them together with the Views.
 
 ```sql
 USE AdventureWorksENG;
@@ -205,9 +205,91 @@ ORDER BY c.column_id;
 
 ---
 
+## Exercise 6 — An aggregate View in a query [INTERMEDIATE]
+
+1. Create `dbo.vCustomerInvoiceCount` that returns `CustomerID` and the number of invoices for each customer as `InvoiceCount`.
+2. Use the View in a query that returns `FirstName`, `LastName`, and `InvoiceCount` for the five customers with the most invoices. Join the View with `Customer`.
+3. Change the View with `ALTER VIEW` so that it also returns the date of each customer's last invoice as `LastInvoiceDate`.
+4. Try to change `InvoiceCount` through the View with `UPDATE`. What happens, and why?
+5. Remove the View with `DROP VIEW`.
+
+<details>
+<summary>Hint</summary>
+
+The View groups `Invoice` by `CustomerID`. The query treats the View like a table and joins it on `Customer.IDCustomer`. Lab 1, Section 6 explains why aggregate Views are not updatable.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER VIEW dbo.vCustomerInvoiceCount
+AS
+SELECT
+    CustomerID,
+    COUNT(*) AS InvoiceCount
+FROM Invoice
+GROUP BY CustomerID;
+GO
+
+SELECT TOP (5)
+    c.FirstName,
+    c.LastName,
+    v.InvoiceCount
+FROM dbo.vCustomerInvoiceCount AS v
+JOIN Customer AS c
+    ON c.IDCustomer = v.CustomerID
+ORDER BY v.InvoiceCount DESC, c.LastName, c.FirstName;
+GO
+```
+
+Result:
+
+| FirstName | LastName | InvoiceCount |
+|---|---|---:|
+| Dalton | Perez | 28 |
+| Mason | Roberts | 28 |
+| Fernando | Barnes | 27 |
+| Nancy | Chapman | 27 |
+| Daniel | Davis | 27 |
+
+Add the date of the last invoice:
+
+```sql
+ALTER VIEW dbo.vCustomerInvoiceCount
+AS
+SELECT
+    CustomerID,
+    COUNT(*) AS InvoiceCount,
+    MAX(InvoiceDate) AS LastInvoiceDate
+FROM Invoice
+GROUP BY CustomerID;
+GO
+```
+
+This update is rejected:
+
+```sql
+UPDATE dbo.vCustomerInvoiceCount
+SET InvoiceCount = 100
+WHERE CustomerID = 1;
+```
+
+`InvoiceCount` is calculated from many rows in `Invoice`; it is not stored in any base-table row, so SQL Server cannot change it.
+
+```sql
+DROP VIEW dbo.vCustomerInvoiceCount;
+GO
+```
+
+</details>
+
+---
+
 # Part B – Modifying data and View options
 
-## Exercise 6 — Modify data through a simple View [INTERMEDIATE]
+## Exercise 7 — Modify data through a simple View [INTERMEDIATE]
 
 Create `dbo.vCategories` that returns all columns from `Category`.
 
@@ -253,7 +335,7 @@ GO
 
 ---
 
-## Exercise 7 — JOIN View restrictions [INTERMEDIATE]
+## Exercise 8 — JOIN View restrictions [INTERMEDIATE]
 
 Create `dbo.vCustomerLocations` returning:
 
@@ -334,7 +416,7 @@ GO
 
 ---
 
-## Exercise 8 — WITH CHECK OPTION [ADVANCED]
+## Exercise 9 — WITH CHECK OPTION [ADVANCED]
 
 Create `dbo.vAcceptedCards` showing cards whose `Type` is `'Visa'` or `'MasterCard'`.
 
@@ -458,9 +540,9 @@ GO
 
 ---
 
-## Exercise 9 — SCHEMABINDING [ADVANCED]
+## Exercise 10 — SCHEMABINDING [ADVANCED]
 
-Create a temporary table with:
+Create a test table `dbo.SchemaExercise` with:
 
 - `ID`
 - `Name`
@@ -506,7 +588,12 @@ GO
 ALTER TABLE dbo.SchemaExercise
 DROP COLUMN Description;
 GO
+
+SELECT *
+FROM dbo.vSchemaExercise;
 ```
+
+The `ALTER TABLE` succeeds, but the query fails: the View still refers to the `Description` column, which no longer exists. The View breaks silently and the error appears only when someone uses it.
 
 Restore the column:
 
@@ -537,7 +624,80 @@ ALTER TABLE dbo.SchemaExercise
 DROP COLUMN Description;
 ```
 
+With `WITH SCHEMABINDING`, SQL Server protects the columns the View depends on: the table cannot be changed in a way that would break the View. Without it, the change succeeds and the View fails later.
+
 The cleanup section removes the View and the table.
+
+</details>
+
+---
+
+## Exercise 11 — WITH ENCRYPTION [INTERMEDIATE]
+
+1. Create `dbo.vProductsWithoutColor` that returns `IDProduct`, `Name`, and `ProductNumber` for products whose `Color` is `NULL`.
+2. Display the View definition with `sp_helptext`.
+3. Change the View so that its definition is hidden, and run `sp_helptext` again.
+4. Query the View. Does it still work?
+5. A month later, you need to add a column to the View. Where do you get its current definition?
+6. Drop the View.
+
+<details>
+<summary>Hint</summary>
+
+`WITH ENCRYPTION` goes before `AS`, as in Lab 1, Section 9.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER VIEW dbo.vProductsWithoutColor
+AS
+SELECT
+    IDProduct,
+    Name,
+    ProductNumber
+FROM Product
+WHERE Color IS NULL;
+GO
+
+EXECUTE sp_helptext 'dbo.vProductsWithoutColor';
+GO
+```
+
+Hide the definition:
+
+```sql
+CREATE OR ALTER VIEW dbo.vProductsWithoutColor
+WITH ENCRYPTION
+AS
+SELECT
+    IDProduct,
+    Name,
+    ProductNumber
+FROM Product
+WHERE Color IS NULL;
+GO
+
+EXECUTE sp_helptext 'dbo.vProductsWithoutColor';
+```
+
+`sp_helptext` now reports *"The text for object 'dbo.vProductsWithoutColor' is encrypted."*
+
+The View still works:
+
+```sql
+SELECT COUNT(*) AS ProductsWithoutColor
+FROM dbo.vProductsWithoutColor;
+```
+
+The database no longer shows the definition, so you need the original script, kept in version control. Change it there and run it again with `CREATE OR ALTER VIEW`.
+
+```sql
+DROP VIEW dbo.vProductsWithoutColor;
+GO
+```
 
 </details>
 
@@ -545,7 +705,7 @@ The cleanup section removes the View and the table.
 
 ## Cleanup
 
-Remove the Views, the test card from Exercise 8, and the test table from Exercise 9:
+Remove the Views, the test card from Exercise 9, and the test table from Exercise 10:
 
 ```sql
 DROP VIEW IF EXISTS dbo.vCustomers;
@@ -554,6 +714,8 @@ DROP VIEW IF EXISTS dbo.vCategories;
 DROP VIEW IF EXISTS dbo.vCustomerLocations;
 DROP VIEW IF EXISTS dbo.vAcceptedCards;
 DROP VIEW IF EXISTS dbo.vSchemaExercise;
+DROP VIEW IF EXISTS dbo.vCustomerInvoiceCount;
+DROP VIEW IF EXISTS dbo.vProductsWithoutColor;
 GO
 
 DELETE FROM dbo.CreditCard

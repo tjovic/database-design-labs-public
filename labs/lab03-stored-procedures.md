@@ -1435,7 +1435,7 @@ Also verify these cases:
 > A nonempty sequence containing only zeros also passes these rules and the Luhn checksum. This illustrates why a checksum alone cannot confirm that a payment card number is actually issued or usable.
 
 > [!TIP]
-> In [Exercise 8 of the Stored Procedure Exercises](../exercises/lab03-stored-procedures.md#exercise-8--validate-all-stored-card-numbers-advanced), you can reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
+> In [Exercise 9 of the Stored Procedure Exercises](../exercises/lab03-stored-procedures.md#exercise-9--validate-all-stored-card-numbers-advanced), you can reuse this procedure inside a `WHILE` loop to validate all card numbers stored in the `CreditCard` table.
 
 > [!TIP]
 > The additional reading in [Lab 4 – Functions](lab04-functions.md) shows how to move this Luhn calculation into a scalar function and reuse it from a procedure, a query, and a trigger.

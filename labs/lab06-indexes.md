@@ -2165,6 +2165,7 @@ Because it contains only `Review` rows, the filtered index is cheaper to store a
 >
 > - The optimizer uses a filtered index only when it can prove that the query's condition matches the filter. A query with `WHERE Status = 'Review'` qualifies. A query with `WHERE Status = @Status` usually does not, because the same plan must work for every possible parameter value.
 > - The filter must be a simple comparison on columns of the table (for example `=`, `<>`, `>`, `IN`, `IS NULL`, combined with `AND`).
+> - With an `IS NULL` filter, add the filter column to the index, for example with `INCLUDE`. Otherwise SQL Server may not use the index even when the query repeats the same condition.
 > - Creating a filtered index requires certain session settings, such as `QUOTED_IDENTIFIER ON`. SSMS uses the required settings by default.
 
 ### Check your understanding

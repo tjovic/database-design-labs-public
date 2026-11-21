@@ -1,8 +1,8 @@
 # Lab 03 – Stored Procedure Exercises
 
-These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, a `RETURN` status code, and reusing one procedure from another script.
+These exercises build on [Lab 03 – Stored Procedures](../labs/lab03-stored-procedures.md) and use the verified tables in `AdventureWorksENG`. They progress from a simple result set to input parameters, `OUTPUT` parameters, `RETURN` status codes for several cases, and reusing one procedure from another script.
 
-Exercise 6 inserts a state and two cities; all other exercises only read table data. The cleanup section removes the procedures and the rows inserted by Exercise 6.
+Exercise 6 inserts a state and two cities, and Exercise 7 inserts one test city; all other exercises only read table data. The cleanup section removes the procedures and these rows.
 
 ## Exercise 1 — List categories [BEGINNER]
 
@@ -363,7 +363,90 @@ The first call inserts `Canada` and `Toronto`. The second call finds `Canada` an
 
 </details>
 
-## Exercise 7 — Return a product, price, and status [ADVANCED]
+## Exercise 7 — Check a city and count its customers [INTERMEDIATE]
+
+Create `dbo.usp_Exercises_CityCustomerCount` with an input parameter `@IDCity int` and an output parameter `@CustomerCount int OUTPUT`.
+
+The procedure distinguishes three cases:
+
+| Case | `RETURN` | `@CustomerCount` |
+|---|---|---|
+| The city does not exist | `-1` | `NULL` |
+| The city exists but has no customers | `0` | `0` |
+| The city has customers | `1` | number of customers |
+
+Every city in the training database has customers, so first insert a test city without customers:
+
+```sql
+INSERT INTO dbo.City (Name, StateID)
+VALUES (N'Exercise Empty City', 1);
+```
+
+Test all three cases with three calls: city `1` (Zagreb), the test city, and city `-1`. After each call, display the return code and the output value.
+
+<details>
+<summary>Hint</summary>
+
+Check first whether the city exists with `IF NOT EXISTS (...)` and `RETURN -1`. Then count the customers into the output parameter and decide between `RETURN 0` and `RETURN 1`. The caller captures the status with `EXEC @ReturnCode = ...` and the count with `OUTPUT`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_Exercises_CityCustomerCount
+    @IDCity int,
+    @CustomerCount int OUTPUT
+AS
+BEGIN
+    SET @CustomerCount = NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.City WHERE IDCity = @IDCity)
+        RETURN -1;
+
+    SELECT @CustomerCount = COUNT(*)
+    FROM dbo.Customer
+    WHERE CityID = @IDCity;
+
+    IF @CustomerCount = 0
+        RETURN 0;
+
+    RETURN 1;
+END;
+GO
+
+DECLARE @ReturnCode int;
+DECLARE @CustomerCount int;
+DECLARE @EmptyCityID int =
+(
+    SELECT IDCity
+    FROM dbo.City
+    WHERE Name = N'Exercise Empty City'
+);
+
+EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+    @IDCity = 1,
+    @CustomerCount = @CustomerCount OUTPUT;
+SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
+
+EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+    @IDCity = @EmptyCityID,
+    @CustomerCount = @CustomerCount OUTPUT;
+SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
+
+EXEC @ReturnCode = dbo.usp_Exercises_CityCustomerCount
+    @IDCity = -1,
+    @CustomerCount = @CustomerCount OUTPUT;
+SELECT @ReturnCode AS ReturnCode, @CustomerCount AS CustomerCount;
+GO
+```
+
+The three calls return `1` and `1492`, `0` and `0`, and `-1` and `NULL`. The return code describes **which case** occurred; the output parameter carries the **value**.
+
+</details>
+
+## Exercise 8 — Return a product, price, and status [ADVANCED]
 
 Create `dbo.usp_Exercises_GetProduct` with an input parameter `@IDProduct int` and an output parameter `@Price money OUTPUT`.
 
@@ -373,7 +456,7 @@ The procedure should:
 - set `@Price` to the product's `PriceWithoutVAT`;
 - return status `0` when a product is found and `1` when no product matches.
 
-Test the successful lookup with product `782`. Do not modify any table data.
+Test it with product `782`, which exists, and with product `-1`, which does not. Do not modify any table data.
 
 <details>
 <summary>Hint</summary>
@@ -425,14 +508,22 @@ EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
 SELECT
     @ReturnCode AS ReturnCode,
     @Price AS Price;
+
+EXEC @ReturnCode = dbo.usp_Exercises_GetProduct
+    @IDProduct = -1,
+    @Price = @Price OUTPUT;
+
+SELECT
+    @ReturnCode AS ReturnCode,
+    @Price AS Price;
 GO
 ```
 
-The call returns the product row, its price, and status `0`. The return code is captured with `EXEC @ReturnCode = ...`; it is not returned as a result set.
+The first call returns the product row, its price `2294.99`, and status `0`. The second call returns no result set, `NULL` as the price, and status `1`. The return code is captured with `EXEC @ReturnCode = ...`; it is not returned as a result set.
 
 </details>
 
-## Exercise 8 — Validate all stored card numbers [ADVANCED]
+## Exercise 9 — Validate all stored card numbers [ADVANCED]
 
 This exercise reuses `dbo.usp_ValidateCardNumber` from [Section 7 of Lab 03](../labs/lab03-stored-procedures.md#section-7--practical-example-validating-a-card-number), which checks one card number. If the procedure does not exist in your database, create it first by running the `CREATE OR ALTER PROCEDURE` statement from that section.
 
@@ -552,7 +643,7 @@ This script calls a procedure once for each card. The additional reading in [Lab
 
 ## Cleanup
 
-Remove the procedures created for this collection. The last statements delete the cities and the state inserted by Exercise 6.
+Remove the procedures created for this collection. The last statements delete the test city from Exercise 7 and the cities and the state inserted by Exercise 6.
 
 ```sql
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_ListCategories;
@@ -562,7 +653,11 @@ DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProductColor;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CustomerInvoices;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_InsertCityInState;
 DROP PROCEDURE IF EXISTS dbo.usp_Exercises_GetProduct;
+DROP PROCEDURE IF EXISTS dbo.usp_Exercises_CityCustomerCount;
 GO
+
+DELETE FROM dbo.City
+WHERE Name = N'Exercise Empty City';
 
 DELETE FROM dbo.City
 WHERE StateID IN (SELECT IDState FROM dbo.State WHERE Name = N'Canada');

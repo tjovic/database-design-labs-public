@@ -239,7 +239,7 @@ GO
 ```
 
 > [!WARNING]
-This is convenient, but there are two important traps.
+> This is convenient, but there are two important traps.
 
 ### Trap 1 – No rows
 

@@ -1,6 +1,6 @@
 # Lab 06 – Index Exercises
 
-These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md). **Part A** (Exercises 1–6) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 7–10) uses the lab's large `IndexLab` database.
+These exercises build on [Lab 06 – Indexes](../labs/lab06-indexes.md). **Part A** (Exercises 1–7) uses `AdventureWorksENG` — the same database the midterm is written against. **Part B** (Exercises 8–11) uses the lab's large `IndexLab` database.
 
 For Part A, note that `AdventureWorksENG` is much smaller than `IndexLab` (hundreds to low tens-of-thousands of rows per table here, versus tens of millions there). That has one consequence worth stating up front:
 
@@ -446,9 +446,99 @@ ORDER BY Cnt DESC;
 
 ---
 
+## Exercise 7 — Optimize a query from start to finish [ADVANCED]
+
+This exercise combines the steps of a typical optimization task: remove the existing nonclustered indexes, measure, rewrite the condition, create an index, and prove the improvement.
+
+```sql
+SELECT IDInvoice, InvoiceNumber, InvoiceDate
+FROM Invoice
+WHERE YEAR(InvoiceDate) = 2003
+  AND MONTH(InvoiceDate) = 12
+  AND CreditCardID IS NULL;
+```
+
+1. Find all nonclustered indexes on `Invoice` and drop them. Earlier exercises created some.
+2. Run the query and record `logical reads`.
+3. Rewrite the date condition so that an index on `InvoiceDate` can be used.
+4. Only 1,131 of the 31,465 invoices have no credit card. Create the smallest index that answers the query.
+5. Run the rewritten query and compare `logical reads`.
+
+<details>
+<summary>Hint</summary>
+
+Nonclustered indexes have `index_id > 1` in `sys.indexes`. `YEAR(InvoiceDate)` hides the column inside a function; a range on the column itself does not (Lab 04, Section 7). A condition that every query repeats, such as `CreditCardID IS NULL`, can become the filter of a filtered index (Lab 06, Section 10.4).
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+**1. Remove the nonclustered indexes.**
+
+```sql
+SELECT name, index_id, type_desc
+FROM sys.indexes
+WHERE object_id = OBJECT_ID('dbo.Invoice')
+  AND index_id > 1;
+```
+
+Drop every index the query lists, for example:
+
+```sql
+DROP INDEX IF EXISTS IX_Exercises_Invoice_CustomerID_InvoiceDate ON Invoice;
+DROP INDEX IF EXISTS IX_Exercises_Invoice_InvoiceDate ON Invoice;
+GO
+```
+
+Do not drop `PK_Invoice`: it is the clustered index, the table itself.
+
+**2. Baseline.** The query returns 85 rows with **202** logical reads: a `Clustered Index Scan` of the whole table.
+
+**3. Rewrite the date condition.**
+
+```sql
+SELECT IDInvoice, InvoiceNumber, InvoiceDate
+FROM Invoice
+WHERE InvoiceDate >= '20031201'
+  AND InvoiceDate < '20040101'
+  AND CreditCardID IS NULL;
+```
+
+Without an index, this is still 202 logical reads. Rewriting alone does not help; it makes an index on `InvoiceDate` usable.
+
+**4. Create a filtered, covering index.**
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Exercises_Invoice_NoCard_InvoiceDate
+ON Invoice (InvoiceDate)
+INCLUDE (InvoiceNumber, CreditCardID)
+WHERE CreditCardID IS NULL;
+GO
+```
+
+- `InvoiceDate` is the key, because the range is on it.
+- `InvoiceNumber` is included, because the query returns it. `IDInvoice` is the clustering key and is already in every nonclustered index.
+- The filter keeps only the 1,131 invoices without a card, so the index has 8 pages instead of 202.
+- `CreditCardID` is included as well. With an `IS NULL` filter, SQL Server does not use the index unless the filter column is in it: without `CreditCardID` in `INCLUDE`, the plan stays at 202 logical reads. A filter with `IS NOT NULL` does not need this.
+
+**5. Compare.**
+
+| | Logical reads |
+|---|---:|
+| Original query, no index | 202 |
+| Original query, with the filtered index | 8 |
+| Rewritten query, with the filtered index | **4** |
+
+With the index, even the original query improves: SQL Server scans the whole small filtered index. Only the rewritten query can `Seek` directly to December 2003.
+
+</details>
+
+---
+
 # Part B – `IndexLab`
 
-Exercises 7–10 use the large `IndexLab` database from [Lab 06](../labs/lab06-indexes.md) instead of `AdventureWorksENG`. On a table with ten million rows, the effect of an index is easy to see in the execution plan and in `logical reads`.
+Exercises 8–11 use the large `IndexLab` database from [Lab 06](../labs/lab06-indexes.md) instead of `AdventureWorksENG`. On a table with ten million rows, the effect of an index is easy to see in the execution plan and in `logical reads`.
 
 > [!IMPORTANT]
 > Do these exercises after Lab 06, in the same `IndexLab` database. They rely on the indexes the lab creates: `IX_SalesOrder_CustomerId_OrderDate`, `IX_SalesOrder_Status`, `IX_SalesOrder_Review_OrderDate`, and `IX_SalesOrderItem_SalesOrderId`.
@@ -460,7 +550,7 @@ USE IndexLab;
 GO
 ```
 
-## Exercise 7 — Index for a filtered, sorted query [INTERMEDIATE]
+## Exercise 8 — Index for a filtered, sorted query [INTERMEDIATE]
 
 Run this query before creating a new index:
 
@@ -492,7 +582,7 @@ GO
 
 `Status` is the leading key because of the equality filter. `OrderDate` follows it, so within one status the entries are already in date order and no `Sort` is needed. `CustomerId` and `TotalAmount` are included to cover the selected data. `SalesOrderId` is already available as the clustered key.
 
-Declaring `OrderDate DESC` matches the requested order, but it is not required: SQL Server can read an ascending index backward just as well (Exercise 10 relies on exactly this). The direction of a key column matters when `ORDER BY` mixes directions, for example `ORDER BY Status ASC, OrderDate DESC` without an equality filter on `Status`.
+Declaring `OrderDate DESC` matches the requested order, but it is not required: SQL Server can read an ascending index backward just as well (Exercise 11 relies on exactly this). The direction of a key column matters when `ORDER BY` mixes directions, for example `ORDER BY Status ASC, OrderDate DESC` without an equality filter on `Status`.
 
 Reference results:
 
@@ -506,7 +596,7 @@ Reference results:
 
 ---
 
-## Exercise 8 — Composite index column order [INTERMEDIATE]
+## Exercise 9 — Composite index column order [INTERMEDIATE]
 
 Lab 06 created `IX_SalesOrder_CustomerId_OrderDate` on `(CustomerId, OrderDate)`. For each query below, predict whether the index supports a seek on both key columns, a seek on the leading column, or no efficient seek on the search condition. Verify your prediction in the plan.
 
@@ -539,7 +629,7 @@ For Queries B and C, `SELECT *` requires a Key Lookup for every matching order. 
 
 ---
 
-## Exercise 9 — Covering index design [BEGINNER]
+## Exercise 10 — Covering index design [BEGINNER]
 
 Write and analyze a query that returns `ProductId`, `Quantity`, and `UnitPrice` for one `SalesOrderId`:
 
@@ -560,7 +650,7 @@ The existing `IX_SalesOrderItem_SalesOrderId` index with `INCLUDE (ProductId, Qu
 
 ---
 
-## Exercise 10 — Evaluate a Missing Index suggestion [ADVANCED]
+## Exercise 11 — Evaluate a Missing Index suggestion [ADVANCED]
 
 Run the following query with Actual Execution Plan enabled:
 
@@ -573,7 +663,7 @@ ORDER BY OrderDate;
 
 If a Missing Index suggestion appears above the plan, look at it carefully before creating anything, and consider:
 
-1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from [Section 10.2](../labs/lab06-indexes.md#102-selectivity-and-statistics), the filtered index `IX_SalesOrder_Review_OrderDate` from [Section 10.4](../labs/lab06-indexes.md#104-filtered-indexes), and `IX_Exercises_SalesOrder_Status_OrderDate` if you completed Exercise 7?
+1. Which relevant indexes already exist, including `IX_SalesOrder_Status` from [Section 10.2](../labs/lab06-indexes.md#102-selectivity-and-statistics), the filtered index `IX_SalesOrder_Review_OrderDate` from [Section 10.4](../labs/lab06-indexes.md#104-filtered-indexes), and `IX_Exercises_SalesOrder_Status_OrderDate` if you completed Exercise 8?
 2. Can an existing index support both the filter and the requested sort order?
 3. Does the suggested index support both of them?
 4. Is it better to create the suggested index, replace an overlapping index, or do nothing?
@@ -583,9 +673,9 @@ If a Missing Index suggestion appears above the plan, look at it carefully befor
 
 **The filtered index is not used.** `IX_SalesOrder_Review_OrderDate` contains only `Review` orders, so it cannot answer a query for `Cancelled` orders (see the limitations in [Section 10.4](../labs/lab06-indexes.md#104-filtered-indexes)).
 
-**If you completed Exercise 7**, no suggestion appears. `IX_Exercises_SalesOrder_Status_OrderDate` already covers the query: with `Status` fixed by the equality condition, SQL Server reads the `Cancelled` part of the index backward (`Index Seek` with `ORDERED BACKWARD` in the plan properties) and returns the rows in ascending date order without a `Sort`. The reference run needed 3,751 logical reads. No new index is needed.
+**If you completed Exercise 8**, no suggestion appears. `IX_Exercises_SalesOrder_Status_OrderDate` already covers the query: with `Status` fixed by the equality condition, SQL Server reads the `Cancelled` part of the index backward (`Index Seek` with `ORDERED BACKWARD` in the plan properties) and returns the rows in ascending date order without a `Sort`. The reference run needed 3,751 logical reads. No new index is needed.
 
-**If you skipped Exercise 7**, the reference plan uses a `Clustered Index Scan` followed by a `Sort` (57,266 logical reads), and SQL Server suggests an index similar to:
+**If you skipped Exercise 8**, the reference plan uses a `Clustered Index Scan` followed by a `Sort` (57,266 logical reads), and SQL Server suggests an index similar to:
 
 ```sql
 -- Missing Index suggestion (estimated impact about 41%)
@@ -613,12 +703,13 @@ DROP INDEX IF EXISTS IX_Exercises_Invoice_CustomerID_InvoiceDate ON Invoice;
 DROP INDEX IF EXISTS IX_Exercises_InvoiceItem_InvoiceID ON InvoiceItem;
 DROP INDEX IF EXISTS IX_Exercises_Product_Color ON Product;
 DROP INDEX IF EXISTS IX_Exercises_Invoice_InvoiceDate ON Invoice;
+DROP INDEX IF EXISTS IX_Exercises_Invoice_NoCard_InvoiceDate ON Invoice;
 GO
 ```
 
 If you created the index suggested in Exercise 5, drop it the same way using the name you gave it.
 
-For Part B, remove the index created in Exercise 7 from `IndexLab`. The indexes created by Lab 06 itself stay in place:
+For Part B, remove the index created in Exercise 8 from `IndexLab`. The indexes created by Lab 06 itself stay in place:
 
 ```sql
 USE IndexLab;

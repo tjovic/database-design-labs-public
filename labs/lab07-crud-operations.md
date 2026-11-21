@@ -43,9 +43,6 @@ USE AdventureWorksENG;
 GO
 ```
 
-> [!NOTE]
-> **Prerequisites:** This lab builds directly on [Lab 3 – Stored Procedures](lab03-stored-procedures.md) (input parameters, `OUTPUT` parameters, `RETURN`, `CREATE OR ALTER`) and on `@@ROWCOUNT` and the basic `TRY/CATCH` block from [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md). It also uses the inline table-valued function syntax from [Lab 4 – Functions](lab04-functions.md). None of these topics are re-explained in depth here — only applied.
-
 ---
 
 # Section 1 – What CRUD Means

@@ -22,9 +22,6 @@ After completing this lab, you should be able to:
 - explain why `LAST_VALUE` needs an explicit frame, and write that frame correctly;
 - choose between `ROWS` and `RANGE` framing, and write the four most common frame idioms.
 
-> [!NOTE]
-> **Prerequisites:** comfort with `SELECT`, `JOIN`, `GROUP BY`, and the aggregate functions. [Lab 11 – Advanced Grouping](lab11-advanced-grouping.md) is not required, but the two labs pair naturally — both are about asking richer questions of data already in the database. No stored procedures, functions, or triggers are used here; almost every query is a plain `SELECT` with one extra clause, `OVER (...)`.
-
 ---
 
 # Section 1 – The Anatomy of a Window Function

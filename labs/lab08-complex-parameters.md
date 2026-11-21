@@ -27,15 +27,6 @@ After completing this lab, you should be able to:
 
 ---
 
-> [!NOTE]
-> **Prerequisites:** This lab assumes familiarity with:
->
-> - **Stored procedures (Lab 3)** — how to create them, what `EXEC` does, what parameters are.
-> - **Functions (Lab 4)** — scalar and table-valued functions.
-> - **T-SQL programming (Lab 0)** — variables (Section 2), `IF/BEGIN/END` (Section 4), `WHILE` loops (Section 7), and inline type conversion (Section 6).
->
-> XML and JSON formats are introduced inline as needed.
-
 ---
 
 > [!NOTE]

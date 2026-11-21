@@ -27,9 +27,6 @@ After completing this lab, you should be able to:
 - explain MVCC as an alternative to locking, and enable `READ_COMMITTED_SNAPSHOT`.
 
 > [!NOTE]
-> **Prerequisites:** [Lab 9 – Transactions](lab09-transactions.md) — explicit transactions, `@@TRANCOUNT`, and the `TransactionsLab` database this lab continues to use. [Lab 5 – Physical Storage](lab05-physical-storage.md) is useful background for lock granularity (pages, the buffer pool).
-
-> [!NOTE]
 > This lab needs **two SSMS query windows** connected to the same server and the same `TransactionsLab` database — open a second window with `Ctrl+N` (or File → New Query) before starting Part C. Label the tabs **Session A** and **Session B** (right-click a tab → Rename Tab) so you don't lose track of which window runs which step. Every demo below says exactly which session runs which block.
 
 ---

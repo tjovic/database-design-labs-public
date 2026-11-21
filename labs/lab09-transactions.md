@@ -25,15 +25,13 @@ After completing this lab, you should be able to:
 - explain, at a conceptual level, how write-ahead logging, checkpoints, and UNDO/REDO let SQL Server keep its promises after a crash.
 
 > [!NOTE]
-> **Suggested route for a 90-minute lab:** Part A (Sections 1–2) and Part B (Sections 3–5) are the core, followed by Exercises 6 and 9 of the [Transaction Exercises](../exercises/lab09-transactions.md). Part C (Sections 6–10) goes deeper — savepoints, nesting, transaction ownership, and the transaction log — for instructor demonstration or self-study.
-
-**Prerequisites:** [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), [Lab 3 – Stored Procedures](lab03-stored-procedures.md), [Lab 7 – CRUD Operations](lab07-crud-operations.md), and [Lab 8 – Complex Parameters](lab08-complex-parameters.md) — variables, `IF`, `@@ROWCOUNT`, procedure parameters, and basic `TRY/CATCH`. This lab uses **one SSMS query window**; concurrency and two-session demonstrations are covered in **Lab 10**.
+> **Suggested route for a 90-minute lab:** Part A (Sections 1–2) and Part B (Sections 3–5) are the core, followed by Exercises 9 and 12 of the [Transaction Exercises](../exercises/lab09-transactions.md). Part C (Sections 6–10) goes deeper — savepoints, nesting, transaction ownership, and the transaction log — for instructor demonstration or self-study.
 
 ---
 
 ## Before you start
 
-Run examples **section by section** — some deliberately produce errors. This lab runs in its own dedicated database, `TransactionsLab`, separate from `AdventureWorksENG` (the same pattern as the `IndexLab` and `PayrollLab` databases in other labs). All account names and balances are fictional.
+Run examples **section by section** — some deliberately produce errors. This lab uses **one SSMS query window**; demonstrations with two sessions follow in Lab 10. This lab runs in its own dedicated database, `TransactionsLab`, separate from `AdventureWorksENG` (the same pattern as the `IndexLab` and `PayrollLab` databases in other labs). All account names and balances are fictional.
 
 ```sql
 USE master;

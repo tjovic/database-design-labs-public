@@ -22,9 +22,6 @@ After completing this lab, you should be able to:
 - rewrite any `ROLLUP` or `CUBE` as an equivalent `GROUPING SETS` list;
 - use `GROUPING()` to tell a "this column was rolled away" `NULL` apart from a real data `NULL`, and build a readable report label from it.
 
-> [!NOTE]
-> **Prerequisites:** comfort with `SELECT`, `JOIN`, `WHERE`, `ORDER BY`, `GROUP BY`, and the aggregate functions `SUM`, `COUNT`, `AVG`, `MIN`, `MAX`. No stored procedures, functions, or triggers are used in this lab — every example is a plain `SELECT`.
-
 ---
 
 # Section 1 – The Grand Total Idiom

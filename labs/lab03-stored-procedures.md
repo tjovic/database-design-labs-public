@@ -28,9 +28,6 @@ USE AdventureWorksENG;
 GO
 ```
 
-> [!NOTE]
-> **Prerequisites:** This lab assumes that you are already familiar with batches and `GO`, variables, `IF / ELSE`, `SCOPE_IDENTITY()`, and basic `CAST` expressions from Lab 00.
-
 ---
 
 # Section 1 – What is a Stored Procedure?

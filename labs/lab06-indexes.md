@@ -25,8 +25,8 @@ By the end of this lab, you should be able to:
 - design useful nonclustered, composite, and covering indexes;
 - explain selectivity, index maintenance, and the cost of additional indexes.
 
-> [!NOTE]
-> **Prerequisite:** Complete Lab 05 (Physical Storage) and create the `IndexLab` database as described in [Lab 05, Section 2](lab05-physical-storage.md#2-create-the-indexlab-database), using the [IndexLab setup script](setup/index-lab-data-setup.md), before starting the SQL exercises below. This lab assumes the reference data and table names from that script.
+> [!IMPORTANT]
+> Before starting the SQL examples, create the `IndexLab` database as described in [Lab 05, Section 2](lab05-physical-storage.md#2-create-the-indexlab-database), using the [IndexLab setup script](setup/index-lab-data-setup.md). This lab uses the reference data and table names from that script.
 
 ---
 

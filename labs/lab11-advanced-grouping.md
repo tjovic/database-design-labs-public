@@ -386,7 +386,9 @@ The following topic extends the lab. It is not required for the exercises.
 
 `GROUPING(col)` reports whether one column was rolled away. `GROUPING_ID(col1, col2, ...)` packs the same information for *several* columns into a single integer bitmask — useful for filtering a multi-column `ROLLUP`/`CUBE` result down to one specific grouping level (e.g. "only the rows where exactly columns 1 and 3 were rolled away") without writing a `GROUPING()` call per column. See [GROUPING_ID (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/grouping-id-transact-sql).
 
-## B. References
+---
+
+# References
 
 - [GROUP BY (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-group-by-transact-sql)
 - [ROLLUP, CUBE, GROUPING SETS — Using GROUP BY with ROLLUP, CUBE, and GROUPING SETS](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-group-by-transact-sql#using-group-by-with-rollup-cube-or-grouping-sets)

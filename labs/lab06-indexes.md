@@ -2,6 +2,9 @@
 
 **Database:** `IndexLab`
 
+> [!IMPORTANT]
+> **Core idea:** An index is a sorted copy of selected columns that lets SQL Server read only the pages it needs instead of scanning the whole table.
+
 ## Learning objectives
 
 By the end of this lab, you should be able to:

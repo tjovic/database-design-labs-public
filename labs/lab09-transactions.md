@@ -2057,7 +2057,9 @@ Avoid leaving a transaction open while waiting for a user, displaying a confirma
 
 The main procedure validates simple parameter rules before opening its transaction. Database-dependent checks need more care because other sessions can change the data; Lab 10 develops that topic.
 
-## D. References
+---
+
+# References
 
 - [Database checkpoints](https://learn.microsoft.com/en-us/sql/relational-databases/logs/database-checkpoints-sql-server)
 - [Restore and recovery overview](https://learn.microsoft.com/en-us/sql/relational-databases/backup-restore/restore-and-recovery-overview-sql-server)

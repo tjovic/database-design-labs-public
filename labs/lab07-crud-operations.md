@@ -10,6 +10,9 @@ Rather than introducing new T-SQL syntax, the focus is on **combining existing k
 
 Several examples insert, change, or delete rows. The expected results, including generated IDs, assume a freshly restored `AdventureWorksENG`.
 
+> [!IMPORTANT]
+> **Core idea:** A CRUD procedure must tell its caller what happened: the change succeeded, the record was missing, the operation was rejected, or an error occurred.
+
 ---
 
 ## Learning objectives

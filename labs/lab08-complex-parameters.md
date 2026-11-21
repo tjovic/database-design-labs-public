@@ -27,8 +27,6 @@ After completing this lab, you should be able to:
 
 ---
 
----
-
 > [!NOTE]
 > Run each insert example once, except where an exercise explicitly asks you to repeat a call. Repeating an insert may create duplicate rows or fail if a unique constraint prevents duplicates.
 

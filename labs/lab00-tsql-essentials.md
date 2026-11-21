@@ -16,11 +16,8 @@ used throughout the course:
 9. `SET NOCOUNT ON` and `@@ROWCOUNT`
 10. Basic error handling with `TRY/CATCH`
 
-These concepts are prerequisites for **Triggers (Lab 2)**, **Stored
-Procedures (Lab 3)**, **Functions (Lab 4)**, and **CRUD Operations
-(Lab 7)**.\
-**Lab 9 – Transactions** goes deeper into `TRY/CATCH` and introduces
-`THROW`.
+> [!IMPORTANT]
+> **Core idea:** A T-SQL script can remember values, make decisions, repeat work, and react to errors. These are the building blocks of every trigger, procedure, and function that follows.
 
 ## Learning objectives
 

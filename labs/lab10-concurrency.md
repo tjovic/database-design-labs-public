@@ -837,7 +837,9 @@ These are two different settings that are easy to confuse:
 
 Enabling `ALLOW_SNAPSHOT_ISOLATION` (Section 9.2) only makes the `SNAPSHOT` level *available* to request; it does not change the default. `READ_COMMITTED_SNAPSHOT` changes the default directly. A database can have either, both, or neither enabled.
 
-## C. References
+---
+
+# References
 
 - [Transaction Locking and Row Versioning Guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide)
 - [SET TRANSACTION ISOLATION LEVEL](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql)

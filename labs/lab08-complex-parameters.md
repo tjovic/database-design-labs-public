@@ -784,8 +784,8 @@ Result:
 **The XML document has been converted into relational rows and columns.**
 
 1. `.nodes('/Customers/Customer')` creates one row for each customer.
-2. In each row, `tbl.col` is the XML of that customer.
-3. `tbl.col.value('@FirstName', 'nvarchar(50)')` takes that XML, reads its `FirstName` attribute, and converts it to `nvarchar(50)`.
+2. In each row, `tbl.col` points to that customer's element.
+3. `tbl.col.value('@FirstName', 'nvarchar(50)')` reads the `FirstName` attribute of that element and converts it to `nvarchar(50)`.
 
 This process is sometimes called **XML shredding**.
 
@@ -1601,7 +1601,7 @@ This is the JSON counterpart of `FOR XML PATH`: JSON uses dots where XML uses sl
 |---|---|
 | Widely used by web applications and REST APIs | JSON input must be parsed |
 | Supports objects, arrays, and nested structures | Data types are checked during extraction and conversion |
-| No predefined type is required | Missing properties may produce `NULL` |
+| No predefined type is required | Missing or misspelled properties (names are case-sensitive) return `NULL` without an error |
 | Can represent complex data in one parameter | Additional validation may be required |
 | Supports both input and output | Large JSON documents introduce parsing overhead |
 
@@ -2125,4 +2125,4 @@ These questions connect the whole lab. Questions about individual methods are at
 
 ## Additional practice
 
-Exercises for this lab are in [Complex Parameters Exercises](../exercises/lab08-complex-parameters.md), grouped by method: delimited strings, XML, `FOR XML PATH`, Table-Valued Parameters, and JSON.
+Exercises for this lab are in [Complex Parameters Exercises](../exercises/lab08-complex-parameters.md), grouped by method: delimited strings, XML, `FOR XML PATH`, JSON, and Table-Valued Parameters.

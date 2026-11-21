@@ -164,8 +164,6 @@ flowchart TB
     end
 ```
 
-*Diagram 1 – `ROLLUP` drops one column at a time along a single path. `CUBE` branches into every combination before converging back on the grand total.*
-
 ## 3.2 Demo: the same query, every combination
 
 ```sql

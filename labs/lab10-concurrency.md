@@ -532,7 +532,7 @@ flowchart LR
     E --> S["Shrinking phase\nall locks released\ntogether"]
 ```
 
-*Diagram 1 – Two-phase locking: once a transaction starts releasing locks, it acquires no more. SQL Server collapses the shrinking phase into a single instant at `COMMIT`/`ROLLBACK`.*
+Once a transaction starts releasing locks, it acquires no more. SQL Server collapses the shrinking phase into a single instant at `COMMIT`/`ROLLBACK`.
 
 > [!IMPORTANT]
 > This is why every demo in Part C had you commit or roll back before the blocked session could proceed — SQL Server does not release a lock early just because a transaction's later statements are read-only. The lock lives exactly as long as the transaction does.
@@ -665,7 +665,7 @@ flowchart LR
     R2["Reader started at T=250"] -.sees.-> V2
 ```
 
-*Diagram 2 – Each reader is handed the version that existed when its own transaction began. No reader ever waits for a writer, and no writer ever waits for a reader.*
+Each reader is handed the version that existed when its own transaction began. No reader ever waits for a writer, and no writer ever waits for a reader.
 
 > [!NOTE]
 > Writers still block other writers — eventually only one new version can win. MVCC changes read behavior; it does not remove write conflicts.

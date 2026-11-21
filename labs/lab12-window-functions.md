@@ -82,8 +82,6 @@ flowchart LR
     E --> F["ORDER BY\norder the final result"]
 ```
 
-*Diagram 1 – Window functions run inside the `SELECT`, after `JOIN`/`WHERE`/`GROUP BY` have already shaped the rows, and before the outer `ORDER BY` reorders the result.*
-
 If a query has a `GROUP BY`, the window function sees the **aggregated** rows, not the original table — usually not what you want, since the whole point of a window function is to keep individual rows. Most window-function queries have no `GROUP BY` at all.
 
 ## 1.4 Check your understanding

@@ -199,7 +199,7 @@ flowchart TD
     class E4 right
 ```
 
-*Diagram 1 – The same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green: committed. Red: failed. The bordered box is the final state: wrong (red) or correct (green).*
+The diagram shows the same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green means committed and red means failed. The bordered box is the final state: wrong (red) or correct (green).
 
 | Mode | Transaction boundary | Typical use |
 |---|---|---|
@@ -499,7 +499,7 @@ flowchart TD
     class RB failed
 ```
 
-*Diagram 2 – Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.*
+Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
@@ -865,7 +865,7 @@ flowchart TD
     class X failed
 ```
 
-*Diagram 3 – `usp_TransferFunds`. The parameter checks need no database data, so they run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.*
+The parameter checks in `usp_TransferFunds` need no database data, so they run before the transaction starts. Inside the transaction, every failure (including any SQL error, such as a constraint violation) leads to the same place: a full rollback and an error for the caller.
 
 ## 5.3 Test a successful transfer
 
@@ -979,7 +979,7 @@ flowchart LR
     end
 ```
 
-*Diagram 4 – Three transfers and two savepoints in one transaction. Rolling back to `AfterFirstTransfer` also discards the later savepoint `AfterSecondTransfer` (6.4). A full rollback ignores savepoints (6.3).*
+Rolling back to `AfterFirstTransfer` also discards the later savepoint `AfterSecondTransfer` (6.4). A full rollback ignores savepoints (6.3).
 
 ## 6.1 Create a savepoint
 
@@ -1515,7 +1515,7 @@ sequenceDiagram
     end
 ```
 
-*Diagram 5 – One transaction shared by a caller and a procedure. Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.*
+Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.
 
 Reset the balances:
 
@@ -1648,7 +1648,7 @@ flowchart TB
     LF -.->|"Required log records must be durable first"| DF
 ```
 
-*Diagram 6 – Two memory buffers and two file roles. The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.*
+The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.
 
 | Component | Location | Purpose |
 |---|---|---|
@@ -1738,7 +1738,7 @@ flowchart TD
     COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
 ```
 
-*Diagram 7 – WAL constrains page writes; fully durable commit also requires the commit record to be durable.*
+WAL constrains page writes; a fully durable commit also requires the commit record to be durable.
 
 ## 10.4 ROLLBACK and UNDO: restore the previous values
 
@@ -1784,8 +1784,6 @@ flowchart TD
     KEEP --> RESULT["Recovered balances: A = 800; B = 700"]
     REDO --> RESULT
 ```
-
-*Diagram 8 – A conceptual recovery decision for this committed transfer.*
 
 The recovered result must preserve the confirmed transfer:
 
@@ -1860,7 +1858,7 @@ gantt
     T5 - ACTIVE at crash :active, t5, 09:06, 4m
 ```
 
-*Diagram 9 – The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.*
+The clock times are illustrative. T3 and T5 end at the crash boundary because execution stops, not because they commit.
 
 **Questions**
 

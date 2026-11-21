@@ -226,7 +226,7 @@ In Section 1, the user selected products `1`, `2`, and `3`. One possible solutio
 
 ## 2.1 Building SQL in Application Code
 
-Consider the following Python example:
+Consider the following application code. It is written in Python, but only as an example: an application in C# or Java builds SQL text the same way. You do not run this code in SSMS.
 
 ```python
 product_ids = [1, 2, 3]
@@ -291,7 +291,7 @@ WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
 2. `OR 1=1` adds a condition that is always true.
 3. `--` starts a comment, so SQL Server ignores the closing quote added by the application.
 
-The query returns **all customers**. The user has changed the meaning of the SQL statement without changing the application code.
+Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
 
 ### The solution – Parameterized queries
 
@@ -306,6 +306,8 @@ cursor.execute(sql, (first_name, last_name))
 The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
 
 Do not put quotes around the `?` placeholders: the database driver handles parameter values.
+
+The placeholder depends on the driver: Python's `pyodbc` uses `?`, while .NET uses named parameters such as `@LastName`. The idea is the same in every language: the SQL text and the values are sent separately.
 
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.

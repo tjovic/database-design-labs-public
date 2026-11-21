@@ -1172,31 +1172,36 @@ The square brackets `[]` represent an array, while curly brackets `{}` represent
 
 In this example, the array contains two customer objects.
 
-In SQL Server 2016–2022, JSON is typically stored and passed as `nvarchar(max)`. The JSON functions in this lab work from SQL Server 2016, with database compatibility level 130 or higher.
+Unlike XML, JSON had no data type of its own before SQL Server 2025, so it is stored and passed as `nvarchar(max)`. The examples in this lab use `nvarchar(max)`; the JSON functions work from SQL Server 2016, with database compatibility level 130 or higher.
+
+> [!NOTE]
+> SQL Server 2025 adds a native `json` data type. A `json` variable or column checks the document when the value is assigned, so `DECLARE @Json json = N'{"a": 1';` fails immediately. An `nvarchar(max)` variable accepts any text, and a malformed document is not always detected later: `JSON_VALUE` may still return a value from it. `JSON_VALUE`, `OPENJSON`, and the other functions in this lab work with both types.
 
 ## 5.2 Reading a Single Value – JSON_VALUE
 
-Let's start with a simple JSON object.
+Let's start with a JSON object. Its `Address` property is itself an object with one property, `City`.
 
 ```sql
 DECLARE @Customer nvarchar(max) = N'
 {
     "FirstName": "Alice",
     "LastName": "Anderson",
-    "Email": "alice@example.com"
+    "Email": "alice@example.com",
+    "Address": { "City": "Zagreb" }
 }';
 
 SELECT
     JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
     JSON_VALUE(@Customer, '$.LastName') AS LastName,
-    JSON_VALUE(@Customer, '$.Email') AS Email;
+    JSON_VALUE(@Customer, '$.Email') AS Email,
+    JSON_VALUE(@Customer, '$.Address.City') AS City; -- a property inside a nested object
 ```
 
 Result:
 
-| FirstName | LastName | Email |
-|---|---|---|
-| Alice | Anderson | alice@example.com |
+| FirstName | LastName | Email | City |
+|---|---|---|---|
+| Alice | Anderson | alice@example.com | Zagreb |
 
 The `JSON_VALUE` function extracts a single scalar value from a JSON document.
 

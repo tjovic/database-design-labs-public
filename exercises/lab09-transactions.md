@@ -2,7 +2,7 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–7) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 8–13) continues in the lab's own `TransactionsLab` database.
+These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–8) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 9–14) continues in the lab's own `TransactionsLab` database.
 
 Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Unlike most other collections, each Part A solution ends with a short cleanup that deletes its test rows and procedure, because the exercises compare row counts and the next exercise expects to start from zero. Part B changes the fictional account balances and notes in `TransactionsLab`.
 
@@ -290,16 +290,17 @@ DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
 
 ---
 
-## Exercise 4 — Delete a Parent and Its Children for the Caller [INTERMEDIATE]
+## Exercise 4 — Close down a country [INTERMEDIATE]
 
-A state cannot be deleted while it has cities, and a city cannot be deleted while it has customers. To remove a state completely, you have to delete from the bottom up: customers, then cities, then the state.
+The company stops doing business in a country. Its row in `State` has to go, together with all its cities and all customers who live in those cities. Closing a country is one step of a larger operation, so the procedure must not confirm anything by itself: whoever calls it decides whether the whole operation is kept or cancelled.
 
-Write a procedure `dbo.usp_DeleteStateWithCities` with one parameter, `@IDState`, that deletes the state, all its cities, and all customers in those cities. As in Exercise 3, **the caller owns the transaction**.
+Write `dbo.usp_DeleteStateWithCities` with one parameter, `@IDState`. If the state does not exist, it raises an error.
 
-1. If the state does not exist, the procedure raises an error with `THROW`.
-2. Create test data: two states, `'ExerciseTx Cascade A'` and `'ExerciseTx Cascade B'`, each with one city and one customer in that city.
-3. In one transaction, delete both test states. Print `Success` after `COMMIT`, or `Failure:` and the error message in `CATCH`.
-4. Create a third test state, `'ExerciseTx Cascade C'`, with one city. In one transaction, delete state `C` and then state `1` (`Croatia`). What is printed, and does state `C` still exist?
+Then test it as the caller:
+
+1. Create test data: two states, `'ExerciseTx Cascade A'` and `'ExerciseTx Cascade B'`, each with one city and one customer in that city.
+2. Close both test states in one operation. Print `Success` if everything was saved, or `Failure:` and the error message if not.
+3. Create a third test state, `'ExerciseTx Cascade C'`, with one city. Close state `C` and state `1` (`Croatia`) in one operation. What is printed, and does state `C` still exist?
 
 <details>
 <summary>Hint 1</summary>
@@ -492,14 +493,12 @@ DELETE FROM dbo.State WHERE Name LIKE N'ExerciseTx%';
 
 ---
 
-## Exercise 6 — Update One Row or Report a Failure [INTERMEDIATE]
+## Exercise 6 — Extend a card, or say why not [INTERMEDIATE]
 
-An `UPDATE` that matches no row is not an error: it simply changes `0` rows. If the business operation requires exactly one changed row, the procedure has to check that itself.
-
-Write a procedure `dbo.usp_ExtendCardExpiry` with one parameter, `@IDCreditCard`, that adds one year to the card's `ExpirationYear`. **The procedure owns its transaction**, as in Exercise 5. If no card was changed, it raises an error.
+Support staff use a tool to extend a credit card's expiry by one year. Last week the tool reported success for a mistyped card ID, although nothing was changed. Write `dbo.usp_ExtendCardExpiry` with one parameter, `@IDCreditCard`, so that the tool reports success only if a card really was extended. The procedure is called on its own, so it must confirm or cancel its own work.
 
 1. Insert one test credit card: type `Visa`, number `4111111111111111`, expiring `12/2030`.
-2. Call the procedure with the test card's ID, then with ID `-1`. Wrap each call in `TRY/CATCH` and print `Success` or `Failure:` with the error message.
+2. Call the procedure with the test card's ID, then with ID `-1`. For each call, print `Success` or `Failure:` with the error message.
 3. Check the test card's `ExpirationYear`.
 
 <details>
@@ -588,7 +587,148 @@ Expected output: `Success`, then `Failure: Credit card does not exist.` The test
 
 ---
 
-## Exercise 7 — An Outer Transaction Overrides an Inner Commit [ADVANCED]
+## Exercise 7 — Merge two cities [ADVANCED]
+
+The same city was entered twice, and customers are split between the two rows. Write `dbo.usp_MergeCities` with the parameters `@FromCityID`, `@ToCityID`, and `@MovedCustomers int OUTPUT`. It moves all customers from the first city to the second and then deletes the first city.
+
+- Both steps happen, or neither does.
+- The procedure fails and changes nothing if the two IDs are the same, if the target city does not exist, or if the city to delete does not exist.
+- `@MovedCustomers` returns how many customers were moved.
+- The procedure is called on its own, so it confirms or cancels its own work.
+
+Test it:
+
+1. Create a test state with two cities, `'ExerciseTx Town'` and `'ExerciseTx Town (duplicate)'`, and two customers in the duplicate.
+2. Merge the duplicate into `'ExerciseTx Town'`.
+3. Call the procedure again with the same IDs. The duplicate no longer exists.
+4. For each call, print `Success` and the number of moved customers, or `Failure:` and the error message.
+
+<details>
+<summary>Hint 1</summary>
+
+Which checks can you do before changing anything, and which result can you only see after a statement has run? A `DELETE` of a city that does not exist is not an error.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Check the two IDs and the target city with `IF` and `THROW` before the transaction starts. Inside the transaction, save `@@ROWCOUNT` right after the `UPDATE`, and check it again right after the `DELETE` (Lab 9, Section 4.2). Use the procedure pattern from Exercise 6.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_MergeCities
+    @FromCityID     int,
+    @ToCityID       int,
+    @MovedCustomers int OUTPUT
+AS
+BEGIN
+    SET XACT_ABORT ON;
+
+    SET @MovedCustomers = 0;
+
+    IF @FromCityID = @ToCityID
+        THROW 50001, 'A city cannot be merged into itself.', 1;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.City WHERE IDCity = @ToCityID)
+        THROW 50002, 'Target city does not exist.', 1;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.Customer
+        SET CityID = @ToCityID
+        WHERE CityID = @FromCityID;
+
+        SET @MovedCustomers = @@ROWCOUNT;
+
+        DELETE FROM dbo.City
+        WHERE IDCity = @FromCityID;
+
+        IF @@ROWCOUNT <> 1
+            THROW 50003, 'City to merge does not exist.', 1;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @MovedCustomers = 0;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- Test data
+DECLARE @StateID int, @TownID int, @DuplicateID int, @Moved int;
+
+INSERT INTO dbo.State (Name) VALUES (N'ExerciseTx Merge State');
+SET @StateID = SCOPE_IDENTITY();
+
+INSERT INTO dbo.City (Name, StateID) VALUES (N'ExerciseTx Town', @StateID);
+SET @TownID = SCOPE_IDENTITY();
+
+INSERT INTO dbo.City (Name, StateID) VALUES (N'ExerciseTx Town (duplicate)', @StateID);
+SET @DuplicateID = SCOPE_IDENTITY();
+
+INSERT INTO dbo.Customer (FirstName, LastName, CityID)
+VALUES
+    (N'Test1', N'ExerciseTxMerge', @DuplicateID),
+    (N'Test2', N'ExerciseTxMerge', @DuplicateID);
+
+-- 1. Merge the duplicate
+BEGIN TRY
+    EXEC dbo.usp_MergeCities
+        @FromCityID = @DuplicateID,
+        @ToCityID = @TownID,
+        @MovedCustomers = @Moved OUTPUT;
+
+    PRINT 'Success: ' + CAST(@Moved AS nvarchar(10)) + ' customer(s) moved';
+END TRY
+BEGIN CATCH
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+
+-- 2. The duplicate is already gone
+BEGIN TRY
+    EXEC dbo.usp_MergeCities
+        @FromCityID = @DuplicateID,
+        @ToCityID = @TownID,
+        @MovedCustomers = @Moved OUTPUT;
+
+    PRINT 'Success: ' + CAST(@Moved AS nvarchar(10)) + ' customer(s) moved';
+END TRY
+BEGIN CATCH
+    PRINT 'Failure: ' + ERROR_MESSAGE();
+END CATCH;
+
+SELECT c.FirstName, ci.Name AS City
+FROM dbo.Customer AS c
+JOIN dbo.City AS ci ON ci.IDCity = c.CityID
+WHERE c.LastName = N'ExerciseTxMerge';
+GO
+
+-- Cleanup
+DELETE FROM dbo.Customer WHERE LastName = N'ExerciseTxMerge';
+DELETE FROM dbo.City WHERE Name LIKE N'ExerciseTx Town%';
+DELETE FROM dbo.State WHERE Name = N'ExerciseTx Merge State';
+DROP PROCEDURE dbo.usp_MergeCities;
+```
+
+Expected output: `Success: 2 customer(s) moved`, then `Failure: City to merge does not exist.` Both test customers now live in `ExerciseTx Town`.
+
+The second call is the interesting one. Its `UPDATE` moves `0` customers and its `DELETE` deletes `0` cities, and neither is an SQL error. Only the `@@ROWCOUNT` check turns "nothing happened" into a failure the caller can see.
+
+</details>
+
+---
+
+## Exercise 8 — An Outer Transaction Overrides an Inner Commit [ADVANCED]
 
 Using `dbo.usp_DeleteThreeStates` from Exercise 5, wrap a call to it in an **outer** transaction that the caller then deliberately rolls back — even though the procedure itself reports success and runs its own `COMMIT`.
 
@@ -666,7 +806,7 @@ The procedure returned without an error and ran `COMMIT TRANSACTION`, but that c
 
 # Part B – `TransactionsLab`
 
-Exercises 8–13 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
+Exercises 9–14 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
 
 > [!IMPORTANT]
 > Start each exercise with `@@TRANCOUNT = 0`. Every transaction you start must end with `COMMIT` or a full `ROLLBACK`.
@@ -676,7 +816,7 @@ USE TransactionsLab;
 GO
 ```
 
-## Exercise 8 — Predict COMMIT and ROLLBACK [BEGINNER]
+## Exercise 9 — Predict COMMIT and ROLLBACK [BEGINNER]
 
 Reset the two balances to `1000.00` and `500.00`.
 
@@ -752,14 +892,14 @@ After rollback: `1000.00` and `500.00`. After the committed transfer: `850.00` a
 
 ---
 
-## Exercise 9 — Keep one change, cancel another [INTERMEDIATE]
+## Exercise 10 — Keep one change, cancel another [INTERMEDIATE]
 
 Using `dbo.Note` from [Section 7.1 of Lab 9](../labs/lab09-transactions.md#71-identity-values):
 
 1. Start a transaction.
-2. Insert the note `Exercise 9: keep this note`.
+2. Insert the note `Exercise 10: keep this note`.
 3. Create a savepoint.
-4. Insert the note `Exercise 9: cancel this note`.
+4. Insert the note `Exercise 10: cancel this note`.
 5. Roll back to the savepoint.
 6. Commit the transaction.
 7. Verify which note was kept and inspect `@@TRANCOUNT`.
@@ -778,12 +918,12 @@ Using `dbo.Note` from [Section 7.1 of Lab 9](../labs/lab09-transactions.md#71-id
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 9: keep this note');
+VALUES (N'Exercise 10: keep this note');
 
 SAVE TRANSACTION KeepFirstNote;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 9: cancel this note');
+VALUES (N'Exercise 10: cancel this note');
 
 ROLLBACK TRANSACTION KeepFirstNote;
 
@@ -793,7 +933,7 @@ COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
 FROM dbo.Note
-WHERE NoteText LIKE N'Exercise 9:%'
+WHERE NoteText LIKE N'Exercise 10:%'
 ORDER BY NoteID;
 
 SELECT @@TRANCOUNT AS AfterCommit; -- 0
@@ -805,14 +945,14 @@ Only the first exercise note is stored. Repeating the exercise adds another copy
 
 ---
 
-## Exercise 10 — An unused savepoint [BEGINNER]
+## Exercise 11 — An unused savepoint [BEGINNER]
 
 Using `dbo.Note`:
 
 1. Start a transaction.
-2. Insert the note `Exercise 10: first note`.
+2. Insert the note `Exercise 11: first note`.
 3. Create a savepoint.
-4. Insert the note `Exercise 10: second note`.
+4. Insert the note `Exercise 11: second note`.
 5. Commit the transaction **without** rolling back to the savepoint.
 6. Verify which notes were kept.
 
@@ -832,18 +972,18 @@ Predict the result before running the code: does creating a savepoint that is ne
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 10: first note');
+VALUES (N'Exercise 11: first note');
 
 SAVE TRANSACTION FirstNoteDone;
 
 INSERT INTO dbo.Note (NoteText)
-VALUES (N'Exercise 10: second note');
+VALUES (N'Exercise 11: second note');
 
 COMMIT TRANSACTION;
 
 SELECT NoteID, NoteText
 FROM dbo.Note
-WHERE NoteText LIKE N'Exercise 10:%'
+WHERE NoteText LIKE N'Exercise 11:%'
 ORDER BY NoteID;
 
 SELECT @@TRANCOUNT AS AfterCommit; -- 0
@@ -855,7 +995,7 @@ Both notes are stored. A savepoint that is never used in a `ROLLBACK TRANSACTION
 
 ---
 
-## Exercise 11 — Test the transfer procedure [INTERMEDIATE]
+## Exercise 12 — Test the transfer procedure [INTERMEDIATE]
 
 Reset balances to `1000.00` and `500.00`. Test `dbo.usp_TransferFunds` with:
 
@@ -968,7 +1108,7 @@ Each test raises its expected error, and the balances remain `750.00` and `750.0
 
 ---
 
-## Exercise 12 — Add a transfer record [ADVANCED]
+## Exercise 13 — Add a transfer record [ADVANCED]
 
 Extend the transfer operation so that it also stores a record of the successful transfer.
 
@@ -1130,7 +1270,7 @@ This demonstration intentionally resets balances between tests, so the history t
 
 ---
 
-## Exercise 13 — Connect transactions to Lab 8 [INTERMEDIATE]
+## Exercise 14 — Connect transactions to Lab 8 [INTERMEDIATE]
 
 In Lab 8, one procedure inserted a parent row and related child rows from structured input.
 

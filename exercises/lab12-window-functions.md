@@ -2,7 +2,7 @@
 
 **Database:** `AdventureWorksENG`
 
-These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions with running totals and frames, and the analytical functions `LAG`, `LEAD`, and `FIRST_VALUE`.
+These exercises build on [Lab 12 – Window Functions](../labs/lab12-window-functions.md) and use `AdventureWorksENG`. They are grouped like the lab: ranking functions, aggregate window functions with running totals and frames, and the analytical functions `LAG`, `LEAD`, and `FIRST_VALUE`. The last exercise combines several of them.
 
 All exercises are plain `SELECT` statements, except Exercise 11, which creates a small table.
 
@@ -135,9 +135,9 @@ Expected result: `39` invoices in `13` groups of 3. Group 1 holds the three invo
 
 ---
 
-## Exercise 5 — Rank colors by quantity sold [INTERMEDIATE]
+## Exercise 5 — Best-selling colors [INTERMEDIATE]
 
-Show each product color with the total quantity sold (`SUM(InvoiceItem.Quantity)`), ranked so that the best-selling color is first. Show products without a color as `(no color)`. Ties should share a rank without gaps.
+Marketing wants to know which product colors sell best. Show each color with the total quantity sold (`SUM(InvoiceItem.Quantity)`) and its position, best-selling first. Show products without a color as `(no color)`. If two colors sold the same quantity, they share a position, and the next position is not skipped.
 
 <details>
 <summary>Hint 1</summary>
@@ -271,9 +271,9 @@ Expected result: the five Road-150 Red bikes come first with `0.00`, because the
 
 ---
 
-## Exercise 9 — Moving average with a frame [INTERMEDIATE]
+## Exercise 9 — Smooth out the price jumps [INTERMEDIATE]
 
-Show the touring bikes (`SubcategoryID = 3`) from cheapest to most expensive. Add a column with the average price of the current bike, the 2 bikes before it, and the 2 bikes after it.
+A chart of touring bike prices (`SubcategoryID = 3`, cheapest first) jumps sharply between models. To draw a smoother line, show each bike's price next to the average price of that bike, the 2 bikes before it, and the 2 bikes after it.
 
 <details>
 <summary>Hint 1</summary>
@@ -392,9 +392,9 @@ The last row's `MinutesToNext` is `NULL` — there is no next station. This is t
 
 ---
 
-## Exercise 12 — Days since the customer's first invoice [INTERMEDIATE]
+## Exercise 12 — How long has the customer been with us? [INTERMEDIATE]
 
-For customers `1` and `2`, show every invoice with its date, the date of that customer's **first** invoice, and the number of days between them.
+For customers `1` and `2`, show every invoice with its date, the date of that customer's **first** invoice, and how many days have passed since then.
 
 <details>
 <summary>Hint 1</summary>
@@ -441,9 +441,9 @@ Expected result: 11 rows, 7 for customer `1` and 4 for customer `2`. `DaysSinceF
 
 ---
 
-## Exercise 13 — Revenue compared with two years earlier [ADVANCED]
+## Exercise 13 — Compared with two years ago [ADVANCED]
 
-Show the total revenue (`SUM(InvoiceItem.TotalPrice)`) for each invoice year. Add the revenue from **two years earlier** and the difference between the two.
+Management compares each year's revenue (`SUM(InvoiceItem.TotalPrice)`) with the year **two years before it**, not the year just before. Show each year's revenue, the revenue from two years earlier, and the difference.
 
 <details>
 <summary>Hint 1</summary>
@@ -476,6 +476,52 @@ ORDER BY InvoiceYear;
 ```
 
 Expected result: 4 rows, 2001–2004. The first two years have `NULL` in the last two columns: there is no year two rows earlier. 2003 is about `30.7` million higher than 2001, and 2004 is about `4.8` million lower than 2002.
+
+</details>
+
+---
+
+# Part D – Putting it together
+
+## Exercise 14 — The leader in each category [ADVANCED]
+
+Category managers want to see how their subcategories compare. For each category, list its subcategories with their revenue (`SUM(InvoiceItem.TotalPrice)`) and their position **within that category**, the highest revenue first. Each category's list starts again at position `1`.
+
+<details>
+<summary>Hint 1</summary>
+
+This combines two exercises: the grouped total from Exercise 5 and the restart per group from Exercise 2.
+
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+`RANK() OVER (PARTITION BY c.Name ORDER BY SUM(ii.TotalPrice) DESC)` after `GROUP BY c.Name, s.Name`.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+```sql
+SELECT
+    c.Name AS Category,
+    s.Name AS Subcategory,
+    SUM(ii.TotalPrice) AS Revenue,
+    RANK() OVER (
+        PARTITION BY c.Name
+        ORDER BY SUM(ii.TotalPrice) DESC
+    ) AS RankInCategory
+FROM InvoiceItem ii
+JOIN Product p ON p.IDProduct = ii.ProductID
+JOIN Subcategory s ON s.IDSubcategory = p.SubcategoryID
+JOIN Category c ON c.IDCategory = s.CategoryID
+GROUP BY c.Name, s.Name
+ORDER BY Category, RankInCategory;
+```
+
+Expected result: 35 rows. The leaders are `Kacige` (Accessories), `Road Bikes` (Bicycles), `Jerseys` (Clothes), and `Mountain Frames` (Parts). Without `PARTITION BY`, all 35 subcategories would be ranked together, and the three bicycle subcategories would take the first three places.
 
 </details>
 

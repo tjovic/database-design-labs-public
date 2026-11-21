@@ -236,21 +236,27 @@ Expected result: 16 rows — the cities of Croatia, Germany, and Italy, an `ALL 
 
 ---
 
-## Exercise 7 — Salesman revenue by year, one name column [INTERMEDIATE]
+## Exercise 7 — One report for the sales meeting [INTERMEDIATE]
 
-For salespeople whose `LastName` starts with `'A'`, show revenue (`SUM(InvoiceItem.TotalPrice)`) by salesperson and invoice year. Write the first and last name in **one** column, the year in the second, and the revenue in the third. The result must also show each salesperson's total for all years and the grand total for all three salespeople. Label the subtotal rows with `GROUPING()`.
+For the sales meeting, management wants one table of revenue (`SUM(InvoiceItem.TotalPrice)`) by product category and invoice year. In the same table they also want:
+
+- each category's total for all years;
+- each year's total for all categories;
+- the grand total.
+
+Rows that are totals must be labeled (`ALL CATEGORIES`, `ALL YEARS`) instead of showing `NULL`, and they must come after the rows they summarize.
 
 <details>
 <summary>Hint 1</summary>
 
-`ROLLUP` works on expressions too: `ROLLUP (s.FirstName + ' ' + s.LastName, YEAR(i.InvoiceDate))`.
+List the grouping levels the meeting needs: (category, year), (category), (year), and (). Which of `ROLLUP`, `CUBE`, or `GROUPING SETS` produces exactly these four levels with the shortest `GROUP BY`?
 
 </details>
 
 <details>
 <summary>Hint 2</summary>
 
-`GROUPING()` takes the same expression as the `ROLLUP` list. The year is a number, so convert it to text before you put `'ALL YEARS'` in the same column.
+`CUBE (c.Name, YEAR(i.InvoiceDate))`. The year is a number, so convert it to text before putting `'ALL YEARS'` in the same column. `GROUPING()` takes the same expression as the `GROUP BY`.
 
 </details>
 
@@ -259,24 +265,86 @@ For salespeople whose `LastName` starts with `'A'`, show revenue (`SUM(InvoiceIt
 
 ```sql
 SELECT
-    CASE WHEN GROUPING(s.FirstName + ' ' + s.LastName) = 1 THEN 'ALL SALESMEN'
-         ELSE s.FirstName + ' ' + s.LastName END AS Salesman,
+    CASE WHEN GROUPING(c.Name) = 1 THEN 'ALL CATEGORIES'
+         ELSE c.Name END AS Category,
     CASE WHEN GROUPING(YEAR(i.InvoiceDate)) = 1 THEN 'ALL YEARS'
          ELSE CAST(YEAR(i.InvoiceDate) AS varchar(4)) END AS InvoiceYear,
     SUM(ii.TotalPrice) AS Revenue
-FROM Salesman s
-JOIN Invoice i ON i.SalesmanID = s.IDSalesman
-JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
-WHERE s.LastName LIKE 'A%'
-GROUP BY ROLLUP (s.FirstName + ' ' + s.LastName, YEAR(i.InvoiceDate))
+FROM InvoiceItem ii
+JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
+JOIN Product p ON p.IDProduct = ii.ProductID
+JOIN Subcategory s ON s.IDSubcategory = p.SubcategoryID
+JOIN Category c ON c.IDCategory = s.CategoryID
+GROUP BY CUBE (c.Name, YEAR(i.InvoiceDate))
 ORDER BY
-    GROUPING(s.FirstName + ' ' + s.LastName), Salesman,
+    GROUPING(c.Name), Category,
     GROUPING(YEAR(i.InvoiceDate)), InvoiceYear;
 ```
 
-Expected result: 14 rows. Each of the three salespeople (Marino Alessi, Romano Arnolfi, and Santi Ajello) has one row per year and an `ALL YEARS` row. Romano Arnolfi has invoices only in 2003 and 2004. The last row, `ALL SALESMEN` / `ALL YEARS`, shows about `11,807,837.78`.
+Expected result: 25 rows — 4 categories × 4 years, an `ALL YEARS` row for each category, an `ALL CATEGORIES` row for each year, and the grand total of about `109,846,381.40`. `Bicycles` brings in about `94.7` million of that.
 
-These are the same three salespeople as in Exercise 3, so you can compare: `CUBE` counted invoices; here `ROLLUP` adds up revenue.
+`ROLLUP (c.Name, YEAR(...))` would miss the four "all categories in one year" rows: it only rolls up from right to left. `GROUPING SETS ((c.Name, YEAR(...)), (c.Name), (YEAR(...)), ())` gives the same result as `CUBE`, just longer.
+
+</details>
+
+---
+
+## Exercise 8 — Choose the grouping [ADVANCED]
+
+For each request, decide whether you would use `ROLLUP`, `CUBE`, or `GROUPING SETS`, and write only the `GROUP BY` clause. Then run the query for request 4.
+
+1. Revenue by country and city, with a total for each country and a grand total.
+2. Number of invoices by salesperson and year, with a total for each salesperson, a total for each year, and a grand total.
+3. Number of products by color and, separately, by subcategory, with a grand total — but no rows for color and subcategory together.
+4. Number of invoices by year and month, with a total for each year — but **no** grand total.
+
+<details>
+<summary>Hint</summary>
+
+For each request, write down the grouping levels it needs, for example `(Country, City)`, `(Country)`, `()`. Then compare: `ROLLUP` gives the levels from left to right, `CUBE` gives every combination, and `GROUPING SETS` gives exactly the levels you list.
+
+</details>
+
+<details>
+<summary>Solution</summary>
+
+1. `ROLLUP` — the levels form a hierarchy:
+
+    ```sql
+    GROUP BY ROLLUP (s.Name, c.Name)
+    ```
+
+2. `CUBE` — every combination of the two columns:
+
+    ```sql
+    GROUP BY CUBE (sm.IDSalesman, YEAR(i.InvoiceDate))
+    ```
+
+3. `GROUPING SETS` — two independent levels and a grand total, without the combination:
+
+    ```sql
+    GROUP BY GROUPING SETS ((p.Color), (p.SubcategoryID), ())
+    ```
+
+    Watch out when you run it: products without a color and products without a subcategory also produce rows with `NULL` in both columns. Only `GROUPING()` tells you which `NULL` row is the grand total (`504` products), which one is "no color" (`248`), and which one is "no subcategory" (`209`).
+
+4. `GROUPING SETS` — `ROLLUP` would add a grand total that the request does not want:
+
+    ```sql
+    SELECT
+        YEAR(i.InvoiceDate) AS InvoiceYear,
+        MONTH(i.InvoiceDate) AS InvoiceMonth,
+        COUNT(*) AS Invoices
+    FROM Invoice i
+    GROUP BY GROUPING SETS
+    (
+        (YEAR(i.InvoiceDate), MONTH(i.InvoiceDate)),
+        (YEAR(i.InvoiceDate))
+    )
+    ORDER BY InvoiceYear, GROUPING(MONTH(i.InvoiceDate)), InvoiceMonth;
+    ```
+
+    Expected result: 41 rows — 37 months from July 2001 to July 2004 and one total for each of the four years. 2003 has the most invoices, `12,443`.
 
 </details>
 

@@ -2,7 +2,7 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–9) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. In Exercises 7–9 you plan the steps yourself, as on the exam. **Part B** (Exercises 10–14) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
+These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–9) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. In Exercises 7–9 you start from a description of what went wrong: recognize the problem, choose the lowest isolation level that prevents it, and demonstrate both. **Part B** (Exercises 10–14) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
 
 Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Exercises 5 and 6 delete the phantom row they insert, so the range again has two rows when the next exercise starts. Run the setup only once; on a freshly restored database the counts match the expected results. Part B changes only the fictional data in `TransactionsLab`.
 
@@ -361,36 +361,40 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
 ---
 
-## Exercise 7 — Your Own Demonstration: Dirty Read [INTERMEDIATE]
+## Exercise 7 — A price nobody set [INTERMEDIATE]
 
-In Exercises 1–6 the steps were given. Now plan them yourself, as you would on the exam.
+The price-list report briefly showed product `707` (`Sport-100 Helmet, Red`, normally `34.99`) with a price of `0.01`. The product team says nobody ever saved that price: a colleague was testing an `UPDATE` inside a transaction and then rolled it back. The report runs at `READ UNCOMMITTED`, "so that it is never blocked".
 
-Describe and demonstrate how a dirty read arises on the `Product` table. Use the price of product `707` (`Sport-100 Helmet, Red`, `34.99`). Mark in a comment the exact place where the problem occurs, then show how and in which session you solve it.
-
-Write the steps for **Session A** and **Session B** in the order you run them. Session A must not change the price permanently.
+1. Which concurrency problem is this?
+2. Reproduce it with two sessions. Session A plays the colleague, Session B the report. The price must not change permanently.
+3. Which is the **lowest** isolation level that prevents the problem, and which session has to use it? Show that it works.
+4. What does the report pay for the fix?
 
 <details>
 <summary>Hint 1</summary>
 
-Who changes the data, and who reads it? The writer keeps its transaction open and rolls back at the end. The reader is the session whose isolation level matters.
+Ask what the report saw: a value that was never committed, the same row with two different committed values, or a new row? Each answer points to one problem from Lab 10, Sections 2–4.
 
 </details>
 
 <details>
 <summary>Hint 2</summary>
 
-Follow the shape of Exercises 1 and 2: the same steps twice, first with the reader at `READ UNCOMMITTED`, then at `READ COMMITTED`.
+The problem is in what the report *reads*, so the fix belongs to the reading session. Lab 10, Section 10.2 lists which level prevents which problem.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-```sql
-/* PROBLEM – dirty read
-   Session B reads a price that Session A changed but never committed. */
+1. A **dirty read**: the report read a change that was never committed.
 
--- Session A
+2. and 3.
+
+```sql
+-- Problem
+
+-- Session A (the colleague)
 BEGIN TRANSACTION;
 
 UPDATE dbo.Product
@@ -398,19 +402,19 @@ SET PriceWithoutVAT = 0.01
 WHERE IDProduct = 707;
 -- Keep the transaction open.
 
--- Session B
+-- Session B (the report)
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 SELECT IDProduct, Name, PriceWithoutVAT
 FROM dbo.Product
 WHERE IDProduct = 707;
--- 0.01  <-- THE PROBLEM OCCURS HERE (dirty read)
+-- 0.01: a price that was never committed
 
 -- Session A
 ROLLBACK TRANSACTION;
--- The price is 34.99 again: Session B used a price that never existed.
+-- The price is 34.99 again.
 
-/* SOLUTION – in Session B (the reader): READ COMMITTED */
+-- Fix
 
 -- Session A
 BEGIN TRANSACTION;
@@ -432,44 +436,52 @@ ROLLBACK TRANSACTION;
 -- Session B now returns 34.99, the committed price.
 ```
 
-The problem appears in Session B, so the fix is also in Session B. Session A does nothing wrong: it is allowed to change data and roll back.
+The lowest level is `READ COMMITTED`, the SQL Server default, set in Session B. Session A does nothing wrong: it may change data and roll back.
+
+4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Section 9](../labs/lab10-concurrency.md#91-dont-lock-reads--version-them) shows how row versioning removes that wait.
 
 </details>
 
 ---
 
-## Exercise 8 — Your Own Demonstration: Non-Repeatable Read [INTERMEDIATE]
+## Exercise 8 — The email changed in the middle of a job [INTERMEDIATE]
 
-Describe and demonstrate how a non-repeatable read arises on the `Customer` table. Mark where the problem occurs, then show how and in which session you solve it.
+A mailing job works in one transaction: it reads a customer's email, sends the message, and then reads the email again to write it into the log. In the log, one customer has a different email from the one the message was sent to: the customer changed it on the website while the job was running. The job runs at `READ COMMITTED`.
 
-So that no real customer is changed, first insert one test customer, `ExerciseConc Customer`, with the email `before@example.com`. Delete it at the end.
+1. Which concurrency problem is this?
+2. Reproduce it with two sessions. So that no real customer is changed, use a test customer `ExerciseConc Customer` with the email `before@example.com`, and delete it at the end.
+3. Which is the lowest isolation level that prevents the problem, and which session has to use it? Show that it works.
+4. `SERIALIZABLE` would also prevent it. Why is it not the best choice here?
 
 <details>
 <summary>Hint 1</summary>
 
-One session reads the same row twice in one transaction. The other session changes that row and commits in between.
+The job reads the **same row** twice, and both values it reads were committed. Which problem from Lab 10 is that?
 
 </details>
 
 <details>
 <summary>Hint 2</summary>
 
-The fix belongs to the session that reads twice: `REPEATABLE READ` keeps the shared lock on the row until its transaction ends (Exercises 3 and 4).
+The job needs the row to stay unchanged until its own transaction ends. Which level keeps the shared lock that long?
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
+1. A **non-repeatable read**: the same row returns two different committed values within one transaction.
+
+2. and 3.
+
 ```sql
 -- Test data (either session)
 INSERT INTO dbo.Customer (FirstName, LastName, Email)
 VALUES (N'ExerciseConc', N'Customer', N'before@example.com');
 
-/* PROBLEM – non-repeatable read
-   Session A reads the same row twice and gets two different values. */
+-- Problem
 
--- Session A
+-- Session A (the job)
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
 BEGIN TRANSACTION;
@@ -479,7 +491,7 @@ FROM dbo.Customer
 WHERE FirstName = N'ExerciseConc';
 -- before@example.com. Keep the transaction open.
 
--- Session B
+-- Session B (the website)
 UPDATE dbo.Customer
 SET Email = N'after@example.com'
 WHERE FirstName = N'ExerciseConc';
@@ -489,11 +501,11 @@ WHERE FirstName = N'ExerciseConc';
 SELECT Email
 FROM dbo.Customer
 WHERE FirstName = N'ExerciseConc';
--- after@example.com  <-- THE PROBLEM OCCURS HERE (non-repeatable read)
+-- after@example.com: the second read disagrees with the first
 
 COMMIT TRANSACTION;
 
-/* SOLUTION – in Session A (the transaction that reads twice): REPEATABLE READ */
+-- Fix
 
 -- Session A
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
@@ -527,36 +539,47 @@ DELETE FROM dbo.Customer
 WHERE FirstName = N'ExerciseConc';
 ```
 
+The lowest level is `REPEATABLE READ`, set in Session A, the session that reads twice.
+
+4. `SERIALIZABLE` also locks ranges, so it would block inserts that have nothing to do with this customer as well. The job only needs the rows it has already read to stay unchanged; a higher level would only add waiting for other users (Lab 10, Section 10.2).
+
 </details>
 
 ---
 
-## Exercise 9 — Your Own Demonstration: Phantom Read [ADVANCED]
+## Exercise 9 — The count does not match the list [ADVANCED]
 
-Describe and demonstrate how a phantom read arises on the `Subcategory` table. Use the subcategories of category `4` (`Accessories`, 12 subcategories). Mark where the problem occurs, then show how and in which session you solve it. Delete the row you insert at the end.
+A report for the `Accessories` category (`IDCategory = 4`) works in one transaction: it first prints how many subcategories the category has, then lists them. Once the count said `12`, but the list had `13` rows. Someone had already set the report to `REPEATABLE READ` "to be safe", and it still happened.
+
+1. Which concurrency problem is this, and why did `REPEATABLE READ` not prevent it?
+2. Reproduce it with two sessions. Delete the row you insert at the end.
+3. Which isolation level prevents the problem, and in which session? Show that it works.
 
 <details>
 <summary>Hint 1</summary>
 
-A phantom is a **new** row that appears in a range that was already read. Which statement creates such a row?
+The 13th row in the list did not exist when the report counted. What does `REPEATABLE READ` lock, and what can it not lock?
 
 </details>
 
 <details>
 <summary>Hint 2</summary>
 
-`REPEATABLE READ` is not enough: it locks only rows that already exist (Exercise 5). Session A needs `SERIALIZABLE` (Exercise 6).
+The other session inserts a new subcategory into category `4` between the two reads (Lab 10, Section 4).
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-```sql
-/* PROBLEM – phantom read
-   Session A runs the same range query twice and gets a new row the second time. */
+1. A **phantom read**: a new row appears in a range the transaction has already read. `REPEATABLE READ` locks only the rows it has read, so it cannot stop a new row from being inserted into the same range.
 
--- Session A
+2. and 3.
+
+```sql
+-- Problem
+
+-- Session A (the report)
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 BEGIN TRANSACTION;
@@ -569,13 +592,13 @@ WHERE CategoryID = 4;
 -- Session B
 INSERT INTO dbo.Subcategory (CategoryID, Name)
 VALUES (4, N'ExerciseConc Subcategory');
--- Runs immediately: REPEATABLE READ locks only the rows already read.
+-- Runs immediately: no existing row it touches is locked.
 
 -- Session A
-SELECT COUNT(*) AS Subcategories
+SELECT IDSubcategory, Name
 FROM dbo.Subcategory
 WHERE CategoryID = 4;
--- 13  <-- THE PROBLEM OCCURS HERE (phantom read)
+-- 13 rows: the new subcategory is a phantom
 
 COMMIT TRANSACTION;
 
@@ -583,7 +606,7 @@ COMMIT TRANSACTION;
 DELETE FROM dbo.Subcategory
 WHERE Name = N'ExerciseConc Subcategory';
 
-/* SOLUTION – in Session A (the transaction that reads the range twice): SERIALIZABLE */
+-- Fix
 
 -- Session A
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
@@ -601,10 +624,10 @@ VALUES (4, N'ExerciseConc Subcategory');
 -- Waits until Session A ends.
 
 -- Session A
-SELECT COUNT(*) AS Subcategories
+SELECT IDSubcategory, Name
 FROM dbo.Subcategory
 WHERE CategoryID = 4;
--- Still 12
+-- Still 12 rows: the count and the list agree.
 
 COMMIT TRANSACTION;
 -- Session B's INSERT completes now.
@@ -616,7 +639,9 @@ DELETE FROM dbo.Subcategory
 WHERE Name = N'ExerciseConc Subcategory';
 ```
 
-In all three anomalies, the fix goes to the session that **reads**: the reader chooses how much it is protected from other sessions' changes.
+`SERIALIZABLE`, set in Session A, locks the whole range `CategoryID = 4`, including the place where a new row would go.
+
+In all three exercises the fix goes to the session that **reads**: the reader decides how much it is protected from other sessions' changes.
 
 </details>
 

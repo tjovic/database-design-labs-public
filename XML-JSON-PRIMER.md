@@ -175,7 +175,7 @@ A common, balanced style uses attributes for identifiers and elements for the co
 Notice the `Items` wrapper element. It groups the repeating `Item` elements and makes it obvious where the collection begins and ends.
 
 > [!NOTE]
-> Lab 08 uses both styles. Section 4.4 shows how the choice affects the way a value is read: `@Name` for an attribute, `text()` for element text.
+> Lab 08 uses both styles. Section 4.5 shows how the choice affects the way a value is read: `@Name` for an attribute, `.` for element text.
 
 ### 1.6 Data types in XML
 

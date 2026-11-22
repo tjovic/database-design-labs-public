@@ -2523,69 +2523,21 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 
 # Key takeaways
 
-The main idea of this lab: **a delete request can end in four different ways, and the caller must be able to tell them apart.**
+- **A delete request can end in four different ways, and the caller must be able to tell them apart:**
 
-| Outcome | How it is detected | Return code used in this lab |
-|---|---|---:|
-| Success | Rows affected | `0` |
-| The row does not exist | Empty result set or `@@ROWCOUNT = 0` — not an error | `1` |
-| Rejected by a business rule | `IF EXISTS` check before the `DELETE` — not an error | `2` |
-| SQL Server error | `TRY/CATCH`, `ERROR_NUMBER()`, `ERROR_MESSAGE()` | `3` |
+  | Outcome | How it is detected | Return code used in this lab |
+  |---|---|---:|
+  | Success | Rows affected | `0` |
+  | The row does not exist | Empty result set or `@@ROWCOUNT = 0` — not an error | `1` |
+  | Rejected by a business rule | `IF EXISTS` check before the `DELETE` — not an error | `2` |
+  | SQL Server error | `TRY/CATCH`, `ERROR_NUMBER()`, `ERROR_MESSAGE()` | `3` |
 
-```text
-CRUD
-    -> four categories of operations, not a fixed number of procedures
-
-Separate procedures
-    -> one clear purpose per procedure
-
-Combined procedure
-    -> one entry point; an @Action parameter or an ID-based decision (Save pattern)
-    -> one shared parameter list fits no action exactly
-    -> a typo in @Action is not an error - check for the "unknown action" code
-    -> an UPDATE of a missing row is not an error - check @@ROWCOUNT and RETURN 1
-```
-
-```text
-Errors inside a procedure
-    -> an error such as 547 or 515 terminates the statement, not the procedure
-    -> without TRY/CATCH, the procedure continues: @@ROWCOUNT and RETURN
-       that follow report a misleading result (RowsDeleted = 0, RETURN 0)
-    -> with TRY at the caller, the procedure stops at the error
-    -> in CATCH, always RETURN your own code - otherwise SQL Server picks one (-6)
-```
-
-```text
-Function
-    -> read-only, usable inside FROM / JOIN
-    -> no ORDER BY inside an inline TVF - the caller sorts
-    -> can return only rows: it cannot tell "does not exist" from "exists, but empty"
-
-Procedure
-    -> can implement INSERT / UPDATE / DELETE
-    -> can report the outcome with a return code or OUTPUT parameters
-
-Read
-    -> called by the application: procedure
-    -> part of another query: inline TVF
-    -> often both: the function holds the query, the procedure calls it
-```
-
-```text
-Protection in layers
-    -> business rule: rejects the request first and explains why (RETURN 2)
-    -> constraint: protects the data even when the rule is missing or bypassed
-    -> TRY/CATCH: turns the constraint error into a code the caller can handle (RETURN 3)
-    -> a rule no constraint can express is protected only by the procedure -
-       a direct UPDATE bypasses it
-    -> if the database can enforce a rule (UNIQUE, CHECK), let it
-
-The database enforces only the rules it has been given
-    -> State.Name has no UNIQUE constraint, so two Slovenia rows are valid
-    -> some rules (e.g. "web orders go only to permanent employees") cannot be a constraint at all
-```
-
-And remember:
+- **CRUD names four categories of operations, not a fixed number of procedures.** Separate procedures give each one a clear purpose; a combined procedure gives one entry point through an `@Action` parameter or an ID-based decision (the Save pattern).
+- **A combined procedure has traps.** One shared parameter list fits no action exactly, a typo in `@Action` is not an error, and an `UPDATE` of a missing row is not an error either — check for the "unknown action" code and for `@@ROWCOUNT`.
+- **An error such as 547 or 515 ends the statement, not the procedure.** Without `TRY/CATCH`, the procedure continues, and the `@@ROWCOUNT` and `RETURN` that follow report a misleading result. In `CATCH`, always `RETURN` your own code; otherwise SQL Server picks one (`-6`).
+- **Read through a function or a procedure.** An inline TVF is read-only and usable in `FROM` and `JOIN`, but it can return only rows, so it cannot tell "does not exist" from "exists, but empty". A procedure can modify data and report the outcome. Often both: the function holds the query, and the procedure calls it.
+- **Protect the data in layers.** The business rule rejects the request first and explains why (`RETURN 2`); the constraint protects the data even when the rule is missing or bypassed; `TRY/CATCH` turns the constraint error into a code the caller can handle (`RETURN 3`).
+- **The database enforces only the rules it has been given.** If it can enforce a rule (`UNIQUE`, `CHECK`), let it. A rule no constraint can express is protected only by the procedure, and a direct `UPDATE` bypasses it.
 
 > **A nullable foreign key means a child row does not need a parent. It does not mean a referenced parent can be deleted.**
 

@@ -2306,37 +2306,12 @@ GO
 
 # Key takeaways
 
-The most important patterns are:
-
-```sql
-CREATE OR ALTER TRIGGER dbo.trg_Name
-ON dbo.TableName
-AFTER INSERT
-AS
-BEGIN
-    ...
-END
-GO
-```
-
-```sql
-SELECT *
-FROM inserted;
-```
-
-```sql
-SELECT *
-FROM deleted;
-```
-
-```sql
-SELECT ...
-FROM inserted AS i
-JOIN deleted AS d
-    ON d.PrimaryKey = i.PrimaryKey;
-```
-
-And the most important rule:
+- **A trigger runs automatically when a table changes.** An `AFTER` trigger runs after the statement; an `INSTEAD OF` trigger runs in its place.
+- **`inserted` holds the new rows, and `deleted` holds the old rows.** An `INSERT` fills only `inserted`, a `DELETE` fills only `deleted`, and an `UPDATE` fills both.
+- **To compare old and new values, join `inserted` and `deleted` on the primary key.**
+- **`UPDATE(column)` tells whether a column was part of the statement,** not whether its value actually changed.
+- **One trigger can handle several events;** the contents of `inserted` and `deleted` show which event occurred.
+- **Triggers can maintain related data and check business rules,** such as keeping inventory in step with invoice items.
 
 > [!IMPORTANT]
 > **A trigger fires once per statement, not once per row.**

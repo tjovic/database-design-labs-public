@@ -1883,85 +1883,16 @@ further, including `THROW` and re-raising errors.
 
 # Key takeaways
 
-You should now be able to recognize and use these patterns:
+- **`GO` separates batches.** It is not a T-SQL statement but a separator recognized by client tools such as SSMS, and a local variable exists only in the batch in which it was declared.
+- **Variables hold values; table variables hold rows.** `DECLARE` creates them, and `SET` or `SELECT @Variable = ...` assigns a value.
+- **`IF / ELSE` decides which statements run; `CASE` computes a value inside a query.**
+- **`SCOPE_IDENTITY()` returns the identity value you just generated.** It is limited to the current session and scope, so inserts in other sessions do not affect it.
+- **`CAST` converts a value to another data type,** for example a number to text when building a message.
+- **`WHILE` repeats statements while its condition is true;** `BREAK` and `CONTINUE` change the flow of the loop.
+- **`@@ROWCOUNT` tells how many rows the previous statement affected.** Read it immediately; `SET NOCOUNT ON` hides the row-count messages but does not change it.
+- **`TRY/CATCH` handles runtime errors.** Inside `CATCH`, `ERROR_NUMBER()` and `ERROR_MESSAGE()` describe the error. A statement that affects zero rows is not an error.
 
-```sql
--- Batch boundary
-GO
-
--- Variable
-DECLARE @ID int;
-
--- Assignment
-SET @ID = 10;
-
--- Assignment from a query
-SELECT @ID = IDState
-FROM State
-WHERE Name = 'Example';
-
--- Table variable
-DECLARE @IDs TABLE
-(
-    ID int
-);
-
-INSERT INTO @IDs (ID)
-VALUES (1), (2), (3);
-
--- Conditional logic
-IF @ID IS NOT NULL
-BEGIN
-    PRINT 'ID = ' + CAST(@ID AS nvarchar(10));
-END
-
--- Capture a generated identity
-INSERT INTO State (Name)
-VALUES ('Example');
-
-SET @ID = SCOPE_IDENTITY();
-
--- Loop
-DECLARE @Counter int = 1;
-
-WHILE @Counter <= 5
-BEGIN
-    PRINT @Counter;
-    SET @Counter = @Counter + 1;
-END
-
--- CASE expression
-SELECT
-    CASE
-        WHEN @ID IS NULL THEN 'Unknown'
-        ELSE 'Known'
-    END AS Status;
-
--- Row count after a statement
-SET NOCOUNT ON;
-
-UPDATE Product
-SET PriceWithoutVAT = PriceWithoutVAT
-WHERE IDProduct <= 5;
-
-DECLARE @RowsUpdated int = @@ROWCOUNT;
-
-SET NOCOUNT OFF;
-
--- Basic error handling
-BEGIN TRY
-    SELECT CAST('N/A' AS int);
-END TRY
-BEGIN CATCH
-    SELECT
-        ERROR_NUMBER()  AS ErrorNumber,
-        ERROR_MESSAGE() AS ErrorMessage;
-END CATCH
-```
-
-You do not need to memorize every detail. You should understand what
-each construct does and be able to recognize it when it appears in later
-labs.
+You do not need to memorize every detail. You should understand what each construct does and be able to recognize it when it appears in later labs.
 
 ---
 

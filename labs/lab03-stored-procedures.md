@@ -1442,49 +1442,12 @@ Also verify these cases:
 
 # Key takeaways
 
-The most important ideas are:
-
-```mermaid
-flowchart LR
-    I[Input parameters] --> P[Stored Procedure]
-    P --> R[Result set]
-    P --> O[OUTPUT parameters]
-    P --> RC[RETURN status code]
-    P --> T[(Tables)]
-```
-
-```text
-Stored Procedure
-    -> a named, callable database operation
-```
-
-```text
-Input parameters
-    -> send values into the procedure
-```
-
-```text
-Result set
-    -> returns rows
-```
-
-```text
-OUTPUT parameter
-    -> returns individual values
-```
-
-```text
-RETURN
-    -> returns an integer status code
-```
-
-And remember:
+- **A stored procedure is a named, callable database operation.** It is particularly useful when one logical operation requires several SQL statements.
+- **Input parameters send values into the procedure.**
+- **A procedure can return data in three ways:** a result set returns rows, an `OUTPUT` parameter returns individual values, and `RETURN` returns an integer status code.
+- **One call, many statements.** The statements run on the database server after a single call, which can reduce network round-trips.
 
 > **Views answer. Triggers react. Procedures do.**
-
-A stored procedure is particularly useful when **one logical database operation requires several SQL statements**.
-
-It can also reduce **network round-trips** by allowing those statements to execute on the database server after a single procedure call.
 
 ---
 

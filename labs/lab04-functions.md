@@ -1385,54 +1385,12 @@ dbo.Product
 
 # Key takeaways
 
-The most important ideas are:
-
-```text
-Scalar Function
-    -> returns one value
-    -> used as an expression
-```
-
-```text
-Inline Table-Valued Function
-    -> returns a table from one SELECT
-    -> used as a table source
-    -> similar to a parameterised View
-```
-
-```text
-Multi-Statement Table-Valued Function
-    -> declares and fills a returned table variable
-    -> supports multiple statements and procedural logic
-```
-
-```text
-Functions and other database objects
-    -> procedures can use functions
-    -> triggers can use functions
-    -> functions can be composed with other functions
-```
-
-The optional additional reading works through a complete example of this: one Luhn-checksum function reused by an ad-hoc query, a stored procedure, and a trigger.
-
-```text
-Performance
-    -> scalar functions may be evaluated over many rows
-    -> functions applied to filtered columns can affect SARGability
-```
-
-A practical decision tree is:
-
-```mermaid
-flowchart TD
-    A[What should be returned?] --> B{One value?}
-    B -- Yes --> C[Scalar Function]
-    B -- No --> D{Can one SELECT<br/>produce the table?}
-    D -- Yes --> E[Inline TVF]
-    D -- No --> F[Multi-Statement TVF]
-```
-
-And remember:
+- **A scalar function returns one value** and is used as an expression.
+- **An inline table-valued function returns a table from one `SELECT`** and is used as a table source, similar to a parameterised View.
+- **A multi-statement table-valued function declares and fills a returned table variable,** so it supports several statements and procedural logic.
+- **Choose by what you need to return:** one value → scalar function; a table one `SELECT` can produce → inline TVF; otherwise → multi-statement TVF.
+- **Functions can be reused.** Procedures, triggers, and other functions can call them. The optional additional reading shows one Luhn-checksum function reused by an ad-hoc query, a stored procedure, and a trigger.
+- **Functions have a performance cost.** A scalar function may be evaluated for many rows, and a function applied to a filtered column can affect SARGability.
 
 > **A function returns a value. You use it where a value goes.**
 

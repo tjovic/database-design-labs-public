@@ -1774,64 +1774,14 @@ GO
 
 # Key takeaways
 
-The most important ideas are:
-
-```text
-View
-    -> stores a query definition
-    -> behaves like a virtual table
-```
-
-```text
-Base table changes
-    -> immediately visible through a regular View
-```
-
-```text
-View
-    -> hides query complexity
-    -> supports reuse
-    -> can provide a stable interface
-```
-
-```text
-CREATE OR ALTER VIEW
-    -> create a new View
-    -> or replace an existing definition
-```
-
-```text
-sys.tables / sys.columns
-    -> expose SQL Server metadata through system Views
-```
-
-The important ideas are:
-
-```text
-Simple View
-    -> may allow INSERT / UPDATE / DELETE
-
-Complex View
-    -> additional modification restrictions
-```
-
-```text
-WITH CHECK OPTION
-    -> modified rows must remain visible through the View
-```
-
-```text
-WITH SCHEMABINDING
-    -> prevents incompatible schema changes to referenced objects
-```
-
-```text
-WITH ENCRYPTION
-    -> hides the View definition from normal metadata inspection
-    -> not a security boundary
-```
-
-And remember:
+- **A View stores a query definition, not data.** It behaves like a virtual table, so changes in the base tables are immediately visible through a regular View.
+- **Views hide query complexity, support reuse, and can provide a stable interface.** The View can change while the application query stays the same.
+- **`CREATE OR ALTER VIEW` creates a new View or replaces an existing definition.**
+- **System Views expose SQL Server metadata.** `sys.tables` and `sys.columns` list tables and their columns.
+- **A simple View may allow `INSERT`, `UPDATE`, and `DELETE`;** joins, calculated columns, aggregates, and `DISTINCT` add restrictions.
+- **`WITH CHECK OPTION`:** modified rows must remain visible through the View.
+- **`WITH SCHEMABINDING`:** prevents incompatible schema changes to referenced objects.
+- **`WITH ENCRYPTION`:** hides the View definition from normal metadata inspection, but it is not a security boundary.
 
 > **Views store SQL. Tables store data.**
 

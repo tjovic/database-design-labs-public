@@ -205,17 +205,34 @@ In this lab, we will explore five approaches:
 
 All five approaches can represent the same list of product IDs, but they differ in how the data is prepared, transmitted, and processed.
 
-We will begin with SQL statements built by embedding values in application code, then explore parameterized alternatives.
+We will begin with what an application can do using only scalar parameters and SQL text, and then explore the other four methods.
 
 ---
 
 # Section 2 – Method 1: Client-Side Query Building
 
-In Section 1, the user selected products `1`, `2`, and `3`. One possible solution is to construct the SQL statement directly in the application.
+In Section 1, the user selected products `1`, `2`, and `3`. Before we look at new kinds of parameters, let's see what an application can do with what we already have: scalar parameters and SQL text.
 
-## 2.1 Building SQL in Application Code
+## 2.1 One Call per ID
 
-Consider the following application code. It is written in Python, but only as an example: an application in C# or Java builds SQL text the same way. You do not run this code in SSMS.
+The simplest solution is the one from Section 1.1: call the procedure once for each selected ID.
+
+Consider the following application code. It is written in Python, but only as an example: an application in C# or Java works the same way. You do not run this code in SSMS.
+
+```python
+product_ids = [1, 2, 3]
+
+for product_id in product_ids:
+    cursor.execute("EXEC dbo.usp_GetProduct @ProductID = ?", product_id)
+```
+
+The `?` marks a parameter: the ID is sent to the server separately from the SQL text. Section 2.3 explains why that matters.
+
+This is safe and correct, but every ID is a separate call, and each call waits for a response from the server. With 100 selected products, the application makes **100 calls**, and the communication time adds up — especially when the application and the database run on different servers.
+
+## 2.2 One Call: Writing the IDs into the SQL Text
+
+To make only one call, the application can write all the IDs into the SQL statement itself:
 
 ```python
 product_ids = [1, 2, 3]
@@ -238,11 +255,11 @@ FROM Product
 WHERE IDProduct IN (1, 2, 3);
 ```
 
-This example uses a fixed list of integers, so it contains no untrusted user input.
+This is one call and one set-based statement.
 
-However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
+This example uses a fixed list of integers, so it contains no untrusted user input. However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
 
-## 2.2 SQL Injection
+## 2.3 SQL Injection
 
 SQL injection occurs when user-provided data becomes part of the SQL command itself.
 
@@ -316,39 +333,49 @@ Do not put quotes around the `?` placeholders: the database driver handles param
 
 The placeholder depends on the driver: Python's `pyodbc` uses `?`, while .NET uses named parameters such as `@LastName`. The idea is the same in every language: the SQL text and the values are sent separately.
 
+Parameters have one more benefit: when the query text stays the same and only the values change, SQL Server can **reuse the cached execution plan** instead of compiling a new one for every value.
+
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
 
-## 2.3 Why Parameters Alone Are Not Enough
+## 2.4 A Parameter Cannot Carry a List
 
-Parameters have one more benefit: when the query text stays the same and only the values change, SQL Server can **reuse the cached execution plan** instead of compiling a new one for every value.
+Parameters protect us from SQL injection. Can we use one parameter for the whole list of IDs? Try it in SSMS:
 
-However, a scalar parameter still carries only one value. As we saw in Section 1.1, retrieving 100 products with a parameterized query in a loop still requires **100 calls**:
+```sql
+DECLARE @IDs nvarchar(100) = N'1,2,3';
 
-| Approach | IDs per call | Number of calls |
+SELECT IDProduct, Name
+FROM Product
+WHERE IDProduct IN (@IDs);
+```
+
+SQL Server returns an error:
+
+```text
+Conversion failed when converting the nvarchar value '1,2,3' to data type int.
+```
+
+`@IDs` is **one value** — the text `'1,2,3'` — not a list of three numbers. `IN (@IDs)` compares `IDProduct` with that single value, so SQL Server tries to convert the whole text to `int`, and fails.
+
+With scalar parameters only, the safe solution is the loop from Section 2.1 again:
+
+| Approach | Safe from SQL injection | Calls for 100 IDs |
 |---|---|---|
-| Parameterized query inside a loop | 1 | 100 |
-| Pass a collection | 100 | 1 |
-
-Each call waits for a response from the server, so the communication time adds up — especially when the application and database run on different servers.
-
-## 2.4 The Better Approach
-
-| Problem | Better approach |
-|---|---|
-| User input can change the SQL command | Pass values as parameters |
-| Changing SQL text can reduce execution-plan reuse | Keep query text consistent and use parameters |
-| Separate queries require many database calls | Send multiple values together |
+| One call per ID (2.1) | Yes | 100 |
+| All IDs written into the SQL text (2.2) | No | 1 |
+| One parameter that carries a collection (Sections 3–6) | Yes | 1 |
 
 We need both: values passed **as parameters**, and many values passed **in one call**. The remaining four methods from Section 1.3 do exactly that — each passes a collection through a single parameter.
 
-We will begin with the simplest format: **delimited strings**.
+We will begin with the simplest format: **delimited strings**. Section 3 shows how to turn exactly this text, `'1,2,3'`, into separate values.
 
 **Check your understanding**
 
 1. With the input `Achong' OR 1=1 --`, why does the concatenated query return all customers, while the parameterized query does not?
 2. Besides protection from SQL injection, what other benefit do parameters give?
 3. Why is a parameterized query inside a loop still not a good way to retrieve 100 products?
+4. Why does `WHERE IDProduct IN (@IDs)` fail when `@IDs` is `N'1,2,3'`?
 
 <details>
 <summary>Show answers</summary>
@@ -356,6 +383,7 @@ We will begin with the simplest format: **delimited strings**.
 1. In the concatenated query, the input becomes part of the SQL text: `'` closes the string, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server searches for a last name that is literally `Achong' OR 1=1 --`.
 2. The query text stays the same, so SQL Server can reuse the cached execution plan.
 3. A scalar parameter carries one value, so 100 IDs still mean 100 calls. We need many values in one call.
+4. `@IDs` is one `nvarchar` value, not a list. SQL Server compares `IDProduct` with that single value and tries to convert the text `'1,2,3'` to `int`, which fails.
 
 </details>
 

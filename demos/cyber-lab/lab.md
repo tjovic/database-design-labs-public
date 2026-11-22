@@ -142,7 +142,7 @@ query, whatever characters it contains.
 > **Rule 1:** Never build SQL by joining strings with user input. Send the
 > input as parameters — `?` placeholders in the application, or the
 > parameters of a stored procedure ([Lab 3](../../labs/lab03-stored-procedures.md)).
-> This is the solution from [Lab 8, Section 2.2](../../labs/lab08-complex-parameters.md#the-solution--parameterized-queries).
+> This is the solution from [Lab 8, Section 2.3](../../labs/lab08-complex-parameters.md#the-solution--parameterized-queries).
 
 > Ask: a colleague suggests removing every `'` from the input instead.
 > Why is that worse than parameters?

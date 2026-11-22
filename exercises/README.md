@@ -147,26 +147,15 @@ The index collection is in [Index Exercises](lab06-indexes.md) and follows the l
 
 Part A (Exercises 1–7) intentionally uses `AdventureWorksENG` — the database the midterm is written against — so students can practice designing and reading indexes in that exact environment. Part B (Exercises 8–11) continues in Lab 06's large `IndexLab` database, where performance differences are obvious, and relies on the indexes the lab creates. Each exercise creates at most one real index on an existing table (see the database safety note below) rather than an isolated new object.
 
-### Advanced grouping
+### Advanced grouping and window functions
 
-The grouping collection is in [Advanced Grouping Exercises](lab11-advanced-grouping.md) and follows the learning goals in [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md):
+The collection is in [Advanced Grouping and Window Function Exercises](lab11-grouping-and-window-functions.md) and follows the learning goals in [Lab 11 – Advanced Grouping and Window Functions](../labs/lab11-grouping-and-window-functions.md):
 
-1. **ROLLUP** — subtotals up a hierarchy, and why the column order matters.
-2. **CUBE** — subtotals for every combination of columns.
-3. **GROUPING SETS** — exactly the grouping levels you need, and rewriting `ROLLUP` as `GROUPING SETS`.
-4. **GROUPING()** — readable labels for subtotal and grand-total rows, also when the grouped column is an expression such as a year.
-5. **Choosing the grouping** — start from a report request and decide which of the three tools fits.
-
-All exercises are plain `SELECT` statements on `AdventureWorksENG`.
-
-### Window functions
-
-The window function collection is in [Window Function Exercises](lab12-window-functions.md) and follows the learning goals in [Lab 12 – Window Functions](../labs/lab12-window-functions.md):
-
-1. **Ranking functions** — `ROW_NUMBER`, `RANK`, `DENSE_RANK`, fixed-size buckets, and ranking the result of a `GROUP BY`.
-2. **Aggregate window functions** — running totals, values that are constant per partition, and moving averages with a `ROWS` frame.
-3. **Analytical functions** — `LAG` and `LEAD` (also more than one row away) and `FIRST_VALUE` per partition.
-4. **Putting it together** — rank grouped totals within each group.
+1. **Advanced grouping (Part A)** — `ROLLUP` and why the column order matters, `CUBE`, `GROUPING SETS` (also as a rewrite of `ROLLUP`), readable labels with `GROUPING()`, and choosing the right tool for a report request.
+2. **Ranking functions (Part B)** — `ROW_NUMBER`, `RANK`, `DENSE_RANK`, fixed-size buckets, and ranking the result of a `GROUP BY`.
+3. **Aggregate window functions (Part C)** — running totals, values that are constant per partition, and moving averages with a `ROWS` frame.
+4. **Analytical functions (Part D)** — `LAG` and `LEAD` (also more than one row away) and `FIRST_VALUE` per partition.
+5. **Putting it together (Part E)** — rank grouped totals within each group.
 
 All exercises are plain `SELECT` statements on `AdventureWorksENG`, except one that creates a small test table.
 
@@ -220,8 +209,6 @@ The index exercises are a deliberate, narrow exception to "prefer isolated test 
 - [Physical Storage Exercises](lab05-physical-storage.md)
 - [Lab 06 – Indexes](../labs/lab06-indexes.md)
 - [Index Exercises](lab06-indexes.md)
-- [Lab 11 – Advanced Grouping](../labs/lab11-advanced-grouping.md)
-- [Advanced Grouping Exercises](lab11-advanced-grouping.md)
-- [Lab 12 – Window Functions](../labs/lab12-window-functions.md)
-- [Window Function Exercises](lab12-window-functions.md)
+- [Lab 11 – Advanced Grouping and Window Functions](../labs/lab11-grouping-and-window-functions.md)
+- [Advanced Grouping and Window Function Exercises](lab11-grouping-and-window-functions.md)
 - [Repository overview](../README.md)

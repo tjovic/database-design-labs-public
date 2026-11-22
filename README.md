@@ -37,12 +37,11 @@ Before starting the labs, make sure you can connect to SQL Server and access the
 | 08 | [Complex Parameters](labs/lab08-complex-parameters.md) | passing collections into a procedure: why client-side query building enables SQL injection, delimited strings, XML (`.nodes()` / `.value()` / `FOR XML PATH`), JSON (`OPENJSON` / `FOR JSON PATH`), Table-Valued Parameters (`CREATE TYPE ... AS TABLE`), choosing the right method |
 | 09 | [Transactions](labs/lab09-transactions.md) | `BEGIN/COMMIT/ROLLBACK TRANSACTION`, ACID properties, write-ahead logging, checkpoints, savepoints, `@@TRANCOUNT`, combining transactions with `TRY/CATCH` and `THROW`, transaction ownership between a procedure and its caller |
 | 10 | [Concurrency and Isolation](labs/lab10-concurrency.md) | dirty reads, non-repeatable reads, phantom reads, the four isolation levels, two-session demos, shared/exclusive locks, two-phase locking, lock granularity and escalation, deadlocks, MVCC and `READ_COMMITTED_SNAPSHOT` |
-| 11 | [Advanced Grouping](labs/lab11-advanced-grouping.md) | `GROUP BY ()` as the grand-total idiom, `ROLLUP`, `CUBE`, `GROUPING SETS`, rewriting `ROLLUP`/`CUBE` as `GROUPING SETS`, disambiguating grouping `NULL`s from data `NULL`s with `GROUPING()` |
-| 12 | [Window Functions](labs/lab12-window-functions.md) | the `OVER` clause, ranking functions (`ROW_NUMBER`/`RANK`/`DENSE_RANK`/`NTILE`), aggregate windows and running totals, analytical functions (`LAG`/`LEAD`/`FIRST_VALUE`/`LAST_VALUE`), the `LAST_VALUE` default-frame trap, `ROWS`/`RANGE` frames |
+| 11 | [Advanced Grouping and Window Functions](labs/lab11-grouping-and-window-functions.md) | **Part I:** `GROUP BY ()` as the grand-total idiom, `ROLLUP`, `CUBE`, `GROUPING SETS`, rewriting `ROLLUP`/`CUBE` as `GROUPING SETS`, disambiguating grouping `NULL`s from data `NULL`s with `GROUPING()`; **Part II:** the `OVER` clause, ranking functions (`ROW_NUMBER`/`RANK`/`DENSE_RANK`/`NTILE`), aggregate windows and running totals, analytical functions (`LAG`/`LEAD`/`FIRST_VALUE`/`LAST_VALUE`), the `LAST_VALUE` default-frame trap, `ROWS`/`RANGE` frames |
 
 > Additional labs will be added as the course progresses.
 
-Practice exercises for the labs are collected in the [Exercise Collection](exercises/README.md) (T-SQL essentials, views, triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, concurrency, physical storage, indexes, advanced grouping, window functions).
+Practice exercises for the labs are collected in the [Exercise Collection](exercises/README.md) (T-SQL essentials, views, triggers, stored procedures, functions, CRUD operations, complex parameters, transactions, concurrency, physical storage, indexes, advanced grouping and window functions).
 
 Lab 8 also has two optional, self-contained live demos — a SQL-injection attack against a running login form, and a REST API that posts JSON into a stored procedure — see [demos/README.md](demos/README.md).
 
@@ -87,9 +86,7 @@ Lab 09 – Transactions
         ↓
 Lab 10 – Concurrency and Isolation
         ↓
-Lab 11 – Advanced Grouping
-        ↓
-Lab 12 – Window Functions
+Lab 11 – Advanced Grouping and Window Functions
 ```
 
 A single lab may span more than one class session when the topic requires additional time.

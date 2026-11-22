@@ -750,9 +750,36 @@ In Section 1.2, we described the 1:N insert problem: an invoice header together 
 
 The `Invoice` element is the parent; its attributes hold the header values. The `<Lines>` element groups the child `Line` elements, one for each invoice item.
 
-### Step 1 – Read the nested XML
+### Step 1 – Read the invoice header
 
-Before writing the procedure, let's read the items:
+Before writing the procedure, let's read the header. The document has only one `Invoice` element, so `.nodes('/Invoice')` returns **one row**:
+
+```sql
+DECLARE @Invoice xml = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TEST-001">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
+
+SELECT
+    tbl.col.value('@CustomerID', 'int') AS CustomerID,
+    tbl.col.value('@InvoiceDate', 'date') AS InvoiceDate,
+    tbl.col.value('@InvoiceNumber', 'nvarchar(20)') AS InvoiceNumber
+FROM @Invoice.nodes('/Invoice') AS tbl(col);
+```
+
+Result:
+
+| CustomerID | InvoiceDate | InvoiceNumber |
+|---|---|---|
+| 5 | 2026-11-04 | SO-TEST-001 |
+
+### Step 2 – Read the invoice items
+
+The items are nested inside `<Lines>`, so the path follows that nesting:
 
 ```sql
 DECLARE @Invoice xml = N'
@@ -781,7 +808,9 @@ Result:
 
 The path `/Invoice/Lines/Line` follows the nesting of the document: `.nodes()` returns one row for each `Line` element.
 
-### Step 2 – Create the procedure
+The procedure uses both queries: the first for the `Invoice` row, the second for the `InvoiceItem` rows.
+
+### Step 3 – Create the procedure
 
 The procedure inserts the invoice header first, then uses its generated ID when inserting the items.
 
@@ -843,7 +872,7 @@ Both inserts use the same pattern:
 
 In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
 
-### Step 3 – Call the procedure
+### Step 4 – Call the procedure
 
 ```sql
 EXEC dbo.usp_InvoiceInsertFromXml
@@ -857,7 +886,7 @@ EXEC dbo.usp_InvoiceInsertFromXml
 </Invoice>';
 ```
 
-### Step 4 – Verify the result
+### Step 5 – Verify the result
 
 ```sql
 SELECT
@@ -1287,7 +1316,9 @@ This document contains two levels of information:
 - **Invoice header** — customer ID, invoice date, and invoice number.
 - **Invoice lines** — an array of products, quantities, and prices.
 
-We read the header with `JSON_VALUE`, and the `Lines` array with `OPENJSON` and a path pointing directly to that array:
+### Step 1 – Read the invoice header
+
+The header fields are single values, so we read them with `JSON_VALUE` (Section 5.2). The path follows the nesting: `$.Invoice.CustomerID` is the `CustomerID` property inside the `Invoice` object.
 
 ```sql
 DECLARE @Json nvarchar(max) = N'
@@ -1308,6 +1339,32 @@ SELECT
     JSON_VALUE(@Json, '$.Invoice.CustomerID') AS CustomerID,
     JSON_VALUE(@Json, '$.Invoice.InvoiceDate') AS InvoiceDate,
     JSON_VALUE(@Json, '$.Invoice.InvoiceNumber') AS InvoiceNumber;
+```
+
+Result:
+
+| CustomerID | InvoiceDate | InvoiceNumber |
+|---|---|---|
+| 5 | 2026-11-04 | SO-TEST-002 |
+
+### Step 2 – Read the invoice items
+
+The `Lines` array becomes rows with `OPENJSON` and a path pointing directly to that array:
+
+```sql
+DECLARE @Json nvarchar(max) = N'
+{
+    "Invoice": {
+        "CustomerID": 5,
+        "InvoiceDate": "2026-11-04",
+        "InvoiceNumber": "SO-TEST-002",
+        "Lines": [
+            { "ProductID": 1, "Quantity": 2, "UnitPrice": 199.00 },
+            { "ProductID": 2, "Quantity": 1, "UnitPrice": 49.90 },
+            { "ProductID": 3, "Quantity": 5, "UnitPrice": 9.99 }
+        ]
+    }
+}';
 
 SELECT *
 FROM OPENJSON(@Json, '$.Invoice.Lines')
@@ -1319,7 +1376,7 @@ WITH
 );
 ```
 
-The second result:
+Result:
 
 | ProductID | Quantity | UnitPrice |
 |---|---|---|
@@ -1328,6 +1385,8 @@ The second result:
 | 3 | 5 | 9.99 |
 
 The second argument of `OPENJSON`, `'$.Invoice.Lines'`, tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
+
+The procedure in Section 5.6 uses both queries: the first for the `Invoice` row, the second for the `InvoiceItem` rows.
 
 ## 5.6 Inserting Related Records from JSON
 

@@ -17,7 +17,7 @@ This lab compares five approaches to handling collections of data, starting with
 
 After completing this lab, you should be able to:
 
-- identify the two classic collection-parameter problems: the 1:N insert and the batch key operation;
+- identify the two classic collection-parameter problems: the 1:N insert and the batch operation on a list of IDs;
 - explain the risks of unsafe SQL concatenation, the benefits of parameterization, and the overhead of separate database calls;
 - pass a flat list of values as a delimited string and split them with `STRING_SPLIT`;
 - pass structured data as XML: shred it with `.nodes()` and `.value()`, read attributes and element text, insert a parent row with its children, and build XML back with `FOR XML PATH`;
@@ -2025,9 +2025,9 @@ END;
 GO
 ```
 
-The body of the procedure is the same as in Sections 4.4 and 5.6: insert the header, read `SCOPE_IDENTITY()`, then insert all items with one `INSERT ... SELECT`. Only the input is new: the header arrives as three scalar parameters, and the items arrive as typed rows in `@Lines`, so the procedure reads them with a plain `FROM @Lines`.
+The body of the procedure is the same as in Sections 4.4 and 5.5: insert the header, read `SCOPE_IDENTITY()`, then insert all items with one `INSERT ... SELECT`. Only the input is new: the header arrives as three scalar parameters, and the items arrive as typed rows in `@Lines`, so the procedure reads them with a plain `FROM @Lines`.
 
-| | 4.4 – XML | 5.6 – JSON | 6.4 – TVP |
+| | 4.4 – XML | 5.5 – JSON | 6.4 – TVP |
 |---|---|---|---|
 | Header | `.value()` reads three attributes | `JSON_VALUE` reads three properties | Three scalar parameters |
 | Items | `.nodes('/Invoice/Lines/Line')` and `.value()` | `OPENJSON(@Json, '$.Invoice.Lines') WITH (...)` | `FROM @Lines` |
@@ -2035,7 +2035,7 @@ The body of the procedure is the same as in Sections 4.4 and 5.6: insert the hea
 
 The same simplified mapping as in Section 4.4 applies: `UnitPrice` becomes `InitialPrice`, `Discount` is `0`, and `TotalPrice` is `Quantity * UnitPrice`.
 
-As in Sections 4.4 and 5.6, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
+As in Sections 4.4 and 5.5, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
 ### Step 3 – Prepare the items and call the procedure
 

@@ -261,18 +261,22 @@ FROM Customer
 WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
 ```
 
-The input is pasted into the application's SQL text, and part of it becomes SQL code:
+The application writes the beginning and the end of the statement, and the user's input fills the gap:
 
 ```text
-Application's SQL text:  ... LastName = '{last_name}'
-User input:                              Achong' OR 1=1 --
-SQL sent to the server:  ... LastName = 'Achong' OR 1=1 --'
-                                         └──┬─┘│└──┬──┘ └┬┘
-                                            │  │   │     └─ comment: the application's closing ' is ignored
-                                            │  │   └─ a new condition that is always true
-                                            │  └─ closes the string early
-                                            └─ the value the application expected
+The application writes:  ... LastName = '_________________'
+The user types:                          Achong' OR 1=1 --
+
+SQL Server receives:     ... LastName = 'Achong' OR 1=1 --'
+                                         └───────┬───────┘
+                                                 └─ everything here was typed by the user
 ```
+
+SQL Server reads the user's part as SQL code:
+
+1. `'` after `Achong` closes the string, so the last name is just `Achong`.
+2. `OR 1=1` adds a new condition that is always true.
+3. `--` starts a comment, so SQL Server ignores the closing `'` added by the application.
 
 Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
 

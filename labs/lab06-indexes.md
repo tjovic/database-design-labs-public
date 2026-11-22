@@ -2387,18 +2387,18 @@ Remember that an `Index Seek` is not automatically better than a `Scan`. The bes
 
 # Key takeaways
 
-- SQL Server indexes use pages, and useful access paths can avoid unnecessary I/O.
-- A B+ tree has navigation pages and a logically ordered leaf level.
-- A **heap** has no clustered index.
-- A nonclustered index on a heap uses **RID** locators; on a clustered table it generally uses the **clustered key** as the locator.
-- A clustered index stores **complete rows in its leaf level**; a table can have only one.
-- A primary key is a constraint enforced by a unique index; it does not replace all other indexes.
-- `Index Seek`, `Index Scan`, `Hash Match`, and `Nested Loops` are access/processing choices, not labels for inherently good or bad plans.
-- Composite key order, selectivity, and included columns determine which access patterns an index supports.
-- Statistics tell the optimizer how values are distributed; without a covering index, even a small fraction of the table can be too many lookups.
-- A filtered index covers only a well-defined subset of rows and can be much smaller than an ordinary index.
-- Indexes cost space and maintenance as well as providing potential read benefits.
-- Always validate an index against the **actual workload** using plans and I/O measurements.
+- **Indexes are about pages.** SQL Server indexes use pages, and a useful access path can avoid unnecessary I/O.
+- **A B+ tree has navigation pages and a logically ordered leaf level.**
+- **A heap is a table without a clustered index.**
+- **A nonclustered index finds the row through a locator:** a **RID** on a heap, and generally the **clustered key** on a clustered table.
+- **A clustered index stores complete rows in its leaf level,** so a table can have only one.
+- **A primary key is a constraint enforced by a unique index.** It does not replace all other indexes.
+- **Plan operators are choices, not grades.** `Index Seek`, `Index Scan`, `Hash Match`, and `Nested Loops` are access and processing choices, not labels for inherently good or bad plans.
+- **Key order, selectivity, and included columns decide what an index supports.** They determine which access patterns a composite index can serve.
+- **Statistics tell the optimizer how values are distributed.** Without a covering index, even a small fraction of the table can be too many lookups.
+- **A filtered index covers only a well-defined subset of rows** and can be much smaller than an ordinary index.
+- **Indexes are not free.** They cost space and maintenance as well as providing potential read benefits.
+- **Validate every index against the actual workload,** using execution plans and I/O measurements.
 
 ---
 

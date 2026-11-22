@@ -2718,21 +2718,21 @@ Understanding how SQL Server organizes and accesses database pages provides the 
 
 ## The minimum you need for Lab 06
 
-- A SQL Server database is stored in **data and log files**.
-- SQL Server pages are **8 KB**; eight consecutive pages form one **64 KB extent**.
-- A data page includes a header, records, free space, and a slot array.
-- Wider rows usually require more pages to store the same number of rows.
-- SQL Server uses the **buffer pool** to cache pages.
-- **Logical reads** count page accesses in memory; **physical reads** involve obtaining pages from storage. Read-ahead activity may be reported separately.
-- More pages processed generally mean more work, but **one page is not equivalent to one physical I/O operation**.
-- **A scan is not automatically bad**; its cost depends partly on how many pages must be processed.
-- Indexes provide alternative access paths that can reduce unnecessary page processing.
+- **A database is stored in data and log files.**
+- **Pages are 8 KB; eight consecutive pages form one 64 KB extent.**
+- **A data page has a header, records, free space, and a slot array.**
+- **Wider rows need more pages.** Storing the same number of rows with wider rows usually requires more pages.
+- **SQL Server caches pages in the buffer pool.**
+- **Logical reads count page accesses in memory; physical reads obtain pages from storage.** Read-ahead activity may be reported separately.
+- **One page is not one physical I/O.** More pages processed generally mean more work, but one page is not equivalent to one physical I/O operation.
+- **A scan is not automatically bad.** Its cost depends partly on how many pages must be processed.
+- **Indexes provide alternative access paths** that can reduce unnecessary page processing.
 
 ## From the hands-on and deep-dive sections
 
-- `DBCC IND` and `DBCC PAGE` are useful laboratory tools for examining page allocation and contents.
-- **Sectors**, **NTFS clusters**, and **SQL Server pages** belong to different storage layers.
-- A clustered index gains levels as the table grows, but finding one row by its key still requires only a few page accesses.
+- **`DBCC IND` and `DBCC PAGE` show page allocation and page contents.** They are useful laboratory tools for examining how data is stored.
+- **Sectors, NTFS clusters, and SQL Server pages belong to different storage layers.**
+- **A clustered index stays shallow.** It gains levels as the table grows, but finding one row by its key still requires only a few page accesses.
 
 > **The key performance question is often not how many rows a query returns, but how many pages SQL Server has to examine to produce the result.**
 

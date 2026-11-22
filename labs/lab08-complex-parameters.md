@@ -1154,31 +1154,31 @@ JSON is a text-based format for representing structured data.
 
 It supports objects, arrays, strings, numbers, Boolean values, and `null`.
 
-Consider a customer represented as a JSON object:
+Consider the first customer from Section 4.1, now represented as a JSON object:
 
 ```json
 {
-    "FirstName": "Alice",
-    "LastName": "Anderson",
-    "Email": "alice@example.com"
+    "FirstName": "Nina",
+    "LastName": "Novak",
+    "Email": "nina.novak@example.com"
 }
 ```
 
 An **object** contains named properties and their values.
 
-We can also represent multiple customers using a JSON array:
+Both customers from Section 4.1 can be represented using a JSON array:
 
 ```json
 [
     {
-        "FirstName": "Alice",
-        "LastName": "Anderson",
-        "Email": "alice@example.com"
+        "FirstName": "Nina",
+        "LastName": "Novak",
+        "Email": "nina.novak@example.com"
     },
     {
-        "FirstName": "Bob",
-        "LastName": "Brown",
-        "Email": "bob@example.com"
+        "FirstName": "Ivan",
+        "LastName": "Horvat",
+        "Email": "ivan.horvat@example.com"
     }
 ]
 ```
@@ -1187,43 +1187,34 @@ The square brackets `[]` represent an array, while curly brackets `{}` represent
 
 In this example, the array contains two customer objects.
 
-Unlike XML, JSON had no data type of its own before SQL Server 2025, so it is stored and passed as `nvarchar(max)`. The examples in this lab use `nvarchar(max)`; the JSON functions work from SQL Server 2016, with database compatibility level 130 or higher.
+Unlike XML, JSON had no data type of its own before SQL Server 2025, so it is stored and passed as `nvarchar(max)`. The examples in this lab use `nvarchar(max)`.
 
 > [!NOTE]
 > SQL Server 2025 adds a native `json` data type, which checks the text when it is assigned. `DECLARE @Json json = N'{"a": 1';` fails at once because the closing `}` is missing. An `nvarchar(max)` variable accepts the same text without an error, because to SQL Server it is just a string. The JSON functions do not always catch the mistake later either: `JSON_VALUE(@Json, '$.a')` still returns `1`. All JSON functions in this lab work with both types.
 
 ## 5.2 Reading a Single Value – JSON_VALUE
 
-Let's start with a JSON object. Its `Address` property is itself an object, with its own properties `Street`, `City`, and `PostalCode`.
+Let's read the values of the customer object from Section 5.1:
 
 ```sql
 DECLARE @Customer nvarchar(max) = N'
 {
-    "FirstName": "Alice",
-    "LastName": "Anderson",
-    "Email": "alice@example.com",
-    "Address": {
-        "Street": "Ilica 10",
-        "City": "Zagreb",
-        "PostalCode": "10000"
-    }
+    "FirstName": "Nina",
+    "LastName": "Novak",
+    "Email": "nina.novak@example.com"
 }';
 
 SELECT
     JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
     JSON_VALUE(@Customer, '$.LastName') AS LastName,
-    JSON_VALUE(@Customer, '$.Email') AS Email,
-    -- properties inside the nested Address object
-    JSON_VALUE(@Customer, '$.Address.Street') AS Street,
-    JSON_VALUE(@Customer, '$.Address.City') AS City,
-    JSON_VALUE(@Customer, '$.Address.PostalCode') AS PostalCode;
+    JSON_VALUE(@Customer, '$.Email') AS Email;
 ```
 
 Result:
 
-| FirstName | LastName | Email | Street | City | PostalCode |
-|---|---|---|---|---|---|
-| Alice | Anderson | alice@example.com | Ilica 10 | Zagreb | 10000 |
+| FirstName | LastName | Email |
+|---|---|---|
+| Nina | Novak | nina.novak@example.com |
 
 The `JSON_VALUE` function extracts a single scalar value from a JSON document.
 
@@ -1233,18 +1224,41 @@ Its basic syntax is:
 JSON_VALUE(json_expression, path)
 ```
 
-The path tells SQL Server which property to read.
+The path tells SQL Server which property to read. The `$` symbol represents the root of the JSON document, so `$.FirstName` is the `FirstName` property of the root object.
 
-For example:
+A property can also hold another object. Here, `Address` is an object with its own properties, and a dot in the path moves one level down:
+
+```sql
+DECLARE @Customer nvarchar(max) = N'
+{
+    "FirstName": "Nina",
+    "LastName": "Novak",
+    "Email": "nina.novak@example.com",
+    "Address": {
+        "Street": "Ilica 10",
+        "City": "Zagreb",
+        "PostalCode": "10000"
+    }
+}';
+
+SELECT
+    JSON_VALUE(@Customer, '$.FirstName') AS FirstName,
+    JSON_VALUE(@Customer, '$.Address.Street') AS Street,        -- NEW: property inside Address
+    JSON_VALUE(@Customer, '$.Address.City') AS City,
+    JSON_VALUE(@Customer, '$.Address.PostalCode') AS PostalCode;
+```
+
+Result:
+
+| FirstName | Street | City | PostalCode |
+|---|---|---|---|
+| Nina | Ilica 10 | Zagreb | 10000 |
 
 | JSON path | Meaning |
 |---|---|
 | `$` | Root of the JSON document |
 | `$.FirstName` | Property `FirstName` |
-| `$.Email` | Property `Email` |
 | `$.Address.City` | Property `City` inside `Address` |
-
-The `$` symbol represents the root of the JSON document, and dots are used to navigate through nested objects.
 
 This path syntax comes from the SQL standard (SQL/JSON, part of ISO SQL:2016), so other databases, such as Oracle and PostgreSQL, use the same `$.Property` notation.
 
@@ -1286,9 +1300,8 @@ We can use `WITH (...)` to specify which properties should become SQL columns:
 ```sql
 DECLARE @Customers nvarchar(max) = N'
 [
-    { "FirstName": "Ida", "LastName": "Ibsen", "Email": "ida@example.com" },
-    { "FirstName": "Jonas", "LastName": "Jensen", "Email": "jonas@example.com" },
-    { "FirstName": "Kari", "LastName": "Kristian", "Email": "kari@example.com" }
+    { "FirstName": "Nina", "LastName": "Novak", "Email": "nina.novak@example.com" },
+    { "FirstName": "Ivan", "LastName": "Horvat", "Email": "ivan.horvat@example.com" }
 ]';
 
 SELECT *
@@ -1305,9 +1318,8 @@ Result:
 
 | FirstName | LastName | Email |
 |---|---|---|
-| Ida | Ibsen | ida@example.com |
-| Jonas | Jensen | jonas@example.com |
-| Kari | Kristian | kari@example.com |
+| Nina | Novak | nina.novak@example.com |
+| Ivan | Horvat | ivan.horvat@example.com |
 
 The `WITH` clause defines, for every column:
 
@@ -1317,7 +1329,12 @@ The `WITH` clause defines, for every column:
 
 For example, `FirstName nvarchar(50) '$.FirstName'` means: create a column named `FirstName`, convert its value to `nvarchar(50)`, and read it from the `FirstName` property.
 
-**The JSON array has now become a relational result set.** This is the JSON counterpart of XML shredding with `.nodes()` and `.value()`.
+**The JSON array has now become a relational result set.** This is the JSON counterpart of XML shredding with `.nodes()` and `.value()`; the result is the same as in Section 4.2, Step 2.
+
+> [!WARNING]
+> **JSON property names are case-sensitive.** The path `'$.firstName'` does not match the property `"FirstName"`, so the `FirstName` column is `NULL` in every row — without an error. The same happens with a misspelled or missing property, in `OPENJSON ... WITH` and in `JSON_VALUE`.
+>
+> If you get unexpected `NULL` values, first check the letter case of every property name in your paths.
 
 ## 5.4 Passing JSON to a Stored Procedure
 
@@ -1382,9 +1399,9 @@ WHERE Email IN
 
 The procedure can handle a larger array without changing its SQL code.
 
-## 5.5 Working with Nested JSON
+## 5.5 Inserting a Parent and Its Children
 
-Real-world JSON documents often contain nested objects and arrays. Consider the same invoice we inserted from XML in Section 4.4, now written as JSON:
+Now we insert an invoice with its items from one JSON document, as we did with XML in Section 4.4. Here is the same invoice, written as JSON:
 
 ```json
 {
@@ -1476,13 +1493,9 @@ Result:
 
 The second argument of `OPENJSON`, `'$.Invoice.Lines'`, tells SQL Server to start reading from the `Lines` array inside the `Invoice` object.
 
-The procedure in Section 5.6 uses both queries: the first for the `Invoice` row, the second for the `InvoiceItem` rows.
+The procedure uses both queries: the first for the `Invoice` row, the second for the `InvoiceItem` rows.
 
-## 5.6 Inserting Related Records from JSON
-
-Now we insert the invoice from Section 5.5: one row in `Invoice` and one row in `InvoiceItem` for every line. The whole invoice arrives as **one JSON document**: `JSON_VALUE` reads the header, and `OPENJSON` turns the lines into rows.
-
-### Step 1 – Create the procedure
+### Step 3 – Create the procedure
 
 ```sql
 CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsertFromJson
@@ -1533,7 +1546,7 @@ GO
 
 The structure follows the XML procedure from Section 4.4: insert the parent, read `SCOPE_IDENTITY()`, then insert all children with one `INSERT ... SELECT`.
 
-### Step 2 – Call the procedure
+### Step 4 – Call the procedure
 
 ```sql
 EXEC dbo.usp_InvoiceInsertFromJson
@@ -1552,7 +1565,7 @@ EXEC dbo.usp_InvoiceInsertFromJson
 }';
 ```
 
-### Step 3 – Verify the result
+### Step 5 – Verify the result
 
 ```sql
 SELECT
@@ -1570,11 +1583,15 @@ WHERE i.InvoiceNumber = N'SO-TEST-002';
 
 The result should contain three items linked to the same invoice. As in Section 4.4, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
-## 5.7 Generating JSON with FOR JSON PATH
+## 5.6 Generating JSON with FOR JSON PATH
 
 So far, we have converted JSON into SQL rows. SQL Server can also do the opposite: **convert query results into JSON**. This is useful when sending data to REST APIs or other applications that expect JSON.
 
-### Building the same shape we read in Section 5.4
+As with XML in Section 4.6, we build the output step by step. SQL Server returns the JSON as one line; the results below are formatted for readability.
+
+### Step 1 – Turn rows into JSON
+
+Add `FOR JSON PATH` to the end of an ordinary query:
 
 ```sql
 SELECT
@@ -1596,25 +1613,50 @@ Result:
 ]
 ```
 
-Each row becomes one JSON object, and the column names become property names. This is exactly the shape that `dbo.usp_InsertCustomerBatchFromJson` accepts. `OPENJSON` turns JSON into rows; `FOR JSON PATH` turns rows back into JSON.
+Each row becomes one JSON object, and the column names become property names. Unlike `FOR XML PATH`, we do not need to name anything: this is already exactly the shape that `dbo.usp_InsertCustomerBatchFromJson` accepts (Section 5.4). `OPENJSON` turns JSON into rows; `FOR JSON PATH` turns rows back into JSON.
 
-### Nested objects
+### Step 2 – Add a root
 
-A **dot** in a column alias creates a nested object, and `ROOT` wraps the array in a root object:
+`ROOT` wraps the array in an object with one property:
+
+```sql
+SELECT
+    c.FirstName,
+    c.LastName,
+    c.Email
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR JSON PATH, ROOT('Customers'); -- NEW: ROOT
+```
+
+Result:
+
+```json
+{
+    "Customers": [
+        { "FirstName": "Gustavo", "LastName": "Achong", "Email": "gustavo0@adventure-works.com" },
+        ...
+    ]
+}
+```
+
+### Step 3 – Create nested objects with a dot
+
+A **dot** in a column alias creates a nested object. As with `@` and `/` in XML, the alias needs brackets:
 
 ```sql
 SELECT
     c.IDCustomer,
     c.FirstName,
     c.LastName,
-    c.Email AS [Contact.Email],
+    c.Email AS [Contact.Email],        -- NEW: dot creates a nested object
     c.PhoneNumber AS [Contact.Phone]
 FROM Customer c
 WHERE c.IDCustomer <= 3
 FOR JSON PATH, ROOT('Customers');
 ```
 
-The result contains one object for each row. The first one looks like this:
+Result (first customer):
 
 ```json
 {
@@ -1635,14 +1677,14 @@ The result contains one object for each row. The first one looks like this:
 
 | SQL syntax | JSON result |
 |---|---|
-| `c.FirstName` | Creates a property named `FirstName` |
-| `[Contact.Email]` | Creates a nested `Contact` object with an `Email` property |
 | `FOR JSON PATH` | Creates one object per row, all inside an array |
+| `c.FirstName` | Creates a property named `FirstName` |
 | `ROOT('Customers')` | Wraps the array in a root object |
+| `[Contact.Email]` | Creates a nested `Contact` object with an `Email` property |
 
 This is the JSON counterpart of `FOR XML PATH`: JSON uses dots where XML uses slashes to create nested structures.
 
-## 5.8 Advantages and Limitations of JSON
+## 5.7 Advantages and Limitations of JSON
 
 | Advantages | Limitations |
 |---|---|
@@ -2134,7 +2176,7 @@ A **TVP** is a natural choice when the client supports it: the items arrive as t
 
 A web application sends the invoice as a JSON document, like the one in Section 5.5.
 
-A procedure with a **JSON** parameter reads the header with `JSON_VALUE` and the items with `OPENJSON` (Section 5.6).
+A procedure with a **JSON** parameter reads the header with `JSON_VALUE` and the items with `OPENJSON` (Section 5.5).
 
 **Why?** JSON is already the format used by the API. Depending on the application architecture, the backend could also convert the JSON into a TVP before calling SQL Server. Both designs are valid.
 

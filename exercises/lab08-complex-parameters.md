@@ -919,7 +919,7 @@ Call it twice: once for team `Blue` with the members above, and once for team `R
 
 - Read the team name with `JSON_VALUE(@Json, '$.Team')`.
 - Save `SCOPE_IDENTITY()` in a variable after inserting the team.
-- `OPENJSON(@Json, '$.Members')` turns the array into rows. The elements are plain values, not objects, so read the `value` column, as in Lab 8, Section 5.3, Step 1.
+- `OPENJSON(@Json, '$.Members')` turns the array into rows. Without `WITH`, each row has a `value` column (Lab 8, Section 5.3, Step 1). In the lab, `value` held a whole object; here the elements are plain names, so `value` is already the name you need.
 
 </details>
 

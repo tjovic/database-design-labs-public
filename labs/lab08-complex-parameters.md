@@ -451,63 +451,9 @@ EXEC dbo.usp_GetProductsByIDList
 
 This solves our first problem: passing a collection of simple values to a stored procedure.
 
-## 3.4 Practical Example – Deleting Multiple Customers
+The same `IN (SELECT … FROM STRING_SPLIT(…))` condition works in `UPDATE` and `DELETE` statements, so one call can change or delete all the listed rows.
 
-Suppose a user selects three customers and clicks **Delete**.
-
-The application can send their IDs as one comma-separated string. The procedure splits the string and deletes the matching customers using one `DELETE` statement.
-
-### Step 1 – Create the procedure
-
-```sql
-CREATE OR ALTER PROCEDURE dbo.usp_DeleteCustomersByIDList
-    @IDList nvarchar(200)
-AS
-BEGIN
-    DELETE FROM Customer
-    WHERE IDCustomer IN
-    (
-        SELECT CAST(value AS int)
-        FROM STRING_SPLIT(@IDList, ',')
-    );
-END;
-GO
-```
-
-### Step 2 – Check the selected customers
-
-For this example, we use customers with IDs `55`, `56`, and `57`.
-
-```sql
-SELECT IDCustomer, FirstName, LastName
-FROM Customer
-WHERE IDCustomer IN (55, 56, 57);
-```
-
-These customers have no invoices or other dependent rows, so a foreign key does not prevent the deletion.
-
-### Step 3 – Delete the customers
-
-Pass all three IDs through one parameter:
-
-```sql
-EXEC dbo.usp_DeleteCustomersByIDList
-    @IDList = N'55,56,57';
-```
-
-`STRING_SPLIT` separates the string into three values, and `CAST` converts them into integers. The `DELETE` statement removes all matching customers.
-
-### Step 4 – Verify the result
-
-```sql
-SELECT IDCustomer, FirstName, LastName
-FROM Customer
-WHERE IDCustomer IN (55, 56, 57);
-```
-
-The query should return no rows.
-
-## 3.5 Limitations of Delimited Strings
+## 3.4 Limitations of Delimited Strings
 
 Delimited strings are simple and convenient, but they have several limitations.
 

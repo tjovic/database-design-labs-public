@@ -459,13 +459,11 @@ Delimited strings are simple and convenient, but they have several limitations.
 
 | Limitation | Explanation |
 |---|---|
-| No type safety | Values arrive as text and may require conversion. |
-| Invalid values | A value such as `'1,ABC,3'` causes an error when converted to `int` using `CAST`. |
+| No type safety | Values arrive as text; a value such as `'1,ABC,3'` fails when converted with `CAST`. |
 | Delimiter conflicts | A comma cannot safely separate values that may themselves contain commas without additional rules. |
 | Limited structure | A string such as `'1,2,3'` represents a flat list, not a collection of records with multiple fields. |
-| No guaranteed order | `STRING_SPLIT` does not guarantee that rows are returned in their original order. |
 
-The invalid-value problem is easy to see:
+The type-safety problem is easy to see:
 
 ```sql
 SELECT CAST(value AS int) AS ProductID
@@ -505,14 +503,14 @@ In the next section, we will introduce **XML**, which allows us to represent mor
 
 **Check your understanding**
 
-1. What does `STRING_SPLIT('1,2,5', ',')` return, and what type is the `value` column?
+1. What does `STRING_SPLIT('1,2,3', ',')` return, and what type is the `value` column?
 2. A caller runs `EXEC dbo.usp_GetProductsByIDList @IDList = N'1,ABC,3';`. What happens?
 3. Why is a delimited string a poor fit for invoice items?
 
 <details>
 <summary>Show answers</summary>
 
-1. A table with one column named `value` and three rows: `1`, `2`, and `5`. The column is `nvarchar` if either argument is `nvarchar` or `nchar`; otherwise it is `varchar`. The values are strings until you convert them.
+1. A table with one column named `value` and three rows: `1`, `2`, and `3`. The column is `nvarchar` if either argument is `nvarchar` or `nchar`; otherwise it is `varchar`. The values are strings until you convert them.
 2. `CAST('ABC' AS int)` fails with a conversion error. Nothing in a delimited string prevents a caller from sending a value that is not a number.
 3. Each item has several fields. We would need two delimiters and our own code to split and convert every value, and the values would have no names or types.
 

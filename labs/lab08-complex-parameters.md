@@ -720,8 +720,11 @@ EXEC dbo.usp_InsertCustomerBatch
     <Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />
     <Customer FirstName="Ana" LastName="Kovac" Email="ana.kovac@example.com" />
 </Customers>';
+```
 
--- Verify
+### Step 3 – Verify the result
+
+```sql
 SELECT IDCustomer, FirstName, LastName, Email
 FROM Customer
 WHERE Email IN (
@@ -852,8 +855,11 @@ EXEC dbo.usp_InvoiceInsertFromXml
         <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
     </Lines>
 </Invoice>';
+```
 
--- Verify
+### Step 4 – Verify the result
+
+```sql
 SELECT
     i.IDInvoice,
     i.InvoiceNumber,
@@ -1241,8 +1247,11 @@ EXEC dbo.usp_InsertCustomerBatchFromJson
         "Email": "janica.kostelic@example.com"
     }
 ]';
+```
 
--- Verify the inserted customers
+### Step 3 – Verify the result
+
+```sql
 SELECT IDCustomer, FirstName, LastName, Email
 FROM Customer
 WHERE Email IN
@@ -1397,7 +1406,7 @@ EXEC dbo.usp_InvoiceInsertFromJson
 }';
 ```
 
-Verify the invoice and its items:
+### Step 3 – Verify the result
 
 ```sql
 SELECT

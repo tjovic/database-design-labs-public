@@ -49,8 +49,6 @@ Run this once at the start. Within the lab, the examples reset the account balan
 > [!IMPORTANT]
 > Every transaction you start must eventually finish with `COMMIT` or a full `ROLLBACK`. A `SELECT`, the end of a procedure, and the SSMS `GO` separator do not finish it automatically.
 
-Requires SQL Server 2016 SP1 or later (`CREATE OR ALTER PROCEDURE`).
-
 ---
 
 # Part A – Understanding Transactions
@@ -680,7 +678,7 @@ THROW 50001, 'Source account does not exist.', 1;
 Compare it with `THROW;` from 3.3: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
 
 > [!NOTE]
-> **THROW vs RAISERROR.** [Lab 4](lab04-functions.md) used `RAISERROR` in a trigger to raise an error. Both statements raise an error, but they differ:
+> **THROW vs RAISERROR.** You will meet `RAISERROR` in older code (and in the Additional Reading of [Lab 4](lab04-functions.md)). Both statements raise an error, but they differ:
 >
 > | | `RAISERROR` | `THROW` |
 > |---|---|---|
@@ -1373,7 +1371,7 @@ The second and fourth sequences leave a transaction open. If you run them, finis
 
 A transaction can be managed by the procedure or by its caller. The important question is: **which code owns the complete business operation?**
 
-[Lab 7 – CRUD Operations](lab07-crud-operations.md), Section 6.3, asked the same ownership question about `TRY/CATCH` placement — inside a procedure or at its caller. Here it returns for transactions, and the stakes are higher: the wrong choice does not just mis-handle an error message, it can commit or roll back the wrong amount of work.
+[Lab 7 – CRUD Operations](lab07-crud-operations.md), Section 5.3, asked the same ownership question about `TRY/CATCH` placement — inside a procedure or at its caller. Here it returns for transactions, and the stakes are higher: the wrong choice does not just mis-handle an error message, it can commit or roll back the wrong amount of work.
 
 ## 9.1 The procedure manages the transaction
 
@@ -1558,6 +1556,8 @@ The procedure returned successfully, but its inner `COMMIT` did not independentl
 The reverse is equally important. Our transfer procedure uses a **full rollback** when an execution error reaches its handler.
 
 If an outer transaction exists, that rollback also undoes earlier work in the outer transaction.
+
+The balances are still `1000.00` and `500.00` after 9.3, so no reset is needed.
 
 ```sql
 SET XACT_ABORT ON;
@@ -2046,8 +2046,6 @@ A reusable procedure can check `@@TRANCOUNT` on entry:
 This is more than adding `IF @@TRANCOUNT = 0` before `BEGIN`. The contract must define who handles errors, which work may survive, and whether the caller may continue.
 
 `SET XACT_ABORT ON` and `THROW` must be considered when designing that policy. Do not assume that a savepoint makes every failure locally recoverable.
-
-See Microsoft's `SAVE TRANSACTION` documentation for a worked transaction-ownership example.
 
 ## C. Keep Transactions Focused
 

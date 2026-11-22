@@ -1032,7 +1032,7 @@ Result:
 
 ### Step 4 – Create attributes with `@`
 
-A column alias that starts with `@` creates an attribute instead of a child element:
+A column alias that starts with `@` creates an attribute instead of a child element. The `@` means "create an attribute", and the rest of the alias is the attribute's name. Here we keep the column names, so `[@FirstName]` creates the attribute `FirstName`:
 
 ```sql
 SELECT

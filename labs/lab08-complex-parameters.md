@@ -213,41 +213,11 @@ We will begin with what an application can do using only scalar parameters and S
 
 In Section 1, the user selected products `1`, `2`, and `3`. Before we look at new kinds of parameters, let's see what an application can do with what we already have: scalar parameters and SQL text.
 
-## 2.1 One Call per ID
+## 2.1 Two Options We Already Have
 
-The simplest solution is the one from Section 1.1: call the procedure once for each selected ID.
+**One call per ID.** The application can call the procedure once for each selected ID, as in Section 1.1. This is safe and correct, but every ID is a separate call, and each call waits for a response from the server. With 100 selected products, the application makes **100 calls**, and the communication time adds up — especially when the application and the database run on different servers.
 
-Consider the following application code. It is written in Python, but only as an example: an application in C# or Java works the same way. You do not run this code in SSMS.
-
-```python
-product_ids = [1, 2, 3]
-
-for product_id in product_ids:
-    cursor.execute("EXEC dbo.usp_GetProduct @ProductID = ?", product_id)
-```
-
-The `?` marks a parameter: the ID is sent to the server separately from the SQL text. Section 2.3 explains why that matters.
-
-This is safe and correct, but every ID is a separate call, and each call waits for a response from the server. With 100 selected products, the application makes **100 calls**, and the communication time adds up — especially when the application and the database run on different servers.
-
-## 2.2 One Call: Writing the IDs into the SQL Text
-
-To make only one call, the application can write all the IDs into the SQL statement itself:
-
-```python
-product_ids = [1, 2, 3]
-
-# Convert the IDs into the text "1,2,3"
-id_list = ",".join(str(product_id) for product_id in product_ids)
-
-# Insert that text into the SQL statement
-sql = f"SELECT * FROM Product WHERE IDProduct IN ({id_list})"
-
-# Send the SQL statement to the database
-cursor.execute(sql)
-```
-
-The application generates this SQL statement:
+**All IDs in one SQL statement.** To make only one call, the application can write all the IDs into the SQL text itself and send this statement:
 
 ```sql
 SELECT *
@@ -255,15 +225,13 @@ FROM Product
 WHERE IDProduct IN (1, 2, 3);
 ```
 
-This is one call and one set-based statement.
+This is one call and one set-based statement. With a fixed list of integers it is harmless. However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
 
-This example uses a fixed list of integers, so it contains no untrusted user input. However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
-
-## 2.3 SQL Injection
+## 2.2 SQL Injection
 
 SQL injection occurs when user-provided data becomes part of the SQL command itself.
 
-Consider an application that searches for customers by first and last name:
+Consider an application that searches for customers by first and last name. The code is written in Python, but only as an example: an application in C# or Java builds SQL text the same way. You do not run this code in SSMS.
 
 ```python
 # UNSAFE — user input is inserted directly into SQL text
@@ -338,7 +306,7 @@ Parameters have one more benefit: when the query text stays the same and only th
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
 
-## 2.4 A Parameter Cannot Carry a List
+## 2.3 A Parameter Cannot Carry a List
 
 Parameters protect us from SQL injection. Can we use one parameter for the whole list of IDs? Try it in SSMS:
 
@@ -358,12 +326,12 @@ Conversion failed when converting the nvarchar value '1,2,3' to data type int.
 
 `@IDs` is **one value** — the text `'1,2,3'` — not a list of three numbers. `IN (@IDs)` compares `IDProduct` with that single value, so SQL Server tries to convert the whole text to `int`, and fails.
 
-With scalar parameters only, the safe solution is the loop from Section 2.1 again:
+With scalar parameters only, the safe solution is one call per ID again:
 
 | Approach | Safe from SQL injection | Calls for 100 IDs |
 |---|---|---|
 | One call per ID (2.1) | Yes | 100 |
-| All IDs written into the SQL text (2.2) | No | 1 |
+| All IDs written into the SQL text (2.1) | No | 1 |
 | One parameter that carries a collection (Sections 3–6) | Yes | 1 |
 
 We need both: values passed **as parameters**, and many values passed **in one call**. The remaining four methods from Section 1.3 do exactly that — each passes a collection through a single parameter.

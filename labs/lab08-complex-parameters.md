@@ -293,12 +293,12 @@ cursor.execute(sql, (first_name, last_name))
 The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
 
 ```text
-Concatenation – the input becomes part of the SQL text
-  Application ── "SELECT … LastName = 'Achong' OR 1=1 --'" ──► SQL Server parses all of it as SQL
+Without parameters – one piece of text
+  Application ───► "... LastName = 'Achong' OR 1=1 --'"   SQL Server reads all of it as SQL code
 
-Parameters – the SQL text and the values travel separately
-  Application ─┬─ "SELECT … LastName = ?"   ──► SQL Server parses only this as SQL
-               └─ "Achong' OR 1=1 --"        ──► used only as a value
+With parameters – the SQL text and the values are sent separately
+  Application ─┬─► "... LastName = ?"                     SQL Server reads this as SQL code
+               └─► "Achong' OR 1=1 --"                    SQL Server uses this only as a value
 ```
 
 Do not put quotes around the `?` placeholders: the database driver handles parameter values.

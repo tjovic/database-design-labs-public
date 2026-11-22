@@ -760,33 +760,32 @@ SSMS shows it as a single link; click it to open the formatted XML.
 
 ## Exercise 9 — Generating Nested XML with FOR XML PATH [ADVANCED]
 
-Write a query (not a procedure) that:
+A catalog system needs the products of selected subcategories as one XML document.
 
-1. Reads from `Customer` where `IDCustomer < 11`.
-2. Produces XML of this shape:
+Write a query (not a procedure) that produces this shape for subcategories `5`, `6`, and `7`:
 
 ```xml
-<Customers>
-    <Customer IDCustomer="1">
-        <FirstName>Gustavo</FirstName>
-        <LastName>Achong</LastName>
-        <Emails>
-            <Email>gustavo0@adventure-works.com</Email>
-        </Emails>
-    </Customer>
+<Subcategories>
+    <Subcategory IDSubcategory="5" Name="Bottom Brackets">
+        <Products>
+            <Product IDProduct="994" Name="LL Bottom Bracket" Price="53.9900" />
+            <Product IDProduct="995" Name="ML Bottom Bracket" Price="101.2400" />
+            <Product IDProduct="996" Name="HL Bottom Bracket" Price="121.4900" />
+        </Products>
+    </Subcategory>
+    <Subcategory IDSubcategory="6" Name="Brakes">
+        ...
+    </Subcategory>
     ...
-</Customers>
+</Subcategories>
 ```
-
-Use `FOR XML PATH` with slash-separated aliases to create the nested structure.
 
 <details>
 <summary>Hint</summary>
 
-- `[@IDCustomer]` in the `SELECT` becomes an XML attribute.
-- `[FirstName]` becomes a simple element.
-- `[Emails/Email]` with a slash creates a nested element.
-- Use `FOR XML PATH('Customer'), ROOT('Customers')` to set the structure.
+- The outer query reads `Subcategory`; the products come from a subquery that is correlated by `SubcategoryID`.
+- Look at which parts of the shape are attributes and which are elements.
+- Compare the shape with the invoice in Lab 8, Section 4.6, Steps 6–7. Here there are several parents, so the document also needs a root element.
 
 </details>
 
@@ -795,20 +794,28 @@ Use `FOR XML PATH` with slash-separated aliases to create the nested structure.
 
 ```sql
 SELECT
-    c.IDCustomer      AS [@IDCustomer],
-    c.FirstName       AS [FirstName],
-    c.LastName        AS [LastName],
-    c.Email           AS [Emails/Email]
-FROM Customer c
-WHERE c.IDCustomer < 11
-FOR XML PATH('Customer'), ROOT('Customers');
+    s.IDSubcategory AS [@IDSubcategory],
+    s.Name AS [@Name],
+    (
+        SELECT
+            p.IDProduct AS [@IDProduct],
+            p.Name AS [@Name],
+            p.PriceWithoutVAT AS [@Price]
+        FROM Product p
+        WHERE p.SubcategoryID = s.IDSubcategory
+        FOR XML PATH('Product'), TYPE
+    ) AS [Products]
+FROM Subcategory s
+WHERE s.IDSubcategory IN (5, 6, 7)
+FOR XML PATH('Subcategory'), ROOT('Subcategories');
 ```
 
-Run it and inspect the XML. Notice:
+Notice:
 
-- `[@IDCustomer]` became an attribute on the `<Customer>` element.
-- `[FirstName]` and `[LastName]` became child elements.
-- `[Emails/Email]` created a nested `<Emails>` container with an `<Email>` child inside.
+- `[@IDSubcategory]` and `[@Name]` become attributes of each `Subcategory` element.
+- The subquery builds the `Product` elements of one subcategory; the alias `[Products]` wraps them.
+- Without `TYPE`, the products would appear as escaped text (`&lt;Product ...&gt;`).
+- `ROOT('Subcategories')` is needed because the result has three `Subcategory` elements.
 
 </details>
 

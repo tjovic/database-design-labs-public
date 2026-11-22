@@ -342,35 +342,11 @@ We will begin with the simplest format: **delimited strings**. Section 3 shows h
 
 # Section 3 – Method 2: Delimited String Parameters
 
-In Section 1, we wanted to pass several product IDs to a stored procedure using a single parameter.
+Section 2.3 ended with the text `'1,2,3'`: one `nvarchar` value that contains three IDs separated by commas. Passing a list this way is called a **delimited string parameter**.
 
-A simple solution is to combine the IDs into one string, separating them with commas:
+To use the IDs in a query, we must split the text back into separate values. SQL Server provides a built-in function for this: **`STRING_SPLIT`**.
 
-```text
-1,2,3
-```
-
-Instead of passing three separate integers, we pass **one string containing three values**.
-
-Inside the stored procedure, SQL Server splits the string back into individual values.
-
-This technique is called a **delimited string parameter**.
-
-## 3.1 How It Works
-
-Consider the following parameter:
-
-```sql
-DECLARE @IDList nvarchar(200) = N'1,2,3';
-```
-
-Although it contains three numbers, SQL Server sees it as a single string.
-
-We need to convert it into a collection of values that can be used in a SQL query.
-
-SQL Server provides a built-in function called **`STRING_SPLIT`** for this purpose.
-
-## 3.2 The STRING_SPLIT Function
+## 3.1 The STRING_SPLIT Function
 
 The `STRING_SPLIT` function divides a string into separate values using a specified delimiter.
 
@@ -384,7 +360,7 @@ For example:
 
 ```sql
 SELECT value
-FROM STRING_SPLIT('1,2,5,7,11', ',');
+FROM STRING_SPLIT('1,2,3', ',');
 ```
 
 Result:
@@ -393,9 +369,7 @@ Result:
 |---|
 | 1 |
 | 2 |
-| 5 |
-| 7 |
-| 11 |
+| 3 |
 
 The function returns a table containing one column named `value`.
 
@@ -407,28 +381,14 @@ To use them as integers, we can convert them:
 
 ```sql
 SELECT CAST(value AS int) AS ProductID
-FROM STRING_SPLIT('1,2,5,7,11', ',');
+FROM STRING_SPLIT('1,2,3', ',');
 ```
 
 Now the result contains integer values that can be compared with integer columns in the database.
 
-`STRING_SPLIT` is available in SQL Server 2016 and later, with database compatibility level 130 or higher.
+## 3.2 Using STRING_SPLIT in a Query
 
-## 3.3 Using STRING_SPLIT in a Query
-
-Let's return to our example from Section 1.
-
-We want to retrieve products with IDs `1`, `2`, and `3`.
-
-First, we can write a normal query:
-
-```sql
-SELECT IDProduct, Name, PriceWithoutVAT
-FROM Product
-WHERE IDProduct IN (1, 2, 3);
-```
-
-Now replace the hardcoded list with `STRING_SPLIT`:
+In Section 2.1, the IDs were written directly into the query: `WHERE IDProduct IN (1, 2, 3)`. Now we take them from the string instead:
 
 ```sql
 DECLARE @IDList nvarchar(200) = N'1,2,3';
@@ -449,11 +409,11 @@ Let's examine the process:
 3. `CAST` converts each value into an integer.
 4. The `IN` operator checks whether `IDProduct` matches any of these values.
 
-The result is the same as the original query, but the list of IDs is now supplied through a variable.
+The result is the same as with `IN (1, 2, 3)`, but the list of IDs is now supplied through a variable.
 
 This means we can use the same SQL statement with different lists of IDs.
 
-## 3.4 Passing the List to a Stored Procedure
+## 3.3 Passing the List to a Stored Procedure
 
 We can now create a stored procedure that accepts a list of product IDs.
 
@@ -491,7 +451,7 @@ EXEC dbo.usp_GetProductsByIDList
 
 This solves our first problem: passing a collection of simple values to a stored procedure.
 
-## 3.5 Practical Example – Deleting Multiple Customers
+## 3.4 Practical Example – Deleting Multiple Customers
 
 Suppose a user selects three customers and clicks **Delete**.
 
@@ -547,7 +507,7 @@ WHERE IDCustomer IN (55, 56, 57);
 
 The query should return no rows.
 
-## 3.6 Limitations of Delimited Strings
+## 3.5 Limitations of Delimited Strings
 
 Delimited strings are simple and convenient, but they have several limitations.
 

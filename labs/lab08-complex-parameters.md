@@ -1040,7 +1040,7 @@ Here, each value is still a separate child element.
 
 ### Step 4 – Create attributes with `@`
 
-A column alias that starts with `@` creates an attribute instead of a child element. The `@` means "create an attribute", and the rest of the alias is the attribute's name. Here we keep the column names, so `[@FirstName]` creates the attribute `FirstName`:
+A column alias that starts with `@` creates an attribute instead of a child element. The `@` means "create an attribute", and the rest of the alias is the attribute's name. Here we keep the column names, so `[@FirstName]` creates the attribute `FirstName`. The brackets are required: without them, SQL Server reads `@FirstName` as a variable and reports a syntax error.
 
 ```sql
 SELECT
@@ -1066,7 +1066,7 @@ This is exactly the shape that `dbo.usp_InsertCustomerBatch` accepts (Section 4.
 
 ### Step 5 – Create nested elements with `/`
 
-A `/` in a column alias creates nested elements:
+A `/` in a column alias creates nested elements. As with `@`, the alias needs brackets:
 
 ```sql
 SELECT

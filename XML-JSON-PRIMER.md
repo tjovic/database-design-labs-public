@@ -2,7 +2,7 @@
 
 > A reference for the two text formats used in [Lab 08 – Complex Parameters](labs/lab08-complex-parameters.md).
 > It explains the formats themselves — how a document is built, which rules it must follow, and how to choose between the options each format offers.
-> How SQL Server reads and generates XML and JSON is covered in Lab 08, Sections 4 and 6.
+> How SQL Server reads and generates XML and JSON is covered in Lab 08, Sections 4 and 5.
 
 Both XML and JSON solve the same problem: describing **structured data as plain text**, so that it can be stored in a file, sent over a network, or passed to a stored procedure.
 

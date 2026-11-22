@@ -280,32 +280,16 @@ SQL Server reads the user's part as SQL code:
 
 Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
 
-### Preventing SQL injection – Parameterized queries
-
-Instead of inserting user input into SQL text, pass the values as parameters:
-
-```python
-sql = "SELECT * FROM Customer WHERE FirstName = ? AND LastName = ?"
-
-cursor.execute(sql, (first_name, last_name))
-```
-
-The `?` placeholders mark where parameter values belong; the values are supplied separately. SQL Server now treats the input `Achong' OR 1=1 --` as **a value to search for**, not as SQL code.
+The safe way is the one you already know from stored procedures: pass the value as a **parameter**. A parameter is always treated as a value, never as SQL code.
 
 ```text
 Without parameters – one piece of text
   Application ───► "... LastName = 'Achong' OR 1=1 --'"   SQL Server reads all of it as SQL code
 
 With parameters – the SQL text and the values are sent separately
-  Application ─┬─► "... LastName = ?"                     SQL Server reads this as SQL code
+  Application ─┬─► "... LastName = @LastName"             SQL Server reads this as SQL code
                └─► "Achong' OR 1=1 --"                    SQL Server uses this only as a value
 ```
-
-Do not put quotes around the `?` placeholders: the database driver handles parameter values.
-
-The placeholder depends on the driver: Python's `pyodbc` uses `?`, while .NET uses named parameters such as `@LastName`. The idea is the same in every language: the SQL text and the values are sent separately.
-
-Parameters have one more benefit: when the query text stays the same and only the values change, SQL Server can **reuse the cached execution plan** instead of compiling a new one for every value.
 
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
@@ -344,18 +328,16 @@ We will begin with the simplest format: **delimited strings**. Section 3 shows h
 
 **Check your understanding**
 
-1. With the input `Achong' OR 1=1 --`, why does the concatenated query return all customers, while the parameterized query does not?
-2. Besides protection from SQL injection, what other benefit do parameters give?
-3. Why is a parameterized query inside a loop still not a good way to retrieve 100 products?
-4. Why does `WHERE IDProduct IN (@IDs)` fail when `@IDs` is `N'1,2,3'`?
+1. With the input `Achong' OR 1=1 --`, why does the query built from SQL text return all customers, while the same input passed as a parameter does not?
+2. Why is calling a procedure with a scalar parameter once per ID not a good way to retrieve 100 products?
+3. Why does `WHERE IDProduct IN (@IDs)` fail when `@IDs` is `N'1,2,3'`?
 
 <details>
 <summary>Show answers</summary>
 
-1. In the concatenated query, the input becomes part of the SQL text: `'` closes the string, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server searches for a last name that is literally `Achong' OR 1=1 --`.
-2. The query text stays the same, so SQL Server can reuse the cached execution plan.
-3. A scalar parameter carries one value, so 100 IDs still mean 100 calls. We need many values in one call.
-4. `@IDs` is one `nvarchar` value, not a list. SQL Server compares `IDProduct` with that single value and tries to convert the text `'1,2,3'` to `int`, which fails.
+1. In the query built from SQL text, the input becomes part of the SQL code: `'` closes the string, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server searches for a last name that is literally `Achong' OR 1=1 --`.
+2. A scalar parameter carries one value, so 100 IDs still mean 100 calls. We need many values in one call.
+3. `@IDs` is one `nvarchar` value, not a list. SQL Server compares `IDProduct` with that single value and tries to convert the text `'1,2,3'` to `int`, which fails.
 
 </details>
 

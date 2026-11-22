@@ -1251,7 +1251,7 @@ There is not one single "right" answer — the argument is what counts.
 
 4. **JSON** — The partner is sending JSON over HTTP. Accept it as-is via `OPENJSON`. Zero translation overhead.
 
-5. **Delimited string or TVP** — The 30 IDs form a flat list, as in Lab 8, Section 7.3, Scenario 1. If the GUI's platform supports TVPs (for example .NET), a TVP adds type safety.
+5. **Delimited string or TVP** — The 30 IDs form a flat list, as in Lab 8, Section 7.2, Scenario 1. If the GUI's platform supports TVPs (for example .NET), a TVP adds type safety.
 
 </details>
 

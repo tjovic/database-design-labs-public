@@ -760,32 +760,31 @@ SSMS shows it as a single link; click it to open the formatted XML.
 
 ## Exercise 9 — Generating Nested XML with FOR XML PATH [ADVANCED]
 
-A catalog system needs the products of selected subcategories as one XML document.
+A catalog system needs the products of subcategories `5`, `6`, and `7` as one XML document, each product together with the name of its subcategory.
 
-Write a query (not a procedure) that produces this shape for subcategories `5`, `6`, and `7`:
+Write a query (not a procedure) that produces this shape, ordered by product ID:
 
 ```xml
-<Subcategories>
-    <Subcategory IDSubcategory="5" Name="Bottom Brackets">
-        <Products>
-            <Product IDProduct="994" Name="LL Bottom Bracket" Price="53.9900" />
-            <Product IDProduct="995" Name="ML Bottom Bracket" Price="101.2400" />
-            <Product IDProduct="996" Name="HL Bottom Bracket" Price="121.4900" />
-        </Products>
-    </Subcategory>
-    <Subcategory IDSubcategory="6" Name="Brakes">
+<Products>
+    <Product IDProduct="907">
+        <Name>Rear Brakes</Name>
+        <Subcategory>
+            <Name>Brakes</Name>
+        </Subcategory>
+    </Product>
+    <Product IDProduct="948">
         ...
-    </Subcategory>
+    </Product>
     ...
-</Subcategories>
+</Products>
 ```
 
 <details>
 <summary>Hint</summary>
 
-- The outer query reads `Subcategory`; the products come from a subquery that is correlated by `SubcategoryID`.
-- Look at which parts of the shape are attributes and which are elements.
-- Compare the shape with the invoice in Lab 8, Section 4.6, Steps 6–7. Here there are several parents, so the document also needs a root element.
+- The product name and the subcategory name come from two tables, so join them.
+- Look at which values are attributes and which are elements, and how deep each element is.
+- Compare with Lab 8, Section 4.6, Steps 3–5.
 
 </details>
 
@@ -794,28 +793,22 @@ Write a query (not a procedure) that produces this shape for subcategories `5`, 
 
 ```sql
 SELECT
-    s.IDSubcategory AS [@IDSubcategory],
-    s.Name AS [@Name],
-    (
-        SELECT
-            p.IDProduct AS [@IDProduct],
-            p.Name AS [@Name],
-            p.PriceWithoutVAT AS [@Price]
-        FROM Product p
-        WHERE p.SubcategoryID = s.IDSubcategory
-        FOR XML PATH('Product'), TYPE
-    ) AS [Products]
-FROM Subcategory s
-WHERE s.IDSubcategory IN (5, 6, 7)
-FOR XML PATH('Subcategory'), ROOT('Subcategories');
+    p.IDProduct AS [@IDProduct],
+    p.Name,
+    s.Name AS [Subcategory/Name]
+FROM Product p
+JOIN Subcategory s ON s.IDSubcategory = p.SubcategoryID
+WHERE p.SubcategoryID IN (5, 6, 7)
+ORDER BY p.IDProduct
+FOR XML PATH('Product'), ROOT('Products');
 ```
 
 Notice:
 
-- `[@IDSubcategory]` and `[@Name]` become attributes of each `Subcategory` element.
-- The subquery builds the `Product` elements of one subcategory; the alias `[Products]` wraps them.
-- Without `TYPE`, the products would appear as escaped text (`&lt;Product ...&gt;`).
-- `ROOT('Subcategories')` is needed because the result has three `Subcategory` elements.
+- `[@IDProduct]` becomes an attribute of each `Product` element.
+- `p.Name` has no alias, so it becomes the child element `<Name>`.
+- `[Subcategory/Name]` creates a `<Subcategory>` element with a `<Name>` element inside it. Two columns are called `Name`, but the alias puts the second one at a different level.
+- `ROOT('Products')` is needed because the result has several `Product` elements.
 
 </details>
 

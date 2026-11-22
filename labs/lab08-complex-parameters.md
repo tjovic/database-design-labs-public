@@ -1102,76 +1102,6 @@ Result (first customer):
 | `[@IDCustomer]` | Creates an attribute |
 | `[Emails/Email]` | Creates nested elements |
 
-### Step 6 – An invoice with its items
-
-Now we generate the same document shape that `dbo.usp_InvoiceInsertFromXml` reads in Section 4.4, this time for invoice `43672` from the database. The header comes from `Invoice`; the items come from a **subquery** with its own `FOR XML PATH('Line')`:
-
-```sql
-SELECT
-    i.CustomerID AS [@CustomerID],
-    CAST(i.InvoiceDate AS date) AS [@InvoiceDate],
-    i.InvoiceNumber AS [@InvoiceNumber],
-    (
-        SELECT
-            ii.ProductID AS [@ProductID],
-            ii.Quantity AS [@Quantity],
-            ii.InitialPrice AS [@UnitPrice]
-        FROM InvoiceItem ii
-        WHERE ii.InvoiceID = i.IDInvoice
-        FOR XML PATH('Line')
-    ) AS [Lines]
-FROM Invoice i
-WHERE i.IDInvoice = 43672
-FOR XML PATH('Invoice');
-```
-
-For each invoice, the subquery builds the `Line` elements of that invoice; the alias `[Lines]` wraps them in a `<Lines>` element. But the result is not what we wanted:
-
-```xml
-<Invoice CustomerID="844" InvoiceDate="2001-07-01" InvoiceNumber="SO43672">
-    <Lines>&lt;Line ProductID="709" Quantity="6" UnitPrice="5.7000"/&gt;&lt;Line ...
-</Invoice>
-```
-
-The subquery returned its XML as **text**, so the outer query escaped the `<` and `>` characters as `&lt;` and `&gt;`. The `Line` elements are no longer elements; they are just characters inside `<Lines>`.
-
-### Step 7 – Keep the nested XML with `TYPE`
-
-`TYPE` makes the subquery return a value of the `xml` data type instead of text, so the outer query inserts it as real elements:
-
-```sql
-SELECT
-    i.CustomerID AS [@CustomerID],
-    CAST(i.InvoiceDate AS date) AS [@InvoiceDate],
-    i.InvoiceNumber AS [@InvoiceNumber],
-    (
-        SELECT
-            ii.ProductID AS [@ProductID],
-            ii.Quantity AS [@Quantity],
-            ii.InitialPrice AS [@UnitPrice]
-        FROM InvoiceItem ii
-        WHERE ii.InvoiceID = i.IDInvoice
-        FOR XML PATH('Line'), TYPE -- NEW: return xml, not text
-    ) AS [Lines]
-FROM Invoice i
-WHERE i.IDInvoice = 43672
-FOR XML PATH('Invoice');
-```
-
-Result:
-
-```xml
-<Invoice CustomerID="844" InvoiceDate="2001-07-01" InvoiceNumber="SO43672">
-    <Lines>
-        <Line ProductID="709" Quantity="6" UnitPrice="5.7000" />
-        <Line ProductID="776" Quantity="2" UnitPrice="2024.9940" />
-        <Line ProductID="774" Quantity="1" UnitPrice="2039.9940" />
-    </Lines>
-</Invoice>
-```
-
-This document has the same shape as the one in Section 4.4. One system can generate it with `FOR XML PATH`, and another can insert it with `.nodes()` and `.value()`.
-
 ## 4.7 Advantages and Limitations of XML
 
 | Advantages | Limitations |
@@ -1195,7 +1125,6 @@ In the next section, we will explore **JSON**, which represents the same kind of
 2. In the procedure in Section 4.4, how does each item get the ID of its invoice?
 3. You change the path in Section 4.4 to `/invoice/lines/line`. What happens?
 4. In `FOR XML PATH`, how do you create nested elements in the output?
-5. In Section 4.6, Step 6, why do the `Line` elements appear as `&lt;Line ...&gt;`? How do you fix it?
 
 <details>
 <summary>Show answers</summary>
@@ -1204,7 +1133,6 @@ In the next section, we will explore **JSON**, which represents the same kind of
 2. The procedure inserts the header first. `SCOPE_IDENTITY()` returns the ID generated for it, and the `INSERT ... SELECT` puts that `@NewInvoiceID` into every item row.
 3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
 4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.
-5. Without `TYPE`, the subquery returns its XML as text, and the outer query escapes `<` and `>`. Add `TYPE` to the subquery's `FOR XML PATH` so it returns the `xml` data type and the elements stay elements.
 
 </details>
 

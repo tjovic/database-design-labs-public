@@ -731,7 +731,7 @@ FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 Now we get the two rows from the diagram. In each row, `tbl.col` is one `Customer` element, and `.query('.')` returns that element (`.`) as XML.
 
 > [!NOTE]
-> The path `/Customers/Customer` uses **XQuery**, a language for navigating XML:
+> The path `/Customers/Customer` is an **XPath** expression. XPath is part of **XQuery**, the W3C standard language for querying XML; the `xml` methods in SQL Server support a subset of it:
 >
 > - `/Customers` — the root element.
 > - `/Customers/Customer` — all `Customer` elements inside `Customers`.
@@ -1212,6 +1212,8 @@ For example:
 | `$.Address.City` | Property `City` inside `Address` |
 
 The `$` symbol represents the root of the JSON document, and dots are used to navigate through nested objects.
+
+This path syntax comes from the SQL standard (SQL/JSON, part of ISO SQL:2016), so other databases, such as Oracle and PostgreSQL, use the same `$.Property` notation.
 
 ## 5.3 Converting JSON Arrays into Rows – OPENJSON
 

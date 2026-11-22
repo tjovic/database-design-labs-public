@@ -2085,27 +2085,25 @@ The result should contain three items linked to the same invoice.
 
 In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It builds the rows in its own table-like structure (for example, a `DataTable` in .NET) whose columns must match the type: **the same number of columns, in the same order, with compatible data types**. It then sends the rows together with the name of the table type, and SQL Server checks them against the type definition:
 
-```mermaid
-sequenceDiagram
-    participant A as Application
-    participant S as SQL Server
-    participant P as usp_InvoiceInsert
-    Note over A: header values<br/>3 item rows<br/>type name "dbo.InvoiceLineInput"
-    A->>S: call the procedure:<br/>3 scalar parameters<br/>+ @Lines = 3 rows<br/>(typed values, not text)
-    Note over S: check the rows against<br/>dbo.InvoiceLineInput:<br/>ProductID, Quantity, UnitPrice
-    alt rows match the type
-        rect rgb(212, 237, 218)
-        S->>P: @Lines as a READONLY table
-        P-->>A: invoice and items inserted
-        end
-    else rows do not match
-        rect rgb(248, 215, 218)
-        S-->>A: error – the procedure does not run
-        end
-    end
+```text
+Application (e.g. a DataTable in .NET)     SQL Server: dbo.InvoiceLineInput
+
+┌───────────┬──────────┬───────────┐       ┌───────────┬──────────┬───────────┐
+│ ProductID │ Quantity │ UnitPrice │       │ ProductID │ Quantity │ UnitPrice │
+│ int       │ int      │ decimal   │  ───► │ int       │ int      │ money     │
+├───────────┼──────────┼───────────┤       └───────────┴──────────┴───────────┘
+│ 1         │ 2        │ 199.00    │
+│ 2         │ 1        │ 49.90     │
+│ 3         │ 5        │ 9.99      │
+└───────────┴──────────┴───────────┘
+
+ + the type name "dbo.InvoiceLineInput"
+
+Same number of columns, same order, compatible types  ───►  the procedure runs
+Anything else, for example a missing column           ───►  error: the procedure does not run
 ```
 
-*Typed values, not text* means that each value travels in its own data type: `199.00` arrives as a `money` value, not as the characters `1`, `9`, `9`, `.`, `0`, `0`. SQL Server does not have to split or convert anything, as it did with `STRING_SPLIT`, XML, and JSON, and no value can ever become SQL code.
+The rows travel as **typed values, not text**: each value travels in its own data type, so `199.00` arrives as a `money` value, not as the characters `1`, `9`, `9`, `.`, `0`, `0`. SQL Server does not have to split or convert anything, as it did with `STRING_SPLIT`, XML, and JSON, and no value can ever become SQL code.
 
 The table type is a contract between the application and the procedure: if you add a column to `dbo.InvoiceLineInput`, every application that fills it must change too.
 

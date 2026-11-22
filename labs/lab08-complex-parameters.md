@@ -1266,36 +1266,39 @@ This path syntax comes from the SQL standard (SQL/JSON, part of ISO SQL:2016), s
 
 `JSON_VALUE` reads one value. To turn a JSON **array** into rows, SQL Server provides the **`OPENJSON`** function.
 
-### Step 1 – Read a simple array
+### Step 1 – Turn array elements into rows
 
-Start with our familiar list of product IDs, written as a JSON array. Without specifying columns, `OPENJSON` returns three default columns:
+Let's pass the customer array from Section 5.1 to `OPENJSON`. Without specifying columns, `OPENJSON` returns one row for each array element, with three default columns:
 
 ```sql
-DECLARE @IDs nvarchar(max) = N'[1, 2, 3]';
+DECLARE @Customers nvarchar(max) = N'
+[
+    { "FirstName": "Nina", "LastName": "Novak", "Email": "nina.novak@example.com" },
+    { "FirstName": "Ivan", "LastName": "Horvat", "Email": "ivan.horvat@example.com" }
+]';
 
 SELECT *
-FROM OPENJSON(@IDs);
+FROM OPENJSON(@Customers);
 ```
 
 Result:
 
 | key | value | type |
 |---|---|---|
-| 0 | 1 | 2 |
-| 1 | 2 | 2 |
-| 2 | 3 | 2 |
+| 0 | `{ "FirstName": "Nina", "LastName": "Novak", "Email": "nina.novak@example.com" }` | 5 |
+| 1 | `{ "FirstName": "Ivan", "LastName": "Horvat", "Email": "ivan.horvat@example.com" }` | 5 |
 
 The columns represent:
 
 - `key` — the array index, starting at zero.
-- `value` — the value of the array element.
-- `type` — a numeric code describing the JSON value type (`2` means number).
+- `value` — the array element itself; here, a whole customer object as JSON text.
+- `type` — a numeric code describing the JSON value type (`5` means object).
 
-This is enough for a simple list, but an array of customer objects has several properties per element.
+This is similar to `.nodes()` in Section 4.2, Step 1: one row per customer, but each row still holds the whole customer, not separate values.
 
 ### Step 2 – Define columns with WITH
 
-We can use `WITH (...)` to specify which properties should become SQL columns:
+To get one column per property, we add `WITH (...)` and specify which properties should become SQL columns:
 
 ```sql
 DECLARE @Customers nvarchar(max) = N'
@@ -1756,7 +1759,7 @@ With XML, we could pass:
 </IDs>
 ```
 
-With JSON, we passed:
+With JSON, we could pass:
 
 ```json
 [1, 2, 3]

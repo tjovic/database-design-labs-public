@@ -2061,6 +2061,28 @@ Run this entire block together so that `@InvoiceLines` remains in scope.
 
 The procedure receives the header through three scalar parameters and all three items through one TVP.
 
+### Step 4 – Verify the result
+
+Find the invoice and its items using the invoice number supplied in the procedure call:
+
+```sql
+SELECT
+    i.IDInvoice,
+    i.InvoiceNumber,
+    i.InvoiceDate,
+    ii.ProductID,
+    ii.Quantity,
+    ii.InitialPrice,
+    ii.TotalPrice
+FROM Invoice i
+JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceNumber = N'SO-TEST-003';
+```
+
+The result should contain three items linked to the same invoice.
+
+### How an application calls the procedure
+
 In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It builds the rows in its own table-like structure (for example, a `DataTable` in .NET) whose columns must match the type: **the same number of columns, in the same order, with compatible data types**. It then sends the rows together with the name of the table type, and SQL Server checks them against the type definition:
 
 ```mermaid
@@ -2086,26 +2108,6 @@ sequenceDiagram
 *Typed values, not text* means that each value travels in its own data type: `199.00` arrives as a `money` value, not as the characters `1`, `9`, `9`, `.`, `0`, `0`. SQL Server does not have to split or convert anything, as it did with `STRING_SPLIT`, XML, and JSON, and no value can ever become SQL code.
 
 The table type is a contract between the application and the procedure: if you add a column to `dbo.InvoiceLineInput`, every application that fills it must change too.
-
-### Step 4 – Verify the result
-
-Find the invoice and its items using the invoice number supplied in the procedure call:
-
-```sql
-SELECT
-    i.IDInvoice,
-    i.InvoiceNumber,
-    i.InvoiceDate,
-    ii.ProductID,
-    ii.Quantity,
-    ii.InitialPrice,
-    ii.TotalPrice
-FROM Invoice i
-JOIN InvoiceItem ii ON ii.InvoiceID = i.IDInvoice
-WHERE i.InvoiceNumber = N'SO-TEST-003';
-```
-
-The result should contain three items linked to the same invoice.
 
 ## 6.5 Advantages and Limitations of TVPs
 

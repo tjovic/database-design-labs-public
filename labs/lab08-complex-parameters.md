@@ -860,11 +860,10 @@ END;
 GO
 ```
 
-Both inserts use the same pattern:
+The procedure adds two things to the queries from Steps 1 and 2:
 
-- `@Invoice.nodes('/Invoice')` returns one row — the header — and `.value()` reads its three attributes.
-- `@Invoice.nodes('/Invoice/Lines/Line')` returns one row per item. The inner query turns each item into typed columns, so the outer `SELECT` can compute `Quantity * UnitPrice` without repeating the `.value()` calls.
 - `SCOPE_IDENTITY()` returns the ID generated for the header, and every item receives it.
+- The inner query turns each item into typed columns, so the outer `SELECT` can compute `Quantity * UnitPrice` without repeating the `.value()` calls.
 
 In this simplified example, `UnitPrice` becomes `InitialPrice`, `Discount` is set to `0`, and `TotalPrice` is calculated as `Quantity * UnitPrice`.
 

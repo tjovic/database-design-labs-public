@@ -944,13 +944,99 @@ In each row, `tbl.col` is one `City` element:
 
 So far, we have received XML and converted it into SQL rows. SQL Server can also do the opposite: **convert query results into XML**. This is useful when an application or external system expects XML output.
 
-### Building the same shape we read in Section 4.3
+We build the output step by step. SQL Server returns the XML as one line; the results below are formatted for readability.
 
-The column aliases decide what the XML looks like. An alias starting with `@` creates an attribute:
+### Step 1 – Turn rows into XML
+
+Add `FOR XML PATH` to the end of an ordinary query:
 
 ```sql
 SELECT
-    c.FirstName AS [@FirstName],
+    c.FirstName,
+    c.LastName,
+    c.Email
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR XML PATH;
+```
+
+Result (first two rows):
+
+```xml
+<row>
+    <FirstName>Gustavo</FirstName>
+    <LastName>Achong</LastName>
+    <Email>gustavo0@adventure-works.com</Email>
+</row>
+<row>
+    <FirstName>Catherine</FirstName>
+    <LastName>Abel</LastName>
+    <Email>catherine0@adventure-works.com</Email>
+</row>
+...
+```
+
+Each row becomes a `<row>` element, and each column becomes a child element named after the column.
+
+### Step 2 – Name the row element
+
+The argument of `PATH` sets the name of the row element:
+
+```sql
+SELECT
+    c.FirstName,
+    c.LastName,
+    c.Email
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR XML PATH('Customer'); -- NEW: Customer instead of row
+```
+
+Result (first row):
+
+```xml
+<Customer>
+    <FirstName>Gustavo</FirstName>
+    <LastName>Achong</LastName>
+    <Email>gustavo0@adventure-works.com</Email>
+</Customer>
+...
+```
+
+### Step 3 – Add a root element
+
+The result still has three elements side by side at the top level. An XML document must have exactly **one** root element, so we add it with `ROOT`:
+
+```sql
+SELECT
+    c.FirstName,
+    c.LastName,
+    c.Email
+FROM Customer c
+WHERE c.IDCustomer <= 3
+FOR XML PATH('Customer'), ROOT('Customers'); -- NEW: ROOT
+```
+
+Result:
+
+```xml
+<Customers>
+    <Customer>
+        <FirstName>Gustavo</FirstName>
+        <LastName>Achong</LastName>
+        <Email>gustavo0@adventure-works.com</Email>
+    </Customer>
+    ...
+</Customers>
+```
+
+### Step 4 – Create attributes with `@`
+
+A column alias that starts with `@` creates an attribute instead of a child element:
+
+```sql
+SELECT
+    c.FirstName AS [@FirstName], -- NEW: @ creates an attribute
     c.LastName AS [@LastName],
     c.Email AS [@Email]
 FROM Customer c
@@ -968,24 +1054,24 @@ Result:
 </Customers>
 ```
 
-This is exactly the shape that `dbo.usp_InsertCustomerBatch` accepts. `.nodes()` and `.value()` turn XML into rows; `FOR XML PATH` turns rows back into XML.
+This is exactly the shape that `dbo.usp_InsertCustomerBatch` accepts (Section 4.3). `.nodes()` and `.value()` turn XML into rows; `FOR XML PATH` turns rows back into XML.
 
-### Elements and nested elements
+### Step 5 – Create nested elements with `/`
 
-An alias without `@` creates a child element, and a `/` in the alias creates nested elements:
+A `/` in a column alias creates nested elements:
 
 ```sql
 SELECT
     c.IDCustomer AS [@IDCustomer],
-    c.FirstName AS [FirstName],
-    c.LastName AS [LastName],
-    c.Email AS [Emails/Email]
+    c.FirstName,
+    c.LastName,
+    c.Email AS [Emails/Email] -- NEW: / creates nested elements
 FROM Customer c
 WHERE c.IDCustomer <= 3
 FOR XML PATH('Customer'), ROOT('Customers');
 ```
 
-The result contains one `Customer` element for each row. The first one looks like this:
+Result (first customer):
 
 ```xml
 <Customers>
@@ -1002,11 +1088,81 @@ The result contains one `Customer` element for each row. The first one looks lik
 
 | SQL syntax | XML result |
 |---|---|
-| `[@IDCustomer]` | Creates an XML attribute |
-| `[FirstName]` | Creates a child element |
-| `[Emails/Email]` | Creates nested elements |
-| `FOR XML PATH('Customer')` | Creates one `Customer` element per row |
+| `FOR XML PATH` | One `<row>` element per row; columns become child elements |
+| `FOR XML PATH('Customer')` | One `Customer` element per row |
 | `ROOT('Customers')` | Wraps the result in a root element |
+| `[@IDCustomer]` | Creates an attribute |
+| `[Emails/Email]` | Creates nested elements |
+
+### Step 6 – An invoice with its items
+
+Now we generate the same document shape that `dbo.usp_InvoiceInsertFromXml` reads in Section 4.4, this time for invoice `43672` from the database. The header comes from `Invoice`; the items come from a **subquery** with its own `FOR XML PATH('Line')`:
+
+```sql
+SELECT
+    i.CustomerID AS [@CustomerID],
+    CAST(i.InvoiceDate AS date) AS [@InvoiceDate],
+    i.InvoiceNumber AS [@InvoiceNumber],
+    (
+        SELECT
+            ii.ProductID AS [@ProductID],
+            ii.Quantity AS [@Quantity],
+            ii.InitialPrice AS [@UnitPrice]
+        FROM InvoiceItem ii
+        WHERE ii.InvoiceID = i.IDInvoice
+        FOR XML PATH('Line')
+    ) AS [Lines]
+FROM Invoice i
+WHERE i.IDInvoice = 43672
+FOR XML PATH('Invoice');
+```
+
+For each invoice, the subquery builds the `Line` elements of that invoice; the alias `[Lines]` wraps them in a `<Lines>` element. But the result is not what we wanted:
+
+```xml
+<Invoice CustomerID="844" InvoiceDate="2001-07-01" InvoiceNumber="SO43672">
+    <Lines>&lt;Line ProductID="709" Quantity="6" UnitPrice="5.7000"/&gt;&lt;Line ...
+</Invoice>
+```
+
+The subquery returned its XML as **text**, so the outer query escaped the `<` and `>` characters as `&lt;` and `&gt;`. The `Line` elements are no longer elements; they are just characters inside `<Lines>`.
+
+### Step 7 – Keep the nested XML with `TYPE`
+
+`TYPE` makes the subquery return a value of the `xml` data type instead of text, so the outer query inserts it as real elements:
+
+```sql
+SELECT
+    i.CustomerID AS [@CustomerID],
+    CAST(i.InvoiceDate AS date) AS [@InvoiceDate],
+    i.InvoiceNumber AS [@InvoiceNumber],
+    (
+        SELECT
+            ii.ProductID AS [@ProductID],
+            ii.Quantity AS [@Quantity],
+            ii.InitialPrice AS [@UnitPrice]
+        FROM InvoiceItem ii
+        WHERE ii.InvoiceID = i.IDInvoice
+        FOR XML PATH('Line'), TYPE -- NEW: return xml, not text
+    ) AS [Lines]
+FROM Invoice i
+WHERE i.IDInvoice = 43672
+FOR XML PATH('Invoice');
+```
+
+Result:
+
+```xml
+<Invoice CustomerID="844" InvoiceDate="2001-07-01" InvoiceNumber="SO43672">
+    <Lines>
+        <Line ProductID="709" Quantity="6" UnitPrice="5.7000" />
+        <Line ProductID="776" Quantity="2" UnitPrice="2024.9940" />
+        <Line ProductID="774" Quantity="1" UnitPrice="2039.9940" />
+    </Lines>
+</Invoice>
+```
+
+This document has the same shape as the one in Section 4.4. One system can generate it with `FOR XML PATH`, and another can insert it with `.nodes()` and `.value()`.
 
 ## 4.7 Advantages and Limitations of XML
 
@@ -1031,6 +1187,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 2. In the procedure in Section 4.4, how does each item get the ID of its invoice?
 3. You change the path in Section 4.4 to `/invoice/lines/line`. What happens?
 4. In `FOR XML PATH`, how do you create nested elements in the output?
+5. In Section 4.6, Step 6, why do the `Line` elements appear as `&lt;Line ...&gt;`? How do you fix it?
 
 <details>
 <summary>Show answers</summary>
@@ -1039,6 +1196,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 2. The procedure inserts the header first. `SCOPE_IDENTITY()` returns the ID generated for it, and the `INSERT ... SELECT` puts that `@NewInvoiceID` into every item row.
 3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
 4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.
+5. Without `TYPE`, the subquery returns its XML as text, and the outer query escapes `<` and `>`. Add `TYPE` to the subquery's `FOR XML PATH` so it returns the `xml` data type and the elements stay elements.
 
 </details>
 

@@ -1926,6 +1926,32 @@ The procedure receives the header through three scalar parameters and all three 
 
 The procedure returns the generated invoice ID.
 
+In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It sends the item rows and the name of the table type, and SQL Server checks the rows against the type definition:
+
+```mermaid
+sequenceDiagram
+    participant A as Application
+    participant S as SQL Server
+    participant P as usp_InvoiceInsert
+    Note over A: header values<br/>3 item rows<br/>type name "dbo.InvoiceLineInput"
+    A->>S: call the procedure:<br/>3 scalar parameters<br/>+ @Lines = 3 rows<br/>(typed values, not text)
+    Note over S: check the rows against<br/>dbo.InvoiceLineInput:<br/>ProductID, Quantity, UnitPrice
+    alt rows match the type
+        rect rgb(212, 237, 218)
+        S->>P: @Lines as a READONLY table
+        P-->>A: new invoice ID
+        end
+    else rows do not match
+        rect rgb(248, 215, 218)
+        S-->>A: error – the procedure does not run
+        end
+    end
+```
+
+*Typed values, not text* means that each value travels in its own data type: `199.00` arrives as a `money` value, not as the characters `1`, `9`, `9`, `.`, `0`, `0`. SQL Server does not have to split or convert anything, as it did with `STRING_SPLIT`, XML, and JSON, and no value can ever become SQL code.
+
+The table type is a contract between the application and the procedure: if you add a column to `dbo.InvoiceLineInput`, every application that fills it must change too.
+
 ### Step 4 – Verify the result
 
 Find the invoice and its items using the invoice number supplied in the procedure call:

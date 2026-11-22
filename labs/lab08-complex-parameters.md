@@ -1763,43 +1763,38 @@ SQL Server supports exactly this through **Table-Valued Parameters (TVPs)**.
 
 A Table-Valued Parameter allows a stored procedure to receive multiple rows and columns as one parameter.
 
-Consider our familiar example: we want to retrieve products with IDs `1`, `2`, and `3`.
+Consider the two customers from Sections 4.1 and 5.1.
 
-With a delimited string, we passed:
-
-```sql
-@IDList = N'1,2,3'
-```
-
-With XML, we could pass:
+With XML, we passed:
 
 ```xml
-<IDs>
-    <ID>1</ID>
-    <ID>2</ID>
-    <ID>3</ID>
-</IDs>
+<Customers>
+    <Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com" />
+    <Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com" />
+</Customers>
 ```
 
-With JSON, we could pass:
+With JSON, we passed:
 
 ```json
-[1, 2, 3]
+[
+    { "FirstName": "Nina", "LastName": "Novak", "Email": "nina.novak@example.com" },
+    { "FirstName": "Ivan", "LastName": "Horvat", "Email": "ivan.horvat@example.com" }
+]
 ```
 
-With a TVP, we pass the values as a table:
+With a TVP, we pass the customers as a table:
 
-| ID |
-|---|
-| 1 |
-| 2 |
-| 3 |
+| FirstName | LastName | Email |
+|---|---|---|
+| Nina | Novak | nina.novak@example.com |
+| Ivan | Horvat | ivan.horvat@example.com |
 
 The stored procedure can use this table directly in SQL queries, including `SELECT`, `JOIN`, and `WHERE`.
 
-There is no need for `STRING_SPLIT`, XML methods, or `OPENJSON`.
+There is no need for XML methods or `OPENJSON`: the values already arrive in named, typed columns.
 
-We start with a table that has one column. In Section 6.4, we pass a table with several columns: the items of an invoice.
+We start with customers. In Section 6.4, we pass the items of an invoice.
 
 ## 6.2 Defining a Table Type
 
@@ -1814,27 +1809,27 @@ date
 money
 ```
 
-But there is no built-in type representing a table with a column named `ID`.
+But there is no built-in type representing a table with the columns `FirstName`, `LastName`, and `Email`.
 
 We must create one.
 
 ### Step 1 – Create a user-defined table type
 
 ```sql
-CREATE TYPE dbo.ProductIDList AS TABLE
+CREATE TYPE dbo.CustomerInput AS TABLE
 (
-    ID int PRIMARY KEY
+    FirstName nvarchar(50) NOT NULL,
+    LastName nvarchar(50) NOT NULL,
+    Email nvarchar(50) NOT NULL
 );
 GO
 ```
 
-This statement creates a new table type named `dbo.ProductIDList`.
+This statement creates a new table type named `dbo.CustomerInput`.
 
-It defines the structure of a table containing one integer column.
+It defines the structure of a table with three columns, using the same data types as the matching columns of the `Customer` table.
 
-The `PRIMARY KEY` ensures that the same ID cannot appear more than once in a value of this type.
-
-`CREATE TYPE ... AS TABLE` does not create a table that stores product IDs. It creates a reusable structure for declaring table variables and procedure parameters.
+`CREATE TYPE ... AS TABLE` does not create a table that stores customers. It creates a reusable structure for declaring table variables and procedure parameters.
 
 > [!NOTE]
 > If you run this section again, `CREATE TYPE` fails because the type already exists. A type cannot be dropped while a procedure uses it: first drop the procedures that use the type, then the type itself with `DROP TYPE`.
@@ -1844,44 +1839,44 @@ The `PRIMARY KEY` ensures that the same ID cannot appear more than once in a val
 Now that the type exists, we can declare a table variable of this type and insert rows into it:
 
 ```sql
-DECLARE @MyIDs dbo.ProductIDList;
+DECLARE @Customers dbo.CustomerInput;
 
-INSERT INTO @MyIDs (ID)
-VALUES (1), (2), (3);
+INSERT INTO @Customers (FirstName, LastName, Email)
+VALUES
+    (N'Nina', N'Novak', N'nina.novak@example.com'),
+    (N'Ivan', N'Horvat', N'ivan.horvat@example.com');
 
 SELECT *
-FROM @MyIDs;
+FROM @Customers;
 ```
 
 Result:
 
-| ID |
-|---|
-| 1 |
-| 2 |
-| 3 |
+| FirstName | LastName | Email |
+|---|---|---|
+| Nina | Novak | nina.novak@example.com |
+| Ivan | Horvat | ivan.horvat@example.com |
 
-Notice that `@MyIDs` behaves like a table.
+This is the same result we got from XML in Section 4.2 and from JSON in Section 5.3, but nothing had to be extracted or converted: `@Customers` already **is** a table.
 
 We can insert rows, query its contents, and use it in joins.
 
-The important difference is that it is a **table variable**, not a permanent table stored under a name such as `dbo.Product`.
+The important difference is that it is a **table variable**, not a permanent table stored under a name such as `dbo.Customer`.
 
 ## 6.3 Passing a Table to a Stored Procedure
 
-Now let's create a procedure that receives our table variable.
+Now we insert several customers in one call, as we did with XML in Section 4.3 and with JSON in Section 5.4.
+
+### Step 1 – Create the procedure
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_GetProductsByIDs
-    @IDs dbo.ProductIDList READONLY
+CREATE OR ALTER PROCEDURE dbo.usp_InsertCustomerBatchFromTvp
+    @Customers dbo.CustomerInput READONLY
 AS
 BEGIN
-    SELECT
-        p.IDProduct,
-        p.Name,
-        p.PriceWithoutVAT
-    FROM Product p
-    INNER JOIN @IDs i ON i.ID = p.IDProduct;
+    INSERT INTO Customer (FirstName, LastName, Email)
+    SELECT FirstName, LastName, Email
+    FROM @Customers;
 END;
 GO
 ```
@@ -1889,59 +1884,74 @@ GO
 Notice the parameter declaration:
 
 ```sql
-@IDs dbo.ProductIDList READONLY
+@Customers dbo.CustomerInput READONLY
 ```
 
 It contains three important parts:
 
 | Part | Meaning |
 |---|---|
-| `@IDs` | Parameter name |
-| `dbo.ProductIDList` | User-defined table type |
+| `@Customers` | Parameter name |
+| `dbo.CustomerInput` | User-defined table type |
 | `READONLY` | The procedure cannot modify the parameter |
 
 Unlike ordinary scalar parameters, TVPs must be declared with `READONLY`.
 
-### Calling the procedure
+Compare the procedure with Sections 4.3 and 5.4: the `INSERT ... SELECT` is the same, but the `FROM` clause reads the parameter directly, without `.nodes()` or `OPENJSON`.
 
-We can now pass our table variable to the procedure:
+### Step 2 – Call the procedure
+
+We fill a table variable and pass it to the procedure:
 
 ```sql
-DECLARE @MyIDs dbo.ProductIDList;
+DECLARE @NewCustomers dbo.CustomerInput;
 
-INSERT INTO @MyIDs (ID)
-VALUES (1), (2), (3);
+INSERT INTO @NewCustomers (FirstName, LastName, Email)
+VALUES
+    (N'Nikola', N'Tesla', N'nikola.tesla@example.com'),
+    (N'Marija', N'Jurić', N'marija.juric@example.com');
 
-EXEC dbo.usp_GetProductsByIDs
-    @IDs = @MyIDs;
+EXEC dbo.usp_InsertCustomerBatchFromTvp
+    @Customers = @NewCustomers;
 ```
 
-The procedure receives all three IDs and joins them with the `Product` table.
+Run this entire block together so that `@NewCustomers` remains in scope.
 
-The procedure can accept any number of IDs without changing its definition.
+### Step 3 – Verify the result
+
+```sql
+SELECT IDCustomer, FirstName, LastName, Email
+FROM Customer
+WHERE Email IN
+(
+    N'nikola.tesla@example.com',
+    N'marija.juric@example.com'
+);
+```
+
+The procedure can accept any number of customers without changing its definition.
 
 ### Why READONLY?
 
-Inside the procedure, we can read the TVP, as `dbo.usp_GetProductsByIDs` does. Try to create a procedure that changes it:
+Inside the procedure, we can read the TVP, as `dbo.usp_InsertCustomerBatchFromTvp` does. Try to create a procedure that changes it:
 
 ```sql
-CREATE OR ALTER PROCEDURE dbo.usp_TryToChangeIDs
-    @IDs dbo.ProductIDList READONLY
+CREATE OR ALTER PROCEDURE dbo.usp_TryToChangeCustomers
+    @Customers dbo.CustomerInput READONLY
 AS
 BEGIN
-    INSERT INTO @IDs (ID)
-    VALUES (4);
+    DELETE FROM @Customers;
 END;
 GO
 ```
 
-SQL Server refuses to create it: *"The table-valued parameter "@IDs" is READONLY and cannot be modified."* The procedure can use the input data, but it cannot change the collection supplied by the caller.
+SQL Server refuses to create it: *"The table-valued parameter "@Customers" is READONLY and cannot be modified."* The procedure can use the input data, but it cannot change the collection supplied by the caller.
 
 If we need to modify the data, we can copy it into a local table variable or temporary table.
 
 ## 6.4 Practical Example – Inserting an Invoice with Multiple Items
 
-In Sections 4.4 and 5.6, we inserted the same invoice from an XML document and from a JSON document. Now we insert it with a TVP, still in **one stored procedure call**.
+In Sections 4.4 and 5.5, we inserted the same invoice from an XML document and from a JSON document. Now we insert it with a TVP, still in **one stored procedure call**.
 
 For this example, we will use:
 
@@ -1972,7 +1982,7 @@ CREATE TYPE dbo.InvoiceLineInput AS TABLE
 GO
 ```
 
-Unlike our earlier table type containing only IDs, this type represents **records with multiple columns**.
+Like `dbo.CustomerInput`, this type has several columns; each row is one invoice item.
 
 ### Step 2 – Create the procedure
 
@@ -2113,7 +2123,7 @@ In the next section, we will compare all five approaches and discuss when each m
 
 **Check your understanding**
 
-1. Does `CREATE TYPE dbo.ProductIDList AS TABLE` create a table that stores product IDs?
+1. Does `CREATE TYPE dbo.CustomerInput AS TABLE` create a table that stores customers?
 2. Why must a TVP be declared `READONLY`, and what do you do if you need to modify the input?
 3. In Section 6.4, why is the invoice header passed as scalar parameters and the items as a TVP?
 
@@ -2187,7 +2197,7 @@ EXEC dbo.usp_GetProductsByIDList
 
 A **delimited string** is sufficient: the procedure from Section 3 uses `STRING_SPLIT` to turn it into rows.
 
-**Why?** The input is a simple flat list. If the client supports TVPs, a TVP (Section 6.3) is another good option, particularly when type safety is important.
+**Why?** The input is a simple flat list. If the client supports TVPs, a TVP (Section 6) is another good option, particularly when type safety is important.
 
 ### Scenario 2 – Inserting invoice items from an application
 

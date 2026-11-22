@@ -1448,7 +1448,7 @@ This document contains two levels of information:
 
 ### Step 1 – Read the invoice header
 
-The header fields are single values, so we read them with `JSON_VALUE` (Section 5.2). The path follows the nesting: `$.Invoice.CustomerID` is the `CustomerID` property inside the `Invoice` object.
+The header fields are single values, so we read them with `JSON_VALUE` (Section 5.2). The path follows the nesting: `$.Invoice.CustomerID` is the `CustomerID` property inside the `Invoice` object. `Invoice` is an object, not an array, so each path leads to exactly one value. Only `Lines` is an array; that part needs `OPENJSON` (Step 2).
 
 ```sql
 DECLARE @Json nvarchar(max) = N'

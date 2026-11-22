@@ -1262,9 +1262,29 @@ Result:
 
 This path syntax comes from the SQL standard (SQL/JSON, part of ISO SQL:2016), so other databases, such as Oracle and PostgreSQL, use the same `$.Property` notation.
 
+`JSON_VALUE` always returns **one** value. Let's try the same path on the customer **array** from Section 5.1:
+
+```sql
+DECLARE @Customers nvarchar(max) = N'
+[
+    { "FirstName": "Nina", "LastName": "Novak", "Email": "nina.novak@example.com" },
+    { "FirstName": "Ivan", "LastName": "Horvat", "Email": "ivan.horvat@example.com" }
+]';
+
+SELECT JSON_VALUE(@Customers, '$.FirstName') AS FirstName;
+```
+
+Result:
+
+| FirstName |
+|---|
+| NULL |
+
+The root of this document is an array, not an object, so `$.FirstName` matches nothing and `JSON_VALUE` returns `NULL`, without an error. We could name one element by its index, for example `$[0].FirstName` returns `Nina`, but we would need a separate call for every element, and we do not know in advance how many elements the array has.
+
 ## 5.3 Converting JSON Arrays into Rows – OPENJSON
 
-`JSON_VALUE` reads one value. To turn a JSON **array** into rows, SQL Server provides the **`OPENJSON`** function.
+To turn a JSON **array** into rows, one row per element, SQL Server provides the **`OPENJSON`** function.
 
 ### Step 1 – Turn array elements into rows
 

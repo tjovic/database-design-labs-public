@@ -194,15 +194,15 @@ SQL Server provides several ways to handle this.
 
 In this lab, we will explore five approaches:
 
-| Method | Example | Main idea |
+| Method | Example from this lab | Main idea |
 |---|---|---|
 | Client-side query building | `WHERE IDProduct IN (1, 2, 3)` | Construct SQL in application code |
 | Delimited string | `'1,2,3'` | Pass a string and split it into values |
-| XML | `<IDs><ID>1</ID><ID>2</ID><ID>3</ID></IDs>` | Pass structured XML data |
-| JSON | `[1, 2, 3]` | Pass structured JSON data |
-| Table-Valued Parameter (TVP) | A table containing three ID rows | Pass a collection of typed rows |
+| XML | `<Customer FirstName="Nina" LastName="Novak" ... />` | Pass structured XML data |
+| JSON | `{ "FirstName": "Nina", "LastName": "Novak", ... }` | Pass structured JSON data |
+| Table-Valued Parameter (TVP) | A table with the columns `FirstName`, `LastName`, and `Email` | Pass a collection of typed rows |
 
-All five approaches can represent the same list of product IDs, but they differ in how the data is prepared, transmitted, and processed.
+The first two methods carry a simple list of values, such as product IDs (Problem 1). XML, JSON, and TVPs can also carry records with several fields, such as customers or invoice items (Problem 2). The methods differ in how the data is prepared, transmitted, and processed.
 
 We will begin with what an application can do using only scalar parameters and SQL text, and then explore the other four methods.
 
@@ -2115,9 +2115,8 @@ The table type is a contract between the application and the procedure: if you a
 | Supports multiple rows and columns | TVP parameters must be `READONLY` |
 | Can be used directly in joins and queries | Changing a table type is expensive: it cannot be altered, so every procedure that uses it must be dropped and recreated, and every application that fills it must change at the same time |
 | Avoids parsing delimited strings, XML, or JSON | Client applications must support sending TVPs |
-| Useful for set-based operations | SQL Server does not maintain column statistics on TVPs |
 
-TVPs are particularly useful when an application needs to pass a collection of relational records directly to SQL Server, and they are commonly used from .NET applications. Because SQL Server keeps no statistics on TVP columns, copying a large TVP into a temporary table can sometimes give a better execution plan.
+TVPs are particularly useful when an application needs to pass a collection of relational records directly to SQL Server, and they are commonly used from .NET applications.
 
 In the next section, we will compare all five approaches and discuss when each method is most appropriate.
 
@@ -2126,6 +2125,7 @@ In the next section, we will compare all five approaches and discuss when each m
 1. Does `CREATE TYPE dbo.CustomerInput AS TABLE` create a table that stores customers?
 2. Why must a TVP be declared `READONLY`, and what do you do if you need to modify the input?
 3. In Section 6.4, why is the invoice header passed as scalar parameters and the items as a TVP?
+4. You add a `Discount` column to `dbo.InvoiceLineInput`. What has to change?
 
 <details>
 <summary>Show answers</summary>
@@ -2133,6 +2133,7 @@ In the next section, we will compare all five approaches and discuss when each m
 1. No. It creates a reusable **structure** for declaring table variables and procedure parameters. No data is stored.
 2. SQL Server requires TVPs to be read-only: the procedure can query the rows but cannot change them, so the caller's data stays as it was sent. To modify the data, copy it into a local table variable or a temporary table.
 3. The header has a fixed number of values; the number of items varies.
+4. A table type cannot be altered, so you drop the procedures that use it, drop and recreate the type, and recreate the procedures. Every application that fills the type must also send the new column, because its columns must match the type.
 
 </details>
 
@@ -2148,41 +2149,25 @@ However, the methods differ in how data is represented, processed, and validated
 
 The goal is not to memorize five different solutions. It is to understand **which method is appropriate for a particular situation**.
 
-## 7.1 One List, Five Approaches
-
-Section 1.3 showed the same list of product IDs — `1`, `2`, and `3` — in five representations. The values are identical; only their representation changes.
-
-For stored procedures, the corresponding parameter declarations are:
-
-| Method | Parameter declaration |
-|---|---|
-| Client-side query building | No collection parameter; values are embedded in SQL text |
-| Delimited string | `@IDList nvarchar(200)` |
-| XML | `@IDs xml` |
-| JSON | `@Json nvarchar(max)` |
-| TVP | `@IDs dbo.ProductIDList READONLY` |
-
-Delimited strings and JSON are both passed as text, but their contents have different structures. This lab uses `nvarchar(200)` for the ID lists and `nvarchar(max)` for JSON documents.
-
-XML has its own SQL Server data type; JSON has one only from SQL Server 2025 (Section 5.1). TVPs use a user-defined table type.
-
-## 7.2 Comparing the Methods
+## 7.1 Comparing the Methods
 
 The following table summarizes the main characteristics of each approach.
 
-| Method | Data Structure | Type Safety | Main Advantage | Main Limitation |
-|---|---|---|---|---|
-| Client-side query building | SQL text | None for concatenated values | Simple to construct | SQL injection risk with untrusted input |
-| Delimited string | Flat list | Values arrive as text | Simple for lists of IDs | Requires splitting and conversion |
-| XML | Hierarchical | XML type; extracted values require conversion | Supports complex nested structures | Verbose syntax and parsing overhead |
-| JSON | Objects and arrays | Values are converted during extraction | Natural format for web integration | Requires parsing and validation |
-| TVP | Relational rows and columns | Strong | Typed data can be used directly in SQL | Requires a predefined table type |
+| Method | Parameter type | Data structure | Type safety | Main advantage | Main limitation |
+|---|---|---|---|---|---|
+| Client-side query building | No collection parameter | SQL text | None for concatenated values | Simple to construct | SQL injection risk with untrusted input |
+| Delimited string | `nvarchar` | Flat list | Values arrive as text | Simple for lists of IDs | Requires splitting and conversion |
+| XML | `xml` | Hierarchical | Text inside; values converted on extraction | Supports complex nested structures | Verbose syntax and parsing overhead |
+| JSON | `nvarchar(max)` | Objects and arrays | Text inside; values converted on extraction | Natural format for web integration | Requires parsing and validation |
+| TVP | User-defined table type, `READONLY` | Relational rows and columns | Strong | Typed data can be used directly in SQL | Requires a predefined table type |
 
-The methods also differ in how easily they adapt to change. JSON is tolerant: if a procedure starts reading a new property, an older application that does not send it still works, because `OPENJSON` returns `NULL` for it, and extra properties are simply ignored. A TVP is a strict contract: when the table type changes, the procedures and every application that fills it must change together. JSON pays for its flexibility with weaker type checking; a TVP pays for its strong typing with a rigid contract.
+Delimited strings and JSON are both passed as text, but their contents have different structures. XML has its own SQL Server data type; JSON has one only from SQL Server 2025 (Section 5.1).
+
+The methods also differ in how easily they adapt to change. XML and JSON are tolerant: if a procedure starts reading a new attribute or property, an older application that does not send it still works, because `.value()` and `OPENJSON` return `NULL` for it, and extra attributes and properties are simply ignored. A TVP is a strict contract: when the table type changes, the procedures and every application that fills it must change together. XML and JSON pay for their flexibility with weaker type checking; a TVP pays for its strong typing with a rigid contract.
 
 There is no single method that is always best.
 
-## 7.3 Common Use Cases
+## 7.2 Common Use Cases
 
 Let's look at four practical situations. Each one was solved earlier in this lab.
 
@@ -2211,7 +2196,7 @@ A **TVP** is a natural choice when the client supports it: the items arrive as t
 
 A web application sends the invoice as a JSON document, like the one in Section 5.5.
 
-A procedure with a **JSON** parameter reads the header with `JSON_VALUE` and the items with `OPENJSON` (Section 5.5).
+A procedure with a **JSON** parameter reads the header with `JSON_VALUE` and the items with `OPENJSON`.
 
 **Why?** JSON is already the format used by the API. Depending on the application architecture, the backend could also convert the JSON into a TVP before calling SQL Server. Both designs are valid.
 
@@ -2223,7 +2208,7 @@ A procedure with an **XML** parameter extracts the data with `.nodes()` and `.va
 
 **Why?** The source system already uses XML, so SQL Server can process the existing format directly. This is common when integrating with XML-based services and legacy systems.
 
-## 7.4 How to Choose
+## 7.3 How to Choose
 
 Use the following decision diagram as a general guide. Each outcome matches one of the scenarios above.
 
@@ -2239,7 +2224,7 @@ flowchart TD
 
 This diagram is a guideline, not a strict rule. The choice also depends on where data conversion should happen and how the application is designed.
 
-## 7.5 Key Takeaways
+## 7.4 Key Takeaways
 
 - **Choose by the data, not by the syntax.** First consider the structure of the data and how it arrives at the database: a simple list, a collection of relational rows, and a nested document may need different approaches.
 - **Keep untrusted values separate from SQL code.** Use parameterized queries or stored procedure parameters; never concatenate user input into SQL text.
@@ -2264,7 +2249,7 @@ These questions connect the whole lab. Questions about individual methods are at
 
 1. **1:N insert** — An invoice header and its items must be inserted together. With one procedure call per row, an invoice with twenty items needs twenty-one calls. A collection parameter carries all items in one call.
 2. **No.** Each procedure runs several statements. If inserting the items fails, the header stays in the database. Lab 9 makes the statements succeed or fail together with a transaction.
-3. **(a)** A delimited string, or a TVP when type safety matters. **(b)** A TVP. **(c)** JSON, or a TVP if the backend converts the data first. **(d)** XML. Section 7.3 explains each choice.
+3. **(a)** A delimited string, or a TVP when type safety matters. **(b)** A TVP. **(c)** JSON, or a TVP if the backend converts the data first. **(d)** XML. Section 7.2 explains each choice.
 
 </details>
 

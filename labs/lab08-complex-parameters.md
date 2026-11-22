@@ -225,23 +225,19 @@ FROM Product
 WHERE IDProduct IN (1, 2, 3);
 ```
 
-This is one call and one set-based statement. With a fixed list of integers it is harmless. However, **building SQL by inserting untrusted values directly into the SQL text is dangerous**.
+This is one call and one set-based statement. In a real application, however, the IDs come from outside — for example, from a web request — as text. **Writing such text directly into the SQL statement is dangerous.**
 
 ## 2.2 SQL Injection
 
 SQL injection occurs when user-provided data becomes part of the SQL command itself.
 
-Consider an application that searches for customers by first and last name. The code is written in Python, but only as an example: an application in C# or Java builds SQL text the same way. You do not run this code in SSMS.
+Consider the application from Section 2.1 that writes the selected IDs into the SQL text. The code is written in Python, but only as an example: an application in C# or Java builds SQL text the same way. You do not run this code in SSMS.
 
 ```python
-# UNSAFE — user input is inserted directly into SQL text
-first_name = input("Enter first name: ")
-last_name = input("Enter last name: ")
+# UNSAFE — text from the user is inserted directly into SQL text
+ids = input("Enter product IDs: ")      # for example: 1,2,3
 
-sql = (
-    f"SELECT * FROM Customer "
-    f"WHERE FirstName = '{first_name}' AND LastName = '{last_name}'"
-)
+sql = f"SELECT * FROM Product WHERE IDProduct IN ({ids})"
 
 cursor.execute(sql)
 ```
@@ -249,47 +245,48 @@ cursor.execute(sql)
 Now imagine the user enters:
 
 ```text
-First name: Gustavo
-Last name: Achong' OR 1=1 --
+Enter product IDs: 1) OR 1=1 --
 ```
 
 The application generates:
 
 ```sql
 SELECT *
-FROM Customer
-WHERE FirstName = 'Gustavo' AND LastName = 'Achong' OR 1=1 --';
+FROM Product
+WHERE IDProduct IN (1) OR 1=1 --);
 ```
 
 The application writes the beginning and the end of the statement, and the user's input fills the gap:
 
 ```text
-The application writes:  ... LastName = '_________________'
-The user types:                          Achong' OR 1=1 --
+The application writes:  ... WHERE IDProduct IN (____________)
+The user sends:                                  1) OR 1=1 --
 
-SQL Server receives:     ... LastName = 'Achong' OR 1=1 --'
-                                         └───────┬───────┘
-                                                 └─ everything here was typed by the user
+SQL Server receives:     ... WHERE IDProduct IN (1) OR 1=1 --)
+                                                 └─────┬────┘
+                                                       └─ everything here was sent by the user
 ```
 
 SQL Server reads the user's part as SQL code:
 
-1. `'` after `Achong` closes the string, so the last name is just `Achong`.
+1. `)` after `1` closes the list, so the list contains only `1`.
 2. `OR 1=1` adds a new condition that is always true.
-3. `--` starts a comment, so SQL Server ignores the closing `'` added by the application.
+3. `--` starts a comment, so SQL Server ignores the closing `)` added by the application.
 
-Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
+Run the generated statement in SSMS: instead of product `1` alone, it returns **all** `504` products. The user has changed the meaning of the SQL statement without changing the application code.
 
 The safe way is the one you already know from stored procedures: pass the value as a **parameter**. A parameter is always treated as a value, never as SQL code.
 
 ```text
 Without parameters – one piece of text
-  Application ───► "... LastName = 'Achong' OR 1=1 --'"   SQL Server reads all of it as SQL code
+  Application ───► "... WHERE IDProduct IN (1) OR 1=1 --)"   SQL Server reads all of it as SQL code
 
 With parameters – the SQL text and the values are sent separately
-  Application ─┬─► "... LastName = @LastName"             SQL Server reads this as SQL code
-               └─► "Achong' OR 1=1 --"                    SQL Server uses this only as a value
+  Application ─┬─► "... WHERE IDProduct = @ProductID"        SQL Server reads this as SQL code
+               └─► "1) OR 1=1 --"                            SQL Server uses this only as a value
 ```
+
+As a parameter, `1) OR 1=1 --` is just text that is not a number, so SQL Server rejects it instead of running it.
 
 > [!TIP]
 > The optional [`Cyber Lab`](../demos/cyber-lab/) demo shows how an application should be designed to keep user input separate from SQL code.
@@ -328,14 +325,14 @@ We will begin with the simplest format: **delimited strings**. Section 3 shows h
 
 **Check your understanding**
 
-1. With the input `Achong' OR 1=1 --`, why does the query built from SQL text return all customers, while the same input passed as a parameter does not?
+1. With the input `1) OR 1=1 --`, why does the query built from SQL text return all products, while the same input passed as a parameter does not?
 2. Why is calling a procedure with a scalar parameter once per ID not a good way to retrieve 100 products?
 3. Why does `WHERE IDProduct IN (@IDs)` fail when `@IDs` is `N'1,2,3'`?
 
 <details>
 <summary>Show answers</summary>
 
-1. In the query built from SQL text, the input becomes part of the SQL code: `'` closes the string, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server searches for a last name that is literally `Achong' OR 1=1 --`.
+1. In the query built from SQL text, the input becomes part of the SQL code: `)` closes the list, `OR 1=1` adds a condition that is always true, and `--` comments out the rest. A parameter is sent separately from the SQL text, so SQL Server treats `1) OR 1=1 --` as one value; it is not a number, so it is rejected and nothing runs.
 2. A scalar parameter carries one value, so 100 IDs still mean 100 calls. We need many values in one call.
 3. `@IDs` is one `nvarchar` value, not a list. SQL Server compares `IDProduct` with that single value and tries to convert the text `'1,2,3'` to `int`, which fails.
 

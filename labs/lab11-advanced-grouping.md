@@ -358,7 +358,9 @@ Now the report is unambiguous: rows labeled `(no color)` are real data `NULL`s; 
 
 </details>
 
-## 6.3 Key takeaways
+---
+
+# Key takeaways
 
 - **`GROUP BY ()` is the grand-total idiom.** Identical to a bare aggregate except on an empty table.
 - **`ROLLUP(a, b, c)` walks up the hierarchy.** Four grouping levels for three columns.

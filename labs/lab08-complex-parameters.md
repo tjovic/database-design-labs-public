@@ -2223,7 +2223,9 @@ flowchart TD
 
 This diagram is a guideline, not a strict rule. The choice also depends on where data conversion should happen and how the application is designed.
 
-## 7.4 Key Takeaways
+---
+
+# Key takeaways
 
 - **Choose by the data, not by the syntax.** First consider the structure of the data and how it arrives at the database: a simple list, a collection of relational rows, and a nested document may need different approaches.
 - **Keep untrusted values separate from SQL code.** Use parameterized queries or stored procedure parameters; never concatenate user input into SQL text.

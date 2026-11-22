@@ -454,7 +454,9 @@ Recall from Section 3.4: when `ORDER BY` is present inside `OVER` with no explic
 
 </details>
 
-## 6.3 Key takeaways
+---
+
+# Key takeaways
 
 - **Window functions aggregate without collapsing.** Every input row survives; each gets one extra column summarizing its neighborhood.
 - **The shape is always `func(...) OVER (PARTITION BY ... ORDER BY ... frame)`.** Three optional pieces, each with a specific job.

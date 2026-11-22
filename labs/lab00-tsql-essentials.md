@@ -1881,7 +1881,7 @@ further, including `THROW` and re-raising errors.
 
 ------------------------------------------------------------------------
 
-# What you should know after this lab
+# Key takeaways
 
 You should now be able to recognize and use these patterns:
 

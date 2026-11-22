@@ -1440,7 +1440,7 @@ Also verify these cases:
 
 ---
 
-# What You Should Know After This Lab
+# Key takeaways
 
 The most important ideas are:
 

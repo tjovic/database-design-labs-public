@@ -798,7 +798,9 @@ ROLLBACK TRANSACTION;
 
 </details>
 
-## 11.3 Key takeaways
+---
+
+# Key takeaways
 
 - **Two sessions can interfere in three specific ways.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
 - **Isolation levels are a trade-off, not a ladder you climb for safety's sake.** Each stricter level prevents one more problem at the cost of more blocking.

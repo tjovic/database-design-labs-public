@@ -1963,7 +1963,9 @@ The transaction log does not replace backups. A log stored on a failed device ca
 
 </details>
 
-## 11.3 Key takeaways
+---
+
+# Key takeaways
 
 - **A business operation can require several SQL statements.** Use a transaction when those changes must be kept or undone together — that is atomicity, the A in ACID.
 - **`COMMIT` confirms; `ROLLBACK` undoes.** A savepoint allows partial rollback without closing the transaction.

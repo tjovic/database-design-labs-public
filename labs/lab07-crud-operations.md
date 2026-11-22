@@ -2521,7 +2521,7 @@ Remove the comments and run `CREATE OR ALTER` once more to restore the procedure
 
 ---
 
-# What You Should Know After This Lab
+# Key takeaways
 
 The main idea of this lab: **a delete request can end in four different ways, and the caller must be able to tell them apart.**
 

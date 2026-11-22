@@ -1383,7 +1383,7 @@ dbo.Product
 
 ---
 
-# What you should know after this lab
+# Key takeaways
 
 The most important ideas are:
 

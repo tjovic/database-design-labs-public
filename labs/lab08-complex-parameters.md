@@ -1030,6 +1030,14 @@ Result:
 </Customers>
 ```
 
+This is a valid XML document, but it is not yet the shape that `dbo.usp_InsertCustomerBatch` reads (Section 4.3). There, each customer is **one element**, and its values are **attributes** of that element:
+
+```xml
+<Customer FirstName="Gustavo" LastName="Achong" Email="gustavo0@adventure-works.com" />
+```
+
+Here, each value is still a separate child element.
+
 ### Step 4 – Create attributes with `@`
 
 A column alias that starts with `@` creates an attribute instead of a child element. The `@` means "create an attribute", and the rest of the alias is the attribute's name. Here we keep the column names, so `[@FirstName]` creates the attribute `FirstName`:

@@ -168,7 +168,6 @@ flowchart TD
         B["Insert invoice header"] --> C["Get generated invoice ID"]
         C --> D["Insert all items using that ID"]
     end
-    D --> E["Return new invoice ID"]
 ```
 
 The procedure receives the invoice data, inserts the header, and uses its generated ID to link all items to the invoice.
@@ -857,9 +856,6 @@ BEGIN
             tbl.col.value('@UnitPrice', 'money') AS UnitPrice
         FROM @Invoice.nodes('/Invoice/Lines/Line') AS tbl(col)
     ) AS lines;
-
-    -- Return the generated invoice ID
-    SELECT @NewInvoiceID AS NewInvoiceID;
 END;
 GO
 ```
@@ -1437,9 +1433,6 @@ BEGIN
         Quantity  int '$.Quantity',
         UnitPrice money '$.UnitPrice'
     );
-
-    -- Return the generated invoice ID
-    SELECT @NewInvoiceID AS NewInvoiceID;
 END;
 GO
 ```
@@ -1857,9 +1850,6 @@ BEGIN
         0,
         Quantity * UnitPrice
     FROM @Lines;
-
-    -- Return the generated invoice ID
-    SELECT @NewInvoiceID AS NewInvoiceID;
 END;
 GO
 ```
@@ -1900,8 +1890,6 @@ Run this entire block together so that `@InvoiceLines` remains in scope.
 
 The procedure receives the header through three scalar parameters and all three items through one TVP.
 
-The procedure returns the generated invoice ID.
-
 In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It builds the rows in its own table-like structure (for example, a `DataTable` in .NET) whose columns must match the type: **the same number of columns, in the same order, with compatible data types**. It then sends the rows together with the name of the table type, and SQL Server checks them against the type definition:
 
 ```mermaid
@@ -1915,7 +1903,7 @@ sequenceDiagram
     alt rows match the type
         rect rgb(212, 237, 218)
         S->>P: @Lines as a READONLY table
-        P-->>A: new invoice ID
+        P-->>A: invoice and items inserted
         end
     else rows do not match
         rect rgb(248, 215, 218)

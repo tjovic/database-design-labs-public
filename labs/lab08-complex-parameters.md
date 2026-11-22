@@ -1926,7 +1926,7 @@ The procedure receives the header through three scalar parameters and all three 
 
 The procedure returns the generated invoice ID.
 
-In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It sends the item rows and the name of the table type, and SQL Server checks the rows against the type definition:
+In SSMS, we act as the caller: we declare a variable, fill it, and pass it. An application does not send this code. It builds the rows in its own table-like structure (for example, a `DataTable` in .NET) whose columns must match the type: **the same number of columns, in the same order, with compatible data types**. It then sends the rows together with the name of the table type, and SQL Server checks them against the type definition:
 
 ```mermaid
 sequenceDiagram
@@ -1978,7 +1978,7 @@ The result should contain three items linked to the same invoice.
 |---|---|
 | Strong typing — columns have defined SQL data types | Requires a user-defined table type |
 | Supports multiple rows and columns | TVP parameters must be `READONLY` |
-| Can be used directly in joins and queries | Table types cannot be altered directly |
+| Can be used directly in joins and queries | Changing a table type is expensive: it cannot be altered, so every procedure that uses it must be dropped and recreated, and every application that fills it must change at the same time |
 | Avoids parsing delimited strings, XML, or JSON | Client applications must support sending TVPs |
 | Useful for set-based operations | SQL Server does not maintain column statistics on TVPs |
 
@@ -2042,6 +2042,8 @@ The following table summarizes the main characteristics of each approach.
 | XML | Hierarchical | XML type; extracted values require conversion | Supports complex nested structures | Verbose syntax and parsing overhead |
 | JSON | Objects and arrays | Values are converted during extraction | Natural format for web integration | Requires parsing and validation |
 | TVP | Relational rows and columns | Strong | Typed data can be used directly in SQL | Requires a predefined table type |
+
+The methods also differ in how easily they adapt to change. JSON is tolerant: if a procedure starts reading a new property, an older application that does not send it still works, because `OPENJSON` returns `NULL` for it, and extra properties are simply ignored. A TVP is a strict contract: when the table type changes, the procedures and every application that fills it must change together. JSON pays for its flexibility with weaker type checking; a TVP pays for its strong typing with a rigid contract.
 
 There is no single method that is always best.
 

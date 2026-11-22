@@ -303,7 +303,7 @@ Call it with the XML above and verify the inserted rows, including each city's s
 <details>
 <summary>Hint</summary>
 
-- Read the element text with `.value('.', 'nvarchar(50)')`, as in Lab 8, Section 4.2, Step 3.
+- Read the element text with `.value('.', 'nvarchar(50)')`, as in Lab 8, Section 4.5.
 - Read the attribute with `.value('@StateID', 'int')`.
 
 </details>

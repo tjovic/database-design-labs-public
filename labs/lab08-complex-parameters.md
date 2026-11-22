@@ -1073,7 +1073,8 @@ SELECT
     c.IDCustomer AS [@IDCustomer],
     c.FirstName,
     c.LastName,
-    c.Email AS [Emails/Email] -- NEW: / creates nested elements
+    c.Email AS [Contact/Email],        -- NEW: / creates nested elements
+    c.PhoneNumber AS [Contact/Phone]
 FROM Customer c
 WHERE c.IDCustomer <= 3
 FOR XML PATH('Customer'), ROOT('Customers');
@@ -1086,9 +1087,10 @@ Result (first customer):
     <Customer IDCustomer="1">
         <FirstName>Gustavo</FirstName>
         <LastName>Achong</LastName>
-        <Emails>
+        <Contact>
             <Email>gustavo0@adventure-works.com</Email>
-        </Emails>
+            <Phone>398-555-0132</Phone>
+        </Contact>
     </Customer>
     ...
 </Customers>
@@ -1100,7 +1102,7 @@ Result (first customer):
 | `FOR XML PATH('Customer')` | One `Customer` element per row |
 | `ROOT('Customers')` | Wraps the result in a root element |
 | `[@IDCustomer]` | Creates an attribute |
-| `[Emails/Email]` | Creates nested elements |
+| `[Contact/Email]` | Creates a nested `Contact` element with an `Email` element |
 
 ## 4.7 Advantages and Limitations of XML
 
@@ -1132,7 +1134,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 1. The **attribute** `ProductID` of the current element. To read the element's text, use `.`, as in Section 4.5.
 2. The procedure inserts the header first. `SCOPE_IDENTITY()` returns the ID generated for it, and the `INSERT ... SELECT` puts that `@NewInvoiceID` into every item row.
 3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
-4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.
+4. Use a **slash** in the column alias. `[Contact/Email]` produces `<Contact><Email>...</Email></Contact>`.
 
 </details>
 

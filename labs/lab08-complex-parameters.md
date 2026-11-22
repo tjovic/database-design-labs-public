@@ -629,7 +629,14 @@ SELECT
 FROM @Customers.nodes('/Customers/Customer') AS tbl(col);
 ```
 
-Now we get the two rows from the diagram. In each row, `tbl.col` is one `Customer` element, and `.query('.')` returns that element (`.`) as XML.
+Result:
+
+| CustomerXml |
+|---|
+| `<Customer FirstName="Nina" LastName="Novak" Email="nina.novak@example.com"/>` |
+| `<Customer FirstName="Ivan" LastName="Horvat" Email="ivan.horvat@example.com"/>` |
+
+These are the two rows from the diagram. In each row, `tbl.col` is one `Customer` element, and `.query('.')` returns that element (`.`) as XML.
 
 > [!NOTE]
 > The path `/Customers/Customer` is an **XPath** expression. XPath is part of **XQuery**, the W3C standard language for querying XML; the `xml` methods in SQL Server support a subset of it:

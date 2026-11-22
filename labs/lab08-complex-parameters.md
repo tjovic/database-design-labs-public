@@ -280,7 +280,7 @@ SQL Server reads the user's part as SQL code:
 
 Run the generated statement in SSMS: instead of Gustavo Achong alone, it returns **all** `19,972` customers. The user has changed the meaning of the SQL statement without changing the application code.
 
-### The solution – Parameterized queries
+### Preventing SQL injection – Parameterized queries
 
 Instead of inserting user input into SQL text, pass the values as parameters:
 

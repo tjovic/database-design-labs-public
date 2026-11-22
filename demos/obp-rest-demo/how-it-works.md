@@ -214,7 +214,7 @@ conn.commit()
 
 The route does not open the JSON, does not know the tables, and does not insert anything itself. It forwards the document to SQL Server. Everything else — reading the header, reading the items, linking them, keeping the data consistent — happens in the procedure.
 
-The `?` is a **parameter placeholder**. The JSON is sent separately from the SQL text, so it can never become part of the SQL statement. This is the parameterized query from [Lab 8, Section 2.2](../../labs/lab08-complex-parameters.md#the-solution--parameterized-queries); the [cyber-lab](../cyber-lab/README.md) demo shows what happens without it.
+The `?` is a **parameter placeholder**. The JSON is sent separately from the SQL text, so it can never become part of the SQL statement. This is the parameterized query from [Lab 8, Section 2.2](../../labs/lab08-complex-parameters.md#preventing-sql-injection--parameterized-queries); the [cyber-lab](../cyber-lab/README.md) demo shows what happens without it.
 
 ---
 

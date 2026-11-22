@@ -637,7 +637,7 @@ Now we get the two rows from the diagram. In each row, `tbl.col` is one `Custome
 > - `/Customers` — the root element.
 > - `/Customers/Customer` — all `Customer` elements inside `Customers`.
 > - `@FirstName` — the `FirstName` attribute of the current element.
-> - `.` — the current element. `.query('.')` returns it as XML; `.value('.', ...)` returns its text as a SQL value (Step 3).
+> - `.` — the current element. `.query('.')` returns it as XML; `.value('.', ...)` returns its text as a SQL value (Section 4.5).
 
 ### Step 2 – Extract values using `.value()`
 
@@ -677,46 +677,8 @@ This process is sometimes called **XML shredding**.
 >
 > If you get an empty result or unexpected `NULL` values, first check the letter case of every element and attribute name.
 
-### Step 3 – Read element text with `.`
-
-An element can store values in two ways — as **attributes** and as **element text**. It can also have both at the same time:
-
-```text
-<City PostalCode="10000">Zagreb</City>
-      └───────┬────────┘ └─┬──┘
-              │            └── element text: read with .
-              └── attribute: read with @PostalCode
-```
-
-```sql
-DECLARE @Cities xml = N'
-<Cities>
-    <City PostalCode="10000">Zagreb</City>
-    <City PostalCode="21000">Split</City>
-    <City PostalCode="31000">Osijek</City>
-</Cities>';
-
-SELECT
-    tbl.col.value('.', 'nvarchar(50)') AS CityName,
-    tbl.col.value('@PostalCode', 'nvarchar(10)') AS PostalCode
-FROM @Cities.nodes('/Cities/City') AS tbl(col);
-```
-
-Result:
-
-| CityName | PostalCode |
-|---|---|
-| Zagreb | 10000 |
-| Split | 21000 |
-| Osijek | 31000 |
-
-In each row, `tbl.col` is one `City` element:
-
-- `.` reads the text of that element.
-- `@PostalCode` reads its attribute.
-
 > [!NOTE]
-> Always read values from the elements returned by `.nodes()`, as in the examples above. If you call `.value()` directly on the whole document, for example `@Cities.value('/Cities/City/@PostalCode', ...)`, SQL Server reports that `'value()' requires a singleton`, because the path could match several elements.
+> Always read values from the elements returned by `.nodes()`, as in the example above. If you call `.value()` directly on the whole document, for example `@Customers.value('/Customers/Customer/@FirstName', 'nvarchar(50)')`, SQL Server reports that `'value()' requires a singleton`, because the path could match several elements.
 
 ## 4.3 Passing XML to a Stored Procedure
 
@@ -902,7 +864,45 @@ The procedure inserts one invoice header and three related items in a single cal
 
 As noted in Section 1.2, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
 
-## 4.5 Generating XML with FOR XML PATH
+## 4.5 Reading Element Text
+
+So far, every value was stored in an **attribute**. An element can also store a value as its **text**, and it can have both at the same time:
+
+```text
+<City PostalCode="10000">Zagreb</City>
+      └───────┬────────┘ └─┬──┘
+              │            └── element text: read with .
+              └── attribute: read with @PostalCode
+```
+
+```sql
+DECLARE @Cities xml = N'
+<Cities>
+    <City PostalCode="10000">Zagreb</City>
+    <City PostalCode="21000">Split</City>
+    <City PostalCode="31000">Osijek</City>
+</Cities>';
+
+SELECT
+    tbl.col.value('.', 'nvarchar(50)') AS CityName,
+    tbl.col.value('@PostalCode', 'nvarchar(10)') AS PostalCode
+FROM @Cities.nodes('/Cities/City') AS tbl(col);
+```
+
+Result:
+
+| CityName | PostalCode |
+|---|---|
+| Zagreb | 10000 |
+| Split | 21000 |
+| Osijek | 31000 |
+
+In each row, `tbl.col` is one `City` element:
+
+- `.` reads the text of that element.
+- `@PostalCode` reads its attribute.
+
+## 4.6 Generating XML with FOR XML PATH
 
 So far, we have received XML and converted it into SQL rows. SQL Server can also do the opposite: **convert query results into XML**. This is useful when an application or external system expects XML output.
 
@@ -970,7 +970,7 @@ The result contains one `Customer` element for each row. The first one looks lik
 | `FOR XML PATH('Customer')` | Creates one `Customer` element per row |
 | `ROOT('Customers')` | Wraps the result in a root element |
 
-## 4.6 Advantages and Limitations of XML
+## 4.7 Advantages and Limitations of XML
 
 | Advantages | Limitations |
 |---|---|
@@ -997,7 +997,7 @@ In the next section, we will explore **JSON**, which represents the same kind of
 <details>
 <summary>Show answers</summary>
 
-1. The **attribute** `ProductID` of the current element. To read the element's text, use `.`, as in Section 4.2, Step 3.
+1. The **attribute** `ProductID` of the current element. To read the element's text, use `.`, as in Section 4.5.
 2. The procedure inserts the header first. `SCOPE_IDENTITY()` returns the ID generated for it, and the `INSERT ... SELECT` puts that `@NewInvoiceID` into every item row.
 3. The query returns **no rows**, without an error. XML names are case-sensitive, so the path does not match `<Invoice><Lines><Line>`.
 4. Use a **slash** in the column alias. `[Emails/Email]` produces `<Emails><Email>...</Email></Emails>`.

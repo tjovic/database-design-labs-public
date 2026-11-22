@@ -878,7 +878,7 @@ Expected result: two rows, Xavier Xavier and Yolanda Yates.
 
 ## Exercise 11 — JSON: Insert a Parent and Its Children [INTERMEDIATE]
 
-In Lab 8, Section 5.6, we inserted an invoice and its items from one JSON document. Here, the children are a simple array of names.
+In Lab 8, Section 5.5, we inserted an invoice and its items from one JSON document. Here, the children are a simple array of names.
 
 Create the test tables:
 

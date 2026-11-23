@@ -26,6 +26,7 @@ After completing this lab, you should be able to:
 - use `GROUPING()` to tell a "this column was rolled away" `NULL` apart from a real data `NULL`, and build a readable report label from it.
 - describe the three parts of a window function's `OVER` clause, and which are mandatory for which function family;
 - use `ROW_NUMBER`, `RANK`, `DENSE_RANK`, and `NTILE`, and explain how they treat ties differently;
+- rank the rows of a `GROUP BY` result with a window function ordered by an aggregate;
 - use `SUM`/`AVG`/`COUNT`/`MIN`/`MAX` with `OVER`, and explain why adding `ORDER BY` turns a constant into a running total;
 - use `LAG` and `LEAD` to compare a row to its neighbors in an ordered partition;
 - explain why `LAST_VALUE` needs an explicit frame, and write that frame correctly;
@@ -35,9 +36,77 @@ After completing this lab, you should be able to:
 
 # Part I – Advanced Grouping
 
-# Section 1 – The Grand Total Idiom
+# Section 1 – The Problem: A Report with Subtotals
 
-There are two ways to compute a grand total in SQL:
+## 1.1 The request
+
+Management asks for a revenue report: revenue for every city, a subtotal for every country, and a grand total.
+
+With the tools you already know, each level is a separate query. `UNION ALL` stacks them into one result:
+
+```sql
+-- Level 1: one row per city
+SELECT s.Name AS Country, c.Name AS City, SUM(ii.TotalPrice) AS Revenue
+FROM InvoiceItem ii
+JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
+JOIN Customer cu ON cu.IDCustomer = i.CustomerID
+JOIN City c ON c.IDCity = cu.CityID
+JOIN State s ON s.IDState = c.StateID
+GROUP BY s.Name, c.Name
+
+UNION ALL
+
+-- Level 2: one row per country
+SELECT s.Name, NULL, SUM(ii.TotalPrice)
+FROM InvoiceItem ii
+JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
+JOIN Customer cu ON cu.IDCustomer = i.CustomerID
+JOIN City c ON c.IDCity = cu.CityID
+JOIN State s ON s.IDState = c.StateID
+GROUP BY s.Name
+
+UNION ALL
+
+-- Level 3: the grand total
+SELECT NULL, NULL, SUM(ii.TotalPrice)
+FROM InvoiceItem ii
+
+ORDER BY Country, City;
+```
+
+Result:
+
+| Country | City | Revenue |
+|---|---|---:|
+| NULL | NULL | 109846381.399888 |
+| Croatia | NULL | 45652509.870609 |
+| Croatia | Osijek | 8033930.576545 |
+| Croatia | Pula | 7959271.672775 |
+| Croatia | Rijeka | 8808797.436713 |
+| Croatia | Split | 11539959.822518 |
+| Croatia | Zagreb | 9310550.362058 |
+| Germany | NULL | 21906402.647159 |
+| Germany | Berlin | 6151941.818056 |
+| Germany | Dresden | 7196759.416819 |
+| Germany | Frankfurt | 8557701.412284 |
+| Italy | NULL | 42287468.882120 |
+| Italy | Certaldo | 7371640.413665 |
+| Italy | Milano | 6436199.155929 |
+| Italy | Napoli | 9819896.947090 |
+| Italy | Rome | 9008852.915235 |
+| Italy | Venice | 9650879.450201 |
+
+The report is correct, but the query is not good:
+
+- the same `FROM` and `JOIN`s are written twice, and the grand total is a third query;
+- every level needs its own `SELECT`, so a report with four levels needs four queries;
+- `NULL` fills the columns that a level does not group by, because all parts of a `UNION ALL` must have the same columns.
+
+Each part is the same aggregate at a different **grouping level**: `(Country, City)`, `(Country)`, and no grouping columns at all.
+
+## 1.2 Grouping by nothing
+
+The third query has no `GROUP BY`, so the whole table is one group. The same level can be written explicitly as `GROUP BY ()` — "group by nothing":
 
 ```sql
 -- The bare aggregate
@@ -47,15 +116,29 @@ SELECT SUM(ii.TotalPrice) AS GrandTotal FROM InvoiceItem ii;
 SELECT SUM(ii.TotalPrice) AS GrandTotal FROM InvoiceItem ii GROUP BY ();
 ```
 
-They return the same answer for a non-empty table. The difference only shows up on an empty input:
+Both return `109846381.399888`. They differ only on an empty input:
 
 | Form | Over 0 rows |
 |---|---|
 | Bare aggregate | 1 result row, value `NULL` |
 | `GROUP BY ()` | 0 result rows |
 
-> [!NOTE]
-> This distinction matters today because every subtotal row you are about to see from `ROLLUP` and `CUBE` is, conceptually, a `GROUP BY ()` applied to a subset of the rows. If "group by nothing means grand total" feels natural, `ROLLUP` and `CUBE` will too.
+`()` is the grand-total level. You will see it in every one of the following sections.
+
+## 1.3 Check your understanding
+
+1. Which three grouping levels does the report in Section 1.1 need?
+2. Why is `City` `NULL` in the country rows?
+3. What does `SELECT SUM(ii.TotalPrice) FROM InvoiceItem ii WHERE 1 = 0 GROUP BY ()` return?
+
+<details>
+<summary>Show answers</summary>
+
+1. `(Country, City)`, `(Country)`, and `()` — the grand total.
+2. The country level does not group by `City`, but all parts of a `UNION ALL` must have the same columns, so the query fills the column with `NULL`.
+3. No rows. `WHERE 1 = 0` leaves an empty input, and `GROUP BY ()` returns one row per group — there are no rows, so there is no group. Without `GROUP BY ()`, the same query returns one row with `NULL`.
+
+</details>
 
 ---
 
@@ -65,7 +148,7 @@ They return the same answer for a non-empty table. The difference only shows up 
 
 `ROLLUP` takes a list of columns, ordered from most detailed (left) to least detailed (right), and groups repeatedly — dropping the rightmost column each time — until it reaches the grand total:
 
-```
+```text
 GROUP BY ROLLUP (a, b, c)
 
 is equivalent to:
@@ -78,7 +161,9 @@ is equivalent to:
 
 Four grouping levels for three columns: start on the left with everything, peel off the rightmost column, group again, repeat until you're grouping by nothing.
 
-## 2.2 Demo: Country, City, and a grand total
+For two columns, `ROLLUP (Country, City)` gives `(Country, City)`, `(Country)`, and `()` — exactly the three levels of the report in Section 1.
+
+## 2.2 Demo: the same report in one query
 
 ```sql
 SELECT
@@ -90,19 +175,30 @@ JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
 JOIN Customer cu ON cu.IDCustomer = i.CustomerID
 JOIN City c ON c.IDCity = cu.CityID
 JOIN State s ON s.IDState = c.StateID
-GROUP BY ROLLUP (s.Name, c.Name)
+GROUP BY ROLLUP (s.Name, c.Name) -- NEW: three levels in one GROUP BY
 ORDER BY s.Name, c.Name;
 ```
 
-Three kinds of row come back:
+Result (first 7 of 17 rows):
+
+| Country | City | Revenue |
+|---|---|---:|
+| NULL | NULL | 109846381.399888 |
+| Croatia | NULL | 45652509.870609 |
+| Croatia | Osijek | 8033930.576545 |
+| Croatia | Pula | 7959271.672775 |
+| Croatia | Rijeka | 8808797.436713 |
+| Croatia | Split | 11539959.822518 |
+| Croatia | Zagreb | 9310550.362058 |
+| ... | ... | ... |
+
+The 17 rows are exactly the rows of the `UNION ALL` query in Section 1.1 — from one `SELECT`, with the `JOIN`s written once. Three kinds of row come back:
 
 | Row shape | Meaning |
 |---|---|
 | `Country` and `City` both filled in | Detail — revenue for that one city |
 | `Country` filled in, `City` is `NULL` | Subtotal — revenue for that whole country |
 | Both `Country` and `City` are `NULL` | Grand total — revenue across everything |
-
-One query, three levels — exactly the shape a dashboard renders as a bold subtotal line above its detail rows, with the grand total at the bottom of the page.
 
 ## 2.3 The NULL warning
 
@@ -136,7 +232,7 @@ You cannot tell these apart from the value alone. Section 5 shows the fix.
 
 `CUBE` has the same syntax as `ROLLUP`, but instead of walking a hierarchy in one direction, it produces every possible combination of the grouping columns:
 
-```
+```text
 GROUP BY CUBE (a, b, c)
 
 is equivalent to:
@@ -172,29 +268,56 @@ flowchart TB
     end
 ```
 
-## 3.2 Demo: the same query, every combination
+## 3.2 Demo: country and year
+
+For `Country` and `City`, `CUBE` would add rows grouped by `City` alone, "revenue for this city across all countries". Every city belongs to exactly one country, so those rows only repeat the detail rows. `CUBE` is useful when the columns are **independent** dimensions — for example, country and invoice year: every country has sales in every year.
 
 ```sql
 SELECT
     s.Name AS Country,
-    c.Name AS City,
+    YEAR(i.InvoiceDate) AS InvoiceYear,
     SUM(ii.TotalPrice) AS Revenue
 FROM InvoiceItem ii
 JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
 JOIN Customer cu ON cu.IDCustomer = i.CustomerID
 JOIN City c ON c.IDCity = cu.CityID
 JOIN State s ON s.IDState = c.StateID
-GROUP BY CUBE (s.Name, c.Name)
-ORDER BY s.Name, c.Name;
+GROUP BY CUBE (s.Name, YEAR(i.InvoiceDate)) -- NEW: every combination
+ORDER BY Country, InvoiceYear;
 ```
 
-Compared to Section 2.2's `ROLLUP` result, there are new rows where `Country` is `NULL` but `City` is filled in — "revenue for this city, across every country". `ROLLUP` never produces that shape, because it only ever walks up the hierarchy in one direction; `CUBE` gives you everything.
+Result (first 10 of 20 rows):
+
+| Country | InvoiceYear | Revenue |
+|---|---|---:|
+| NULL | NULL | 109846381.399888 |
+| NULL | 2001 | 11331808.961814 |
+| NULL | 2002 | 30674773.173625 |
+| NULL | 2003 | 42011037.162396 |
+| NULL | 2004 | 25828762.102053 |
+| Croatia | NULL | 45652509.870609 |
+| Croatia | 2001 | 4640120.257854 |
+| Croatia | 2002 | 13021813.205923 |
+| Croatia | 2003 | 17380664.430461 |
+| Croatia | 2004 | 10609911.976371 |
+| ... | ... | ... |
+
+Four kinds of row come back:
+
+| Row shape | Meaning |
+|---|---|
+| `Country` and `InvoiceYear` both filled in | Detail — revenue for one country in one year |
+| `Country` filled in, `InvoiceYear` is `NULL` | Revenue for that country across all years |
+| `Country` is `NULL`, `InvoiceYear` filled in | Revenue for that year across all countries |
+| Both `NULL` | Grand total |
+
+`ROLLUP (s.Name, YEAR(i.InvoiceDate))` would return the same rows except the four yearly totals across all countries: it never skips the left column.
 
 ## 3.3 When to use CUBE — and when not
 
 | Use CUBE when | Don't use CUBE when |
 |---|---|
-| You genuinely need every possible aggregation level (rare) | A `ROLLUP` would already give you what you need |
+| You need totals for every combination of independent dimensions | The columns form a hierarchy — `ROLLUP` already gives you what you need |
 | Building a pivot table with fully interchangeable dimensions | You want only some combinations — use `GROUPING SETS` instead |
 | | You have many columns: `CUBE` on 6 columns is 64 grouping levels |
 
@@ -211,7 +334,7 @@ Compared to Section 2.2's `ROLLUP` result, there are new rows where `Country` is
 <summary>Show answers</summary>
 
 1. `2^4 = 16`. Each additional column doubles the count.
-2. Every combination that skips a "middle" column — for `(Country, City)`, that's the rows grouped by `City` alone, across all countries, which `ROLLUP` never produces.
+2. Every combination that skips a column on the left — for `(Country, InvoiceYear)`, the yearly totals across all countries, which `ROLLUP` never produces.
 3. Whenever the grouping columns form a genuine hierarchy (country contains city, year contains month) and you only need subtotals up that hierarchy, not sideways combinations — the vast majority of real reporting queries.
 
 </details>
@@ -224,7 +347,7 @@ Compared to Section 2.2's `ROLLUP` result, there are new rows where `Country` is
 
 `GROUPING SETS` is the explicit, general form: you list exactly which grouping levels you want, nothing more:
 
-```
+```text
 GROUP BY GROUPING SETS
 (
     (a, b),   -- this level
@@ -235,33 +358,48 @@ GROUP BY GROUPING SETS
 
 `ROLLUP` and `CUBE` are shortcuts for specific `GROUPING SETS` lists:
 
-```
+```text
 GROUP BY ROLLUP(a, b)  ==  GROUP BY GROUPING SETS ((a, b), (a), ())
 GROUP BY CUBE(a, b)    ==  GROUP BY GROUPING SETS ((a, b), (a), (b), ())
 ```
 
-## 4.2 Demo: subtotals without the detail rows
+## 4.2 Demo: totals without the detail rows
+
+Management now wants only the totals from Section 3.2: one row per country, one row per year, and the grand total — without the 12 country-and-year detail rows.
 
 ```sql
 SELECT
     s.Name AS Country,
-    c.Name AS City,
+    YEAR(i.InvoiceDate) AS InvoiceYear,
     SUM(ii.TotalPrice) AS Revenue
 FROM InvoiceItem ii
 JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
 JOIN Customer cu ON cu.IDCustomer = i.CustomerID
 JOIN City c ON c.IDCity = cu.CityID
 JOIN State s ON s.IDState = c.StateID
-GROUP BY GROUPING SETS
+GROUP BY GROUPING SETS -- NEW: list the levels explicitly
 (
-    (s.Name),   -- by country
-    (c.Name),   -- by city (across all countries)
-    ()          -- grand total
+    (s.Name),                -- by country
+    (YEAR(i.InvoiceDate)),   -- by year
+    ()                       -- grand total
 )
-ORDER BY s.Name, c.Name;
+ORDER BY Country, InvoiceYear;
 ```
 
-The result has no `(Country, City)` detail rows at all — only per-country subtotals, per-city subtotals (across every country), and a grand total. Neither `ROLLUP` nor `CUBE` can produce this shape alone; both would include the detail rows. `GROUPING SETS` lets you skip them.
+Result:
+
+| Country | InvoiceYear | Revenue |
+|---|---|---:|
+| NULL | NULL | 109846381.399888 |
+| NULL | 2001 | 11331808.961814 |
+| NULL | 2002 | 30674773.173625 |
+| NULL | 2003 | 42011037.162396 |
+| NULL | 2004 | 25828762.102053 |
+| Croatia | NULL | 45652509.870609 |
+| Germany | NULL | 21906402.647159 |
+| Italy | NULL | 42287468.882120 |
+
+Neither `ROLLUP` nor `CUBE` can produce this shape alone; both would include the detail rows. `GROUPING SETS` lets you skip them.
 
 | Tool | Produces |
 |---|---|
@@ -278,7 +416,7 @@ The result has no `(Country, City)` detail rows at all — only per-country subt
 <summary>Show answers</summary>
 
 1. `GROUPING SETS ((a, b, c), (a, b), (a), ())`.
-2. Revenue by country, revenue by city (across all countries), and a grand total — but *without* the `(country, city)` detail rows. Neither `ROLLUP` nor `CUBE` skips that intersection; `GROUPING SETS` lets you list exactly those four levels.
+2. Revenue by country, revenue by year, and a grand total — but *without* the `(country, year)` detail rows. Neither `ROLLUP` nor `CUBE` skips that level; `GROUPING SETS` lets you list exactly those three levels.
 
 </details>
 
@@ -291,12 +429,27 @@ The result has no `(Country, City)` detail rows at all — only per-country subt
 ```sql
 SELECT
     p.Color,
-    COUNT(*) AS Products,
+    COUNT(*) AS InvoiceItems,
     SUM(ii.TotalPrice) AS Revenue
 FROM Product p
 JOIN InvoiceItem ii ON ii.ProductID = p.IDProduct
 GROUP BY ROLLUP (p.Color);
 ```
+
+Result:
+
+| Color | InvoiceItems | Revenue |
+|---|---:|---:|
+| NULL | 34145 | 1099318.907552 |
+| Bijela | 1429 | 29745.127584 |
+| Crna | 30099 | 38247018.631195 |
+| Crvena | 13065 | 21623269.540854 |
+| Plava | 9044 | 9602850.958400 |
+| Srebrna | 10654 | 19777339.945262 |
+| Srebrna/Crna | 1517 | 147483.909800 |
+| Šarena | 8502 | 649849.160346 |
+| Žuta | 12862 | 18669505.218895 |
+| NULL | 121317 | 109846381.399888 |
 
 Two rows in this result show `Color = NULL`: one is "products where the color is genuinely unrecorded in the data" (`Product` has 248 rows with `Color IS NULL`), the other is the `ROLLUP` grand-total row. Same value, two different meanings, and no way to tell them apart from the raw result.
 
@@ -311,13 +464,28 @@ SELECT
          ELSE p.Color
     END AS Color,
     GROUPING(p.Color) AS ColorIsGroupingNull,
-    COUNT(*) AS Products,
+    COUNT(*) AS InvoiceItems,
     SUM(ii.TotalPrice) AS Revenue
 FROM Product p
 JOIN InvoiceItem ii ON ii.ProductID = p.IDProduct
 GROUP BY ROLLUP (p.Color)
 ORDER BY GROUPING(p.Color), p.Color;
 ```
+
+Result:
+
+| Color | ColorIsGroupingNull | InvoiceItems | Revenue |
+|---|---:|---:|---:|
+| (no color) | 0 | 34145 | 1099318.907552 |
+| Bijela | 0 | 1429 | 29745.127584 |
+| Crna | 0 | 30099 | 38247018.631195 |
+| Crvena | 0 | 13065 | 21623269.540854 |
+| Plava | 0 | 9044 | 9602850.958400 |
+| Srebrna | 0 | 10654 | 19777339.945262 |
+| Srebrna/Crna | 0 | 1517 | 147483.909800 |
+| Šarena | 0 | 8502 | 649849.160346 |
+| Žuta | 0 | 12862 | 18669505.218895 |
+| ALL | 1 | 121317 | 109846381.399888 |
 
 Now the report is unambiguous: rows labeled `(no color)` are real data `NULL`s; the row labeled `ALL` is the `ROLLUP` grand total. The extra `ColorIsGroupingNull` column is shown here only to make the point — a production report would just display the labeled `Color`.
 
@@ -348,7 +516,7 @@ The tool built for exactly that is the window function. It aggregates across a s
 
 # Section 6 – The Anatomy of a Window Function
 
-## 6.1 The killer comparison
+## 6.1 Grouped versus windowed
 
 ```sql
 -- Grouped: one row per color, detail gone
@@ -363,6 +531,20 @@ SELECT Name, Color, PriceWithoutVAT,
        SUM(PriceWithoutVAT) OVER (PARTITION BY Color) AS ColorTotal
 FROM Product;
 ```
+
+The grouped query returns 10 rows, one per color. Its `Plava` row is:
+
+| Color | ColorTotal |
+|---|---:|
+| Plava | 24015.6600 |
+
+The windowed query returns all 504 products. Every one of the 26 `Plava` products carries the same `ColorTotal`; three of them:
+
+| Name | Color | PriceWithoutVAT | ColorTotal |
+|---|---|---:|---:|
+| Classic Vest, L | Plava | 63.5000 | 24015.6600 |
+| Classic Vest, M | Plava | 63.5000 | 24015.6600 |
+| HL Touring Frame - Blue, 46 | Plava | 1003.9100 | 24015.6600 |
 
 Same aggregate, same partitioning by color. `GROUP BY` loses the individual rows. The window function keeps every row **and** adds the aggregate as an extra column, living on every row of the partition it applies to. Everything in this lab is a variation on that one pattern.
 
@@ -401,7 +583,7 @@ flowchart LR
     E --> F["ORDER BY\norder the final result"]
 ```
 
-If a query has a `GROUP BY`, the window function sees the **aggregated** rows, not the original table — usually not what you want, since the whole point of a window function is to keep individual rows. Most window-function queries have no `GROUP BY` at all.
+If a query has a `GROUP BY`, the window function sees the **aggregated** rows, not the original table. When you need the individual rows, leave the `GROUP BY` out — most window-function queries have none. When you want to rank or compare the groups themselves, the `GROUP BY` is exactly right (Section 7.4).
 
 ## 6.4 Check your understanding
 
@@ -414,7 +596,7 @@ If a query has a `GROUP BY`, the window function sees the **aggregated** rows, n
 
 1. `PARTITION BY` (slice into strips), `ORDER BY` (order within each strip), and a frame (a sliding window inside the ordered strip).
 2. `ORDER BY`. `PARTITION BY` is optional.
-3. The aggregated rows produced by `GROUP BY`, not the original rows — usually not what you want, since window functions exist to preserve individual rows.
+3. The aggregated rows produced by `GROUP BY`, not the original rows. That is useful for ranking the groups themselves, but not when you need the individual rows.
 
 </details>
 
@@ -449,7 +631,26 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT DESC;
 ```
 
-Look at the tied prices (there are several): `ROW_NUMBER` gives them consecutive numbers; `RANK` gives them the same number, then skips; `DENSE_RANK` gives them the same number, no skip; `NTILE(4)` assigns each row to one of four price-based quartiles.
+Result (first 12 of 304 rows):
+
+| Name | Color | PriceWithoutVAT | RN | RK | DR | Quartile |
+|---|---|---:|---:|---:|---:|---:|
+| Road-150 Red, 62 | Crvena | 3578.2700 | 1 | 1 | 1 | 1 |
+| Road-150 Red, 44 | Crvena | 3578.2700 | 2 | 1 | 1 | 1 |
+| Road-150 Red, 48 | Crvena | 3578.2700 | 3 | 1 | 1 | 1 |
+| Road-150 Red, 52 | Crvena | 3578.2700 | 4 | 1 | 1 | 1 |
+| Road-150 Red, 56 | Crvena | 3578.2700 | 5 | 1 | 1 | 1 |
+| Mountain-100 Silver, 38 | Srebrna | 3399.9900 | 6 | 6 | 2 | 1 |
+| Mountain-100 Silver, 42 | Srebrna | 3399.9900 | 7 | 6 | 2 | 1 |
+| Mountain-100 Silver, 44 | Srebrna | 3399.9900 | 8 | 6 | 2 | 1 |
+| Mountain-100 Silver, 48 | Srebrna | 3399.9900 | 9 | 6 | 2 | 1 |
+| Mountain-100 Black, 38 | Crna | 3374.9900 | 10 | 10 | 3 | 1 |
+| Mountain-100 Black, 42 | Crna | 3374.9900 | 11 | 10 | 3 | 1 |
+| Mountain-100 Black, 44 | Crna | 3374.9900 | 12 | 10 | 3 | 1 |
+
+The five `Road-150 Red` bikes have the same price. `ROW_NUMBER` still numbers them 1 to 5; `RANK` and `DENSE_RANK` give all five `1`. The next price differs in the two: `RANK` continues with `6` (five rows were ahead), `DENSE_RANK` with `2` (one distinct price was ahead). `NTILE(4)` puts the first 76 of the 304 rows into quartile `1`.
+
+The order of tied rows is not defined, so `ROW_NUMBER` can number the five bikes in a different order on your computer.
 
 ## 7.3 Restarting per partition
 
@@ -465,9 +666,64 @@ WHERE p.Color IS NOT NULL
 ORDER BY p.Color, p.PriceWithoutVAT DESC;
 ```
 
+Result (first 8 rows):
+
+| Name | Color | PriceWithoutVAT | RankInColor |
+|---|---|---:|---:|
+| Mountain Bike Socks, M | Bijela | 9.5000 | 1 |
+| Mountain Bike Socks, L | Bijela | 9.5000 | 2 |
+| Racing Socks, M | Bijela | 8.9900 | 3 |
+| Racing Socks, L | Bijela | 8.9900 | 4 |
+| Mountain-100 Black, 38 | Crna | 3374.9900 | 1 |
+| Mountain-100 Black, 42 | Crna | 3374.9900 | 2 |
+| Mountain-100 Black, 44 | Crna | 3374.9900 | 3 |
+| Mountain-100 Black, 48 | Crna | 3374.9900 | 4 |
+
 Adding `PARTITION BY p.Color` makes `RankInColor` restart at `1` for every new color — "the most expensive Crna product", "the most expensive Plava product", all in one query. The same pattern applies to `RANK`, `DENSE_RANK`, and `NTILE`.
 
-## 7.4 When to use each
+## 7.4 Ranking the result of a GROUP BY
+
+Back to the report from Part I: which city earns the most in each country? The query needs one row per city, so it uses `GROUP BY`, and then ranks those city rows within each country:
+
+```sql
+SELECT
+    s.Name AS Country,
+    c.Name AS City,
+    SUM(ii.TotalPrice) AS Revenue,
+    RANK() OVER (PARTITION BY s.Name
+                 ORDER BY SUM(ii.TotalPrice) DESC) AS RankInCountry -- NEW: rank by an aggregate
+FROM InvoiceItem ii
+JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
+JOIN Customer cu ON cu.IDCustomer = i.CustomerID
+JOIN City c ON c.IDCity = cu.CityID
+JOIN State s ON s.IDState = c.StateID
+GROUP BY s.Name, c.Name
+ORDER BY Country, RankInCountry;
+```
+
+Result:
+
+| Country | City | Revenue | RankInCountry |
+|---|---|---:|---:|
+| Croatia | Split | 11539959.822518 | 1 |
+| Croatia | Zagreb | 9310550.362058 | 2 |
+| Croatia | Rijeka | 8808797.436713 | 3 |
+| Croatia | Osijek | 8033930.576545 | 4 |
+| Croatia | Pula | 7959271.672775 | 5 |
+| Germany | Frankfurt | 8557701.412284 | 1 |
+| Germany | Dresden | 7196759.416819 | 2 |
+| Germany | Berlin | 6151941.818056 | 3 |
+| Italy | Napoli | 9819896.947090 | 1 |
+| Italy | Venice | 9650879.450201 | 2 |
+| Italy | Rome | 9008852.915235 | 3 |
+| Italy | Certaldo | 7371640.413665 | 4 |
+| Italy | Milano | 6436199.155929 | 5 |
+
+This works because of the order in Section 6.3: `GROUP BY` runs first and produces one row per city; the window function then runs over those 13 rows. That is why its `ORDER BY` can use `SUM(ii.TotalPrice)` — the same aggregate as in the `SELECT` list.
+
+Here the window function seeing the grouped rows is exactly what we want: we rank the groups themselves. The rule is the same as always — a window function sees the rows that exist when `SELECT` runs.
+
+## 7.5 When to use each
 
 | Function | Use for |
 |---|---|
@@ -476,11 +732,12 @@ Adding `PARTITION BY p.Color` makes `RankInColor` restart at `1` for every new c
 | `DENSE_RANK` | Grouped-by-value listings ("top 5 distinct prices") |
 | `NTILE(n)` | Percentiles, deciles, cohort analysis |
 
-## 7.5 Check your understanding
+## 7.6 Check your understanding
 
 1. What does `RANK` do differently from `ROW_NUMBER`?
 2. What does `DENSE_RANK` do differently from `RANK`?
 3. You want the top 3 rows per partition, and you don't want ties to give you more or fewer than 3. Which function do you use?
+4. In Section 7.4, why can the `ORDER BY` inside `OVER` use `SUM(ii.TotalPrice)`?
 
 <details>
 <summary>Show answers</summary>
@@ -488,6 +745,7 @@ Adding `PARTITION BY p.Color` makes `RankInColor` restart at `1` for every new c
 1. `ROW_NUMBER` gives every row a unique number, breaking ties arbitrarily. `RANK` gives tied rows the same number and then skips the following numbers (`1, 2, 2, 4`).
 2. `DENSE_RANK` also shares a rank across ties, but does not skip — the next distinct value gets the next integer (`1, 2, 2, 3`).
 3. `ROW_NUMBER`, filtered to `<= 3` in an outer query — it guarantees exactly 3 rows per partition regardless of ties. `RANK` could return more or fewer than 3 if there's a tie at the boundary.
+4. The query has a `GROUP BY`, which runs before the window function. When the window function runs, each row is a group, so it can be ordered by that group's aggregate.
 
 </details>
 
@@ -515,6 +773,15 @@ FROM Product p
 WHERE p.PriceWithoutVAT > 0;
 ```
 
+Result (first 4 of 304 rows):
+
+| Name | PriceWithoutVAT | TotalOfAllPrices |
+|---|---:|---:|
+| LL Mountain Seat Assembly | 133.3400 | 221087.7900 |
+| ML Mountain Seat Assembly | 147.1400 | 221087.7900 |
+| HL Mountain Seat Assembly | 196.9200 | 221087.7900 |
+| LL Road Seat Assembly | 133.3400 | 221087.7900 |
+
 An empty `OVER ()` means no partition and no order — the window is the entire result set, so the same total appears on every row.
 
 ## 8.3 Demo: running total per year
@@ -522,18 +789,33 @@ An empty `OVER ()` means no partition and no order — the window is the entire 
 ```sql
 SELECT
     i.InvoiceDate,
+    i.IDInvoice,
+    ii.IDInvoiceItem,
     ii.TotalPrice,
     SUM(ii.TotalPrice) OVER
     (
         PARTITION BY YEAR(i.InvoiceDate)
-        ORDER BY i.InvoiceDate, i.IDInvoice
+        ORDER BY i.InvoiceDate, i.IDInvoice, ii.IDInvoiceItem
     ) AS RunningTotalThisYear
 FROM InvoiceItem ii
 JOIN Invoice i ON i.IDInvoice = ii.InvoiceID
-ORDER BY i.InvoiceDate, i.IDInvoice;
+ORDER BY i.InvoiceDate, i.IDInvoice, ii.IDInvoiceItem;
 ```
 
-The running total climbs as the rows go by in date order, then resets to zero on January 1st of the next year — because the partition is `YEAR(InvoiceDate)`, and a new year is a new partition. One query; no cursor needed for a running total ever again.
+`IDInvoiceItem` makes the order unique, so every row adds exactly one item to the total.
+
+Result (the last rows of 2001 and the first rows of 2002, out of 121317 rows):
+
+| InvoiceDate | IDInvoice | IDInvoiceItem | TotalPrice | RunningTotalThisYear |
+|---|---:|---:|---:|---:|
+| 2001-12-31 | 45035 | 5149 | 3578.270000 | 11327531.593614 |
+| 2001-12-31 | 45036 | 5150 | 3578.270000 | 11331109.863614 |
+| 2001-12-31 | 45037 | 5151 | 699.098200 | 11331808.961814 |
+| 2002-01-01 | 45038 | 5152 | 11.400000 | 11.400000 |
+| 2002-01-01 | 45038 | 5153 | 115.361600 | 126.761600 |
+| 2002-01-01 | 45038 | 5154 | 1429.408600 | 1556.170200 |
+
+The running total climbs as the rows go by in date order. The last row of 2001 shows `11331808.961814` — the 2001 revenue from Section 3.2. On January 1st, the total starts again from the first item, because the partition is `YEAR(InvoiceDate)`, and a new year is a new partition. One query, no loop.
 
 ## 8.4 Why ORDER BY inside OVER produces a running total
 
@@ -594,6 +876,16 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
 
+Result (first 5 of 304 rows):
+
+| Name | PriceWithoutVAT | PrevPrice | DeltaFromPrev |
+|---|---:|---:|---:|
+| Patch Kit/8 Patches | 2.2900 | NULL | NULL |
+| Road Tire Tube | 3.9900 | 2.2900 | 1.7000 |
+| Touring Tire Tube | 4.9900 | 3.9900 | 1.0000 |
+| Mountain Tire Tube | 4.9900 | 4.9900 | .0000 |
+| Water Bottle - 30 oz. | 4.9900 | 4.9900 | .0000 |
+
 `PrevPrice` is the previous product's price on every row; the first row's `PrevPrice` is `NULL`, because nothing precedes it — that's `LAG`'s default at the edge of a partition. `DeltaFromPrev` is how much more this product costs than the one before it. "Compare each row to the one before it" is one of the most common analytical patterns in real code.
 
 ## 9.3 LEAD: the mirror
@@ -607,6 +899,14 @@ FROM Product p
 WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
+
+Result (first 3 of 304 rows):
+
+| Name | PriceWithoutVAT | NextPrice |
+|---|---:|---:|
+| Patch Kit/8 Patches | 2.2900 | 3.9900 |
+| Road Tire Tube | 3.9900 | 4.9900 |
+| Touring Tire Tube | 4.9900 | 4.9900 |
 
 Same idea, mirrored: the last row's `NextPrice` is `NULL`, since nothing follows it. Common use: "when does the next event happen after this one" — timestamps, schedules, version history.
 
@@ -622,6 +922,15 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
 
+Result (first 4 of 304 rows):
+
+| Name | PriceWithoutVAT | CheapestProduct |
+|---|---:|---|
+| Patch Kit/8 Patches | 2.2900 | Patch Kit/8 Patches |
+| Road Tire Tube | 3.9900 | Patch Kit/8 Patches |
+| Touring Tire Tube | 4.9900 | Patch Kit/8 Patches |
+| Mountain Tire Tube | 4.9900 | Patch Kit/8 Patches |
+
 Every row shows the name of the cheapest product — the first row of the ordered window. `LAST_VALUE` looks symmetric, but is not, with default settings:
 
 ```sql
@@ -633,7 +942,16 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
 
-`LastValueDefault` on every row turns out to equal that row's own `Name`. That is not "the last value in the partition" — it is "the last value seen so far". The default frame when `ORDER BY` is present is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` (Section 8.4), so "the last row of the window" is the current row itself.
+Result (first 4 of 304 rows):
+
+| Name | PriceWithoutVAT | LastValueDefault |
+|---|---:|---|
+| Patch Kit/8 Patches | 2.2900 | Patch Kit/8 Patches |
+| Road Tire Tube | 3.9900 | Road Tire Tube |
+| Touring Tire Tube | 4.9900 | Water Bottle - 30 oz. |
+| Mountain Tire Tube | 4.9900 | Water Bottle - 30 oz. |
+
+`LastValueDefault` is not the most expensive product. It is "the last value seen so far". The default frame when `ORDER BY` is present is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` (Section 8.4), so the window ends at the current row: on the first two rows, `LastValueDefault` is the row's own `Name`. On the rows priced `4.9900`, it is `Water Bottle - 30 oz.`, the last of the products with that price — with `RANGE`, "current row" includes every row that ties on the `ORDER BY` value (Section 10.1).
 
 The fix is an explicit frame covering the whole partition:
 
@@ -649,6 +967,17 @@ FROM Product p
 WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
+
+Result (first 4 of 304 rows):
+
+| Name | PriceWithoutVAT | ActuallyMostExpensive |
+|---|---:|---|
+| Patch Kit/8 Patches | 2.2900 | Road-150 Red, 56 |
+| Road Tire Tube | 3.9900 | Road-150 Red, 56 |
+| Touring Tire Tube | 4.9900 | Road-150 Red, 56 |
+| Mountain Tire Tube | 4.9900 | Road-150 Red, 56 |
+
+Now the window covers the whole partition, and every row shows a product with the highest price. Five products share that price, so which of them appears depends on the order of the tied rows.
 
 > [!IMPORTANT]
 > Whenever you use `LAST_VALUE`, add the explicit `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` frame. Always.
@@ -724,6 +1053,16 @@ WHERE p.PriceWithoutVAT > 0
 ORDER BY p.PriceWithoutVAT;
 ```
 
+Result (first 5 of 304 rows):
+
+| Name | PriceWithoutVAT | Moving3Avg |
+|---|---:|---:|
+| Patch Kit/8 Patches | 2.2900 | 2.2900 |
+| Road Tire Tube | 3.9900 | 3.1400 |
+| Touring Tire Tube | 4.9900 | 3.7566 |
+| Mountain Tire Tube | 4.9900 | 4.6566 |
+| Water Bottle - 30 oz. | 4.9900 | 4.9900 |
+
 The first row's window has just 1 row (nothing precedes it), so the average equals that row's own price. The second row's window has 2 rows; the third row onward, 3. This is the standard shape for smoothing a time series with a moving average.
 
 ## 10.4 The default frame, revisited
@@ -760,7 +1099,7 @@ Recall from Section 8.4: when `ORDER BY` is present inside `OVER` with no explic
 | Forgetting `WHERE` before grouping sensitive columns | Subtotals then include rows you didn't mean to report on | Filter first, then apply `ROLLUP`/`CUBE`/`GROUPING SETS` |
 | Using `LAST_VALUE` without an explicit frame | Default frame ends at the current row — you get the row itself, not the true last value | Always add `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` |
 | Forgetting `ORDER BY` on a ranking or analytical function | The function has nothing to rank or reach relative to — syntax error or meaningless result | Treat `ORDER BY` as mandatory for ranking and analytical functions |
-| Mixing a `GROUP BY` into a window-function query without meaning to | The window function sees aggregated rows, not the originals | Drop the `GROUP BY` unless you specifically want to window over aggregated groups |
+| Mixing a `GROUP BY` into a window-function query without meaning to | The window function sees aggregated rows, not the originals | Drop the `GROUP BY` unless you want to rank or compare the groups themselves (Section 7.4) |
 | Expecting `RANK` to give exactly `N` rows per partition when filtering top-`N` | Ties can produce more or fewer than `N` | Use `ROW_NUMBER` when you need exactly `N`, `RANK`/`DENSE_RANK` when ties should matter |
 | Assuming `RANGE` and `ROWS` always behave the same | They agree only when there are no ties on the `ORDER BY` column | Default to `ROWS` unless you have a specific reason for value-based framing |
 

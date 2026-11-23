@@ -488,7 +488,7 @@ First write the `GROUP BY p.Color` query with the total. Then add the ranking co
 <details>
 <summary>Hint 2</summary>
 
-A window function can order by an aggregate: `DENSE_RANK() OVER (ORDER BY SUM(ii.Quantity) DESC)`. Window functions run after `GROUP BY` (Lab 11, Section 6.3).
+Window functions run after `GROUP BY`, so they can rank the grouped rows by an aggregate (Lab 11, Section 7.4).
 
 </details>
 

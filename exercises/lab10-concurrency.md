@@ -380,7 +380,7 @@ Ask what the report saw: a value that was never committed, the same row with two
 <details>
 <summary>Hint 2</summary>
 
-The problem is in what the report *reads*, so the fix belongs to the reading session. Lab 10, Section 10.2 lists which level prevents which problem.
+The problem is in what the report *reads*, so the fix belongs to the reading session. Lab 10, Section 5.1 lists which level prevents which problem.
 
 </details>
 
@@ -438,7 +438,7 @@ ROLLBACK TRANSACTION;
 
 The lowest level is `READ COMMITTED`, the SQL Server default, set in Session B. Session A does nothing wrong: it may change data and roll back.
 
-4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Section 9](../labs/lab10-concurrency.md#91-dont-lock-reads--version-them) shows how row versioning removes that wait.
+4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Section 8](../labs/lab10-concurrency.md#81-dont-lock-reads--version-them) shows how row versioning removes that wait.
 
 </details>
 
@@ -541,7 +541,7 @@ WHERE FirstName = N'ExerciseConc';
 
 The lowest level is `REPEATABLE READ`, set in Session A, the session that reads twice.
 
-4. `SERIALIZABLE` also locks ranges, so it would block inserts that have nothing to do with this customer as well. The job only needs the rows it has already read to stay unchanged; a higher level would only add waiting for other users (Lab 10, Section 10.2).
+4. `SERIALIZABLE` also locks ranges, so it would block inserts that have nothing to do with this customer as well. The job only needs the rows it has already read to stay unchanged; a higher level would only add waiting for other users (Lab 10, Section 5.2).
 
 </details>
 
@@ -698,16 +698,18 @@ Session A runs `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRAN; SELECT
 <details>
 <summary>Hint</summary>
 
-- `SERIALIZABLE` locks the rows Session A read **and** the range its `WHERE` condition covers. Ask whether each Session B statement touches that range.
+- `SERIALIZABLE` locks the rows Session A read **and** the ranges between them. Ask first how Session A's `SELECT` finds the `West%` rows: is there an index on `BranchName`, or does it read the whole table?
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-1. Succeeds immediately — outside the locked range.
-2. Blocks — falls inside the `West%` range Session A locked.
-3. Succeeds immediately — `Central Osijek` was never read by Session A's query, so it holds no lock there.
+`dbo.Branch` has no index on `BranchName`, so Session A's `SELECT` scans the whole table. Under `SERIALIZABLE` it keeps a shared range lock on **every** row it scanned, not only on the two `West%` rows (Lab 10, Section 4.2).
+
+1. Succeeds immediately — reading needs a shared lock, and shared locks are compatible.
+2. Blocks — every range of the table is locked, so no new row can be inserted.
+3. Blocks — the `UPDATE` needs an exclusive lock on the `Central Osijek` row, and Session A holds a shared lock on it, because its scan read that row too.
 
 Finish by rolling back Session A: `ROLLBACK TRANSACTION;`.
 
@@ -737,7 +739,7 @@ A reporting procedure must read the total balance across all accounts twice in o
 
 ## Exercise 13 — Trigger and explain a deadlock [ADVANCED]
 
-Reproduce the deadlock from [Section 8.1 of Lab 10](../labs/lab10-concurrency.md#81-two-sessions-opposite-order), but swap which account each session updates first (Session A starts with account 2, Session B starts with account 1). Confirm a deadlock still occurs, and explain in your own words why swapping the starting account did not fix it.
+Reproduce the deadlock from [Section 7.1 of Lab 10](../labs/lab10-concurrency.md#71-two-sessions-opposite-order), but swap the direction of the two transfers (Session A moves money from account 2 to account 1, Session B from account 1 to account 2). Confirm a deadlock still occurs, and explain in your own words why swapping the directions did not fix it.
 
 <details>
 <summary>Hint</summary>
@@ -749,7 +751,7 @@ Reproduce the deadlock from [Section 8.1 of Lab 10](../labs/lab10-concurrency.md
 <details>
 <summary>Solution</summary>
 
-A deadlock still occurs. What matters is that the two sessions acquire the two locks in **opposite order relative to each other** — it does not matter which specific account each one starts with, only that A then wants what B holds and B then wants what A holds. The fix from [Section 8.2](../labs/lab10-concurrency.md#82-avoiding-deadlocks) (always touch accounts in the same, e.g. ascending, ID order, in every transaction) is still required.
+A deadlock still occurs. What matters is that the two sessions acquire the two locks in **opposite order relative to each other** — it does not matter which specific account each one starts with, only that A then wants what B holds and B then wants what A holds. The fix from [Section 7.2](../labs/lab10-concurrency.md#72-avoiding-deadlocks) (always touch accounts in the same, e.g. ascending, ID order, in every transaction) is still required.
 
 </details>
 

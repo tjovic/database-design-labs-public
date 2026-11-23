@@ -4,9 +4,28 @@
 
 Lab 9 treated every transaction as if it were the only one running. In the real world, many sessions read and write the same database at the same time. What happens when two of them touch the same row within a few milliseconds of each other?
 
-Consider two bank tellers looking at the same account at the same instant. One is reading the balance to decide whether to approve a withdrawal; the other is in the middle of depositing a cheque that hasn't been confirmed yet. If the first teller sees the unconfirmed deposit and it later bounces, they approved a withdrawal against money that never existed.
+Consider two airline sellers booking seats on the same flight at the same moment. Each one reads the number of free seats, subtracts the seats the customer wants, and writes the result back:
 
-In this lab you will reproduce three concrete ways two sessions can interfere with each other, fix each one with a stronger isolation level, and then look under the hood at how SQL Server actually enforces that — with locks, and with an alternative strategy called MVCC.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S1 as Seller 1
+    participant F as Flight OU 660
+    participant S2 as Seller 2
+    Note over F: free seats = 20
+    F-->>S1: reads 20
+    F-->>S2: reads 20
+    S1->>F: books 3, writes 20 - 3
+    Note over F: free seats = 17
+    rect rgb(248, 215, 218)
+    S2->>F: books 1, writes 20 - 1
+    Note over S1,S2: free seats = 19 — Seller 1's booking is lost
+    end
+```
+
+Four seats were sold, but the flight still shows 19 free seats. Both sellers did their job correctly, and both changes were saved — yet the first booking has disappeared, overwritten by the second seller, who was still working with the old value 20. This is a **lost update**.
+
+A lost update is one way two sessions can interfere with each other. In this lab you will reproduce three more, which the isolation levels are defined by, fix each one with a stronger isolation level, and then look under the hood at how SQL Server actually enforces that — with locks, and with an alternative strategy called MVCC. At the end, we return to the two sellers.
 
 > [!IMPORTANT]
 > **Core idea:** An isolation level is a deliberate trade-off between correctness and concurrency. Stronger isolation prevents more surprises but makes sessions wait for each other longer. There is no setting that is simply "best" — only the right one for a given workload.
@@ -165,7 +184,7 @@ The setting applies to the **session**, not to a single statement — like `@@TR
 
 ## 2.1 Demo: READ UNCOMMITTED exposes an uncommitted value
 
-This is the bank-teller story from the introduction: Session A is a deposit that has not been confirmed yet; Session B is the teller checking the balance.
+Two bank tellers look at the same account. One is depositing a cheque that has not been confirmed yet; the other is checking the balance to decide whether to approve a withdrawal. If the second teller sees the unconfirmed deposit and the cheque later bounces, they approve a withdrawal against money that never existed. Session A is the deposit; Session B is the teller checking the balance.
 
 **Session A:**
 
@@ -950,7 +969,7 @@ Because a `SNAPSHOT` transaction sees one fixed view, its reads are repeatable a
 - **A deadlock is SQL Server protecting correctness, not a bug.** Fix the access order; the database will always detect and break a cycle it cannot resolve.
 - **MVCC is a second strategy, not a free upgrade.** It trades locking for row versions — readers stop blocking writers, but writers still block each other, and `tempdb` pays the cost.
 
-Back to the opening question: two tellers looking at the same account at the same instant. Every tool in this lab — the four isolation levels, the lock compatibility rules, two-phase locking, and MVCC — exists to give you a precise, chosen answer to what the second teller is allowed to see.
+Back to the opening question: two sellers booking seats on the same flight. The first booking was lost because each seller read the free seats, calculated the new value outside the database, and wrote it back. Written as one statement — `UPDATE ... SET FreeSeats = FreeSeats - 3` — the read and the write happen together: the first `UPDATE` takes an **X** lock on the row, the second one waits for it, then subtracts from the committed value `17`. Both bookings count. Every tool in this lab — the isolation levels, the lock compatibility rules, two-phase locking, and MVCC — exists to give you a precise, chosen answer to what one session is allowed to see and change while another is working on the same rows.
 
 **Looking ahead:** Labs 1–10 covered everything needed to design, build, and correctly operate a database as a service to an application. Lab 11 turns to the analytical side — reporting and aggregation over the data this course has spent ten labs learning to store and protect correctly.
 

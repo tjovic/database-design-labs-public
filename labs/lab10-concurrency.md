@@ -244,6 +244,29 @@ ROLLBACK TRANSACTION;
 
 The instant Session A finishes, Session B's `SELECT` returns — with the true value, `1000.00`.
 
+The two demos side by side:
+
+```mermaid
+sequenceDiagram
+    participant A as Session A (deposit)
+    participant R as Account 1
+    participant B as Session B (teller)
+    rect rgb(248, 215, 218)
+    Note over A,B: 2.1 READ UNCOMMITTED
+    A->>R: UPDATE +300.00 (X lock, not committed)
+    B->>R: SELECT (no S lock requested)
+    R-->>B: 1300.00 — never committed
+    A->>R: ROLLBACK (balance is 1000.00 again)
+    end
+    rect rgb(212, 237, 218)
+    Note over A,B: 2.2 READ COMMITTED
+    A->>R: UPDATE +300.00 (X lock, not committed)
+    B->>R: SELECT requests S lock — waits
+    A->>R: ROLLBACK (X lock released)
+    R-->>B: 1000.00 — the committed value
+    end
+```
+
 > [!NOTE]
 > No lie this time, but a cost: Session B waited. `READ COMMITTED` trades a little latency for a guarantee that you never read a value that might be undone.
 
@@ -545,6 +568,21 @@ flowchart LR
 | `REPEATABLE READ` | held until the transaction ends | held until the transaction ends |
 | `SERIALIZABLE` | held until the transaction ends, together with locks on the ranges between rows | held until the transaction ends |
 
+The same table as a timeline of one transaction in Session A that reads the same row twice:
+
+```text
+Session A           BEGIN    read row            read row again      COMMIT
+                      │         │                     │                 │
+
+S lock on the row
+READ UNCOMMITTED               (none)                (none)
+READ COMMITTED                  █----- no S lock -----█
+REPEATABLE READ                 █████████████████████████████████████████
+SERIALIZABLE                    █████████████████████████████████████████ + ranges
+```
+
+The gap in the `READ COMMITTED` row is where Session B changed the balance in Section 3.1.
+
 `REPEATABLE READ` and `SERIALIZABLE` keep **S** locks under the two-phase rule as well. `READ COMMITTED` breaks it for **S** locks — it releases each one right after the read — and that is exactly why it cannot guarantee that a second read returns the same value. The longer the **S** locks live, the more problems the level prevents — and the longer writers wait.
 
 A direct consequence from Lab 9: a shorter transaction holds its **X** locks for less time, which means less time blocking other sessions. Transaction length is a concurrency decision, not just a correctness one.
@@ -690,6 +728,17 @@ WHERE AccountID = 2;
 UPDATE dbo.BankAccount
 SET Balance = Balance + 50.00
 WHERE AccountID = 1;
+```
+
+At this moment, the locks form a cycle:
+
+```text
+           holds X                   waits for X
+ Session A ──────────► Account 1 ◄─────────────────────── Session B
+ (1 → 2)                                                   (2 → 1)
+     │                                                        │
+     │  waits for X                                holds X    │
+     └───────────────► Account 2 ◄────────────────────────────┘
 ```
 
 Neither statement can ever finish on its own — Session A waits for Session B's lock, Session B waits for Session A's. Within a few seconds, SQL Server detects the cycle and ends one of the two transactions. One window shows:

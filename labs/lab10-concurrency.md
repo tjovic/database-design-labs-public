@@ -790,8 +790,6 @@ SQL Server normally locks rows. That is why, in Section 1.4, Session A's change 
 
 Which rows a statement locks depends on **how SQL Server finds them**. In Section 1.4, the primary key let Session B go straight to account 2, so it never touched the locked row. A query that has to scan the table requests a lock on every row it reads: in Section 4.2, `dbo.Branch` has no index on `BranchName`, so the `SERIALIZABLE` scan locked every row and every gap between them — in effect the whole table, although with row-level locks. An index that lets SQL Server read only the rows it needs ([Lab 6](lab06-indexes.md)) therefore also means fewer locks and less blocking.
 
-To see the row, page and table levels in SQL Server's own lock list, see [Additional Reading A](#a-looking-at-locks-sysdm_tran_locks).
-
 If a single statement would need an impractically large number of row locks — for example, an `UPDATE` with no `WHERE` clause on a large table — SQL Server **escalates** them to one table lock. During that escalated lock, no other session can touch the table at all, even rows the original statement never cared about. SQL Server escalates once a statement holds roughly 5,000 locks on one table, or under memory pressure; the exact threshold is an internal heuristic, so do not rely on a specific number.
 
 ## 6.3 Check your understanding
@@ -982,80 +980,11 @@ Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurr
 
 # Additional Reading
 
-The following topics go beyond the locking model of this lab (**S** and **X** locks). They are not required for the exercises.
+The following topic goes beyond the locking model of this lab (**S** and **X** locks). It is not required for the exercises.
 
-## A. Looking at Locks: sys.dm_tran_locks
+## MVCC: An Alternative to Locking
 
-`sys.dm_tran_locks` lists the locks sessions currently hold or wait for. You can watch the table from Section 6.1 in a single window.
-
-**Session A** — `READ COMMITTED`, read a row, then look at this session's own locks before committing:
-
-```sql
-BEGIN TRANSACTION;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-WHERE AccountID = 1;
-
-SELECT
-    resource_type  AS ResourceType,
-    request_mode   AS LockMode,
-    request_status AS Status
-FROM sys.dm_tran_locks
-WHERE request_session_id = @@SPID
-  AND resource_database_id = DB_ID();
-
-COMMIT TRANSACTION;
-```
-
-Result of the second `SELECT`:
-
-| ResourceType | LockMode | Status |
-|---|---|---|
-| DATABASE | S | GRANT |
-
-The transaction is still open, but no lock on the row is left: `READ COMMITTED` released the **S** lock right after the read. (Every session that uses a database holds a **S** lock on the database itself; it only means "this database is in use".)
-
-Run the same block again, with one change in the first line:
-
-```sql
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- NEW: hold S locks
-
-BEGIN TRANSACTION;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-WHERE AccountID = 1;
-
-SELECT
-    resource_type  AS ResourceType,
-    request_mode   AS LockMode,
-    request_status AS Status
-FROM sys.dm_tran_locks
-WHERE request_session_id = @@SPID
-  AND resource_database_id = DB_ID();
-
-COMMIT TRANSACTION;
-
-SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-Result of the second `SELECT`:
-
-| ResourceType | LockMode | Status |
-|---|---|---|
-| DATABASE | S | GRANT |
-| PAGE | IS | GRANT |
-| KEY | S | GRANT |
-| OBJECT | IS | GRANT |
-
-Now the **S** lock on the row (`KEY`, a row in the primary key index) is still there. The `IS` locks are *intent* locks on the page and the table: they announce that a row below them is locked, so that another session cannot lock the whole page or table in an incompatible mode.
-
-If another session is blocked, it appears in the same view with `Status = WAIT`.
-
-## B. MVCC: An Alternative to Locking
-
-### B.1 Don't lock reads — version them
+### Don't lock reads — version them
 
 Locking makes readers and writers wait for each other. **Multi-Version Concurrency Control (MVCC)** takes a different approach: when a row changes, keep the previous committed version, and let a reader read a committed version instead of waiting for the writer.
 
@@ -1074,7 +1003,7 @@ No reader waits for a writer, and no writer waits for a reader. The uncommitted 
 > [!NOTE]
 > Writers still block other writers — only one session at a time can change a row. MVCC changes read behavior; it does not remove write conflicts.
 
-### B.2 Turning it on
+### Turning it on
 
 MVCC is opt-in, per database. Changing this setting requires that no other connection uses the database, so first move **Session B** out of it:
 
@@ -1100,7 +1029,7 @@ If the `ALTER DATABASE` keeps running, another connection (for example, a third 
 
 `READ_COMMITTED_SNAPSHOT ON` changes what `READ COMMITTED` itself means on this database: reads use row versions instead of **S** locks, with no code change required anywhere.
 
-### B.3 Re-run the dirty-read fix under MVCC
+### Re-run the dirty-read fix under MVCC
 
 Repeat Section 2.2 now that `READ_COMMITTED_SNAPSHOT` is on.
 
@@ -1135,7 +1064,7 @@ ROLLBACK TRANSACTION;
 > [!IMPORTANT]
 > Same guarantee as Section 2.2 — no dirty read — but the blocking disappeared entirely. The cost moves elsewhere: `tempdb` stores the row versions, and every write becomes slightly more expensive to maintain them.
 
-### B.4 SNAPSHOT isolation
+### SNAPSHOT isolation
 
 SQL Server offers MVCC in a second form, the `SNAPSHOT` isolation level. The two are easy to confuse:
 

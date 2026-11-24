@@ -188,27 +188,6 @@ FROM dbo.BankAccount;
 
 This query **hangs**. To return all rows, Session B needs an **S** lock on account 1 as well, and Session A's **X** lock blocks it.
 
-The locks at this moment:
-
-```mermaid
-flowchart LR
-    A["Session A<br>UPDATE<br>account 1<br>not committed"]
-    B2["Session B<br>SELECT all rows"]
-    B1["Session B<br>SELECT account 2"]
-    subgraph T["dbo.BankAccount"]
-        direction TB
-        R1["Account 1<br>1300.00 uncommitted<br>X lock: Session A"]
-        R2["Account 2<br>500.00<br>no lock"]
-    end
-    A -- "holds X" --> R1
-    B2 -. "needs S ✗ waits" .-> R1
-    B1 -- "needs S ✔ returns at once" --> R2
-    classDef locked fill:#f8d7da,stroke:#c62828,color:#000
-    classDef free fill:#d4edda,stroke:#2e7d32,color:#000
-    class R1 locked
-    class R2 free
-```
-
 **Session A:**
 
 ```sql
@@ -216,6 +195,25 @@ ROLLBACK TRANSACTION;
 ```
 
 The instant Session A finishes, Session B's `SELECT` returns both rows, with account 1 at `1000.00`.
+
+The whole demo:
+
+```mermaid
+sequenceDiagram
+    participant A as Session A
+    participant R1 as Account 1
+    participant R2 as Account 2
+    participant B as Session B
+    A->>R1: UPDATE +300.00 — X lock, not committed
+    B->>R2: SELECT account 2 — S lock granted
+    R2-->>B: 500.00 — at once
+    B->>R1: SELECT all rows — needs S lock on account 1
+    activate B
+    Note right of B: ⏳ waiting
+    A->>R1: ROLLBACK — X lock released
+    R1-->>B: both rows, account 1 = 1000.00
+    deactivate B
+```
 
 ## 1.5 How long a session waits: LOCK_TIMEOUT
 

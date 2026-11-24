@@ -934,11 +934,30 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 
 ## 8.2 Back to the two sellers
 
-Back to the opening question. Two sellers book seats on the same flight. Each one reads the free seats, calculates the new value, and writes it back. What do the tools from this lab do with that pattern?
+Back to the opening question. Two sellers book seats on the same flight. Each one reads the free seats, calculates the new value in the application, and writes it back — two separate statements:
 
-- **`READ COMMITTED`** — each seller's **S** lock is released right after the read, so both read `20` and both writes go through. The booking is lost, exactly as in the opening.
-- **`REPEATABLE READ`** — both sellers keep their **S** lock on the row. To write, each one needs an **X** lock and waits for the other's **S** lock: the deadlock from Section 7. SQL Server rolls one seller back with error 1205, and that seller must book again. Nothing is lost silently, but one booking fails.
-- **One statement** — `UPDATE ... SET FreeSeats = FreeSeats - 3` reads and writes the row together, under an **X** lock. The second seller waits for that lock, then subtracts from the committed value `17`. Both bookings count — with no deadlock, at the default `READ COMMITTED`.
+```sql
+-- Seller 1 books 3 seats (Seller 2 does the same with 1 seat)
+SELECT FreeSeats FROM dbo.Flight WHERE FlightNo = 'OU 660';     -- 20
+-- the application calculates 20 - 3 = 17
+UPDATE dbo.Flight SET FreeSeats = 17 WHERE FlightNo = 'OU 660';
+```
+
+(`dbo.Flight` is only an illustration; it is not part of this lab's database.)
+
+What do the tools from this lab do with that pattern?
+
+- **`READ COMMITTED`** — each seller's **S** lock is released right after the `SELECT`, so both read `20` and both `UPDATE`s go through. The booking is lost, exactly as in the opening.
+- **`REPEATABLE READ`** — both sellers keep their **S** lock on the row. To write, each one needs an **X** lock and waits for the other's **S** lock — a deadlock, as in Section 7, but on a single row. SQL Server rolls one seller back with error 1205, and that seller must book again. Nothing is lost silently, but one booking fails.
+- **One statement** — let the database do the calculation:
+
+   ```sql
+   UPDATE dbo.Flight
+   SET FreeSeats = FreeSeats - 3   -- read and write in one step
+   WHERE FlightNo = 'OU 660';
+   ```
+
+   There is no separate `SELECT`, so nobody works with an old value. The `UPDATE` takes an **X** lock before it reads the row; the second seller's `UPDATE` waits for that lock, then subtracts its 1 from the committed `17`. Both bookings count — with no deadlock, at the default `READ COMMITTED`.
 
 The last two cases side by side (the first one is the diagram at the start of the lab):
 

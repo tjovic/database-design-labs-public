@@ -43,7 +43,8 @@ After completing this lab, you should be able to:
 - explain how long shared and exclusive locks are held at each isolation level, and why that decides what the level guarantees;
 - limit how long a session waits for a lock with `SET LOCK_TIMEOUT`;
 - explain lock granularity, why an index reduces blocking, and why SQL Server escalates row locks to a table lock;
-- recognize a deadlock, interpret SQL Server's error, and design around it.
+- recognize a deadlock, interpret SQL Server's error, and design around it;
+- prevent a lost update by reading and writing in one statement.
 
 > [!NOTE]
 > This lab needs **two SSMS query windows** connected to the same server and the same `TransactionsLab` database — open a second window with `Ctrl+N` (or File → New Query) before starting Part A. Label the tabs **Session A** and **Session B** (right-click a tab → Rename Tab) so you don't lose track of which window runs which step. Every demo below says exactly which session runs which block.
@@ -536,13 +537,13 @@ sequenceDiagram
     end
 ```
 
-Reset for the next section:
+Reset for the next section.
+
+**Session A:**
 
 ```sql
 UPDATE dbo.BankAccount SET Balance = 1000.00 WHERE AccountID = 1;
-```
 
-```sql
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 ```
 
@@ -678,11 +679,12 @@ sequenceDiagram
     end
 ```
 
-Clean up and reset the isolation level:
+Clean up and reset the isolation level.
+
+**Session A:**
 
 ```sql
 DELETE FROM dbo.Branch WHERE BranchName = N'West Pula';
-GO
 
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 ```
@@ -1088,7 +1090,7 @@ The isolation level is not the only tool: how a statement is written decides whi
 
 1. Name the three concurrency problems in order of which isolation level first prevents each.
 2. What table explains every blocking moment demonstrated in Part A, and what decides how long the blocking lasts?
-3. What must be true of two transactions for a deadlock to form between them?
+3. In Section 7, the deadlock needed two rows. Why could the two sellers under `REPEATABLE READ` in Section 8.2 deadlock on a single row?
 4. The one-statement `UPDATE` in Section 8.2 prevents the lost update, but a seller can still sell 3 seats when only 2 are left. Change the statement so that it books only when enough seats are free. How does the application know whether the booking succeeded?
 
 <details>
@@ -1096,7 +1098,7 @@ The isolation level is not the only tool: how a statement is written decides whi
 
 1. Dirty read (`READ COMMITTED`), non-repeatable read (`REPEATABLE READ`), phantom (`SERIALIZABLE`).
 2. The shared/exclusive lock compatibility table (Section 1.3). How long a lock lives (Section 6.1): **X** locks until the transaction ends, **S** locks depending on the isolation level.
-3. Each must hold a lock the other needs, with neither able to proceed without the other releasing first.
+3. Both sellers held an **S** lock on the same row until the end of the transaction (Section 6.1). Each then needed an **X** lock, which is incompatible with the other's **S** lock (Section 1.3). Each waited for the other — the same cycle as in Section 7, on one row.
 4. Put the check in the same statement:
 
    ```sql
@@ -1114,7 +1116,7 @@ The isolation level is not the only tool: how a statement is written decides whi
 
 # Key takeaways
 
-- **Two sessions can interfere in three specific ways.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
+- **The isolation levels are defined by three problems.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
 - **Isolation levels are a trade-off, not a ladder you climb for safety's sake.** Each stricter level prevents one more problem at the cost of more blocking.
 - **Locks implement isolation; their duration decides the level.** **X** locks live until the transaction ends; how long **S** locks live is what separates the isolation levels.
 - **Fewer rows read means fewer locks.** SQL Server locks rows, so an index that lets a query read only the rows it needs also reduces blocking; a statement that needs too many row locks escalates to a table lock.
@@ -1346,7 +1348,7 @@ FROM dbo.BankAccount WITH (NOLOCK); -- NEW: read this table without S locks
 
 It removes the waiting, but brings back the dirty read from Section 2.1. During a long scan it can even miss rows or read the same row twice when rows move. MVCC removes the waiting without these errors.
 
-It is not switched on blindly, for two reasons:
+MVCC is still not switched on blindly, for two reasons:
 
 - **Resources** — every change keeps an old version, which costs `tempdb` space and some extra work on each write.
 - **Behavior** — readers no longer wait; they get the last committed value. Code written for locking may rely on a reader waiting for a writer to finish. Turning MVCC on for an existing application therefore needs testing.

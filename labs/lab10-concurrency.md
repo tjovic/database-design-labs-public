@@ -137,7 +137,7 @@ This section names three specific ways that two sessions can interfere with each
 
 ## 1.3 Shared and exclusive locks
 
-The two sellers lost a booking because nothing coordinated them: both worked on the same row at the same time. A database needs a rule for who may use a row while another session is using it.
+When two sessions use the same row at the same time, a database needs a rule for what each of them may do with it while the other is using it.
 
 Think of a shared document. Any number of people can read it at the same time. While one person is editing it, nobody else should edit it — or read a half-finished version.
 
@@ -934,7 +934,17 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 | Running a large unfiltered `UPDATE`/`DELETE`, or a query with no useful index, on a busy table | It locks many rows, or escalates to a table lock, and blocks unrelated work | Filter and index so only the needed rows are read; split large changes into smaller batches |
 | Letting a blocked session wait forever | A user or a job hangs without an error | Set `LOCK_TIMEOUT` where waiting has a limit, and handle error 1222 |
 
-## 8.2 Final questions
+## 8.2 Back to the two sellers
+
+Back to the opening question. Two sellers book seats on the same flight. Each one reads the free seats, calculates the new value, and writes it back. What do the tools from this lab do with that pattern?
+
+- **`READ COMMITTED`** — each seller's **S** lock is released right after the read, so both read `20` and both writes go through. The booking is lost, exactly as in the opening.
+- **`REPEATABLE READ`** — both sellers keep their **S** lock on the row. To write, each one needs an **X** lock and waits for the other's **S** lock: the deadlock from Section 7. SQL Server rolls one seller back with error 1205, and that seller must book again. Nothing is lost silently, but one booking fails.
+- **One statement** — `UPDATE ... SET FreeSeats = FreeSeats - 3` reads and writes the row together, under an **X** lock. The second seller waits for that lock, then subtracts from the committed value `17`. Both bookings count — with no deadlock, at the default `READ COMMITTED`.
+
+The isolation level is not the only tool: how a statement is written decides which locks it takes and how long it holds them.
+
+## 8.3 Final questions
 
 1. Name the three concurrency problems in order of which isolation level first prevents each.
 2. What table explains every blocking moment demonstrated in Part A, and what decides how long the blocking lasts?
@@ -958,8 +968,7 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 - **Locks implement isolation; their duration decides the level.** **X** locks live until the transaction ends; how long **S** locks live is what separates the isolation levels.
 - **Fewer rows read means fewer locks.** SQL Server locks rows, so an index that lets a query read only the rows it needs also reduces blocking; a statement that needs too many row locks escalates to a table lock.
 - **A deadlock is SQL Server protecting correctness, not a bug.** Fix the access order; the database will always detect and break a cycle it cannot resolve.
-
-Back to the opening question: two sellers booking seats on the same flight. The first booking was lost because each seller read the free seats, calculated the new value outside the database, and wrote it back. Written as one statement — `UPDATE ... SET FreeSeats = FreeSeats - 3` — the read and the write happen together: the first `UPDATE` takes an **X** lock on the row, the second one waits for it, then subtracts from the committed value `17`. Both bookings count. Every tool in this lab — the isolation levels, the lock compatibility rules, and two-phase locking — exists to give you a precise, chosen answer to what one session is allowed to see and change while another is working on the same rows.
+- **The isolation level is not the only tool.** A read-then-write done as one `UPDATE` avoids the lost update without a stricter level or a deadlock.
 
 **Looking ahead:** Labs 1–10 covered everything needed to design, build, and correctly operate a database as a service to an application. Lab 11 turns to the analytical side — reporting and aggregation over the data this course has spent ten labs learning to store and protect correctly.
 

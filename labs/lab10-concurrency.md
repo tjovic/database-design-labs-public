@@ -999,6 +999,7 @@ The isolation level is not the only tool: how a statement is written decides whi
 1. Name the three concurrency problems in order of which isolation level first prevents each.
 2. What table explains every blocking moment demonstrated in Part A, and what decides how long the blocking lasts?
 3. What must be true of two transactions for a deadlock to form between them?
+4. The one-statement `UPDATE` in Section 8.2 prevents the lost update, but a seller can still sell 3 seats when only 2 are left. Change the statement so that it books only when enough seats are free. How does the application know whether the booking succeeded?
 
 <details>
 <summary>Show answers</summary>
@@ -1006,6 +1007,16 @@ The isolation level is not the only tool: how a statement is written decides whi
 1. Dirty read (`READ COMMITTED`), non-repeatable read (`REPEATABLE READ`), phantom (`SERIALIZABLE`).
 2. The shared/exclusive lock compatibility table (Section 1.3). How long a lock lives (Section 6.1): **X** locks until the transaction ends, **S** locks depending on the isolation level.
 3. Each must hold a lock the other needs, with neither able to proceed without the other releasing first.
+4. Put the check in the same statement:
+
+   ```sql
+   UPDATE dbo.Flight
+   SET FreeSeats = FreeSeats - 3
+   WHERE FlightNo = 'OU 660'
+     AND FreeSeats >= 3;
+   ```
+
+   If `@@ROWCOUNT` is `0`, there were not enough seats and nothing changed. The check and the booking happen in one step under the same **X** lock, so no other seller can take the last seats in between.
 
 </details>
 

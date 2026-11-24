@@ -40,7 +40,7 @@ After completing this lab, you should be able to:
 - set and explain what each of the four standard isolation levels prevents;
 - predict which of two concurrent sessions blocks, and why, given their isolation levels and access pattern;
 - explain shared and exclusive locks and read the compatibility matrix between them;
-- explain two-phase locking and how the lifetime of shared locks decides what an isolation level guarantees;
+- explain how long shared and exclusive locks are held at each isolation level, and why that decides what the level guarantees;
 - limit how long a session waits for a lock with `SET LOCK_TIMEOUT`;
 - explain lock granularity, why an index reduces blocking, and why SQL Server escalates row locks to a table lock;
 - recognize a deadlock, interpret SQL Server's error, and design around it.
@@ -755,17 +755,9 @@ Part A showed **what** each isolation level prevents. This part explains **how**
 
 # Section 6 – How Long Locks Are Held
 
-## 6.1 Two-phase locking (2PL)
+## 6.1 How long each lock lives
 
-Two-phase locking divides a transaction into two phases: in the first, it only acquires locks, as its statements need them; in the second, it only releases them. SQL Server releases the locks together, at `COMMIT` or `ROLLBACK`.
-
-```mermaid
-flowchart LR
-    G["Growing phase\nlocks are acquired\nas statements run"] --> E{"COMMIT or ROLLBACK"}
-    E --> S["Shrinking phase\nlocks are released\ntogether"]
-```
-
-**X** locks always follow this rule: they live exactly as long as the transaction does. **S** locks are where the isolation levels differ — this table is the mechanism behind every demo in Part A:
+In Section 3, the same `SELECT` under `READ COMMITTED` and under `REPEATABLE READ` took the same **S** lock. The difference was only how long the lock stayed. This table is the mechanism behind every demo in Part A:
 
 | Isolation level | **S** lock on a row it reads | **X** lock on a row it changes |
 |---|---|---|
@@ -774,7 +766,12 @@ flowchart LR
 | `REPEATABLE READ` | held until the transaction ends | held until the transaction ends |
 | `SERIALIZABLE` | held until the transaction ends, together with locks on the ranges between rows | held until the transaction ends |
 
-`REPEATABLE READ` and `SERIALIZABLE` keep **S** locks under the two-phase rule as well. `READ COMMITTED` breaks it for **S** locks — it releases each one right after the read — and that is exactly why it cannot guarantee that a second read returns the same value (see the diagram at the end of Section 3.2). The longer the **S** locks live, the more problems the level prevents — and the longer writers wait.
+Read the table column by column:
+
+- **X** locks are the same at every level: they live until `COMMIT` or `ROLLBACK`. That is why no level, not even `READ UNCOMMITTED`, lets two sessions change the same row at the same time.
+- **S** locks are where the levels differ. The longer an **S** lock lives, the more problems the level prevents — and the longer writers wait. `READ COMMITTED` releases it right after the read, so another session can change the row before the next read (see the diagram at the end of Section 3.2).
+
+Holding every lock until the transaction ends is known in database theory as **two-phase locking (2PL)**: a transaction first only acquires locks, then releases them all at the end. `REPEATABLE READ` and `SERIALIZABLE` follow it; `READ COMMITTED` does not, for **S** locks.
 
 A consequence for the transactions from Lab 9: a shorter transaction holds its **X** locks for less time, which means less time blocking other sessions. Transaction length is a concurrency decision, not just a correctness one.
 

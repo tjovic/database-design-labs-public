@@ -188,6 +188,15 @@ FROM dbo.BankAccount;
 
 This query **hangs**. To return all rows, Session B needs an **S** lock on account 1 as well, and Session A's **X** lock blocks it.
 
+The table at this moment:
+
+| | AccountID | Balance | Lock |
+|:---:|---|---|---|
+| 🔒 | 1 | 1300.00 (not committed) | **X**, held by Session A |
+| | 2 | 500.00 | none |
+
+`WHERE AccountID = 2` reads only the second row, so it never meets the lock. A `SELECT` of all rows has to read the first row too, and stops there.
+
 **Session A:**
 
 ```sql

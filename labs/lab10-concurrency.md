@@ -909,8 +909,87 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 
 ## 7.2 Avoiding deadlocks
 
+SQL Server's fix is automatic but destructive: one transaction simply fails and must be retried. The real fix is in your code.
+
+The deadlock in 7.1 formed because the two transfers touched the accounts in opposite order: Session A went 1 → 2, Session B went 2 → 1. Make every transfer touch the account with the **lower ID first**, whatever the direction of the money. For Session B, that only means swapping its two `UPDATE`s — it adds 50.00 to account 1 first, then takes 50.00 from account 2.
+
+Repeat 7.1 with that rule.
+
+**Session A** (unchanged):
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 100.00
+WHERE AccountID = 1;
+```
+
+**Session B** (now account 1 first):
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 50.00
+WHERE AccountID = 1; -- NEW: the lower ID first
+```
+
+This waits for Session A's **X** lock on account 1. While it waits, Session B holds **no** lock that Session A needs.
+
+**Session A:**
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = Balance + 100.00
+WHERE AccountID = 2;
+
+COMMIT TRANSACTION;
+```
+
+Account 2 is free, so Session A finishes. Its commit releases account 1, and Session B's waiting `UPDATE` completes.
+
+**Session B:**
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = Balance - 50.00
+WHERE AccountID = 2;
+
+COMMIT TRANSACTION;
+```
+
+Both transfers succeed: account 1 is at `950.00`, account 2 at `550.00`. Session B waited for a moment, but a wait in one direction can never close a cycle.
+
+```mermaid
+sequenceDiagram
+    participant A as Session A (1 → 2)
+    participant R1 as Account 1
+    participant R2 as Account 2
+    participant B as Session B (2 → 1)
+    rect rgb(212, 237, 218)
+    A->>R1: UPDATE −100.00 — X lock
+    B->>R1: UPDATE +50.00 — needs X lock
+    activate B
+    Note right of B: ⏳ waits for Session A
+    A->>R2: UPDATE +100.00 — X lock, nobody holds it
+    A->>R1: COMMIT — locks released
+    R1-->>B: UPDATE completes
+    deactivate B
+    B->>R2: UPDATE −50.00 — X lock
+    B->>R2: COMMIT
+    end
+```
+
 > [!IMPORTANT]
-> SQL Server's fix is automatic but destructive — one transaction simply fails and must be retried. The real fix is in your code: **always touch tables, and rows, in the same order**, everywhere in your application. If every transfer updated the account with the lower ID first — whatever the direction of the transfer — the cycle in 7.1 could never form.
+> **Always touch tables, and rows, in the same order** everywhere in your application — for example, the lower ID first. Then one transaction may wait for another, but two can never wait for each other.
+
+Reset the balances before continuing:
+
+```sql
+UPDATE dbo.BankAccount SET Balance = 1000.00 WHERE AccountID = 1;
+UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
+```
 
 ## 7.3 Check your understanding
 

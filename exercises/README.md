@@ -115,7 +115,7 @@ The concurrency collection is in [Concurrency Exercises](lab10-concurrency.md) a
 2. **Non-repeatable read** — reproduce it under `READ COMMITTED`, then prevent it with `REPEATABLE READ`.
 3. **Phantom read** — reproduce it under `REPEATABLE READ`, then prevent it with `SERIALIZABLE`.
 4. **From a symptom to a fix (Exercises 7–9)** — start from a description of what went wrong, recognize the anomaly, choose the lowest isolation level that prevents it, and demonstrate both.
-5. **`TransactionsLab` practice (Exercises 10–14)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT`.
+5. **`TransactionsLab` practice (Exercises 10–14)** — classify an anomaly, predict blocking under `SERIALIZABLE`, choose the minimum isolation level, explain a deadlock, and weigh `READ_COMMITTED_SNAPSHOT` (based on the lab's additional reading).
 
 Part A (Exercises 1–9) needs two SSMS query windows (Session A / Session B), like Lab 10. Exercises 1–6 use tagged, temporary rows in `AdventureWorksENG`'s `State` table; Exercises 7–9 change real rows only inside transactions they roll back, or test rows they delete. Part B (Exercises 10–14) continues in Lab 10's `TransactionsLab` database with its fictional bank accounts and branches.
 

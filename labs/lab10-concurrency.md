@@ -991,14 +991,24 @@ Locking makes readers and writers wait for each other. **Multi-Version Concurren
 SQL Server's `READ_COMMITTED_SNAPSHOT` works at the level of a **statement**: each `SELECT` sees the rows as they were committed when that statement started.
 
 ```mermaid
-flowchart LR
-    V1["Version 1\ncommitted at T=100"] --> V2["Version 2\ncommitted at T=200"]
-    V2 --> V3["Version 3\nuncommitted, in progress"]
-    R1["SELECT started at T=150"] -.sees.-> V1
-    R2["SELECT started at T=250"] -.sees.-> V2
+sequenceDiagram
+    participant A as Session A (deposit)
+    participant R as Account 1
+    participant B as Session B (teller)
+    A->>R: UPDATE +300.00 (X lock, not committed)
+    Note over R: new: 1300.00, not committed<br>old: 1000.00, kept
+    rect rgb(212, 237, 218)
+    B->>R: SELECT
+    R-->>B: 1000.00 — last committed version, no waiting
+    end
+    A->>R: COMMIT
+    rect rgb(212, 237, 218)
+    B->>R: SELECT again (a new statement)
+    R-->>B: 1300.00 — now committed
+    end
 ```
 
-No reader waits for a writer, and no writer waits for a reader. The uncommitted version 3 is visible to nobody but its own transaction.
+No reader waits for a writer, and no writer waits for a reader. The uncommitted `1300.00` is visible only to Session A until it commits.
 
 > [!NOTE]
 > Writers still block other writers — only one session at a time can change a row. MVCC changes read behavior; it does not remove write conflicts.

@@ -438,7 +438,7 @@ ROLLBACK TRANSACTION;
 
 The lowest level is `READ COMMITTED`, the SQL Server default, set in Session B. Session A does nothing wrong: it may change data and roll back.
 
-4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Section 8](../labs/lab10-concurrency.md#81-dont-lock-reads--version-them) shows how row versioning removes that wait.
+4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Additional Reading B](../labs/lab10-concurrency.md#b-mvcc-an-alternative-to-locking) shows how row versioning removes that wait.
 
 </details>
 
@@ -757,7 +757,9 @@ A deadlock still occurs. What matters is that the two sessions acquire the two l
 
 ---
 
-## Exercise 14 — READ_COMMITTED_SNAPSHOT, costs and benefits [INTERMEDIATE]
+## Exercise 14 — READ_COMMITTED_SNAPSHOT, costs and benefits [ADVANCED]
+
+This exercise is based on [Additional Reading B of Lab 10](../labs/lab10-concurrency.md#b-mvcc-an-alternative-to-locking).
 
 `READ_COMMITTED_SNAPSHOT` removes the blocking you saw in [Section 2.2 of Lab 10](../labs/lab10-concurrency.md#22-fix-read-committed-blocks-instead-of-lying). List one scenario where you would turn it on, and one reason a team might deliberately choose not to.
 
@@ -781,4 +783,4 @@ A team might avoid it if `tempdb` is already a bottleneck (it must hold every ro
 
 ## References
 
-- [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md) — dirty reads, non-repeatable reads, phantom reads, the four isolation levels, locking, and MVCC.
+- [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md) — dirty reads, non-repeatable reads, phantom reads, the four isolation levels, locking, deadlocks, and (in the additional reading) MVCC.

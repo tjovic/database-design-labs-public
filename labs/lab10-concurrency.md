@@ -25,7 +25,7 @@ sequenceDiagram
 
 Four seats were sold, but the flight still shows 19 free seats. Both sellers did their job correctly, and both changes were saved — yet the first booking has disappeared, overwritten by the second seller, who was still working with the old value 20. This is a **lost update**.
 
-A lost update is one way two sessions can interfere with each other. In this lab you will reproduce three more, which the isolation levels are defined by, fix each one with a stronger isolation level, and then look under the hood at how SQL Server actually enforces that — with locks, and with an alternative strategy called MVCC. At the end, we return to the two sellers.
+A lost update is one way two sessions can interfere with each other. In this lab you will reproduce three more — the ones the isolation levels are defined by — fix each one with a stronger isolation level, and then look under the hood at how SQL Server enforces that with locks. At the end, we return to the two sellers.
 
 > [!IMPORTANT]
 > **Core idea:** An isolation level is a deliberate trade-off between correctness and concurrency. Stronger isolation prevents more surprises but makes sessions wait for each other longer. There is no setting that is simply "best" — only the right one for a given workload.
@@ -40,10 +40,10 @@ After completing this lab, you should be able to:
 - set and explain what each of the four standard isolation levels prevents;
 - predict which of two concurrent sessions blocks, and why, given their isolation levels and access pattern;
 - explain shared and exclusive locks and read the compatibility matrix between them;
-- explain two-phase locking and why how long a shared lock is held controls what an isolation level can guarantee;
-- explain lock granularity and why SQL Server escalates row locks to a table lock;
-- recognize a deadlock, interpret SQL Server's error, and design around it;
-- explain MVCC as an alternative to locking, and enable `READ_COMMITTED_SNAPSHOT`.
+- explain two-phase locking and how the lifetime of shared locks decides what an isolation level guarantees;
+- limit how long a session waits for a lock with `SET LOCK_TIMEOUT`;
+- explain lock granularity, why an index reduces blocking, and why SQL Server escalates row locks to a table lock;
+- recognize a deadlock, interpret SQL Server's error, and design around it.
 
 > [!NOTE]
 > This lab needs **two SSMS query windows** connected to the same server and the same `TransactionsLab` database — open a second window with `Ctrl+N` (or File → New Query) before starting Part A. Label the tabs **Session A** and **Session B** (right-click a tab → Rename Tab) so you don't lose track of which window runs which step. Every demo below says exactly which session runs which block.
@@ -153,7 +153,102 @@ Two readers never block each other. A writer blocks every other reader and write
 
 An **X** lock is always held until the transaction ends. How long an **S** lock is held depends on the isolation level, and that difference is what the demos in Sections 2–4 show.
 
-## 1.4 Setting the isolation level
+## 1.4 Demo: a conflict is about one row
+
+Locks are taken on rows, so two sessions conflict only when they need the same row in incompatible ways (Section 6.2 explains why). Both sessions use the default isolation level here.
+
+**Session A** — change account 1 and keep the transaction open:
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 300.00
+WHERE AccountID = 1;
+
+-- Do not COMMIT or ROLLBACK yet.
+```
+
+**Session B** — read the other account:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+WHERE AccountID = 2;
+```
+
+This returns `500.00` immediately. Session A holds an **X** lock on account 1 only; account 2 is free, and the primary key lets SQL Server find row 2 without touching row 1.
+
+**Session B** — now read every account:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount;
+```
+
+This query **hangs**. To return all rows, Session B needs an **S** lock on account 1 as well, and Session A's **X** lock blocks it.
+
+**Session A:**
+
+```sql
+ROLLBACK TRANSACTION;
+```
+
+The instant Session A finishes, Session B's `SELECT` returns both rows, with account 1 at `1000.00`.
+
+## 1.5 How long a session waits: LOCK_TIMEOUT
+
+By default, a blocked session waits for as long as it takes. `SET LOCK_TIMEOUT` sets a limit, in milliseconds, for the session:
+
+```sql
+SET LOCK_TIMEOUT 5000;   -- wait at most 5 seconds
+```
+
+Repeat the second part of 1.4 with a limit.
+
+**Session A:**
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 300.00
+WHERE AccountID = 1;
+```
+
+**Session B:**
+
+```sql
+SET LOCK_TIMEOUT 5000; -- NEW: give up after 5 seconds
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount;
+```
+
+After 5 seconds, instead of waiting further, Session B receives an error:
+
+```text
+Msg 1222, Level 16
+Lock request time out period exceeded.
+```
+
+Only the `SELECT` failed; Session B can continue and try again later. Finish Session A and restore the default in Session B:
+
+**Session A:**
+
+```sql
+ROLLBACK TRANSACTION;
+```
+
+**Session B:**
+
+```sql
+SET LOCK_TIMEOUT -1;     -- the default: wait without a limit
+```
+
+`LOCK_TIMEOUT` belongs to the session and stays set until it is changed again or the connection closes.
+
+## 1.6 Setting the isolation level
 
 ```sql
 SET TRANSACTION ISOLATION LEVEL <level>;
@@ -161,20 +256,24 @@ SET TRANSACTION ISOLATION LEVEL <level>;
 
 The four levels are `READ UNCOMMITTED`, `READ COMMITTED` (the default), `REPEATABLE READ`, and `SERIALIZABLE`.
 
-The setting applies to the **session**, not to a single statement — like `@@TRANCOUNT` in Lab 9, the isolation level is per-connection state. It stays in effect for every transaction on that connection until you change it again or the connection closes. That is why the demos below reset it to `READ COMMITTED` after each fix.
+The setting applies to the **session**, not to a single statement — like `LOCK_TIMEOUT` in 1.5 and `@@TRANCOUNT` in Lab 9, the isolation level is per-connection state. It stays in effect for every transaction on that connection until you change it again or the connection closes. That is why the demos below reset it to `READ COMMITTED` whenever a demo has changed it.
 
-## 1.5 Check your understanding
+## 1.7 Check your understanding
 
 1. Which lock does a session request to read a row, and which to change it?
 2. A session holds an **S** lock on a row. Which of these can another session get on the same row: an **S** lock, an **X** lock?
-3. You run `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;` in Session A. Which level does Session B use?
+3. In 1.4, why did Session B's first `SELECT` return immediately, but its second one wait?
+4. What happens to a blocked statement in a session with `SET LOCK_TIMEOUT 5000`?
+5. You run `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;` in Session A. Which level does Session B use?
 
 <details>
 <summary>Show answers</summary>
 
 1. An **S** (shared) lock to read, an **X** (exclusive) lock to change.
 2. An **S** lock — two readers are compatible. An **X** lock must wait until the **S** lock is released.
-3. Its own level — `READ COMMITTED`, unless Session B changed it. The setting belongs to the session that ran it.
+3. The first `SELECT` read only account 2, which Session A had not locked. The second one also had to read account 1, where Session A held an **X** lock.
+4. After 5 seconds of waiting, the statement fails with error 1222. The session itself can continue.
+5. Its own level — `READ COMMITTED`, unless Session B changed it. The setting belongs to the session that ran it.
 
 </details>
 
@@ -280,9 +379,12 @@ sequenceDiagram
     rect rgb(212, 237, 218)
     Note over A,B: 2.2 READ COMMITTED
     A->>R: UPDATE +300.00 (X lock, not committed)
-    B->>R: SELECT requests S lock — waits
+    B->>R: SELECT requests S lock
+    activate B
+    Note right of B: ⏳ waiting
     A->>R: ROLLBACK (X lock released)
     R-->>B: 1000.00 — the committed value
+    deactivate B
     end
 ```
 
@@ -293,14 +395,14 @@ sequenceDiagram
 
 1. Which isolation level never blocks and never guarantees a committed value?
 2. Why did Session B's query hang under `READ COMMITTED` but not under `READ UNCOMMITTED`?
-3. Is `READ COMMITTED` the SQL Server default?
+3. In 2.1, the teller trusts the `1300.00` and approves a withdrawal of `1200.00` from account 1. What happens to that withdrawal once the deposit is rolled back?
 
 <details>
 <summary>Show answers</summary>
 
 1. `READ UNCOMMITTED`. It reads rows without requesting **S** locks, regardless of what other sessions hold.
 2. `READ COMMITTED` requires an **S** lock to read a row; Session A held an incompatible **X** lock on that row until it finished. `READ UNCOMMITTED` does not request an **S** lock at all, so there was nothing to wait for.
-3. Yes.
+3. The withdrawal's `UPDATE` cannot change the row before the rollback — it would wait for Session A's **X** lock. After the rollback the balance is `1000.00`, so `1000.00 - 1200.00` violates `CK_BankAccount_Balance` and the `UPDATE` fails. Without that constraint the account would end at `-200.00` — the bank would pay out money that never existed.
 
 </details>
 
@@ -390,6 +492,36 @@ COMMIT TRANSACTION;
 ```
 
 The moment Session A commits, Session B's `UPDATE` unblocks and completes.
+
+The two demos side by side:
+
+```mermaid
+sequenceDiagram
+    participant A as Session A
+    participant R as Account 1
+    participant B as Session B
+    rect rgb(248, 215, 218)
+    Note over A,B: 3.1 READ COMMITTED
+    A->>R: SELECT — S lock taken
+    R-->>A: 1000.00 — S lock released at once
+    B->>R: UPDATE to 1200.00 — X lock, runs at once
+    A->>R: SELECT again
+    R-->>A: 1200.00 — a different answer
+    end
+    rect rgb(212, 237, 218)
+    Note over A,B: 3.2 REPEATABLE READ
+    A->>R: SELECT — S lock taken
+    R-->>A: 1000.00 — S lock kept
+    B->>R: UPDATE to 1200.00 — needs X lock
+    activate B
+    Note right of B: ⏳ waiting
+    A->>R: SELECT again
+    R-->>A: 1000.00 — the same answer
+    A->>R: COMMIT — S lock released
+    R-->>B: UPDATE completes
+    deactivate B
+    end
+```
 
 Reset for the next section:
 
@@ -501,7 +633,39 @@ WHERE BranchName LIKE N'West%';
 COMMIT TRANSACTION;
 ```
 
-Session B's `INSERT` unblocks and completes. Clean up and reset the isolation level:
+Session B's `INSERT` unblocks and completes.
+
+The two demos side by side:
+
+```mermaid
+sequenceDiagram
+    participant A as Session A
+    participant T as Branch table
+    participant B as Session B
+    rect rgb(248, 215, 218)
+    Note over A,B: 4.1 REPEATABLE READ
+    A->>T: SELECT West% — S locks on the rows read
+    T-->>A: 2 rows
+    B->>T: INSERT West Pula — runs at once
+    A->>T: SELECT West% again
+    T-->>A: 3 rows — West Pula is a phantom
+    end
+    rect rgb(212, 237, 218)
+    Note over A,B: 4.2 SERIALIZABLE
+    A->>T: SELECT West% — S locks on rows and ranges
+    T-->>A: 2 rows
+    B->>T: INSERT West Pula — the range is locked
+    activate B
+    Note right of B: ⏳ waiting
+    A->>T: SELECT West% again
+    T-->>A: still 2 rows
+    A->>T: COMMIT — locks released
+    T-->>B: INSERT completes
+    deactivate B
+    end
+```
+
+Clean up and reset the isolation level:
 
 ```sql
 DELETE FROM dbo.Branch WHERE BranchName = N'West Pula';
@@ -538,12 +702,22 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 | `REPEATABLE READ` | ✔ | ✔ | — |
 | `SERIALIZABLE` | ✔ | ✔ | ✔ |
 
+The levels trade one thing for another: the higher in the list, the more sessions can work at the same time; the lower, the stronger the guarantee of consistent data.
+
+```text
+READ UNCOMMITTED                 ▲             │
+READ COMMITTED (default)         │             │
+REPEATABLE READ                  │             │
+SERIALIZABLE                     │             ▼
+                            concurrency   consistency
+```
+
 > [!IMPORTANT]
 > Each stricter level is a superset of the one before it: it prevents everything the weaker level prevented, plus one more problem — at the cost of holding locks longer and making more sessions wait.
 
 ## 5.2 Choosing a level
 
-Almost every real application runs on `READ COMMITTED` (or `READ COMMITTED` with `READ_COMMITTED_SNAPSHOT`, Section 8). Design for it by default. Reach for a stricter level only for the specific transaction that genuinely needs the stronger guarantee — not for the whole system — because every step up this table costs concurrency.
+Almost every real application runs on `READ COMMITTED`. Design for it by default. Reach for a stricter level only for the specific transaction that genuinely needs the stronger guarantee — not for the whole system — because every step up this table costs concurrency.
 
 ## 5.3 Check your understanding
 
@@ -564,7 +738,7 @@ Almost every real application runs on `READ COMMITTED` (or `READ COMMITTED` with
 
 # Part B – How SQL Server Enforces Isolation
 
-Part A showed **what** each isolation level prevents. This part explains **how** SQL Server enforces that: by holding locks for a controlled duration, and — as an alternative — by keeping multiple versions of a row instead of locking it for reading.
+Part A showed **what** each isolation level prevents. This part explains **how** SQL Server enforces that — by holding locks for a controlled duration — and what happens when two sessions end up waiting for each other.
 
 # Section 6 – How Long Locks Are Held
 
@@ -587,95 +761,11 @@ flowchart LR
 | `REPEATABLE READ` | held until the transaction ends | held until the transaction ends |
 | `SERIALIZABLE` | held until the transaction ends, together with locks on the ranges between rows | held until the transaction ends |
 
-The same table as a timeline of one transaction in Session A that reads the same row twice:
+`REPEATABLE READ` and `SERIALIZABLE` keep **S** locks under the two-phase rule as well. `READ COMMITTED` breaks it for **S** locks — it releases each one right after the read — and that is exactly why it cannot guarantee that a second read returns the same value (see the diagram at the end of Section 3.2). The longer the **S** locks live, the more problems the level prevents — and the longer writers wait.
 
-```text
-Session A           BEGIN    read row            read row again      COMMIT
-                      │         │                     │                 │
+A consequence for the transactions from Lab 9: a shorter transaction holds its **X** locks for less time, which means less time blocking other sessions. Transaction length is a concurrency decision, not just a correctness one.
 
-S lock on the row
-READ UNCOMMITTED               (none)                (none)
-READ COMMITTED                  █----- no S lock -----█
-REPEATABLE READ                 █████████████████████████████████████████
-SERIALIZABLE                    █████████████████████████████████████████ + ranges
-```
-
-The gap in the `READ COMMITTED` row is where Session B changed the balance in Section 3.1.
-
-`REPEATABLE READ` and `SERIALIZABLE` keep **S** locks under the two-phase rule as well. `READ COMMITTED` breaks it for **S** locks — it releases each one right after the read — and that is exactly why it cannot guarantee that a second read returns the same value. The longer the **S** locks live, the more problems the level prevents — and the longer writers wait.
-
-A direct consequence from Lab 9: a shorter transaction holds its **X** locks for less time, which means less time blocking other sessions. Transaction length is a concurrency decision, not just a correctness one.
-
-## 6.2 Looking under the hood
-
-`sys.dm_tran_locks` lists the locks sessions currently hold or wait for. You can watch the table from 6.1 in a single window.
-
-**Session A** — `READ COMMITTED`, read a row, then look at this session's own locks before committing:
-
-```sql
-BEGIN TRANSACTION;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-WHERE AccountID = 1;
-
-SELECT
-    resource_type  AS ResourceType,
-    request_mode   AS LockMode,
-    request_status AS Status
-FROM sys.dm_tran_locks
-WHERE request_session_id = @@SPID
-  AND resource_database_id = DB_ID();
-
-COMMIT TRANSACTION;
-```
-
-Result of the second `SELECT`:
-
-| ResourceType | LockMode | Status |
-|---|---|---|
-| DATABASE | S | GRANT |
-
-The transaction is still open, but no lock on the row is left: `READ COMMITTED` released the **S** lock right after the read. (Every session that uses a database holds a **S** lock on the database itself; it only means "this database is in use".)
-
-Run the same block again, with one change in the first line:
-
-```sql
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- NEW: hold S locks
-
-BEGIN TRANSACTION;
-
-SELECT AccountID, Balance
-FROM dbo.BankAccount
-WHERE AccountID = 1;
-
-SELECT
-    resource_type  AS ResourceType,
-    request_mode   AS LockMode,
-    request_status AS Status
-FROM sys.dm_tran_locks
-WHERE request_session_id = @@SPID
-  AND resource_database_id = DB_ID();
-
-COMMIT TRANSACTION;
-
-SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-Result of the second `SELECT`:
-
-| ResourceType | LockMode | Status |
-|---|---|---|
-| DATABASE | S | GRANT |
-| PAGE | IS | GRANT |
-| KEY | S | GRANT |
-| OBJECT | IS | GRANT |
-
-Now the **S** lock on the row (`KEY`, a row in the primary key index) is still there. The `IS` locks are *intent* locks on the page and the table: they announce that a row below them is locked, so that another session cannot lock the whole page or table in an incompatible mode.
-
-If another session is blocked, it appears in the same view with `Status = WAIT`.
-
-## 6.3 Lock granularity
+## 6.2 Lock granularity
 
 | Granularity | Covers | Concurrency | Overhead |
 |---|---|---|---|
@@ -683,20 +773,30 @@ If another session is blocked, it appears in the same view with `Status = WAIT`.
 | Page | One 8 KB page (see [Lab 5](lab05-physical-storage.md)) | Medium | One lock per page |
 | Table | The whole table | Lowest | One lock |
 
-SQL Server normally takes row locks. If a statement would need an impractically large number of them, SQL Server **escalates** to a table lock — for example, an `UPDATE` with no `WHERE` clause touching every row of a large table. During that escalated lock, no other session can touch the table at all, even rows the original statement never cared about.
+SQL Server normally locks rows. That is why, in Section 1.4, Session A's change to account 1 did not stop Session B from reading account 2.
 
-## 6.4 Check your understanding
+Which rows a statement locks depends on **how SQL Server finds them**. In Section 1.4, the primary key let Session B go straight to account 2, so it never touched the locked row. A query that has to scan the table requests a lock on every row it reads: in Section 4.2, `dbo.Branch` has no index on `BranchName`, so the `SERIALIZABLE` scan locked every row and every gap between them — in effect the whole table, although with row-level locks. An index that lets SQL Server read only the rows it needs ([Lab 6](lab06-indexes.md)) therefore also means fewer locks and less blocking.
+
+To see the row, page and table levels in SQL Server's own lock list, see [Additional Reading A](#a-looking-at-locks-sysdm_tran_locks).
+
+If a single statement would need an impractically large number of row locks — for example, an `UPDATE` with no `WHERE` clause on a large table — SQL Server **escalates** them to one table lock. During that escalated lock, no other session can touch the table at all, even rows the original statement never cared about. SQL Server escalates once a statement holds roughly 5,000 locks on one table, or under memory pressure; the exact threshold is an internal heuristic, so do not rely on a specific number.
+
+## 6.3 Check your understanding
 
 1. When does SQL Server release an **X** lock?
 2. In terms of locks, why can `READ COMMITTED` not prevent a non-repeatable read?
-3. What can cause SQL Server to escalate from row locks to a table lock?
+3. Two sessions both run under `REPEATABLE READ` and have both read the same row. What happens when one of them tries to change it?
+4. Why can an index on the column in a `WHERE` condition reduce blocking?
+5. What can cause SQL Server to escalate from row locks to a table lock, and why does it hurt other sessions?
 
 <details>
 <summary>Show answers</summary>
 
 1. At `COMMIT` or `ROLLBACK` — never earlier, at any isolation level.
 2. It releases the **S** lock right after each read, so between two reads another session can get an **X** lock on the row, change it, and commit.
-3. A single statement that would need to acquire a very large number of row locks, such as an unfiltered `UPDATE` or `DELETE` on a large table.
+3. It waits: the `UPDATE` needs an **X** lock, and the other session holds an **S** lock on the row until its transaction ends.
+4. With an index, SQL Server reads — and locks — only the rows that match. Without one, it scans the table and requests a lock on every row it reads, so it can collide with sessions working on completely different rows.
+5. A single statement that needs a very large number of row locks, such as an unfiltered `UPDATE` or `DELETE` on a large table. The table lock then blocks every other session from the whole table, even from rows the statement never needed.
 
 </details>
 
@@ -807,9 +907,133 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 
 ---
 
-# Section 8 – MVCC: An Alternative to Locking
+# Section 8 – Common Mistakes and Final Review
 
-## 8.1 Don't lock reads — version them
+## 8.1 Common mistakes
+
+| Mistake | Why it matters | Better approach |
+|---|---|---|
+| Assuming one session's behavior predicts another's | Isolation level is per-session | Check `SET TRANSACTION ISOLATION LEVEL` for the session that matters |
+| Forgetting a changed isolation level persists | It stays set until changed again or the connection closes | Reset it explicitly when a demo or test finishes |
+| Treating `REPEATABLE READ` as phantom-proof | It only locks rows already read | Use `SERIALIZABLE` when new matching rows must not appear |
+| Reaching for `SERIALIZABLE` everywhere "to be safe" | Maximizes blocking for problems that may not apply | Match the level to the specific anomaly a transaction must avoid |
+| Treating a deadlock as a bug to silence | It is SQL Server protecting correctness, not a malfunction | Fix the access order; always retry the chosen victim |
+| Running a large unfiltered `UPDATE`/`DELETE`, or a query with no useful index, on a busy table | It locks many rows, or escalates to a table lock, and blocks unrelated work | Filter and index so only the needed rows are read; split large changes into smaller batches |
+| Letting a blocked session wait forever | A user or a job hangs without an error | Set `LOCK_TIMEOUT` where waiting has a limit, and handle error 1222 |
+
+## 8.2 Final questions
+
+1. Name the three concurrency problems in order of which isolation level first prevents each.
+2. What table explains every blocking moment demonstrated in Part A, and what decides how long the blocking lasts?
+3. What must be true of two transactions for a deadlock to form between them?
+
+<details>
+<summary>Show answers</summary>
+
+1. Dirty read (`READ COMMITTED`), non-repeatable read (`REPEATABLE READ`), phantom (`SERIALIZABLE`).
+2. The shared/exclusive lock compatibility table (Section 1.3). How long a lock lives (Section 6.1): **X** locks until the transaction ends, **S** locks depending on the isolation level.
+3. Each must hold a lock the other needs, with neither able to proceed without the other releasing first.
+
+</details>
+
+---
+
+# Key takeaways
+
+- **Two sessions can interfere in three specific ways.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
+- **Isolation levels are a trade-off, not a ladder you climb for safety's sake.** Each stricter level prevents one more problem at the cost of more blocking.
+- **Locks implement isolation; their duration decides the level.** **X** locks live until the transaction ends; how long **S** locks live is what separates the isolation levels.
+- **Fewer rows read means fewer locks.** SQL Server locks rows, so an index that lets a query read only the rows it needs also reduces blocking; a statement that needs too many row locks escalates to a table lock.
+- **A deadlock is SQL Server protecting correctness, not a bug.** Fix the access order; the database will always detect and break a cycle it cannot resolve.
+
+Back to the opening question: two sellers booking seats on the same flight. The first booking was lost because each seller read the free seats, calculated the new value outside the database, and wrote it back. Written as one statement — `UPDATE ... SET FreeSeats = FreeSeats - 3` — the read and the write happen together: the first `UPDATE` takes an **X** lock on the row, the second one waits for it, then subtracts from the committed value `17`. Both bookings count. Every tool in this lab — the isolation levels, the lock compatibility rules, and two-phase locking — exists to give you a precise, chosen answer to what one session is allowed to see and change while another is working on the same rows.
+
+**Looking ahead:** Labs 1–10 covered everything needed to design, build, and correctly operate a database as a service to an application. Lab 11 turns to the analytical side — reporting and aggregation over the data this course has spent ten labs learning to store and protect correctly.
+
+---
+
+## Additional practice
+
+Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurrency.md).
+
+---
+
+# Additional Reading
+
+The following topics go beyond the locking model of this lab (**S** and **X** locks). They are not required for the exercises.
+
+## A. Looking at Locks: sys.dm_tran_locks
+
+`sys.dm_tran_locks` lists the locks sessions currently hold or wait for. You can watch the table from Section 6.1 in a single window.
+
+**Session A** — `READ COMMITTED`, read a row, then look at this session's own locks before committing:
+
+```sql
+BEGIN TRANSACTION;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+WHERE AccountID = 1;
+
+SELECT
+    resource_type  AS ResourceType,
+    request_mode   AS LockMode,
+    request_status AS Status
+FROM sys.dm_tran_locks
+WHERE request_session_id = @@SPID
+  AND resource_database_id = DB_ID();
+
+COMMIT TRANSACTION;
+```
+
+Result of the second `SELECT`:
+
+| ResourceType | LockMode | Status |
+|---|---|---|
+| DATABASE | S | GRANT |
+
+The transaction is still open, but no lock on the row is left: `READ COMMITTED` released the **S** lock right after the read. (Every session that uses a database holds a **S** lock on the database itself; it only means "this database is in use".)
+
+Run the same block again, with one change in the first line:
+
+```sql
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- NEW: hold S locks
+
+BEGIN TRANSACTION;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+WHERE AccountID = 1;
+
+SELECT
+    resource_type  AS ResourceType,
+    request_mode   AS LockMode,
+    request_status AS Status
+FROM sys.dm_tran_locks
+WHERE request_session_id = @@SPID
+  AND resource_database_id = DB_ID();
+
+COMMIT TRANSACTION;
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+```
+
+Result of the second `SELECT`:
+
+| ResourceType | LockMode | Status |
+|---|---|---|
+| DATABASE | S | GRANT |
+| PAGE | IS | GRANT |
+| KEY | S | GRANT |
+| OBJECT | IS | GRANT |
+
+Now the **S** lock on the row (`KEY`, a row in the primary key index) is still there. The `IS` locks are *intent* locks on the page and the table: they announce that a row below them is locked, so that another session cannot lock the whole page or table in an incompatible mode.
+
+If another session is blocked, it appears in the same view with `Status = WAIT`.
+
+## B. MVCC: An Alternative to Locking
+
+### B.1 Don't lock reads — version them
 
 Locking makes readers and writers wait for each other. **Multi-Version Concurrency Control (MVCC)** takes a different approach: when a row changes, keep the previous committed version, and let a reader read a committed version instead of waiting for the writer.
 
@@ -828,7 +1052,7 @@ No reader waits for a writer, and no writer waits for a reader. The uncommitted 
 > [!NOTE]
 > Writers still block other writers — only one session at a time can change a row. MVCC changes read behavior; it does not remove write conflicts.
 
-## 8.2 Turning it on
+### B.2 Turning it on
 
 MVCC is opt-in, per database. Changing this setting requires that no other connection uses the database, so first move **Session B** out of it:
 
@@ -854,7 +1078,7 @@ If the `ALTER DATABASE` keeps running, another connection (for example, a third 
 
 `READ_COMMITTED_SNAPSHOT ON` changes what `READ COMMITTED` itself means on this database: reads use row versions instead of **S** locks, with no code change required anywhere.
 
-## 8.3 Re-run the dirty-read fix under MVCC
+### B.3 Re-run the dirty-read fix under MVCC
 
 Repeat Section 2.2 now that `READ_COMMITTED_SNAPSHOT` is on.
 
@@ -889,7 +1113,7 @@ ROLLBACK TRANSACTION;
 > [!IMPORTANT]
 > Same guarantee as Section 2.2 — no dirty read — but the blocking disappeared entirely. The cost moves elsewhere: `tempdb` stores the row versions, and every write becomes slightly more expensive to maintain them.
 
-## 8.4 SNAPSHOT isolation
+### B.4 SNAPSHOT isolation
 
 SQL Server offers MVCC in a second form, the `SNAPSHOT` isolation level. The two are easy to confuse:
 
@@ -910,81 +1134,8 @@ Because a `SNAPSHOT` transaction sees one fixed view, its reads are repeatable a
 
 \* `SNAPSHOT` gives each transaction a consistent view from the moment it started, so a range query sees no phantom *relative to that starting point* — but it does so without blocking the writer. It answers a subtly different question than `SERIALIZABLE`: "what did the world look like when I started?" rather than "force everyone to behave as if transactions ran one at a time."
 
-## 8.5 Check your understanding
+To return to the locking behavior used in this lab, turn the setting off the same way (Session B in `master` first):
 
-1. Under `READ_COMMITTED_SNAPSHOT`, what does Session B read while Session A has an uncommitted change, and does it wait?
-2. Does MVCC remove blocking between two writers of the same row?
-3. Where does SQL Server store the extra row versions MVCC needs?
-4. Which isolation levels prevent all three problems, and what question does `SERIALIZABLE` answer that `SNAPSHOT` does not?
-
-<details>
-<summary>Show answers</summary>
-
-1. The last committed version of the row — the same value lock-based `READ COMMITTED` would return after waiting — but it reads it immediately from the version store, without waiting.
-2. No. Writers still block other writers; only reader-vs-writer blocking is eliminated.
-3. `tempdb`.
-4. `SERIALIZABLE` and `SNAPSHOT`. `SERIALIZABLE` guarantees that the result is as if every transaction ran one after another, with no overlap at all; `SNAPSHOT` gives each transaction a fixed point-in-time view without enforcing that ordering.
-
-</details>
-
----
-
-# Section 9 – Common Mistakes and Final Review
-
-## 9.1 Common mistakes
-
-| Mistake | Why it matters | Better approach |
-|---|---|---|
-| Assuming one session's behavior predicts another's | Isolation level is per-session | Check `SET TRANSACTION ISOLATION LEVEL` for the session that matters |
-| Forgetting a changed isolation level persists | It stays set until changed again or the connection closes | Reset it explicitly when a demo or test finishes |
-| Treating `REPEATABLE READ` as phantom-proof | It only locks rows already read | Use `SERIALIZABLE` when new matching rows must not appear |
-| Reaching for `SERIALIZABLE` everywhere "to be safe" | Maximizes blocking for problems that may not apply | Match the level to the specific anomaly a transaction must avoid |
-| Treating a deadlock as a bug to silence | It is SQL Server protecting correctness, not a malfunction | Fix the access order; always retry the chosen victim |
-| Assuming MVCC removes all blocking | Writers still block writers | Expect write contention to remain under `READ_COMMITTED_SNAPSHOT` |
-
-## 9.2 Final questions
-
-1. Name the three concurrency problems in order of which isolation level first prevents each.
-2. What table explains every blocking moment demonstrated in Part A, and what decides how long the blocking lasts?
-3. What must be true of two transactions for a deadlock to form between them?
-4. What does `READ_COMMITTED_SNAPSHOT ON` change about the default isolation level?
-
-<details>
-<summary>Show answers</summary>
-
-1. Dirty read (`READ COMMITTED`), non-repeatable read (`REPEATABLE READ`), phantom (`SERIALIZABLE`).
-2. The shared/exclusive lock compatibility table (Section 1.3). How long a lock lives (Section 6.1): **X** locks until the transaction ends, **S** locks depending on the isolation level.
-3. Each must hold a lock the other needs, with neither able to proceed without the other releasing first.
-4. Reads use row versions instead of **S** locks, so they no longer block on — or get blocked by — concurrent writers.
-
-</details>
-
----
-
-# Key takeaways
-
-- **Two sessions can interfere in three specific ways.** Dirty read, non-repeatable read, and phantom read — each is a different kind of "the world changed while you were looking."
-- **Isolation levels are a trade-off, not a ladder you climb for safety's sake.** Each stricter level prevents one more problem at the cost of more blocking.
-- **Locks implement isolation; their duration decides the level.** **X** locks live until the transaction ends; how long **S** locks live is what separates the isolation levels.
-- **A deadlock is SQL Server protecting correctness, not a bug.** Fix the access order; the database will always detect and break a cycle it cannot resolve.
-- **MVCC is a second strategy, not a free upgrade.** It trades locking for row versions — readers stop blocking writers, but writers still block each other, and `tempdb` pays the cost.
-
-Back to the opening question: two sellers booking seats on the same flight. The first booking was lost because each seller read the free seats, calculated the new value outside the database, and wrote it back. Written as one statement — `UPDATE ... SET FreeSeats = FreeSeats - 3` — the read and the write happen together: the first `UPDATE` takes an **X** lock on the row, the second one waits for it, then subtracts from the committed value `17`. Both bookings count. Every tool in this lab — the isolation levels, the lock compatibility rules, two-phase locking, and MVCC — exists to give you a precise, chosen answer to what one session is allowed to see and change while another is working on the same rows.
-
-**Looking ahead:** Labs 1–10 covered everything needed to design, build, and correctly operate a database as a service to an application. Lab 11 turns to the analytical side — reporting and aggregation over the data this course has spent ten labs learning to store and protect correctly.
-
----
-
-## Additional practice
-
-Exercises for this lab are in [Concurrency Exercises](../exercises/lab10-concurrency.md).
-
----
-
-# Additional Reading
-
-The following topic extends the lab. It is not required for the exercises.
-
-## A. Lock Escalation Thresholds
-
-SQL Server escalates row or page locks to a table lock once a single statement holds roughly 5,000 locks on one table, or under memory pressure. The exact thresholds are an internal heuristic, not a fixed contract — do not rely on a specific number in application logic. It can be disabled per table with `ALTER TABLE ... SET (LOCK_ESCALATION = ...)`.
+```sql
+ALTER DATABASE TransactionsLab SET READ_COMMITTED_SNAPSHOT OFF;
+```

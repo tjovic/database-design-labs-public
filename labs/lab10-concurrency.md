@@ -1076,27 +1076,110 @@ ROLLBACK TRANSACTION;
 
 ### SNAPSHOT isolation
 
-SQL Server offers MVCC in a second form, the `SNAPSHOT` isolation level. The two are easy to confuse:
+`READ_COMMITTED_SNAPSHOT` removed the waiting, but it is still `READ COMMITTED`: every statement sees the latest committed data. The non-repeatable read from Section 3.1 therefore still happens.
 
-| Setting | Scope | What a read sees |
+SQL Server's second form of MVCC, the `SNAPSHOT` isolation level, goes further: the **whole transaction** sees the data as it was committed when the transaction started. It must first be allowed on the database.
+
+**Session A:**
+
+```sql
+ALTER DATABASE TransactionsLab SET ALLOW_SNAPSHOT_ISOLATION ON;
+```
+
+Unlike `READ_COMMITTED_SNAPSHOT`, this setting does not require Session B to leave the database.
+
+Now repeat the demo from Section 3.1.
+
+**Session A:**
+
+```sql
+SET TRANSACTION ISOLATION LEVEL SNAPSHOT; -- NEW
+
+BEGIN TRANSACTION;
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+WHERE AccountID = 1;
+-- 1000.00. Keep this transaction open.
+```
+
+**Session B:**
+
+```sql
+UPDATE dbo.BankAccount
+SET Balance = 1200.00
+WHERE AccountID = 1;
+```
+
+This runs immediately. Unlike `REPEATABLE READ` in Section 3.2, a `SNAPSHOT` read takes no **S** lock, so the writer does not wait.
+
+**Session A:**
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+WHERE AccountID = 1;
+-- Still 1000.00 — the version from when the transaction started.
+
+COMMIT TRANSACTION;
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+```
+
+The two forms of MVCC side by side:
+
+```mermaid
+sequenceDiagram
+    participant A as Session A
+    participant R as Account 1
+    participant B as Session B
+    rect rgb(248, 215, 218)
+    Note over A,B: READ_COMMITTED_SNAPSHOT — each statement
+    A->>R: SELECT
+    R-->>A: 1000.00
+    B->>R: UPDATE to 1200.00 — runs at once
+    A->>R: SELECT again
+    R-->>A: 1200.00 — a different answer
+    end
+    rect rgb(212, 237, 218)
+    Note over A,B: SNAPSHOT — the whole transaction
+    A->>R: SELECT
+    R-->>A: 1000.00
+    B->>R: UPDATE to 1200.00 — runs at once
+    A->>R: SELECT again
+    R-->>A: 1000.00 — the version from the start
+    end
+```
+
+| | `READ_COMMITTED_SNAPSHOT` | `SNAPSHOT` |
 |---|---|---|
-| `READ_COMMITTED_SNAPSHOT ON` | Database-wide; changes what `READ COMMITTED` means, no code change | Rows as committed when **the statement** started |
-| `SNAPSHOT` isolation | Per transaction: `ALLOW_SNAPSHOT_ISOLATION ON` on the database, then `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` in the session | Rows as committed when **the transaction** started — one fixed view for the whole transaction |
+| How to turn it on | `SET READ_COMMITTED_SNAPSHOT ON` on the database | `SET ALLOW_SNAPSHOT_ISOLATION ON` on the database, then `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` in the session |
+| Code change | None — it changes what `READ COMMITTED` means | Each session asks for it |
+| A read sees the data committed when | the **statement** started | the **transaction** started |
+| Non-repeatable reads and phantoms | can happen | cannot happen |
+| Writers wait for readers | no | no |
 
-Because a `SNAPSHOT` transaction sees one fixed view, its reads are repeatable and show no phantoms. The complete picture:
+`SNAPSHOT` makes reads repeatable without making writers wait. The price: if two `SNAPSHOT` transactions change the same row, the second one fails with error 3960 (an update conflict) and must be retried.
 
-| Isolation level | Dirty read | Non-repeatable read | Phantom |
-|---|:---:|:---:|:---:|
-| `READ UNCOMMITTED` | can happen | can happen | can happen |
-| `READ COMMITTED` (with or without `READ_COMMITTED_SNAPSHOT`) | **prevented** | can happen | can happen |
-| `REPEATABLE READ` | **prevented** | **prevented** | can happen |
-| `SERIALIZABLE` | **prevented** | **prevented** | **prevented** |
-| `SNAPSHOT` | **prevented** | **prevented** | **prevented**\* |
+To return to the locking behavior used in this lab, turn both settings off. First move **Session B** out of the database:
 
-\* `SNAPSHOT` gives each transaction a consistent view from the moment it started, so a range query sees no phantom *relative to that starting point* — but it does so without blocking the writer. It answers a subtly different question than `SERIALIZABLE`: "what did the world look like when I started?" rather than "force everyone to behave as if transactions ran one at a time."
+**Session B:**
 
-To return to the locking behavior used in this lab, turn the setting off the same way (Session B in `master` first):
+```sql
+USE master;
+```
+
+**Session A:**
 
 ```sql
 ALTER DATABASE TransactionsLab SET READ_COMMITTED_SNAPSHOT OFF;
+ALTER DATABASE TransactionsLab SET ALLOW_SNAPSHOT_ISOLATION OFF;
+
+UPDATE dbo.BankAccount SET Balance = 1000.00 WHERE AccountID = 1;
+```
+
+**Session B:**
+
+```sql
+USE TransactionsLab;
 ```

@@ -23,7 +23,7 @@ sequenceDiagram
     end
 ```
 
-Four seats were sold, but the flight still shows 19 free seats. Both sellers did their job correctly, and both changes were saved — yet the first booking has disappeared, overwritten by the second seller, who was still working with the old value 20. This is a **lost update**.
+Four seats were sold, but the flight still shows 19 free seats. Both sellers did their job correctly, and both changes were saved — yet the first booking has disappeared, overwritten by the second seller, who was still working with the old value 20. This is a **lost update**. (The flight is only an illustration; the demos in this lab use bank accounts.)
 
 A lost update is one way two sessions can interfere with each other. In this lab you will reproduce three more — the ones the isolation levels are defined by — fix each one with a stronger isolation level, and then look under the hood at how SQL Server enforces that with locks. At the end, we return to the two sellers.
 

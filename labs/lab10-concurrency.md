@@ -205,25 +205,6 @@ ROLLBACK TRANSACTION;
 
 The instant Session A finishes, Session B's `SELECT` returns both rows, with account 1 at `1000.00`.
 
-The whole demo:
-
-```mermaid
-sequenceDiagram
-    participant A as Session A
-    participant R1 as Account 1
-    participant R2 as Account 2
-    participant B as Session B
-    A->>R1: UPDATE +300.00 — X lock, not committed
-    B->>R2: SELECT account 2 — S lock granted
-    R2-->>B: 500.00 — at once
-    B->>R1: SELECT all rows — needs S lock on account 1
-    activate B
-    Note right of B: ⏳ waiting
-    A->>R1: ROLLBACK — X lock released
-    R1-->>B: both rows, account 1 = 1000.00
-    deactivate B
-```
-
 ## 1.5 How long a session waits: LOCK_TIMEOUT
 
 By default, a blocked session waits for as long as it takes. `SET LOCK_TIMEOUT` sets a limit, in milliseconds, for the session:

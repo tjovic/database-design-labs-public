@@ -188,6 +188,27 @@ FROM dbo.BankAccount;
 
 This query **hangs**. To return all rows, Session B needs an **S** lock on account 1 as well, and Session A's **X** lock blocks it.
 
+The locks at this moment:
+
+```mermaid
+flowchart LR
+    A["Session A<br>UPDATE<br>account 1<br>not committed"]
+    B2["Session B<br>SELECT all rows"]
+    B1["Session B<br>SELECT account 2"]
+    subgraph T["dbo.BankAccount"]
+        direction TB
+        R1["Account 1<br>1300.00 uncommitted<br>X lock: Session A"]
+        R2["Account 2<br>500.00<br>no lock"]
+    end
+    A -- "holds X" --> R1
+    B2 -. "needs S ✗ waits" .-> R1
+    B1 -- "needs S ✔ returns at once" --> R2
+    classDef locked fill:#f8d7da,stroke:#c62828,color:#000
+    classDef free fill:#d4edda,stroke:#2e7d32,color:#000
+    class R1 locked
+    class R2 free
+```
+
 **Session A:**
 
 ```sql

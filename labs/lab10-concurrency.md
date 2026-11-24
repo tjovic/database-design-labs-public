@@ -940,6 +940,39 @@ Back to the opening question. Two sellers book seats on the same flight. Each on
 - **`REPEATABLE READ`** — both sellers keep their **S** lock on the row. To write, each one needs an **X** lock and waits for the other's **S** lock: the deadlock from Section 7. SQL Server rolls one seller back with error 1205, and that seller must book again. Nothing is lost silently, but one booking fails.
 - **One statement** — `UPDATE ... SET FreeSeats = FreeSeats - 3` reads and writes the row together, under an **X** lock. The second seller waits for that lock, then subtracts from the committed value `17`. Both bookings count — with no deadlock, at the default `READ COMMITTED`.
 
+The last two cases side by side (the first one is the diagram at the start of the lab):
+
+```mermaid
+sequenceDiagram
+    participant S1 as Seller 1
+    participant F as Flight OU 660
+    participant S2 as Seller 2
+    rect rgb(248, 215, 218)
+    Note over S1,S2: REPEATABLE READ
+    S1->>F: SELECT — S lock kept
+    F-->>S1: 20
+    S2->>F: SELECT — S lock kept
+    F-->>S2: 20
+    S1->>F: UPDATE to 17 — needs X lock
+    activate S1
+    Note left of S1: ⏳ waits for Seller 2's S lock
+    S2->>F: UPDATE to 19 — needs X lock
+    Note over S1,S2: deadlock — Seller 2 is rolled back (error 1205)
+    F-->>S1: UPDATE completes — free seats = 17
+    deactivate S1
+    end
+    rect rgb(212, 237, 218)
+    Note over S1,S2: One statement
+    S1->>F: UPDATE FreeSeats = FreeSeats - 3 — X lock
+    S2->>F: UPDATE FreeSeats = FreeSeats - 1 — needs X lock
+    activate S2
+    Note right of S2: ⏳ waiting
+    S1->>F: COMMIT
+    F-->>S2: subtracts from 17 — free seats = 16
+    deactivate S2
+    end
+```
+
 The isolation level is not the only tool: how a statement is written decides which locks it takes and how long it holds them.
 
 ## 8.3 Final questions

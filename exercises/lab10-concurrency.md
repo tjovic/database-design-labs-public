@@ -2,7 +2,7 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–9) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. In Exercises 7–9 you start from a description of what went wrong: recognize the problem, choose the lowest isolation level that prevents it, and demonstrate both. **Part B** (Exercises 10–14) continues in the lab's `TransactionsLab` database with blocking predictions, deadlocks, and `READ_COMMITTED_SNAPSHOT`.
+These exercises build on [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md). **Part A** (Exercises 1–9) reproduces the three anomalies — dirty read, non-repeatable read, and phantom read — and their isolation-level fixes on real `AdventureWorksENG` tables, following the same two-session format Lab 10 uses. In Exercises 7–9 you start from a description of what went wrong: recognize the problem, choose the lowest isolation level that prevents it, and demonstrate both. **Part B** (Exercises 10–13) continues in the lab's `TransactionsLab` database: classifying an anomaly, predicting blocking, choosing a level, and handling `LOCK_TIMEOUT` inside a transaction.
 
 Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Exercises 5 and 6 delete the phantom row they insert, so the range again has two rows when the next exercise starts. Run the setup only once; on a freshly restored database the counts match the expected results. Part B changes only the fictional data in `TransactionsLab`.
 
@@ -330,7 +330,7 @@ INSERT INTO dbo.State (Name) VALUES (N'ExerciseConc Range C');
 <summary>Hint</summary>
 
 - Session B's `INSERT` should **hang** this time.
-- `SERIALIZABLE` locks the whole range implied by the predicate, including the gap a new matching row would fall into.
+- `SERIALIZABLE` locks the range implied by the predicate, including the gap a new matching row would fall into. `dbo.State` has no index on `Name`, so the query scans the table and the range is in fact the whole table (Lab 10, Section 4.2).
 
 </details>
 
@@ -438,7 +438,7 @@ ROLLBACK TRANSACTION;
 
 The lowest level is `READ COMMITTED`, the SQL Server default, set in Session B. Session A does nothing wrong: it may change data and roll back.
 
-4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower. [Lab 10, Additional Reading](../labs/lab10-concurrency.md#mvcc-an-alternative-to-locking) shows how row versioning removes that wait.
+4. The report can now wait while another session holds an uncommitted change. It no longer shows wrong prices, but it can be slower.
 
 </details>
 
@@ -639,7 +639,7 @@ DELETE FROM dbo.Subcategory
 WHERE Name = N'ExerciseConc Subcategory';
 ```
 
-`SERIALIZABLE`, set in Session A, locks the whole range `CategoryID = 4`, including the place where a new row would go.
+`SERIALIZABLE`, set in Session A, locks the range `CategoryID = 4`, including the place where a new row would go. `dbo.Subcategory` has no index on `CategoryID`, so the query scans the table and the range is in fact the whole table: an insert into any other category waits too (Lab 10, Section 4.2).
 
 In all three exercises the fix goes to the session that **reads**: the reader decides how much it is protected from other sessions' changes.
 
@@ -649,7 +649,7 @@ In all three exercises the fix goes to the session that **reads**: the reader de
 
 # Part B – `TransactionsLab`
 
-Exercises 10–14 use the `dbo.BankAccount` and `dbo.Branch` tables that [Lab 10](../labs/lab10-concurrency.md) prepares in the `TransactionsLab` database. Do them after Lab 10, in the same database. Exercises 11 and 13 need two SSMS windows; the others are questions you answer on paper and then check.
+Exercises 10–13 use the `dbo.BankAccount` and `dbo.Branch` tables that [Lab 10](../labs/lab10-concurrency.md) prepares in the `TransactionsLab` database. Do them after Lab 10, in the same database. Exercises 11 and 13 need two SSMS windows; the others are questions you answer on paper and then check.
 
 Use your two SSMS windows for every exercise below. Reset `AccountID = 1`'s values (`AccountName = 'Account A'`, `Balance = 1000.00`) and `dbo.Branch` to its three seed rows between exercises if a previous one changed them.
 
@@ -731,51 +731,88 @@ A reporting procedure must read the total balance across all accounts twice in o
 <details>
 <summary>Solution</summary>
 
-`REPEATABLE READ`. The procedure only re-reads existing rows — it needs protection against a non-repeatable read, not against new rows appearing (no phantom risk, since it is not filtering a growing range). `SERIALIZABLE` would also work but costs more blocking for no extra benefit here.
+`REPEATABLE READ`. A transfer only changes rows that already exist, so the procedure needs protection against a non-repeatable read: once it has read an account, no other session may change it until the procedure ends. `SERIALIZABLE` would also work, but it costs more blocking for no extra benefit here.
+
+The answer changes if new accounts can be opened while the procedure runs. A new account would change the total between the two reads — a phantom — and then only `SERIALIZABLE` is enough.
 
 </details>
 
 ---
 
-## Exercise 13 — Trigger and explain a deadlock [ADVANCED]
+## Exercise 13 — A timeout in the middle of a transfer [ADVANCED]
 
-Reproduce the deadlock from [Section 7.1 of Lab 10](../labs/lab10-concurrency.md#71-two-sessions-opposite-order), but swap the direction of the two transfers (Session A moves money from account 2 to account 1, Session B from account 1 to account 2). Confirm a deadlock still occurs, and explain in your own words why swapping the directions did not fix it.
+Session B runs a transfer of 50.00 from account 2 to account 1, as in Lab 9, but with a lock time-out. Session A is holding an uncommitted change on account 1.
+
+**Session A:**
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 300.00
+WHERE AccountID = 1;
+-- Keep this transaction open.
+```
+
+**Session B:**
+
+```sql
+SET LOCK_TIMEOUT 3000;
+
+BEGIN TRANSACTION;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - 50.00
+WHERE AccountID = 2;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 50.00
+WHERE AccountID = 1;
+```
+
+1. What does Session B see after 3 seconds?
+2. Is Session B's transaction still open? Has its first `UPDATE` been undone? Check it in Session B.
+3. What would happen to the money if Session B now ran `COMMIT`? What should it do instead?
 
 <details>
 <summary>Hint</summary>
 
-- A deadlock needs two sessions that each hold one lock and wait for the other's. Look at the order in which each session takes its locks.
+- `LOCK_TIMEOUT` cancels the **statement** that waited too long (Lab 10, Section 1.5). Does that say anything about the transaction?
+- Check with `SELECT @@TRANCOUNT;` and by reading account 2 in Session B.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-A deadlock still occurs. What matters is that the two sessions acquire the two locks in **opposite order relative to each other** — it does not matter which specific account each one starts with, only that A then wants what B holds and B then wants what A holds. The fix from [Section 7.2](../labs/lab10-concurrency.md#72-avoiding-deadlocks) (always touch accounts in the same, e.g. ascending, ID order, in every transaction) is still required.
+1. The second `UPDATE` fails with error 1222 (*Lock request time out period exceeded*).
+2. Only that statement was cancelled. The transaction is still open, and its first `UPDATE` still stands:
 
-</details>
+   ```sql
+   SELECT @@TRANCOUNT AS OpenTransactions;
+   -- 1
 
----
+   SELECT AccountID, Balance
+   FROM dbo.BankAccount
+   WHERE AccountID = 2;
+   -- 450.00: the 50.00 has left account 2 but has not reached account 1
+   ```
 
-## Exercise 14 — READ_COMMITTED_SNAPSHOT, costs and benefits [ADVANCED]
+3. `COMMIT` would save only half of the transfer: 50.00 would disappear. The transfer must be undone as a whole:
 
-This exercise is based on [the Additional Reading of Lab 10](../labs/lab10-concurrency.md#mvcc-an-alternative-to-locking).
+   ```sql
+   ROLLBACK TRANSACTION;
 
-`READ_COMMITTED_SNAPSHOT` removes the blocking you saw in [Section 2.2 of Lab 10](../labs/lab10-concurrency.md#22-fix-read-committed-blocks-instead-of-lying). List one scenario where you would turn it on, and one reason a team might deliberately choose not to.
+   SET LOCK_TIMEOUT -1;
+   ```
 
-<details>
-<summary>Hint</summary>
+   In application code, handle error 1222 the same way as any other error in a transaction — with `TRY...CATCH` and `ROLLBACK`, as in Lab 9.
 
-- Row versions are kept in `tempdb`. Think about who gains from readers not waiting for writers, and who pays for the versions.
+Finish Session A as well:
 
-</details>
-
-<details>
-<summary>Solution</summary>
-
-Turn it on for a read-heavy application where long-running reports currently block, or get blocked by, ordinary transactional writes — the version-based reads stop that contention with no application code changes.
-
-A team might avoid it if `tempdb` is already a bottleneck (it must hold every row version) or if write-heavy workloads cannot absorb the extra cost of maintaining versions on every write.
+```sql
+ROLLBACK TRANSACTION;
+```
 
 </details>
 
@@ -783,4 +820,4 @@ A team might avoid it if `tempdb` is already a bottleneck (it must hold every ro
 
 ## References
 
-- [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md) — dirty reads, non-repeatable reads, phantom reads, the four isolation levels, locking, deadlocks, and (in the additional reading) MVCC.
+- [Lab 10 – Concurrency and Isolation](../labs/lab10-concurrency.md) — dirty reads, non-repeatable reads, phantom reads, the four isolation levels, shared and exclusive locks, and `LOCK_TIMEOUT`.

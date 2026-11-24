@@ -857,15 +857,29 @@ SET Balance = Balance + 50.00
 WHERE AccountID = 1;
 ```
 
-At this moment, the locks form a cycle:
+At this moment, each session holds one lock and waits for the other:
 
-```text
-           holds X                   waits for X
- Session A ──────────► Account 1 ◄─────────────────────── Session B
- (1 → 2)                                                   (2 → 1)
-     │                                                        │
-     │  waits for X                                holds X    │
-     └───────────────► Account 2 ◄────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant A as Session A (1 → 2)
+    participant R1 as Account 1
+    participant R2 as Account 2
+    participant B as Session B (2 → 1)
+    A->>R1: UPDATE −100.00 — X lock
+    B->>R2: UPDATE −50.00 — X lock
+    rect rgb(248, 215, 218)
+    A->>R2: UPDATE +100.00 — needs X lock
+    activate A
+    Note left of A: ⏳ waits for Session B
+    B->>R1: UPDATE +50.00 — needs X lock
+    activate B
+    Note right of B: ⏳ waits for Session A
+    Note over A,B: each waits for the other — a deadlock
+    end
+    Note over A,B: SQL Server picks a victim, e.g. Session B (Msg 1205, rolled back)
+    deactivate B
+    R2-->>A: UPDATE completes — Session B's lock was released
+    deactivate A
 ```
 
 Neither statement can ever finish on its own — Session A waits for Session B's lock, Session B waits for Session A's. Within a few seconds, SQL Server detects the cycle and ends one of the two transactions. One window shows:

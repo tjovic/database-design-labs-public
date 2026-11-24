@@ -137,12 +137,16 @@ This section names three specific ways that two sessions can interfere with each
 
 ## 1.3 Shared and exclusive locks
 
-SQL Server keeps sessions apart with **locks**. Before a session reads or changes a row, it requests a lock on that row:
+The two sellers lost a booking because nothing coordinated them: both worked on the same row at the same time. A database needs a rule for who may use a row while another session is using it.
 
-| Lock | Used for | Compatible with other sessions' |
-|---|---|---|
-| **S** (Shared) | Reading | Other **S** locks only |
-| **X** (Exclusive) | Writing | Nothing |
+Think of a shared document. Any number of people can read it at the same time. While one person is editing it, nobody else should edit it — or read a half-finished version.
+
+SQL Server follows the same rule with **locks**. Before a session reads or changes a row, it requests a lock on that row:
+
+- an **S** (shared) lock to read it — other sessions may still read the row;
+- an **X** (exclusive) lock to change it — no other session may read or change the row.
+
+Whether a requested lock can be granted depends on the lock another session already holds:
 
 | | S requested | X requested |
 |---|:---:|:---:|

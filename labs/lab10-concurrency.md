@@ -922,15 +922,15 @@ UPDATE dbo.BankAccount SET Balance =  500.00 WHERE AccountID = 2;
 
 ## 8.1 Common mistakes
 
-| Mistake | Why it matters | Better approach |
-|---|---|---|
-| Assuming one session's behavior predicts another's | Isolation level is per-session | Check `SET TRANSACTION ISOLATION LEVEL` for the session that matters |
-| Forgetting a changed isolation level persists | It stays set until changed again or the connection closes | Reset it explicitly when a demo or test finishes |
-| Treating `REPEATABLE READ` as phantom-proof | It only locks rows already read | Use `SERIALIZABLE` when new matching rows must not appear |
-| Reaching for `SERIALIZABLE` everywhere "to be safe" | Maximizes blocking for problems that may not apply | Match the level to the specific anomaly a transaction must avoid |
-| Treating a deadlock as a bug to silence | It is SQL Server protecting correctness, not a malfunction | Fix the access order; always retry the chosen victim |
-| Running a large unfiltered `UPDATE`/`DELETE`, or a query with no useful index, on a busy table | It locks many rows, or escalates to a table lock, and blocks unrelated work | Filter and index so only the needed rows are read; split large changes into smaller batches |
-| Letting a blocked session wait forever | A user or a job hangs without an error | Set `LOCK_TIMEOUT` where waiting has a limit, and handle error 1222 |
+| Mistake | What goes wrong | Instead | See |
+|---|---|---|---|
+| Letting a blocked session wait forever | The user sees a hang, not an error | Set `LOCK_TIMEOUT` and handle error 1222 | 1.5 |
+| Forgetting that the isolation level belongs to the session | It applies to every later transaction on that connection — and to no other connection | Set it in the session that needs it; reset it when done | 1.6 |
+| Thinking `REPEATABLE READ` stops phantoms | It locks only the rows already read, so new rows can still appear | Use `SERIALIZABLE` when new matching rows must not appear | 4 |
+| Using `SERIALIZABLE` everywhere "to be safe" | More locks, more waiting, more deadlocks | Choose the lowest level that prevents the problem you actually have | 5.2 |
+| Reading without a useful index, or changing many rows in one statement | Many row locks, or a table lock; unrelated work waits | Index the columns in `WHERE`; split large changes into smaller batches | 6.2 |
+| Treating a deadlock as a bug | Error 1205 means SQL Server broke the cycle on purpose | Access rows in the same order; retry the transaction that was rolled back | 7 |
+| Reading a value, then writing a new value calculated in the application | A lost update | Let one `UPDATE` do the calculation | 8.2 |
 
 ## 8.2 Back to the two sellers
 
@@ -1078,7 +1078,7 @@ No reader waits for a writer, and no writer waits for a reader. The uncommitted 
 
 ### Turning it on
 
-MVCC is opt-in, per database. Changing this setting requires that no other connection uses the database, so first move **Session B** out of it:
+In SQL Server, MVCC is turned on per **database** — unlike the isolation level, which belongs to a session. Changing this setting requires that no other connection uses the database, so first move **Session B** out of it:
 
 **Session B:**
 
@@ -1101,6 +1101,15 @@ USE TransactionsLab;
 If the `ALTER DATABASE` keeps running, another connection (for example, a third query window) is still using `TransactionsLab`.
 
 `READ_COMMITTED_SNAPSHOT ON` changes what `READ COMMITTED` itself means on this database: reads use row versions instead of **S** locks, with no code change required anywhere.
+
+The setting is stored in the database. It applies to every connection and stays on — even after SQL Server restarts — until it is turned off again (see the end of this reading). To check it:
+
+```sql
+SELECT name, is_read_committed_snapshot_on
+FROM sys.databases
+WHERE name = 'TransactionsLab';
+-- is_read_committed_snapshot_on = 1
+```
 
 ### Re-run the dirty-read fix under MVCC
 
@@ -1135,7 +1144,7 @@ ROLLBACK TRANSACTION;
 ```
 
 > [!IMPORTANT]
-> Same guarantee as Section 2.2 — no dirty read — but the blocking disappeared entirely. The cost moves elsewhere: `tempdb` stores the row versions, and every write becomes slightly more expensive to maintain them.
+> Same guarantee as Section 2.2 — no dirty read — but the blocking disappeared entirely. The cost moves elsewhere: `tempdb` stores the row versions, and every write becomes slightly more expensive to maintain them. A version is kept only as long as some running statement or transaction may still need it, so one long-running transaction keeps old versions alive and makes `tempdb` grow.
 
 ### SNAPSHOT isolation
 
@@ -1150,6 +1159,11 @@ ALTER DATABASE TransactionsLab SET ALLOW_SNAPSHOT_ISOLATION ON;
 ```
 
 Unlike `READ_COMMITTED_SNAPSHOT`, this setting does not require Session B to leave the database.
+
+> [!IMPORTANT]
+> This setting only **allows** `SNAPSHOT`; on its own, it changes nothing for any session. A session uses it only after `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` (next step). Without the database setting, that session fails with error 3952 (*snapshot isolation is not allowed in this database*).
+>
+> The cost starts at once, though: from now on, SQL Server keeps row versions for every change in the database, even if no session ever asks for `SNAPSHOT`.
 
 Now repeat the demo from Section 3.1.
 
@@ -1223,6 +1237,29 @@ sequenceDiagram
 | Writers wait for readers | no | no |
 
 `SNAPSHOT` makes reads repeatable without making writers wait. The price: if two `SNAPSHOT` transactions change the same row, the second one fails with error 3960 (an update conflict) and must be retried.
+
+### MVCC in practice
+
+MVCC is not a niche feature. Oracle and PostgreSQL read this way by default: a reader never waits for a writer. SQL Server keeps lock-based `READ COMMITTED` as its default for compatibility with existing applications, but Azure SQL Database turns `READ_COMMITTED_SNAPSHOT` on by default, and many SQL Server databases turn it on too.
+
+Long reports show the difference best. A `SELECT SUM(Balance)` over a large table that is changing at the same time:
+
+- with locking, it waits on every row a writer has locked — and its result is not a snapshot of one moment: if money moves from an account it has not read yet to one it has already read, the total is wrong, even with no dirty read;
+- with MVCC, it never waits, and the whole statement sees the table as it was when the statement started, so the total is correct.
+
+Many SQL Server applications use a different workaround for long reports, the table hint `WITH (NOLOCK)`, which reads one table as `READ UNCOMMITTED`:
+
+```sql
+SELECT SUM(Balance)
+FROM dbo.BankAccount WITH (NOLOCK); -- NEW: read this table without S locks
+```
+
+It removes the waiting, but brings back the dirty read from Section 2.1. During a long scan it can even miss rows or read the same row twice when rows move. MVCC removes the waiting without these errors.
+
+It is not switched on blindly, for two reasons:
+
+- **Resources** — every change keeps an old version, which costs `tempdb` space and some extra work on each write.
+- **Behavior** — readers no longer wait; they get the last committed value. Code written for locking may rely on a reader waiting for a writer to finish. Turning MVCC on for an existing application therefore needs testing.
 
 To return to the locking behavior used in this lab, turn both settings off. First move **Session B** out of the database:
 

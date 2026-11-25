@@ -1049,7 +1049,20 @@ SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterFirstTransfer; -- NEW: a point to return to
+
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 900.00 |
+| 2 | 600.00 |
+
+`OpenTransactionCount` is `1`. The savepoint marks this state inside the open transaction; it does not commit anything.
 
 **Step 2 – Make the second transfer.**
 

@@ -1801,17 +1801,20 @@ This illustrates **Durability**.
 
 A database normally has many transactions. Their log records can be interleaved in the same log stream.
 
-For example, transaction T1 can begin first, while another transaction T2 finishes first. Each transaction has its own row; the columns show the order of the records in the shared log:
+For example, transaction T1 can begin first, while another transaction T2 finishes first. Each transaction has its own row at the top; all their records end up in **one** log, in the order they happen (bottom row):
 
 ```text
 Log order      1          2          3          4          5          6          7
 T1             ●──────────●────────────────────────────────●─────────────────────●
-             Begin     Change A                         Change B               Commit
 T2                                   ●──────────●─────────────────────●
-                                   Begin     Change X               Commit
+               │          │          │          │          │          │          │
+               ▼          ▼          ▼          ▼          ▼          ▼          ▼
+          ┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+Log       │ T1 Begin │ T1 Chg A │ T2 Begin │ T2 Chg X │ T1 Chg B │T2 Commit │T1 Commit │
+          └──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
 ```
 
-T1 begins first, but T2 commits first. Every record carries its transaction's identifier, and it also remembers where the **previous record of the same transaction** is — the lines in the diagram. If T1 had to be rolled back before its commit, SQL Server would follow T1's chain backward, 5 → 2 → 1, and skip T2's records.
+T1 begins first, but T2 commits first. Every record carries its transaction's identifier, and it also remembers where the **previous record of the same transaction** is — the lines in the top rows. If T1 had to be rolled back before its commit, SQL Server would follow T1's chain backward, 5 → 2 → 1, and skip T2's records.
 
 This explains two important points:
 

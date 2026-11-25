@@ -1821,6 +1821,21 @@ This explains two important points:
 - Undoing T1 does not mean undoing every later record in the whole database log.
 - SQL Server can identify T1's changes separately from T2's changes.
 
+Now suppose T1 is rolled back instead of committed. SQL Server follows T1's chain backward and undoes its changes in reverse order: first the change to B (record 5), then the change to A (record 2). Nothing is erased from the log. Each undo step is written as a **new** log record, and the rollback ends with its own record:
+
+```text
+           1            2            3            4            5            6            7            8            9
+T1         ●────────────●──────────────────────────────────────●─────────────────────────●────────────●────────────●
+T2                                   ●────────────●─────────────────────────●
+           │            │            │            │            │            │            │            │            │
+           ▼            ▼            ▼            ▼            ▼            ▼            ▼            ▼            ▼
+    ┌────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┐
+Log │  T1 Begin  │  T1 Chg A  │  T2 Begin  │  T2 Chg X  │  T1 Chg B  │ T2 Commit  │ T1 Undo B  │ T1 Undo A  │T1 Rollback │
+    └────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘
+```
+
+The log only grows. Because the undo steps are logged too, SQL Server can complete a rollback even if the server crashes in the middle of it.
+
 We are looking only at logging and recovery here. Which operations can proceed simultaneously, and when one session must wait, are questions for Lab 10.
 
 ## 10.7 Checkpoints help recovery

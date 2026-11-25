@@ -1049,12 +1049,14 @@ SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterFirstTransfer; -- NEW: a point to return to
+```
 
+Check the balances:
+
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
 | AccountID | Balance |
@@ -1062,7 +1064,17 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 | 1 | 900.00 |
 | 2 | 600.00 |
 
-`OpenTransactionCount` is `1`. The savepoint marks this state inside the open transaction; it does not commit anything.
+Check the open transactions:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| OpenTransactionCount |
+|---:|
+| 1 |
+
+The savepoint marks this state inside the open transaction; it does not commit anything.
 
 **Step 2 – Make the second transfer.**
 
@@ -1075,7 +1087,11 @@ WHERE AccountID = 1;
 UPDATE dbo.BankAccount
 SET Balance = Balance + 50.00
 WHERE AccountID = 2;
+```
 
+Check the balances:
+
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
@@ -1092,12 +1108,14 @@ Both transfers are visible inside the transaction.
 
 ```sql
 ROLLBACK TRANSACTION AfterFirstTransfer; -- NEW: undo only back to the savepoint
+```
 
+Check the balances:
+
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
-
-SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
 | AccountID | Balance |
@@ -1105,21 +1123,48 @@ SELECT @@TRANCOUNT AS OpenTransactionCount;
 | 1 | 900.00 |
 | 2 | 600.00 |
 
-`OpenTransactionCount` is `1`. The second transfer is gone, the first one is still there — and the transaction is **still open**. A rollback to a savepoint does not end the transaction.
+Check the open transactions:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| OpenTransactionCount |
+|---:|
+| 1 |
+
+The second transfer is gone, the first one is still there — and the transaction is **still open**. A rollback to a savepoint does not end the transaction.
 
 **Step 4 – Commit.**
 
 ```sql
 COMMIT TRANSACTION;
+```
 
+Check the open transactions:
+
+```sql
 SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
 
+| OpenTransactionCount |
+|---:|
+| 0 |
+
+Only `COMMIT` (or a full `ROLLBACK`) ends the transaction. Check the balances:
+
+```sql
 SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-`OpenTransactionCount` is now `0`: only `COMMIT` (or a full `ROLLBACK`) ends the transaction. The committed balances are `900.00` and `600.00` — the first transfer only.
+| AccountID | Balance |
+|---|---:|
+| 1 | 900.00 |
+| 2 | 600.00 |
+
+The committed balances contain the first transfer only.
 
 ## 6.2 What a savepoint does not do
 

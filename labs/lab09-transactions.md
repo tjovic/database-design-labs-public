@@ -739,7 +739,28 @@ Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other s
 
 ## 4.3 Detect insufficient funds in the update
 
-The source check from 4.2 can do more. Instead of reading a balance and later deciding whether to subtract, we can include the funds condition in the update itself:
+The source check from 4.2 can do more: it can also check the balance. The obvious way is to check first and change later:
+
+```sql
+DECLARE @Amount decimal(12, 2) = 2000.00;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM dbo.BankAccount
+    WHERE AccountID = 1
+      AND Balance >= @Amount
+)
+    THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
+
+-- Another session can withdraw money from account 1 here.
+
+UPDATE dbo.BankAccount
+SET Balance = Balance - @Amount
+WHERE AccountID = 1;
+```
+
+As the note in 4.2 explains, the balance can change between the check and the `UPDATE`, so the decision rests on an old value. Instead, put the same condition into the update itself:
 
 ```sql
 DECLARE @Amount decimal(12, 2) = 2000.00;

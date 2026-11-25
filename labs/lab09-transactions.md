@@ -1480,27 +1480,20 @@ This helper illustrates transaction ownership. It is a low-level building block:
 
 ## 9.3 An outer transaction wraps our transfer procedure
 
-What happens when the caller starts a transaction and then calls `usp_TransferFunds`, which starts its own? Sections 9.3 and 9.4 run both outcomes. Follow `@@TRANCOUNT` in the diagram:
+What happens when the caller starts a transaction and then calls `usp_TransferFunds`, which starts its own? Follow `@@TRANCOUNT` in the diagram:
 
 ```mermaid
 sequenceDiagram
     participant C as Caller
     participant P as usp_TransferFunds
-    C->>C: BEGIN TRANSACTION (count 0 → 1)
-    Note over C: 9.4 only: the caller also renames Account A
+    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
     C->>P: EXEC
-    P->>P: BEGIN TRANSACTION (count 1 → 2)
-    P->>P: debit the source account
-    alt 9.3: destination exists
-        P->>P: credit the destination account
-        P->>P: COMMIT (count 2 → 1), nothing is committed yet
-        P-->>C: returns successfully
-        C->>C: ROLLBACK (count 1 → 0), the transfer is undone
-    else 9.4: destination does not exist
-        P->>P: CATCH: full ROLLBACK (count 2 → 0)
-        Note over C,P: the caller's rename is undone too
-        P-->>C: THROW 50014
-        C->>C: CATCH: count is already 0, nothing to roll back, THROW
+    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
+    Note over P: debit and credit
+    Note over P: COMMIT<br>@@TRANCOUNT 2 → 1<br>nothing is confirmed yet
+    P-->>C: returns successfully
+    rect rgb(248, 215, 218)
+    Note over C: ROLLBACK<br>@@TRANCOUNT 1 → 0<br>the transfer is undone
     end
 ```
 
@@ -1552,6 +1545,24 @@ The procedure returned successfully, but its inner `COMMIT` did not independentl
 The reverse is equally important. Our transfer procedure uses a **full rollback** when an execution error reaches its handler.
 
 If an outer transaction exists, that rollback also undoes earlier work in the outer transaction.
+
+This time the destination does not exist, and the caller has done some work of its own before the call:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant P as usp_TransferFunds
+    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
+    Note over C: rename Account A
+    C->>P: EXEC (destination 999)
+    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
+    Note over P: debit, then no destination:<br>THROW 50014
+    rect rgb(248, 215, 218)
+    Note over P: CATCH: ROLLBACK<br>@@TRANCOUNT 2 → 0<br>also undoes the caller's rename
+    end
+    P-->>C: error 50014
+    Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW
+```
 
 The balances are still `1000.00` and `500.00` after 9.3, so no reset is needed.
 

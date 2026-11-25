@@ -753,14 +753,15 @@ IF NOT EXISTS
 )
     THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
 
--- Another session can withdraw money from account 1 here.
-
 UPDATE dbo.BankAccount
 SET Balance = Balance - @Amount
 WHERE AccountID = 1;
 ```
 
-As the note in 4.2 explains, the balance can change between the check and the `UPDATE`, so the decision rests on an old value. Instead, put the same condition into the update itself:
+> [!WARNING]
+> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. See the note in 4.2 and [Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers).
+
+Instead, put the same condition into the update itself:
 
 ```sql
 DECLARE @Amount decimal(12, 2) = 2000.00;

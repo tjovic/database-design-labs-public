@@ -1602,9 +1602,7 @@ The caller's `CATCH` receives error `50014` and passes it on with `THROW`. When 
 |---|---|---|
 | Procedure manages the transaction | One procedure performs the complete operation | Procedure starts and finishes the transaction |
 | Caller manages the transaction | Several calls form one larger operation | Caller starts and finishes the transaction; helpers participate |
-| Procedure supports both contexts | A reusable operation has a carefully defined transaction contract | Requires additional ownership and error-state handling |
-
-The third approach is discussed briefly in Additional Reading. It is not required for this lab.
+| Procedure supports both contexts | A reusable operation has a carefully defined transaction contract | Requires additional ownership and error-state handling; beyond the scope of this lab |
 
 ---
 
@@ -1953,7 +1951,7 @@ The transaction log does not replace backups. A log stored on a failed device ca
 3. No. It only reduces the nesting count; the outer transaction still controls the final outcome.
 4. Yes. No matching row is not automatically an execution error.
 5. So the caller knows the requested operation failed and can react appropriately.
-6. No. It reports nesting, not whether the transaction is committable. `XACT_STATE()` reports that state; see Additional Reading.
+6. No. It reports how many transactions are open, not whether the open transaction can still be committed.
 7. The log contains recovery information. Under fully durable commit, the required log records are durable before commit is acknowledged.
 8. Atomicity keeps the specified changes together. It cannot decide whether those changes represent the correct business operation.
 
@@ -1969,6 +1967,7 @@ The transaction log does not replace backups. A log stored on a failed device ca
 - **`SET XACT_ABORT ON` covers what `CATCH` cannot.** A cancelled query or timeout never reaches `CATCH`; with `XACT_ABORT ON`, SQL Server rolls the transaction back itself.
 - **Zero affected rows is not an error.** Check `@@ROWCOUNT` and raise an error yourself when a business rule is broken.
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
+- **Keep transactions short.** An open transaction holds its locks and blocks other sessions (Lab 10). Never leave one open while waiting for a user or a slow external call.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
 
 Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Section 10 explains how SQL Server preserves committed work after a crash.
@@ -1980,75 +1979,3 @@ Back to the opening question: a transfer that subtracts from one account and add
 ## Additional practice
 
 Exercises for this lab are in [Transaction Exercises](../exercises/lab09-transactions.md).
-
----
-
-# Additional Reading
-
-The following topics extend the lab. They are not required for the exercises.
-
-## A. XACT_STATE(): Is the Transaction Committable?
-
-`@@TRANCOUNT` reports the nesting count. `XACT_STATE()` reports whether a user transaction exists and whether it can commit.
-
-| `XACT_STATE()` | Meaning |
-|---|---|
-| `0` | No active user transaction |
-| `1` | Active transaction that can commit |
-| `-1` | Active transaction that cannot commit; a full rollback is required |
-
-An uncommittable transaction cannot be repaired by rolling back to a savepoint.
-
-To observe the state, start with no open transaction and run:
-
-```sql
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    -- Deliberately violate the CHECK constraint.
-    UPDATE dbo.BankAccount
-    SET Balance = -1.00
-    WHERE AccountID = 1;
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    SELECT ERROR_MESSAGE() AS ErrorMessage,
-           @@TRANCOUNT AS TransactionCount,
-           XACT_STATE() AS TransactionState;
-
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-END CATCH;
-
-SELECT @@TRANCOUNT AS FinalTransactionCount,
-       XACT_STATE() AS FinalTransactionState;
-```
-
-For this constraint error with `XACT_ABORT ON`, the transaction is uncommittable in `CATCH`. After rollback, both final values are `0`.
-
-Our main pattern always rolls back on a caught operation failure. It therefore does not need to distinguish committable and uncommittable transactions before deciding to roll back.
-
-## B. Procedures That Support an Existing Transaction
-
-A reusable procedure can check `@@TRANCOUNT` on entry:
-
-- If no transaction exists, it starts one and owns its completion.
-- If a transaction already exists, it participates without committing the caller's transaction.
-- It may create a savepoint so that certain recoverable failures can undo only its own work.
-- If an error makes the transaction uncommittable, rollback to that savepoint is not possible. The caller must perform a full rollback.
-- Some errors can already have ended the transaction, so rollback logic must also handle the absence of a transaction.
-
-This is more than adding `IF @@TRANCOUNT = 0` before `BEGIN`. The contract must define who handles errors, which work may survive, and whether the caller may continue.
-
-`SET XACT_ABORT ON` and `THROW` must be considered when designing that policy. Do not assume that a savepoint makes every failure locally recoverable.
-
-## C. Keep Transactions Focused
-
-An open transaction can retain resources needed by other sessions. Keep the transaction focused on the database work that must be atomic.
-
-Avoid leaving a transaction open while waiting for a user, displaying a confirmation dialog, or performing an unrelated slow network request.
-
-The main procedure validates simple parameter rules before opening its transaction. Database-dependent checks need more care because other sessions can change the data; Lab 10 develops that topic.

@@ -1302,7 +1302,9 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-The block starts like 6.1, adds a third transfer with a second savepoint, rolls back to the **first** savepoint, and then tries to roll back to the second one:
+The demo starts like 6.1, adds a third transfer with a second savepoint, rolls back to the **first** savepoint, and then tries to roll back to the second one. Run the steps one after another, in the same window.
+
+**Step 1 – Start the transaction, make the first transfer, and mark the first savepoint.**
 
 ```sql
 SET XACT_ABORT ON;
@@ -1319,7 +1321,24 @@ SET Balance = Balance + 100.00
 WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterFirstTransfer;
+```
 
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 900.00 |
+| 2 | 600.00 |
+
+**Step 2 – Make the second transfer and mark a second savepoint.**
+
+```sql
 -- Second transfer.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 50.00
@@ -1330,7 +1349,24 @@ SET Balance = Balance + 50.00
 WHERE AccountID = 2;
 
 SAVE TRANSACTION AfterSecondTransfer; -- NEW: a second savepoint
+```
 
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 850.00 |
+| 2 | 650.00 |
+
+**Step 3 – Make a third transfer.**
+
+```sql
 -- NEW: third transfer.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 25.00
@@ -1339,26 +1375,9 @@ WHERE AccountID = 1;
 UPDATE dbo.BankAccount
 SET Balance = Balance + 25.00
 WHERE AccountID = 2;
-
-ROLLBACK TRANSACTION AfterFirstTransfer;
-
-SELECT AccountID, Balance AS AfterSavepointRollback
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
--- AfterSecondTransfer was defined after AfterFirstTransfer.
-ROLLBACK TRANSACTION AfterSecondTransfer;
 ```
 
-The rollback to `AfterFirstTransfer` returns the balances to `900.00` and `600.00`. The last statement then fails:
-
-```text
-Msg 6401: Cannot roll back AfterSecondTransfer. No transaction or savepoint of that name was found.
-```
-
-Rolling back to `AfterFirstTransfer` undid everything after it, **including the savepoint `AfterSecondTransfer`**. That savepoint no longer exists.
-
-Because `XACT_ABORT` is `ON`, the error also rolled back the whole transaction. Check the balances:
+Check the balances:
 
 ```sql
 SELECT AccountID, Balance
@@ -1366,12 +1385,81 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-| Point | Account A | Account B |
-|---|---:|---:|
-| Initial state | 1000.00 | 500.00 |
-| After third transfer | 825.00 | 675.00 |
-| After rollback to `AfterFirstTransfer` | 900.00 | 600.00 |
-| After error 6401 (`XACT_ABORT ON`) | 1000.00 | 500.00 |
+| AccountID | Balance |
+|---|---:|
+| 1 | 825.00 |
+| 2 | 675.00 |
+
+**Step 4 – Roll back to the first savepoint.**
+
+```sql
+ROLLBACK TRANSACTION AfterFirstTransfer;
+```
+
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 900.00 |
+| 2 | 600.00 |
+
+Check the open transactions:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| OpenTransactionCount |
+|---:|
+| 1 |
+
+The second and third transfers are gone; the transaction is still open.
+
+**Step 5 – Try to roll back to the second savepoint.**
+
+```sql
+-- AfterSecondTransfer was defined after AfterFirstTransfer.
+ROLLBACK TRANSACTION AfterSecondTransfer;
+```
+
+The statement fails:
+
+```text
+Msg 6401: Cannot roll back AfterSecondTransfer. No transaction or savepoint of that name was found.
+```
+
+Rolling back to `AfterFirstTransfer` in Step 4 undid everything after it, **including the savepoint `AfterSecondTransfer`**. That savepoint no longer exists.
+
+Because `XACT_ABORT` is `ON`, the error also rolled back the whole transaction. Check the open transactions:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| OpenTransactionCount |
+|---:|
+| 0 |
+
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 1000.00 |
+| 2 | 500.00 |
+
+Even the first transfer is gone: the error ended the transaction with a full rollback.
 
 ---
 

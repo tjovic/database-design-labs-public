@@ -1469,7 +1469,7 @@ Even the first transfer is gone: the error ended the transaction with a full rol
 
 ## 7.1 IDENTITY values
 
-Create a separate demonstration table:
+**Step 1 – Create a separate demonstration table.**
 
 ```sql
 CREATE TABLE dbo.Note
@@ -1478,31 +1478,90 @@ CREATE TABLE dbo.Note
         CONSTRAINT PK_Note PRIMARY KEY,
     NoteText nvarchar(100) NOT NULL
 );
-GO
+```
 
+**Step 2 – Insert a committed note.**
+
+```sql
 INSERT INTO dbo.Note (NoteText)
 VALUES (N'First committed note');
+```
 
-BEGIN TRANSACTION;
+Check the notes:
 
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'This note will be rolled back');
-
-SELECT NoteID, NoteText
-FROM dbo.Note
-ORDER BY NoteID;
-
-ROLLBACK TRANSACTION;
-
-INSERT INTO dbo.Note (NoteText)
-VALUES (N'Next committed note');
-
+```sql
 SELECT NoteID, NoteText
 FROM dbo.Note
 ORDER BY NoteID;
 ```
 
-On the first run against this newly created table, the final IDs are `1` and `3`. The row with ID `2` was rolled back, but its allocated identity value was consumed.
+| NoteID | NoteText |
+|---:|---|
+| 1 | First committed note |
+
+**Step 3 – Insert a note inside a transaction.**
+
+```sql
+BEGIN TRANSACTION;
+
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'This note will be rolled back');
+```
+
+Check the notes:
+
+```sql
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
+```
+
+| NoteID | NoteText |
+|---:|---|
+| 1 | First committed note |
+| 2 | This note will be rolled back |
+
+**Step 4 – Roll back.**
+
+```sql
+ROLLBACK TRANSACTION;
+```
+
+Check the notes:
+
+```sql
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
+```
+
+| NoteID | NoteText |
+|---:|---|
+| 1 | First committed note |
+
+The row with ID `2` is gone.
+
+**Step 5 – Insert the next committed note.**
+
+```sql
+INSERT INTO dbo.Note (NoteText)
+VALUES (N'Next committed note');
+```
+
+Check the notes:
+
+```sql
+SELECT NoteID, NoteText
+FROM dbo.Note
+ORDER BY NoteID;
+```
+
+| NoteID | NoteText |
+|---:|---|
+| 1 | First committed note |
+| 3 | Next committed note |
+
+The new note gets ID `3`, not `2`. On the first run against this newly created table, the final IDs are `1` and `3`: the row with ID `2` was rolled back, but its allocated identity value was consumed.
 
 `IDENTITY` generates identifiers; it does not guarantee a gap-free sequence. Rollbacks, failed inserts, and other events can leave gaps. Do not use the largest identity value as a row count.
 

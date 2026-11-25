@@ -1801,19 +1801,17 @@ This illustrates **Durability**.
 
 A database normally has many transactions. Their log records can be interleaved in the same log stream.
 
-For example, transaction T1 can begin first, while another transaction T2 finishes first:
+For example, transaction T1 can begin first, while another transaction T2 finishes first. Each transaction has its own row; the columns show the order of the records in the shared log:
 
-| Log order | Transaction | Conceptual record |
-|---|---|---|
-| 1 | T1 | Begin |
-| 2 | T1 | Change A |
-| 3 | T2 | Begin |
-| 4 | T2 | Change another row |
-| 5 | T1 | Change B |
-| 6 | T2 | Commit |
-| 7 | T1 | Commit |
+```text
+Log order      1          2          3          4          5          6          7
+T1             ●──────────●────────────────────────────────●─────────────────────●
+             Begin     Change A                         Change B               Commit
+T2                                   ●──────────●─────────────────────●
+                                   Begin     Change X               Commit
+```
 
-Read the table from top to bottom. T1 begins first, but T2 commits first. The transaction identifier distinguishes their records within one shared log stream.
+T1 begins first, but T2 commits first. Every record carries its transaction's identifier, and it also remembers where the **previous record of the same transaction** is — the lines in the diagram. If T1 had to be rolled back before its commit, SQL Server would follow T1's chain backward, 5 → 2 → 1, and skip T2's records.
 
 This explains two important points:
 

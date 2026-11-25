@@ -1193,9 +1193,65 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-**Steps 1 and 2** – Run Steps 1 and 2 from 6.1 again: start the transaction, make the first transfer, mark the savepoint `AfterFirstTransfer`, and make the second transfer. The balances inside the transaction are `850.00` and `650.00`.
+Steps 1 and 2 are the same as in 6.1; only Step 3 is different.
 
-**Step 3 – Roll back the whole transaction.** This time, roll back with no savepoint name:
+**Step 1 – Start the transaction, make the first transfer, and mark a savepoint.**
+
+```sql
+BEGIN TRANSACTION;
+
+-- First transfer.
+UPDATE dbo.BankAccount
+SET Balance = Balance - 100.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 100.00
+WHERE AccountID = 2;
+
+SAVE TRANSACTION AfterFirstTransfer;
+```
+
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 900.00 |
+| 2 | 600.00 |
+
+**Step 2 – Make the second transfer.**
+
+```sql
+-- Second transfer.
+UPDATE dbo.BankAccount
+SET Balance = Balance - 50.00
+WHERE AccountID = 1;
+
+UPDATE dbo.BankAccount
+SET Balance = Balance + 50.00
+WHERE AccountID = 2;
+```
+
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+```
+
+| AccountID | Balance |
+|---|---:|
+| 1 | 850.00 |
+| 2 | 650.00 |
+
+**Step 3 – Roll back the whole transaction.** This time, use no savepoint name:
 
 ```sql
 ROLLBACK TRANSACTION; -- NEW: full rollback, no savepoint name

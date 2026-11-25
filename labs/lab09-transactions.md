@@ -668,9 +668,9 @@ Compare it with `THROW;` from 3.2: without arguments, `THROW` passes on an error
 >
 > | | `RAISERROR` | `THROW` |
 > |---|---|---|
+> | With `SET XACT_ABORT ON`, outside `TRY/CATCH` | The batch continues and the transaction stays open | The batch ends and the transaction is rolled back |
+> | Pass on the original error in `CATCH` | Not possible: it raises a new error (number `50000`) with a copied message | `THROW;` keeps the original number and message |
 > | Severity | Passed as an argument | Always `16` for a new error |
-> | Pass on the original error in `CATCH` | Not directly | `THROW;` |
-> | `SET XACT_ABORT ON` | Ignored | Rolls back the transaction |
 > | Message text | Can contain placeholders such as `%s` and `%d` | Plain text |
 >
 > Microsoft recommends `THROW` for new code. One trap: the statement **before** `THROW` must end with a semicolon.

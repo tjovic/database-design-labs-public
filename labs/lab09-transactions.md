@@ -478,11 +478,14 @@ flowchart TD
     class RB failed
 ```
 
-Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller.
+Every path ends with the transaction finished: committed on success, rolled back on any error. A failure is always reported to the caller. This is the minimum a correct transaction needs.
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
 ## 3.3 When CATCH never runs: SET XACT_ABORT ON
+
+> [!TIP]
+> **Best practice.** The pattern from 3.2 is already correct for every error that reaches `CATCH`. `SET XACT_ABORT ON` adds protection for the cases that never reach it, such as a cancelled query or a client timeout. Professional code uses it in every procedure with a transaction, and so does the rest of this lab.
 
 In 3.1 and 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 

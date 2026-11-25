@@ -602,7 +602,7 @@ WHERE CityID = 1;
 >
 > However, a check followed by a `DELETE` is not automatically atomic. In a concurrent environment, another session could modify related data between these statements.
 >
-> Section 6.2 returns to this problem, and Labs 9 and 10 show how transactions solve it.
+> Section 6.2 returns to this problem, and Labs 9 and 10 show how transactions and isolation levels solve it.
 
 ### What does the business rule actually add?
 

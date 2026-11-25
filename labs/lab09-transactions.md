@@ -163,11 +163,27 @@ The bank has just created `600.00` out of nothing. The credit succeeded and was 
 
 **Handling an error does not automatically make several statements atomic.**
 
-## 1.4 Autocommit and explicit transactions
+## 1.4 ACID: four promises of a transaction
+
+What went wrong in 1.3 has a name. A reliable transaction makes four promises, known by the acronym **ACID**:
+
+| Property | Promise | In our example | Where in this lab |
+|---|---|---|---|
+| **Atomicity** | All changes are kept together or undone together | The credit and the debit form one operation | Sections 2, 3, and 5 |
+| **Consistency** | A transaction takes the database from one valid state to another | Balances stay non-negative; a transfer preserves the total | Section 4 |
+| **Isolation** | Concurrent transactions do not interfere with each other | Two simultaneous transfers from the same account | Lab 10 |
+| **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Section 10 |
+
+Block 1.3 broke **atomicity**: half of the transfer stayed. That broke **consistency** as well: the total changed from `1500.00` to `2100.00`.
+
+> [!IMPORTANT]
+> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements succeed and the transaction commits them. Consistency depends on correct constraints and business logic, not only on transaction boundaries.
+
+## 1.5 Autocommit and explicit transactions
 
 In the normal **autocommit** mode, each individual SQL statement runs as its own transaction. One `UPDATE` affecting many rows is therefore already one unit of work: if it fails, SQL Server undoes that whole statement.
 
-Our problem is different: the transfer contains **two separate statements**, so autocommit gives it two separate transactions.
+Why did atomicity break in 1.3? The transfer contains **two separate statements**, so autocommit gives it two separate transactions.
 
 ```mermaid
 flowchart TD
@@ -192,28 +208,14 @@ flowchart TD
     class E4 right
 ```
 
-The diagram shows the same two statements under autocommit (what you just ran) and inside one explicit transaction (Sections 2 and 3). Green means committed and red means failed. The bordered box is the final state: wrong (red) or correct (green).
+The diagram shows the same two statements under autocommit (what you ran in 1.3) and inside one explicit transaction (Sections 2 and 3). Green means committed and red means failed. The bordered box is the final state: wrong (red) or correct (green).
 
 | Mode | Transaction boundary | Typical use |
 |---|---|---|
 | Autocommit | One statement | A single independent change |
 | Explicit transaction | Several statements, grouped under your control | Several changes that belong together |
 
-## 1.5 ACID: four promises of a transaction
-
-What went wrong in 1.3 has a name. A reliable transaction makes four promises, known by the acronym **ACID**:
-
-| Property | Promise | In our example | Where in this lab |
-|---|---|---|---|
-| **Atomicity** | All changes are kept together or undone together | The credit and the debit form one operation | Sections 2, 3, and 5 |
-| **Consistency** | A transaction takes the database from one valid state to another | Balances stay non-negative; a transfer preserves the total | Section 4 |
-| **Isolation** | Concurrent transactions do not interfere with each other | Two simultaneous transfers from the same account | Lab 10 |
-| **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Section 10 |
-
-Block 1.3 broke **atomicity**: half of the transfer stayed. That broke **consistency** as well: the total changed from `1500.00` to `2100.00`.
-
-> [!IMPORTANT]
-> A transaction does not know your business rules. If your code subtracts `200.00` and adds only `100.00`, both statements succeed and the transaction commits them. Consistency depends on correct constraints and business logic, not only on transaction boundaries.
+Section 2 shows how to group the two statements of the transfer into one explicit transaction.
 
 **Check your understanding**
 
@@ -351,27 +353,9 @@ Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs c
 
 [Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
 
-## 3.1 A first attempt: TRY/CATCH with ROLLBACK
+## 3.1 TRY/CATCH with ROLLBACK
 
-Put the operation inside a transaction, and roll the transaction back if any statement fails:
-
-```sql
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    -- Execute all statements belonging to the operation.
-
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-END CATCH;
-```
-
-`@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). In the examples of this section the count in `CATCH` is always `1`. The check matters when something has already ended the transaction before `CATCH` runs — you will see such a case in 9.4. A `ROLLBACK` without an open transaction would raise a second error and hide the original one.
-
-## 3.2 Repeat the failing transfer with protection
+Put the operation inside a transaction, and roll the transaction back if any statement fails.
 
 Reset the balances:
 
@@ -385,11 +369,11 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-Then run the `600.00` transfer from 1.3 again, this time inside the pattern:
+Then run the `600.00` transfer from 1.3 again. Compared with 1.3, the two `UPDATE`s and the `TRY/CATCH` are the same; what is new is the transaction around the `UPDATE`s (Section 2) and the rollback in `CATCH`:
 
 ```sql
 BEGIN TRY
-    BEGIN TRANSACTION;
+    BEGIN TRANSACTION; -- NEW: start one transaction for both statements
 
     UPDATE dbo.BankAccount
     SET Balance = Balance + 600.00
@@ -399,11 +383,11 @@ BEGIN TRY
     SET Balance = Balance - 600.00
     WHERE AccountID = 2;
 
-    COMMIT TRANSACTION;
+    COMMIT TRANSACTION; -- NEW: confirm both changes
 END TRY
 BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
+    IF @@TRANCOUNT > 0          -- NEW: is a transaction still open?
+        ROLLBACK TRANSACTION;   -- NEW: undo both changes
 END CATCH;
 
 SELECT AccountID, AccountName, Balance
@@ -411,17 +395,19 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
+`@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). In the examples of this section the count in `CATCH` is always `1`. The check matters when something has already ended the transaction before `CATCH` runs — you will see such a case in 9.4. A `ROLLBACK` without an open transaction would raise a second error and hide the original one.
+
 The balances are `1000.00` and `500.00`. The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created: the **data** is correct.
 
 But look at the *Messages* tab: there is **no error**. SSMS reports that the query completed successfully. The `CATCH` block handled the error and kept it to itself.
 
 The transfer did not happen, yet whoever started it is told that it did. Here you can see the balances, so no harm is done. The caller of a procedure, however — an application or another procedure — sees only whether an error came back. An application would tell the user *"Transfer completed"* for a transfer that never happened.
 
-## 3.3 THROW: tell the caller
+## 3.2 THROW: tell the caller
 
 `THROW;` without arguments, placed inside `CATCH`, passes the original error on to the caller, with its original number and message. [Lab 7](lab07-crud-operations.md) met a weaker form of the same problem: a return code tells the caller *that* something failed, but not *what*.
 
-The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again. The block is the same as in 3.2, except for one new line, `THROW;`, after the rollback. The verification `SELECT` is no longer part of the block (see below):
+The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again. The block is the same as in 3.1, except for one new line, `THROW;`, after the rollback. The verification `SELECT` is no longer part of the block (see below):
 
 ```sql
 BEGIN TRY
@@ -496,9 +482,9 @@ Every path ends with the transaction finished: committed on success, rolled back
 
 The pattern assumes that this block owns the whole operation. Section 9 explains how an outer transaction changes that responsibility.
 
-## 3.4 When CATCH never runs: SET XACT_ABORT ON
+## 3.3 When CATCH never runs: SET XACT_ABORT ON
 
-In 3.2 and 3.3, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
+In 3.1 and 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
 Run this block and, during the 20-second wait, click **Cancel Executing Query** in SSMS (or press `Alt+Break`). If the block finishes before you cancel, simply run it again:
 
@@ -590,16 +576,16 @@ This time the result is `0`: SQL Server rolled back the debit itself, even thoug
 
 **Check your understanding**
 
-1. In 3.2, the balances were correct. What was still wrong, and which statement fixes it?
+1. In 3.1, the balances were correct. What was still wrong, and which statement fixes it?
 2. Why must `ROLLBACK` come before `THROW` in the `CATCH` block?
-3. After the cancelled query in 3.4, `@@TRANCOUNT` was `1`. Why did `CATCH` not roll the transaction back?
+3. After the cancelled query in 3.3, `@@TRANCOUNT` was `1`. Why did `CATCH` not roll the transaction back?
 4. With `SET XACT_ABORT ON`, why does the pattern still need its own `ROLLBACK` in `CATCH`?
 
 <details>
 <summary>Show answers</summary>
 
 1. The caller received no error, so it would report a transfer that never happened. `THROW;` passes the error on to the caller.
-2. `THROW` ends the batch, so a `ROLLBACK` placed after it would never run. In 3.3, without `XACT_ABORT`, the transaction would stay open.
+2. `THROW` ends the batch, so a `ROLLBACK` placed after it would never run. In 3.2, without `XACT_ABORT`, the transaction would stay open.
 3. The client stopped the batch. No T-SQL code ran after that point, `CATCH` included.
 4. When `CATCH` runs, the transaction is still open; it just can no longer be committed. `CATCH` must roll it back before reporting the error.
 
@@ -675,7 +661,7 @@ THROW 50001, 'Source account does not exist.', 1;
 | Message | Explanation for the caller |
 | `1` | State value, which can help identify where an error was raised |
 
-Compare it with `THROW;` from 3.3: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
+Compare it with `THROW;` from 3.2: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
 
 > [!NOTE]
 > **THROW vs RAISERROR.** You will meet `RAISERROR` in older code (and in the Additional Reading of [Lab 4](lab04-functions.md)). Both statements raise an error, but they differ:
@@ -744,6 +730,16 @@ ORDER BY AccountID;
 The balances are `1000.00` and `500.00`: the custom error sent the transaction into `CATCH`, which rolled back the debit.
 
 Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other statements can change or reset its value.
+
+> [!NOTE]
+> **Why not check with `IF EXISTS` first?** A check before the `UPDATE` looks simpler:
+>
+> ```sql
+> IF NOT EXISTS (SELECT 1 FROM dbo.BankAccount WHERE AccountID = 999)
+>     THROW 50002, 'Destination account does not exist.', 1;
+> ```
+>
+> [Lab 7](lab07-crud-operations.md) used such checks to choose a return code, and warned that a check and the following change are not atomic. For a missing account, this usually works — but it costs an extra read, while `@@ROWCOUNT` only looks at the result of the `UPDATE` you run anyway. For a **balance**, a check in advance is not safe: between the check and the `UPDATE`, another session can withdraw money from the same account, so the decision rests on an old value ([Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers)). That is why 4.3 checks the balance inside the `UPDATE` itself.
 
 ## 4.3 Detect insufficient funds in the update
 
@@ -1614,7 +1610,7 @@ The third approach is discussed briefly in Additional Reading. It is not require
 
 # Section 10 – How SQL Server Keeps A and D: the Transaction Log
 
-Sections 1–9 relied on two of the ACID promises from 1.5: **atomicity** (`ROLLBACK` undoes everything) and **durability** (`COMMIT` is permanent). This section explains how SQL Server keeps them, even if the server stops unexpectedly. Nothing here changes how you write a transaction.
+Sections 1–9 relied on two of the ACID promises from 1.4: **atomicity** (`ROLLBACK` undoes everything) and **durability** (`COMMIT` is permanent). This section explains how SQL Server keeps them, even if the server stops unexpectedly. Nothing here changes how you write a transaction.
 
 The section builds on the data pages and buffer pool from Lab 5. It uses a **simplified model**: the real log format and recovery algorithm contain more detail, but they follow the same rules. Sections 10.1–10.5 are the core ideas; 10.6–10.9 go further into recovery.
 

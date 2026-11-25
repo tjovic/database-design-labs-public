@@ -6,8 +6,8 @@ Every lab so far has been about building a database — tables, procedures, inde
 
 This lab answers two kinds of questions:
 
-- **Part I – Advanced grouping.** A report with subtotals for every category and a grand total at the bottom. Writing that in plain SQL usually means several queries glued together with `UNION`. Three extensions to `GROUP BY` produce that shape in a single query.
-- **Part II – Window functions.** Every product **and** its category's total on the same row, a ranking, or a running total that updates on every row. `GROUP BY` cannot do this, because it collapses the rows. A window function aggregates **without collapsing them**.
+- **Part A – Advanced grouping.** A report with subtotals for every category and a grand total at the bottom. Writing that in plain SQL usually means several queries glued together with `UNION`. Three extensions to `GROUP BY` produce that shape in a single query.
+- **Part B – Window functions.** Every product **and** its category's total on the same row, a ranking, or a running total that updates on every row. `GROUP BY` cannot do this, because it collapses the rows. A window function aggregates **without collapsing them**.
 
 > [!IMPORTANT]
 > **Core idea:** `GROUP BY` collapses rows into groups. `ROLLUP`, `CUBE`, and `GROUPING SETS` run several `GROUP BY`s at once and stack the results. A window function, `OVER (PARTITION BY ... ORDER BY ...)`, keeps every row and adds a column that summarizes the rows around it.
@@ -34,7 +34,7 @@ After completing this lab, you should be able to:
 
 ---
 
-# Part I – Advanced Grouping
+# Part A – Advanced Grouping
 
 # Section 1 – The Problem: A Report with Subtotals
 
@@ -508,9 +508,9 @@ Now the report is unambiguous: rows labeled `(no color)` are real data `NULL`s; 
 
 ---
 
-# Part II – Window Functions
+# Part B – Window Functions
 
-Part I produced subtotals and grand totals in one query — but every one of `ROLLUP`, `CUBE`, and `GROUPING SETS` *collapses* rows. Each group becomes one output row; the detail is gone. That's fine for a report. It's no help when you want to see every product **and** its category's total on the same row, or rank rows without losing the rows themselves, or compute a running total that updates on every row.
+Part A produced subtotals and grand totals in one query — but every one of `ROLLUP`, `CUBE`, and `GROUPING SETS` *collapses* rows. Each group becomes one output row; the detail is gone. That's fine for a report. It's no help when you want to see every product **and** its category's total on the same row, or rank rows without losing the rows themselves, or compute a running total that updates on every row.
 
 The tool built for exactly that is the window function. It aggregates across a set of rows **without collapsing them**.
 
@@ -683,7 +683,7 @@ Adding `PARTITION BY p.Color` makes `RankInColor` restart at `1` for every new c
 
 ## 7.4 Ranking the result of a GROUP BY
 
-Back to the report from Part I: which city earns the most in each country? The query needs one row per city, so it uses `GROUP BY`, and then ranks those city rows within each country:
+Back to the report from Part A: which city earns the most in each country? The query needs one row per city, so it uses `GROUP BY`, and then ranks those city rows within each country:
 
 ```sql
 SELECT

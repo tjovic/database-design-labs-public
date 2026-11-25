@@ -46,6 +46,12 @@ GO
 
 ---
 
+# Part A – Reading data through Views
+
+Sections 1–5 use Views to read data: to simplify queries, hide complexity, and give applications a stable interface.
+
+---
+
 # Section 1 – Why Views exist
 
 Views become useful when queries grow longer, more repetitive, or harder to read.
@@ -932,7 +938,7 @@ This is useful when working with SQL Server metadata.
 
 ---
 
-# Part II – Modifying data through Views
+# Part B – Modifying data through Views
 
 So far, Views have mainly been used for reading data, simplifying queries, hiding complexity, and providing an interface over the underlying database.
 

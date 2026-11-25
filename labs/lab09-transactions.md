@@ -731,11 +731,16 @@ Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other s
 > **Why not check with `IF EXISTS` first?** A check before the `UPDATE` looks simpler:
 >
 > ```sql
-> IF NOT EXISTS (SELECT 1 FROM dbo.BankAccount WHERE AccountID = 999)
+> IF NOT EXISTS
+> (
+>     SELECT 1
+>     FROM dbo.BankAccount
+>     WHERE AccountID = 999
+> )
 >     THROW 50002, 'Destination account does not exist.', 1;
 > ```
 >
-> [Lab 7](lab07-crud-operations.md) used such checks to choose a return code, and warned that a check and the following change are not atomic. For a missing account, this usually works — but it costs an extra read, while `@@ROWCOUNT` only looks at the result of the `UPDATE` you run anyway. For a **balance**, a check in advance is not safe: between the check and the `UPDATE`, another session can withdraw money from the same account, so the decision rests on an old value ([Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers)). That is why 4.3 checks the balance inside the `UPDATE` itself.
+> [Lab 7](lab07-crud-operations.md) used such checks to choose a return code, and warned that a check and the following change are not atomic. For a missing account, this usually works, because accounts are rarely deleted — but it costs an extra read, while `@@ROWCOUNT` only looks at the result of the `UPDATE` you run anyway. For a balance, which changes all the time, the gap between the check and the change matters, as 4.3 shows.
 
 ## 4.3 Detect insufficient funds in the update
 
@@ -761,7 +766,7 @@ WHERE AccountID = 1;
 ```
 
 > [!WARNING]
-> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. Here, the `CHECK` constraint from 1.1 would still stop a negative balance — but only with a technical constraint error, and only because the business rule happens to be "never below zero". A rule such as an allowed overdraft would not be protected at all. See the note in 4.2 and [Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers).
+> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. Here, the `CHECK` constraint from 1.1 would still stop a negative balance — but only with a technical constraint error, and only because the business rule happens to be "never below zero". A rule such as an allowed overdraft would not be protected at all ([Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers)).
 
 Instead, put the same condition into the update itself:
 
@@ -779,7 +784,7 @@ IF @@ROWCOUNT <> 1
 
 Account A has less than `2000.00`, so no row is changed and the custom error is raised.
 
-The `CHECK` constraint from 1.1 would also stop a negative balance, but only with a technical constraint error. The condition in the `WHERE` clause turns the situation into a clear business error, `50001`, that the caller can understand, and the rule no longer depends on the constraint existing.
+The check and the debit are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50001`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
 
 This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
 

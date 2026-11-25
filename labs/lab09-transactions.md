@@ -753,6 +753,8 @@ IF NOT EXISTS
 )
     THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
 
+-- ⚠ GAP: another session can withdraw money from account 1 here
+
 UPDATE dbo.BankAccount
 SET Balance = Balance - @Amount
 WHERE AccountID = 1;

@@ -1573,8 +1573,7 @@ BEGIN
     )
     BEGIN
         ROLLBACK TRANSACTION;
-        RAISERROR('CardNumber failed the Luhn checksum.', 16, 1);
-        RETURN;
+        THROW 50001, 'CardNumber failed the Luhn checksum.', 1;
     END;
 END;
 GO
@@ -1583,11 +1582,11 @@ GO
 > [!NOTE]
 > An `AFTER` trigger runs after the data modification. Here,
 > `ROLLBACK TRANSACTION` undoes the **entire current transaction**,
-> including any earlier changes within it; `RAISERROR` reports the failure.
+> including any earlier changes within it; `THROW` reports the failure to the caller.
 > In autocommit mode, the transaction covers the triggering statement.
 > These statements are one way to reject the change. Error handling with
 > `TRY/CATCH` is covered in [Lab 7](lab07-crud-operations.md);
-> `THROW` is covered in Lab 9.
+> Lab 9 explains `THROW` in detail.
 
 Test a valid insert, then an invalid one:
 

@@ -666,17 +666,10 @@ THROW 50001, 'Source account does not exist.', 1;
 
 Compare it with `THROW;` from 3.2: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
 
+One trap: the statement **before** `THROW` must end with a semicolon.
+
 > [!NOTE]
-> **THROW vs RAISERROR.** You will meet `RAISERROR` in older code (and in the Additional Reading of [Lab 4](lab04-functions.md)). Both statements raise an error, but they differ:
->
-> | | `RAISERROR` | `THROW` |
-> |---|---|---|
-> | With `SET XACT_ABORT ON`, outside `TRY/CATCH` | The batch continues and the transaction stays open | The batch ends and the transaction is rolled back |
-> | Pass on the original error in `CATCH` | Not possible: it raises a new error (number `50000`) with a copied message | `THROW;` keeps the original number and message |
-> | Severity | Passed as an argument | Always `16` for a new error |
-> | Message text | Can contain placeholders such as `%s` and `%d` | Plain text |
->
-> Microsoft recommends `THROW` for new code. One trap: the statement **before** `THROW` must end with a semicolon.
+> You may meet `RAISERROR` in older code. It also raises an error, but Microsoft recommends `THROW` for new code. One difference matters for transactions: `RAISERROR` ignores `SET XACT_ABORT ON` (3.3), so the transaction stays open.
 
 Reset the balances:
 

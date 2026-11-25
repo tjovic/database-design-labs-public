@@ -1486,7 +1486,7 @@ The `EXISTS` condition finds that at least one row has a salary outside the allo
 1. The allowed range depends on the employee's `Area`, and that mapping is stored in another table, so the trigger must look it up per row instead of hardcoding a value.
 2. Yes. `EXISTS` only needs one matching row among everything in `inserted` to trigger the warning.
 3. `EXISTS` stops as soon as it finds one row outside the allowed range; it does not need to process every row individually like a scalar check would.
-4. No. A real system would normally reject the change (for example, with `ROLLBACK` or `RAISERROR`) or log it properly instead of only printing a message.
+4. No. A real system would normally reject the change (for example, with `ROLLBACK` and `THROW`) or log it properly instead of only printing a message.
 
 </details>
 

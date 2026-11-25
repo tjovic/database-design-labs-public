@@ -2,7 +2,7 @@
 
 **Databases:** `AdventureWorksENG` (Part A), `TransactionsLab` (Part B)
 
-These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–8) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 9–14) continues in the lab's own `TransactionsLab` database.
+These exercises build on [Lab 9 – Transactions](../labs/lab09-transactions.md). **Part A** (Exercises 1–8) applies explicit transactions, savepoints, and transaction ownership between a caller and a procedure to real `AdventureWorksENG` tables. **Part B** (Exercises 9–13) continues in the lab's own `TransactionsLab` database, and Exercise 14 returns to `AdventureWorksENG` to add a transaction to the invoice procedure from Lab 8.
 
 Part A inserts its own, clearly tagged rows; no existing `AdventureWorksENG` data is changed or removed. Unlike most other collections, each Part A solution ends with a short cleanup that deletes its test rows and procedure, because the exercises compare row counts and the next exercise expects to start from zero. Part B changes the fictional account balances and notes in `TransactionsLab`.
 
@@ -806,7 +806,7 @@ The procedure returned without an error and ran `COMMIT TRANSACTION`, but that c
 
 # Part B – `TransactionsLab`
 
-Exercises 9–14 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
+Exercises 9–13 continue in the fictional `TransactionsLab` database from [Lab 9](../labs/lab09-transactions.md). They use the objects the lab creates: the `dbo.BankAccount` table (Section 1.1), the `dbo.Note` table (Section 7.1), and the `dbo.usp_TransferFunds` procedure (Section 5). Do them after Lab 9, in the same database.
 
 > [!IMPORTANT]
 > Start each exercise with `@@TRANCOUNT = 0`. Every transaction you start must end with `COMMIT` or a full `ROLLBACK`.
@@ -1270,60 +1270,174 @@ This demonstration intentionally resets balances between tests, so the history t
 
 ---
 
-## Exercise 14 — Connect transactions to Lab 8 [INTERMEDIATE]
+## Exercise 14 — Finish what Lab 8 started [INTERMEDIATE]
 
-In Lab 8, one procedure inserted a parent row and related child rows from structured input.
+**Database:** `AdventureWorksENG`, with `dbo.usp_InvoiceInsertFromXml` from [Lab 8, Section 4.4](../labs/lab08-complex-parameters.md#44-inserting-a-parent-and-its-children).
 
-Without changing its original code yet, explain:
+Lab 8 ended Section 4.4 with a warning: if inserting the items fails, the invoice header remains in the database. Now you can fix that.
 
-1. Why does passing all input in one call not guarantee atomicity?
-2. Where should `BEGIN TRANSACTION` and `COMMIT` go?
-3. What should happen if inserting a child row fails after the parent was inserted?
-4. Should JSON/XML parsing and basic input validation always happen inside the transaction?
-5. If a generated parent identity is rolled back, must the next insert reuse it?
+**(a) See the problem.** Call the Lab 8 procedure with an invoice whose third item refers to product `9999`, which does not exist. Predict what remains in the database, then check:
+
+```sql
+EXEC dbo.usp_InvoiceInsertFromXml
+    @Invoice = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TX-001">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="9999" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
+```
+
+```sql
+SELECT i.InvoiceNumber, COUNT(ii.IDInvoiceItem) AS Items
+FROM Invoice AS i
+LEFT JOIN InvoiceItem AS ii ON ii.InvoiceID = i.IDInvoice
+WHERE i.InvoiceNumber LIKE N'SO-TX-%'
+GROUP BY i.InvoiceNumber
+ORDER BY i.InvoiceNumber;
+```
+
+**(b) Fix it.** Change `dbo.usp_InvoiceInsertFromXml` so that the header and all items are kept or undone together, and the caller still receives the error.
+
+**(c) Test the fix.** Call the changed procedure twice: once with the same bad item (invoice `SO-TX-002`), and once with three valid items (invoice `SO-TX-003`, third product `3`). Run the check query again.
+
+**(d)** Should the XML be read before the transaction starts, or inside it? And when the insert of `SO-TX-002` is rolled back, will the next invoice reuse its `IDInvoice`?
 
 <details>
 <summary>Hint</summary>
 
-- Think about which statements must succeed or fail together, and which work does not depend on the database at all.
+- (a) Each `INSERT` in the Lab 8 procedure is its own autocommit transaction (Lab 9, 1.5).
+- (b) Use the complete pattern from Lab 9, Section 3: `SET XACT_ABORT ON`, `TRY/CATCH`, one transaction, `ROLLBACK` and `THROW;` in `CATCH`.
+- (d) Lab 9, Section 7 is about what `ROLLBACK` does not undo.
 
 </details>
 
 <details>
 <summary>Solution</summary>
 
-1. One call can contain several independently committed statements unless a transaction groups them.
-2. The transaction must cover all related writes: the parent insert and all child inserts. Commit only after every required write and check succeeds.
-3. The complete operation should be rolled back, including the parent insert.
-4. Independent parsing and basic input validation can often be done before opening the transaction. Checks that depend on database state must be designed together with the writes and concurrency requirements.
-5. No. Rolled-back inserts can consume identity values.
+**(a)** The procedure fails with error 547 (`FK_InvoiceItem_Product`), but the header stays:
 
-The following is a **structural outline**, not an executable replacement for a tested Lab 8 procedure:
+| InvoiceNumber | Items |
+|---|---:|
+| SO-TX-001 | 0 |
+
+The header `INSERT` succeeded and was committed on its own. The items `INSERT` failed as a whole, so even the two valid items were not inserted: one statement is already atomic. The result is an invoice without items.
+
+**(b)**
 
 ```sql
--- Validate and parse the input where appropriate.
+CREATE OR ALTER PROCEDURE dbo.usp_InvoiceInsertFromXml
+    @Invoice xml
+AS
+BEGIN
+    SET XACT_ABORT ON; -- NEW
 
-SET XACT_ABORT ON;
+    BEGIN TRY
+        BEGIN TRANSACTION; -- NEW: header and items together
 
-BEGIN TRY
-    BEGIN TRANSACTION;
+        DECLARE @NewInvoiceID int;
 
-    -- Insert the parent.
-    -- Capture its ID with SCOPE_IDENTITY() or OUTPUT INSERTED.
-    -- Insert all children using that parent ID.
-    -- Check any required business conditions.
+        -- Insert the invoice header
+        INSERT INTO Invoice (CustomerID, InvoiceDate, InvoiceNumber)
+        SELECT
+            tbl.col.value('@CustomerID', 'int'),
+            tbl.col.value('@InvoiceDate', 'date'),
+            tbl.col.value('@InvoiceNumber', 'nvarchar(20)')
+        FROM @Invoice.nodes('/Invoice') AS tbl(col);
 
-    COMMIT TRANSACTION;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
+        -- Get the generated invoice ID
+        SET @NewInvoiceID = SCOPE_IDENTITY();
 
-    THROW;
-END CATCH;
+        -- Insert all invoice items
+        INSERT INTO InvoiceItem
+        (
+            InvoiceID,
+            ProductID,
+            Quantity,
+            InitialPrice,
+            Discount,
+            TotalPrice
+        )
+        SELECT
+            @NewInvoiceID,
+            ProductID,
+            Quantity,
+            UnitPrice,
+            0,
+            Quantity * UnitPrice
+        FROM
+        (
+            SELECT
+                tbl.col.value('@ProductID', 'int') AS ProductID,
+                tbl.col.value('@Quantity', 'int') AS Quantity,
+                tbl.col.value('@UnitPrice', 'money') AS UnitPrice
+            FROM @Invoice.nodes('/Invoice/Lines/Line') AS tbl(col)
+        ) AS lines;
+
+        COMMIT TRANSACTION; -- NEW
+    END TRY
+    BEGIN CATCH -- NEW
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH;
+END;
+GO
 ```
 
-Preserve the tested table names, column names, and insert logic from Lab 8 when applying this structure to that database.
+The two `INSERT` statements are the same as in Lab 8; only the transaction pattern around them is new.
+
+**(c)**
+
+```sql
+EXEC dbo.usp_InvoiceInsertFromXml
+    @Invoice = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TX-002">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="9999" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
+```
+
+```sql
+EXEC dbo.usp_InvoiceInsertFromXml
+    @Invoice = N'
+<Invoice CustomerID="5" InvoiceDate="2026-11-04" InvoiceNumber="SO-TX-003">
+    <Lines>
+        <Line ProductID="1" Quantity="2" UnitPrice="199.00" />
+        <Line ProductID="2" Quantity="1" UnitPrice="49.90" />
+        <Line ProductID="3" Quantity="5" UnitPrice="9.99" />
+    </Lines>
+</Invoice>';
+```
+
+The first call fails with error 547 again; the second succeeds. The check query now returns:
+
+| InvoiceNumber | Items |
+|---|---:|
+| SO-TX-001 | 0 |
+| SO-TX-003 | 3 |
+
+`SO-TX-002` is gone completely: the rollback undid its header together with the failed items. `SO-TX-001` is still the leftover from (a).
+
+**(d)** Reading the XML does not change the database, so it could happen before the transaction. Here it is part of the `INSERT ... SELECT` statements, which is fine: the transaction is short either way. The `IDInvoice` of `SO-TX-002` is **not** reused: a rollback does not return identity values (Lab 9, Section 7), so the invoice IDs have a gap.
+
+Clean up the test rows:
+
+```sql
+DELETE ii
+FROM InvoiceItem AS ii
+JOIN Invoice AS i ON i.IDInvoice = ii.InvoiceID
+WHERE i.InvoiceNumber LIKE N'SO-TX-%';
+
+DELETE FROM Invoice
+WHERE InvoiceNumber LIKE N'SO-TX-%';
+```
 
 </details>
 

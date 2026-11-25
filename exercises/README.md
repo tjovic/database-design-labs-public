@@ -103,9 +103,10 @@ The transaction collection is in [Transaction Exercises](lab09-transactions.md) 
 6. **Extend a card, or say why not** — a procedure checks `@@ROWCOUNT`, because an `UPDATE` of a missing row is not an error.
 7. **Merge two cities** — two dependent changes, all or nothing, with checks before and after the changes.
 8. **Outer transaction vs. inner commit** — an outer transaction rolls back after a called procedure already ran its own `COMMIT`, showing that no nested commit is final until the outermost one runs.
-9. **`TransactionsLab` practice (Exercises 9–14)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, extend it with a history record, and plan a transaction for a Lab 8 procedure.
+9. **`TransactionsLab` practice (Exercises 9–13)** — predict `COMMIT` and `ROLLBACK`, use savepoints, test the lab's transfer procedure, and extend it with a history record.
+10. **Finish what Lab 8 started (Exercise 14)** — add a transaction to Lab 8's XML invoice procedure so that a failed item also undoes the invoice header.
 
-Part A (Exercises 1–8) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted test rows so they can be counted and removed precisely. Part B (Exercises 9–14) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates.
+Part A (Exercises 1–8) applies the concepts to real `AdventureWorksENG` data — deleting `State` rows referenced by `City` through a real foreign key, and tagging inserted test rows so they can be counted and removed precisely. Part B (Exercises 9–13) continues in Lab 9's `TransactionsLab` database with its fictional bank accounts and relies on the objects the lab creates; Exercise 14 returns to `AdventureWorksENG` and Lab 8's invoice procedure.
 
 ### Concurrency
 

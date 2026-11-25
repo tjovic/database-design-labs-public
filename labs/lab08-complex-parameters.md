@@ -899,7 +899,7 @@ WHERE i.InvoiceNumber = N'SO-TEST-001';
 
 The procedure inserts one invoice header and three related items in a single call.
 
-As noted in Section 1.2, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction.
+As noted in Section 1.2, if inserting the items fails, the invoice header remains in the database; Lab 9 fixes this with a transaction ([Lab 9 exercises, Exercise 14](../exercises/lab09-transactions.md#exercise-14--finish-what-lab-8-started-intermediate)).
 
 ## 4.5 Reading Element Text
 

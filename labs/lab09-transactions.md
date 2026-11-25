@@ -1193,48 +1193,38 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-The block is the same as in 6.1, except for the end: instead of rolling back to the savepoint and committing, it performs one **full** rollback:
+**Steps 1 and 2** – Run Steps 1 and 2 from 6.1 again: start the transaction, make the first transfer, mark the savepoint `AfterFirstTransfer`, and make the second transfer. The balances inside the transaction are `850.00` and `650.00`.
+
+**Step 3 – Roll back the whole transaction.** This time, roll back with no savepoint name:
 
 ```sql
-BEGIN TRANSACTION;
-
--- First transfer.
-UPDATE dbo.BankAccount
-SET Balance = Balance - 100.00
-WHERE AccountID = 1;
-
-UPDATE dbo.BankAccount
-SET Balance = Balance + 100.00
-WHERE AccountID = 2;
-
-SAVE TRANSACTION AfterFirstTransfer;
-
--- Second transfer.
-UPDATE dbo.BankAccount
-SET Balance = Balance - 50.00
-WHERE AccountID = 1;
-
-UPDATE dbo.BankAccount
-SET Balance = Balance + 50.00
-WHERE AccountID = 2;
-
-SELECT AccountID, Balance AS BeforeFullRollback
-FROM dbo.BankAccount
-ORDER BY AccountID;
-
 ROLLBACK TRANSACTION; -- NEW: full rollback, no savepoint name
+```
 
-SELECT AccountID, Balance AS AfterFullRollback
+Check the balances:
+
+```sql
+SELECT AccountID, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-| Point | Account A | Account B |
-|---|---:|---:|
-| Initial state | 1000.00 | 500.00 |
-| After first transfer | 900.00 | 600.00 |
-| After second transfer | 850.00 | 650.00 |
-| After full rollback | 1000.00 | 500.00 |
+| AccountID | Balance |
+|---|---:|
+| 1 | 1000.00 |
+| 2 | 500.00 |
+
+Check the open transactions:
+
+```sql
+SELECT @@TRANCOUNT AS OpenTransactionCount;
+```
+
+| OpenTransactionCount |
+|---:|
+| 0 |
+
+Both transfers are gone, and the transaction is over.
 
 Compare this with 6.1: there, `ROLLBACK TRANSACTION AfterFirstTransfer` undid only the second transfer, and the subsequent `COMMIT` kept the first one. Here, `ROLLBACK TRANSACTION` with no savepoint name is a **full** rollback: it undoes everything in the transaction, including the work recorded before the savepoint existed.
 

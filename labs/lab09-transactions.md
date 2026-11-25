@@ -759,7 +759,7 @@ WHERE AccountID = 1;
 ```
 
 > [!WARNING]
-> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. See the note in 4.2 and [Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers).
+> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. Here, the `CHECK` constraint from 1.1 would still stop a negative balance — but only with a technical constraint error, and only because the business rule happens to be "never below zero". A rule such as an allowed overdraft would not be protected at all. See the note in 4.2 and [Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers).
 
 Instead, put the same condition into the update itself:
 

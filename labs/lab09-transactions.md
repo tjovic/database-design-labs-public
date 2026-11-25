@@ -655,14 +655,16 @@ The second `UPDATE` is valid SQL. It found no row with `AccountID = 999`, so it 
 When the count is wrong, SQL Server sees no error, so we must raise one ourselves. `THROW` with arguments creates a **new** error:
 
 ```sql
-THROW 50001, 'Source account does not exist.', 1;
+THROW 50013, 'Source account does not exist.', 1;
 ```
 
 | Argument | Meaning |
 |---|---|
-| `50001` | Application error number; user-defined numbers start at `50000` |
+| `50013` | Application error number; user-defined numbers start at `50000` |
 | Message | Explanation for the caller |
 | `1` | State value, which can help identify where an error was raised |
+
+You choose the number yourself. Any number from `50000` up is free for your application; SQL Server does not check or register it. The convention is simple: give each **kind** of error its own number, use it everywhere that error can happen, and document the list. The caller can then read the number with `ERROR_NUMBER()` and react to it (5.5). This lab groups the numbers by procedure: `50010`–`50014` for the transfer procedure in Section 5, which reuses the numbers from this section, and `50020`–`50021` for the procedure in Section 9.
 
 Compare it with `THROW;` from 3.2: without arguments, `THROW` passes on an error that already happened; with arguments, it raises a new one.
 
@@ -696,14 +698,14 @@ BEGIN TRY
     WHERE AccountID = 1;
 
     IF @@ROWCOUNT <> 1 -- NEW: zero rows means the source does not exist
-        THROW 50001, 'Source account does not exist.', 1;
+        THROW 50013, 'Source account does not exist.', 1;
 
     UPDATE dbo.BankAccount
     SET Balance = Balance + 200.00
     WHERE AccountID = 999;
 
     IF @@ROWCOUNT <> 1 -- NEW: zero rows means the destination does not exist
-        THROW 50002, 'Destination account does not exist.', 1;
+        THROW 50014, 'Destination account does not exist.', 1;
 
     COMMIT TRANSACTION;
 END TRY
@@ -715,7 +717,7 @@ BEGIN CATCH
 END CATCH;
 ```
 
-The first check passes, because Account A exists. The second one raises error `50002`. Check the balances:
+The first check passes, because Account A exists. The second one raises error `50014`. Check the balances:
 
 ```sql
 SELECT AccountID, AccountName, Balance
@@ -737,7 +739,7 @@ Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other s
 >     FROM dbo.BankAccount
 >     WHERE AccountID = 999
 > )
->     THROW 50002, 'Destination account does not exist.', 1;
+>     THROW 50014, 'Destination account does not exist.', 1;
 > ```
 >
 > [Lab 7](lab07-crud-operations.md) used such checks to choose a return code, and warned that a check and the following change are not atomic. For a missing account, this usually works, because accounts are rarely deleted — but it costs an extra read, while `@@ROWCOUNT` only looks at the result of the `UPDATE` you run anyway. For a balance, which changes all the time, the gap between the check and the change matters, as 4.3 shows.
@@ -756,7 +758,7 @@ IF NOT EXISTS
     WHERE AccountID = 1
       AND Balance >= @Amount
 )
-    THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
+    THROW 50013, 'Source account does not exist or has insufficient funds.', 1;
 
 -- ⚠ GAP: another session can withdraw money from account 1 here
 
@@ -779,12 +781,12 @@ WHERE AccountID = 1
   AND Balance >= @Amount;
 
 IF @@ROWCOUNT <> 1
-    THROW 50001, 'Source account does not exist or has insufficient funds.', 1;
+    THROW 50013, 'Source account does not exist or has insufficient funds.', 1;
 ```
 
 Account A has less than `2000.00`, so no row is changed and the custom error is raised.
 
-The check and the debit are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50001`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
+The check and the debit are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50013`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
 
 This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
 
@@ -949,6 +951,27 @@ ORDER BY AccountID;
 ```
 
 Both balances remain unchanged.
+
+The error number is what lets a caller react to **this** error. The call is the same; the `TRY/CATCH` around it is new:
+
+```sql
+BEGIN TRY
+    EXEC dbo.usp_TransferFunds
+        @SourceAccountID = 1,
+        @DestinationAccountID = 2,
+        @Amount = 2000.00;
+
+    PRINT 'Transfer completed.';
+END TRY
+BEGIN CATCH
+    IF ERROR_NUMBER() = 50013 -- NEW: react to one specific error
+        PRINT 'Not enough money in the source account.';
+    ELSE
+        THROW;                -- any other error goes on to the caller
+END CATCH;
+```
+
+The output is `Not enough money in the source account.` With `@DestinationAccountID = 999`, the same block would pass error `50014` on with `THROW;`.
 
 ## 5.6 Verify behavior, not only messages
 

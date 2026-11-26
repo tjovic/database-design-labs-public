@@ -34,7 +34,7 @@ After completing this lab, you should be able to:
 
 ---
 
-# Part A – Advanced Grouping
+# 🟦 Part A – Advanced Grouping
 
 # Section 1 – The Problem: A Report with Subtotals
 
@@ -508,7 +508,7 @@ Now the report is unambiguous: rows labeled `(no color)` are real data `NULL`s; 
 
 ---
 
-# Part B – Window Functions
+# 🟩 Part B – Window Functions
 
 Part A produced subtotals and grand totals in one query — but every one of `ROLLUP`, `CUBE`, and `GROUPING SETS` *collapses* rows. Each group becomes one output row; the detail is gone. That's fine for a report. It's no help when you want to see every product **and** its category's total on the same row, or rank rows without losing the rows themselves, or compute a running total that updates on every row.
 

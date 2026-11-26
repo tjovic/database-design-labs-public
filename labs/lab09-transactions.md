@@ -1980,24 +1980,28 @@ Memory is fast, but its contents can be lost if the server crashes or loses powe
 
 The answer is the **transaction log**.
 
-SQL Server maintains both data pages and log records in memory, with separate mechanisms for writing them to files:
+SQL Server keeps both data pages and log records in memory, and writes them to separate files. Follow one change:
 
 ```mermaid
 flowchart TB
+    U["UPDATE changes a page in memory<br/>and describes the change in a log record"]
     subgraph RAM["RAM - contents can be lost in a crash"]
+        LB["Log buffer: log records"]
         BP["Buffer pool: data pages"]
-        LB["Log buffer: recovery records"]
     end
     subgraph DISK["Durable storage"]
-        DF["Data files: table and index pages"]
-        LF["Log file: durable recovery records"]
+        LF["Log file (.ldf)"]
+        DF["Data files (.mdf, .ndf)"]
     end
-    BP -->|"Write modified pages"| DF
-    LB -->|"Flush log records"| LF
-    LF -.->|"Required log records must be durable first"| DF
+    U --> LB
+    U --> BP
+    LB -->|"① FIRST: flush log records"| LF
+    BP -->|"② LATER: write the modified page"| DF
+    classDef first fill:#d4edda,stroke:#2e7d32,color:#000
+    class LB,LF first
 ```
 
-The dashed arrow is a WAL ordering requirement, not a transfer of data from the log file to the data file.
+The numbers show the order: the log records reach durable storage **first**; the modified data page may follow **later**. Section 10.3 states the exact rule.
 
 | Component | Location | Purpose |
 |---|---|---|

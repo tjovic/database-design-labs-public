@@ -1606,6 +1606,8 @@ COMMIT TRANSACTION;
 SELECT @@TRANCOUNT AS AfterOuterCommit;  -- 0
 ```
 
+The savepoint rows were already visible in [6.1](#61-create-a-savepoint): `@@TRANCOUNT` stayed `1` after `SAVE TRANSACTION` and after `ROLLBACK TRANSACTION AfterFirstTransfer`, and dropped to `0` only at `COMMIT`.
+
 ## 8.2 An inner COMMIT does not independently commit
 
 SQL Server does not provide independently committable nested transactions.

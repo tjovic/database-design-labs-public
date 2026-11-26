@@ -768,7 +768,7 @@ WHERE AccountID = 1;
 ```
 
 > [!WARNING]
-> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. Here, the `CHECK` constraint from 1.1 would still stop a negative balance — but only with a technical constraint error, and only because the business rule happens to be "never below zero". A rule such as an allowed overdraft would not be protected at all ([Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers)).
+> Between the check and the `UPDATE`, **another session can withdraw money from account 1**. The check then rests on an old balance, and the `UPDATE` subtracts anyway. Here, the `CHECK` constraint from 1.1 would still stop a negative balance — but only with a technical constraint error, and only because the business rule happens to be "never below zero". A rule that a `CHECK` constraint cannot express — for example, an allowed negative balance (overdraft limit) that differs per customer and is stored in another table — would not be protected at all ([Lab 10](lab10-concurrency.md#82-back-to-the-two-sellers)).
 
 Instead, put the same condition into the update itself:
 
@@ -1807,24 +1807,7 @@ This helper illustrates transaction ownership. It is a low-level building block:
 
 ## 9.3 An outer transaction wraps our transfer procedure
 
-What happens when the caller starts a transaction and then calls `usp_TransferFunds`, which starts its own? Follow `@@TRANCOUNT` in the diagram:
-
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant P as usp_TransferFunds
-    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
-    C->>P: EXEC
-    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
-    Note over P: debit and credit
-    Note over P: COMMIT<br>@@TRANCOUNT 2 → 1<br>nothing is confirmed yet
-    P-->>C: returns successfully
-    rect rgb(248, 215, 218)
-    Note over C: ROLLBACK<br>@@TRANCOUNT 1 → 0<br>the transfer is undone
-    end
-```
-
-Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.
+What happens when the caller starts a transaction and then calls `usp_TransferFunds` ([5.2](#52-create-the-procedure)), which starts its own? Predict the final balances, then run the demo.
 
 Reset the balances:
 
@@ -1865,7 +1848,24 @@ ORDER BY AccountID;
 
 The final balances are `1000.00` and `500.00`.
 
-The procedure returned successfully, but its inner `COMMIT` did not independently confirm the transfer. The caller's rollback undid it.
+The procedure returned successfully, but its inner `COMMIT` did not independently confirm the transfer. The caller's rollback undid it. Follow `@@TRANCOUNT` in the diagram:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant P as usp_TransferFunds
+    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
+    C->>P: EXEC
+    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
+    Note over P: debit and credit
+    Note over P: COMMIT<br>@@TRANCOUNT 2 → 1<br>nothing is confirmed yet
+    P-->>C: returns successfully
+    rect rgb(248, 215, 218)
+    Note over C: ROLLBACK<br>@@TRANCOUNT 1 → 0<br>the transfer is undone
+    end
+```
+
+Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the whole transaction.
 
 ## 9.4 A rollback inside a procedure can undo the caller's work
 
@@ -1873,23 +1873,7 @@ The reverse is equally important. Our transfer procedure uses a **full rollback*
 
 If an outer transaction exists, that rollback also undoes earlier work in the outer transaction.
 
-This time the destination does not exist, and the caller has done some work of its own before the call:
-
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant P as usp_TransferFunds
-    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
-    Note over C: rename Account A
-    C->>P: EXEC (destination 999)
-    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
-    Note over P: debit, then no destination:<br>THROW 50014
-    rect rgb(248, 215, 218)
-    Note over P: CATCH: ROLLBACK<br>@@TRANCOUNT 2 → 0<br>also undoes the caller's rename
-    end
-    P-->>C: error 50014
-    Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW
-```
+This time the destination does not exist, and the caller has done some work of its own before the call.
 
 The balances are still `1000.00` and `500.00` after 9.3, so no reset is needed.
 
@@ -1928,7 +1912,23 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-The temporary name change is also undone. Account A is still named `Account A`, and the balances are `1000.00` and `500.00`.
+The temporary name change is also undone. Account A is still named `Account A`, and the balances are `1000.00` and `500.00`. The whole sequence:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant P as usp_TransferFunds
+    Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
+    Note over C: rename Account A
+    C->>P: EXEC (destination 999)
+    Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
+    Note over P: debit, then no destination:<br>THROW 50014
+    rect rgb(248, 215, 218)
+    Note over P: CATCH: ROLLBACK<br>@@TRANCOUNT 2 → 0<br>also undoes the caller's rename
+    end
+    P-->>C: error 50014
+    Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW
+```
 
 The caller's `CATCH` receives error `50014` and passes it on with `THROW`. When the `CATCH` runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too. This is the case the `IF @@TRANCOUNT > 0` check in the pattern from Section 3 exists for: without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
 

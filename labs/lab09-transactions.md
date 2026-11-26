@@ -2056,40 +2056,33 @@ The transaction log is not an audit trail: it does not record who performed a bu
 
 ## 10.3 Write-ahead logging: which information must be written first?
 
-The rule is called **Write-Ahead Logging (WAL)**:
+Two rules decide what must reach the log file first:
 
-> Log records describing a page modification must reach durable storage before that modified page is written to its data file.
+1. **Write-Ahead Logging (WAL):** a changed data page may be written to its data file only after the log record describing that change is durable.
+2. **Fully durable commit:** SQL Server reports a successful commit only after the transaction's log records, including its commit record, are durable.
 
-This rule matters even **before commit**. SQL Server may write an uncommitted dirty page to a data file. The relevant log information must already be durable so the change can later be undone if necessary.
+On the timeline of the transfer:
 
-There is also a requirement for a normal, **fully durable commit**:
+```text
+time       ───────────────────────────────────────────────────────────────►
 
-> The log records required for the transaction, including its commit record, must be durable before SQL Server acknowledges the commit as successful.
+                  1              2              3              4
+           ┌──────────────┬──────────────┬──────────────┬──────────────┐
+Log file   │   T1 Begin   │ T1 Change A  │ T1 Change B  │  T1 Commit   │
+(.ldf)     └──────────────┴──────────────┴──────────────┴──────────────┘
+                                        ①│                            ②│
+                                         ▼                             ▼
+Data file                        page A may be written         COMMIT OK to client;
+(.mdf)                           (even before COMMIT)          pages A, B later
+```
 
-These are related but distinct requirements:
-
-| Event | What must already be durable? |
-|---|---|
-| Writing a modified data page to its data file | The log records describing the page changes |
-| Acknowledging a fully durable commit | The transaction's required log records, including its commit record |
+- **①** As soon as record 2 is in the log file, the page with account A may be written, even though T1 has not committed yet. If T1 later rolls back, the old value in record 2 is there to undo it.
+- **②** As soon as record 4 is in the log file, the client gets "COMMIT OK". The changed pages can stay in memory and be written later; records 2 and 3 hold the new values needed to redo them.
 
 > [!IMPORTANT]
 > **COMMIT does not have to write every changed data page immediately.** The durable log provides the information needed to recover the confirmed operation.
 >
 > Conversely, finding a change in a data file does not prove that its transaction committed.
-
-The two durability rules can be read separately:
-
-```mermaid
-flowchart TD
-    READY["Log records for a modification are generated in RAM"] --> EVENT{"Which event is being completed?"}
-    EVENT -->|"Write a modified data page"| PAGELOG["Make the related log records durable"]
-    PAGELOG --> PAGE["The modified data page may now be written"]
-    EVENT -->|"Acknowledge a fully durable COMMIT"| COMMITLOG["Make all required records, including COMMIT, durable"]
-    COMMITLOG --> ACK["Report successful COMMIT; data pages may be written later"]
-```
-
-WAL constrains page writes; a fully durable commit also requires the commit record to be durable.
 
 ## 10.4 ROLLBACK and UNDO: restore the previous values
 

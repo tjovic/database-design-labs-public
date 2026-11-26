@@ -2122,33 +2122,28 @@ If a crash happens after only the first update, recovery must undo that incomple
 
 ## 10.5 COMMIT, a crash, and REDO: preserve the confirmed operation
 
-Now consider a different sequence:
+Now the transfer finishes: both updates run, the commit record reaches the log file, and SQL Server reports a successful commit. Then the server crashes before the changed data pages have been written to the data file.
 
-1. Both account updates run.
-2. The required log records and the commit record reach durable storage.
-3. SQL Server reports a successful commit.
-4. The server crashes before all changed data pages have been written to the data files.
+Memory is lost, but the log file survives. During recovery, SQL Server reads the committed transaction's records forward and writes the new values again:
 
-The memory contents are lost, but the durable transaction log survives. During recovery, SQL Server can reconstruct any logged changes that are missing from the data pages.
+```text
+time ────────────────────────────────────────────────────────────►
+            1              2              3              4
+     ┌──────────────┬──────────────┬──────────────┬──────────────┐
+Log  │   T1 Begin   │ T1 Change A  │ T1 Change B  │  T1 Commit   │  ✗ CRASH
+     │              │ old 1000.00  │ old  500.00  │              │    RAM lost, pages
+     │              │ new  800.00  │ new  700.00  │              │    not yet written
+     └──────────────┴──────────────┴──────────────┴──────────────┘
+                            │              │
+                            ▼              ▼
+                      1st: A = 800   2nd: B = 700
 
-```mermaid
-flowchart TD
-    CR["Server crashes; RAM contents are lost"] --> LOG["Durable log contains the changes and COMMIT"]
-    LOG --> CHECK{"Are the required page changes already present?"}
-    CHECK -->|"Yes"| KEEP["Keep the existing page changes"]
-    CHECK -->|"No"| REDO["REDO the missing changes using the log"]
-    KEEP --> RESULT["Recovered balances: A = 800; B = 700"]
-    REDO --> RESULT
+REDO ────────────────────────────────────────────────────────────►  new values, left to right
 ```
 
-The recovered result must preserve the confirmed transfer:
+First account A gets `800.00` again, then account B gets `700.00`. If a page already contains the change, SQL Server skips that record.
 
-| Account | Required recovered balance |
-|---|---:|
-| A | 800.00 |
-| B | 700.00 |
-
-This illustrates **Durability**.
+The confirmed transfer survives the crash. This illustrates **Durability**.
 
 > [!IMPORTANT]
 > **REDO does not mean calling the transfer procedure again.** Recovery uses the log to restore the required page changes. It must not subtract another `200.00` from the recovered balance.

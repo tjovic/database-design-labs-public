@@ -1668,6 +1668,15 @@ SELECT @@TRANCOUNT AS AfterRollback; -- 0
 
 A full rollback ends the entire transaction, regardless of nesting depth. There is no remaining outer transaction to commit.
 
+> [!IMPORTANT]
+> **There is only one transaction.** `@@TRANCOUNT` counts how many times `BEGIN TRANSACTION` was called:
+> - an inner `BEGIN TRANSACTION` only raises the counter;
+> - an inner `COMMIT` only lowers it — nothing is confirmed, and the locks stay;
+> - only the `COMMIT` that brings the counter to `0` confirms the transaction;
+> - a full `ROLLBACK` undoes everything and sets the counter to `0` at any depth.
+>
+> `COMMIT` acts only at the outermost level; `ROLLBACK` acts at all levels at once. That asymmetry is why Section 9 asks: who manages the transaction?
+
 **Check your understanding**
 
 Predict the final counter for each sequence. Each sequence starts at `0`.

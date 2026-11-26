@@ -2014,17 +2014,9 @@ A database has at least one data file and one log file. Common extensions are `.
 
 ## 10.2 Follow one transfer into the log
 
-Use the same transfer as before, starting from these illustrative balances:
-
-| Account | Before transfer | After successful transfer |
-|---|---:|---:|
-| A | 1000.00 | 800.00 |
-| B | 500.00 | 700.00 |
-
-The SQL operation contains two updates:
+What does SQL Server actually write into the log? Take the familiar transfer of `200.00` from account A to account B:
 
 ```sql
--- Illustration only: the executable examples are in Sections 2 and 5.
 BEGIN TRANSACTION;
 
 UPDATE dbo.BankAccount
@@ -2038,21 +2030,21 @@ WHERE AccountID = 2;
 COMMIT TRANSACTION;
 ```
 
-As SQL Server processes the changes, it generates log records associated with the transaction. Those records provide information needed to recover the changes.
+Each statement adds a record to the log. Call this transaction T1. In simplified form, its log looks like this:
 
-The following table is a conceptual log for one transfer. Read it from top to bottom.
+| Order | Transaction | Record | Old value | New value |
+|---|---|---|---:|---:|
+| 1 | T1 | Begin | | |
+| 2 | T1 | Change account A | 1000.00 | 800.00 |
+| 3 | T1 | Change account B | 500.00 | 700.00 |
+| 4 | T1 | Commit | | |
 
-| Order | Transaction | Record | Simplified recovery information |
-|---|---|---|---|
-| 1 | T1 | Begin | Start of the logged transaction |
-| 2 | T1 | Change account A | Old balance: 1000.00; new balance: 800.00 |
-| 3 | T1 | Change account B | Old balance: 500.00; new balance: 700.00 |
-| 4 | T1 | Commit | Successful completion |
+The key point: every change record stores **both** values. Each value serves one direction of recovery:
 
-Two directions are now possible:
+- **Old value → UNDO.** To roll T1 back, SQL Server reads its records from the bottom up and puts back the old values: B to `500.00`, then A to `1000.00`.
+- **New value → REDO.** If T1 committed but its changed pages never reached the data file before a crash, SQL Server reads the records from the top down and applies the new values again: A to `800.00`, B to `700.00`.
 
-- **UNDO:** restore the old values when the transaction must be rolled back.
-- **REDO:** reconstruct logged changes that need to be reapplied during recovery.
+Sections 10.4 and 10.5 follow each direction in turn.
 
 The transaction log is not an audit trail: it does not record who performed a business action or why.
 

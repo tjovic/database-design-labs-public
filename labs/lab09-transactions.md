@@ -53,6 +53,8 @@ Run this once at the start. Within the lab, the examples reset the account balan
 
 # Part A – Understanding Transactions
 
+Part A shows why a transaction is needed and how to start and end one by hand.
+
 ---
 
 # Section 1 – Why We Need Transactions
@@ -172,7 +174,7 @@ What went wrong in 1.3 has a name. A reliable transaction makes four promises, k
 | **Atomicity** | All changes are kept together or undone together | The credit and the debit form one operation | Sections 2, 3, and 5 |
 | **Consistency** | A transaction takes the database from one valid state to another | Balances stay non-negative; a transfer preserves the total | Section 4 |
 | **Isolation** | Concurrent transactions do not interfere with each other | Two simultaneous transfers from the same account | Lab 10 |
-| **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Section 10 |
+| **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Part D (Section 10) |
 
 Block 1.3 broke **atomicity**: half of the transfer stayed. That broke **consistency** as well: the total changed from `1500.00` to `2100.00`.
 
@@ -344,6 +346,8 @@ A procedure's `BEGIN ... END` body does not create a transaction.
 ---
 
 # Part B – Transactions in Code
+
+Part B moves the transaction into code that chooses the outcome itself: it rolls back on errors, reports them to the caller, and detects business failures that raise no error.
 
 ---
 
@@ -570,6 +574,8 @@ This time the result is `0`: SQL Server rolled back the debit itself, even thoug
 
 > [!NOTE]
 > The block with `SET XACT_ABORT ON` is the complete pattern; the `WAITFOR` was only there to give you time to cancel. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`.
+>
+> The setting belongs to the **session**: it stays `ON` in this query window until you run `SET XACT_ABORT OFF;` or close the window. Later examples in this window therefore run with it `ON` even where they do not repeat the line. To repeat the first demo of this subsection, run `SET XACT_ABORT OFF;` first.
 
 `XACT_ABORT ON` is a safety net, not a replacement for the rest of the pattern:
 
@@ -789,6 +795,23 @@ Account A has less than `2000.00`, so no row is changed and the custom error is 
 The check and the debit are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50013`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
 
 This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
+
+**Check your understanding**
+
+1. In 4.1, the second `UPDATE` changed zero rows. Why did neither `CATCH` nor `XACT_ABORT` react?
+2. Why must `@@ROWCOUNT` be read immediately after the `UPDATE` it checks?
+3. What is the difference between `THROW;` and `THROW 50013, 'Source account does not exist.', 1;`?
+4. Why is `AND Balance >= @Amount` inside the `UPDATE` safer than an `IF NOT EXISTS` check before it?
+
+<details>
+<summary>Show answers</summary>
+
+1. Zero affected rows is not an error. `CATCH` and `XACT_ABORT` react only to errors.
+2. Other statements can change or reset its value.
+3. `THROW;` passes on an error that already happened. `THROW` with arguments raises a new error with your own number and message.
+4. The check and the debit are one statement, so no other session can change the balance in between. The caller also gets a clear business error, `50013`, instead of a constraint error.
+
+</details>
 
 The next section puts the checks and both account updates into one procedure.
 
@@ -1461,6 +1484,23 @@ ORDER BY AccountID;
 
 Even the first transfer is gone: the error ended the transaction with a full rollback.
 
+**Check your understanding**
+
+1. After `ROLLBACK TRANSACTION AfterFirstTransfer` in 6.1, what is `@@TRANCOUNT`, and what must you still do?
+2. A transaction contains a savepoint, and you run `ROLLBACK TRANSACTION` without a name. What is left of the work done before the savepoint?
+3. Why did `ROLLBACK TRANSACTION AfterSecondTransfer` fail in 6.4?
+4. At the end of 6.4, even the first transfer was gone. Why?
+
+<details>
+<summary>Show answers</summary>
+
+1. It is still `1`: the transaction is open. You must finish it with `COMMIT` or a full `ROLLBACK`.
+2. Nothing. A full rollback undoes the whole transaction and ignores savepoints.
+3. Rolling back to the earlier savepoint, `AfterFirstTransfer`, also removed every savepoint defined after it.
+4. `XACT_ABORT` was `ON`, so error 6401 rolled back the whole transaction.
+
+</details>
+
 ---
 
 # Section 7 – What ROLLBACK Does Not Undo
@@ -1964,6 +2004,23 @@ Step 3 is the case the `IF @@TRANCOUNT > 0` check from Section 3 exists for. Wit
 
 A procedure that can work both ways, alone or inside a caller's transaction, needs a more careful contract; that is beyond the scope of this lab.
 
+**Check your understanding**
+
+1. In 9.2, the helper procedure has no transaction commands. What undid the first debit when the second call failed?
+2. In 9.3, `usp_TransferFunds` committed and returned successfully. Why are the balances back at `1000.00` and `500.00`?
+3. In 9.4, the caller's rename was undone. Which `ROLLBACK` undid it?
+4. Why does the caller's `CATCH` in 9.4 need `IF @@TRANCOUNT > 0`?
+
+<details>
+<summary>Show answers</summary>
+
+1. The caller's `ROLLBACK`. Both calls ran inside the caller's transaction.
+2. The procedure's `COMMIT` only lowered `@@TRANCOUNT` from `2` to `1`. The caller's `ROLLBACK` then undid the whole transaction.
+3. The procedure's `ROLLBACK` in its own `CATCH`. A full rollback ends the entire transaction, including the work the caller did before the call.
+4. `@@TRANCOUNT` is already `0`. A `ROLLBACK` would raise error 3903, which would end the batch and hide the real error, `50014`.
+
+</details>
+
 ---
 
 # Part D – Under the Hood (Theory)
@@ -2073,7 +2130,7 @@ Two rules decide what must reach the log file first:
 On the timeline of the transfer:
 
 ```text
-time       ───────────────────────────────────────────────────────────────►
+time ─────────────────────────────────────────────────────────────────────►
 
                   1              2              3              4
            ┌──────────────┬──────────────┬──────────────┬──────────────┐
@@ -2095,7 +2152,7 @@ Data file                        page A may be written         COMMIT OK to clie
 
 ## 10.4 ROLLBACK and UNDO: restore the previous values
 
-Suppose both account updates have run, but the operation is canceled before commit.
+Suppose both account updates have run, but the operation is cancelled before commit.
 
 The balances visible inside our session are now `800.00` and `700.00`. A full rollback must restore `1000.00` and `500.00`.
 
@@ -2261,7 +2318,7 @@ The examples above assume that the data and log storage remain usable after the 
 
 | Failure | What is affected? | Basic response |
 |---|---|---|
-| Operation canceled or rolled back | One transaction's work | Undo the transaction's changes |
+| Operation cancelled or rolled back | One transaction's work | Undo the transaction's changes |
 | Server crash or power loss | In-memory state; files remain available | Recover using the surviving data files and log |
 | Loss or corruption of required storage | Data and/or log files | Appropriate backups, log backups, or another recovery strategy are needed |
 
@@ -2306,34 +2363,34 @@ The transaction log does not replace backups. A log stored on a failed device ca
 | Treating zero affected rows as automatic failure | SQL Server may report successful execution | Check `@@ROWCOUNT` and raise an error when required |
 | Reading `@@ROWCOUNT` after unrelated statements | Its value may have changed | Check it immediately after the relevant operation |
 | Catching an error and only printing a message | The caller may believe the operation succeeded | Roll back as required and propagate the error |
-| Forgetting to finish a transaction | It can retain resources and interfere with other work | Ensure all paths finish or transfer ownership explicitly |
+| Forgetting to finish a transaction | It keeps its locks and blocks other sessions | Make every path end with `COMMIT` or a full `ROLLBACK` |
+| Checking first and changing later (`IF EXISTS`, then `UPDATE`) | Another session can change the data in between | Put the condition into the `UPDATE` and check `@@ROWCOUNT` |
 | Leaving out `SET XACT_ABORT ON` | A cancelled query or timeout skips `CATCH` and leaves the transaction open | Start transactional code with `SET XACT_ABORT ON` |
 | Expecting an inner `COMMIT` to be independent | An outer rollback can undo its changes | Understand the shared transaction boundary |
+| Rolling back inside a procedure that runs in the caller's transaction | The full rollback also undoes the caller's work | Choose one owner for each operation (9.5) |
 | Expecting savepoint rollback to close the transaction | The transaction stays open | Finish it explicitly |
 | Expecting identity values to be gap-free | Allocations are not undone with the inserted rows | Treat IDs as identifiers |
 
 ## 11.2 Final questions
 
-1. What does an explicit transaction add to autocommit behavior?
-2. What is the difference between full rollback and rollback to a savepoint?
-3. Does an inner `COMMIT` protect changes from an outer rollback?
-4. Can an `UPDATE` succeed while affecting zero rows?
-5. Why should a failing procedure usually rethrow the error after rollback?
-6. Does `@@TRANCOUNT > 0` tell us whether a transaction can commit?
-7. Why can a transaction log preserve committed changes even if the data pages were not yet written?
-8. Why does a transaction still need correct business logic?
+These questions connect the sections of the lab.
+
+1. A transfer must never keep only one half, and the caller must always learn what went wrong. Which tools from Sections 2–4 work together for this, and what is each one responsible for?
+2. Which failure from this lab would each of these miss: `TRY/CATCH` without a transaction; a transaction without `@@ROWCOUNT` checks; `TRY/CATCH` without `SET XACT_ABORT ON`?
+3. `usp_TransferFunds` works correctly when called alone. What two surprises appear when a caller wraps it in its own transaction?
+4. Compare a full `ROLLBACK`, a rollback to a savepoint, and an inner `COMMIT`: how does each change `@@TRANCOUNT`, and which one ends the transaction?
+5. Does `@@TRANCOUNT > 0` tell us whether a transaction can still commit?
+6. A `COMMIT` returned successfully, and a second later the server lost power. Why is the transfer still there after the restart, and what does SQL Server do to restore it?
 
 <details>
 <summary>Show answers</summary>
 
-1. It groups several statements into one transaction boundary.
-2. Full rollback undoes and ends the whole transaction. Savepoint rollback undoes later work and leaves the transaction open.
-3. No. It only reduces the nesting count; the outer transaction still controls the final outcome.
-4. Yes. No matching row is not automatically an execution error.
-5. So the caller knows the requested operation failed and can react appropriately.
-6. No. It reports how many transactions are open, not whether the open transaction can still be committed.
-7. The log contains recovery information. Under fully durable commit, the required log records are durable before commit is acknowledged.
-8. Atomicity keeps the specified changes together. It cannot decide whether those changes represent the correct business operation.
+1. `BEGIN TRANSACTION`/`COMMIT` set the boundary; `ROLLBACK` in `CATCH` protects the data; `THROW` informs the caller; `@@ROWCOUNT` with `THROW` and your own number turns a business failure into an error; `SET XACT_ABORT ON` covers a cancel or timeout that never reaches `CATCH`.
+2. Without a transaction, the credit stays after the debit fails (1.3). Without `@@ROWCOUNT`, a transfer to a missing account commits (4.1). Without `XACT_ABORT`, a cancelled query leaves the transaction open (3.3).
+3. Its `COMMIT` confirms nothing, so the caller's rollback undoes the transfer (9.3). Its `ROLLBACK` undoes the caller's own earlier work (9.4).
+4. A full `ROLLBACK` sets the count to `0` and ends the transaction. A rollback to a savepoint does not change the count, and the transaction stays open. An inner `COMMIT` lowers the count by `1` and ends nothing.
+5. No. It reports how many transactions are open, not whether the open transaction can still be committed. After an error with `XACT_ABORT ON`, the count is still above `0`, but the transaction can only be rolled back.
+6. The commit record was in the log file before SQL Server reported success (10.3). At restart, SQL Server reads the log and redoes the committed changes with their new values (10.5).
 
 </details>
 
@@ -2346,11 +2403,13 @@ The transaction log does not replace backups. A log stored on a failed device ca
 - **ROLLBACK protects the data, THROW informs the caller.** A `CATCH` block that only rolls back hides the failure; it must also pass the error on.
 - **`SET XACT_ABORT ON` covers what `CATCH` cannot.** A cancelled query or timeout never reaches `CATCH`; with `XACT_ABORT ON`, SQL Server rolls the transaction back itself.
 - **Zero affected rows is not an error.** Check `@@ROWCOUNT` and raise an error yourself when a business rule is broken.
+- **Check the condition where the change happens.** A condition inside the `UPDATE` leaves no gap for another session; a separate `IF EXISTS` check does.
 - **Nested transactions share the final outcome.** An inner commit is not independent, and a full rollback can undo the caller's work.
+- **One owner per operation.** Either the procedure or its caller starts, commits, and rolls back the transaction — never both.
 - **Keep transactions short.** An open transaction holds its locks and blocks other sessions (Lab 10). Never leave one open while waiting for a user or a slow external call.
 - **The transaction log supports recovery.** Committing a transaction is different from immediately writing every modified data page.
 
-Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Section 10 explains how SQL Server preserves committed work after a crash.
+Back to the opening question: a transfer that subtracts from one account and adds to another must never keep only one half. The core tools in this lab — explicit transactions, `TRY/CATCH` with `THROW`, `@@ROWCOUNT`, and a clear transaction boundary — let us implement and verify that requirement. Part D explains how SQL Server preserves committed work after a crash.
 
 **Looking ahead:** What happens if two sessions try to change the same data at the same time? Lab 10 introduces concurrency, locking, isolation levels, and deadlocks.
 

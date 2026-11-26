@@ -1953,13 +1953,16 @@ Step 3 is the case the `IF @@TRANCOUNT > 0` check from Section 3 exists for. Wit
 
 **A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It ends the entire current transaction.** For this lab's transfer procedure, a failure means the complete enclosing operation fails. A caller must not continue toward a commit after that failure.
 
-## 9.5 Choose a clear convention
+## 9.5 Choose one owner
 
-| Approach | Appropriate when… | Responsibility |
-|---|---|---|
-| Procedure manages the transaction | One procedure performs the complete operation | Procedure starts and finishes the transaction |
-| Caller manages the transaction | Several calls form one larger operation | Caller starts and finishes the transaction; helpers participate |
-| Procedure supports both contexts | A reusable operation has a carefully defined transaction contract | Requires additional ownership and error-state handling; beyond the scope of this lab |
+9.3 and 9.4 show what happens when the caller and the procedure both manage the same transaction: the procedure's `COMMIT` confirms nothing, and its `ROLLBACK` undoes the caller's work. The cure is a simple convention: **for each operation, exactly one side owns the transaction.**
+
+| Owner | Use it when… | The owner… | The other side… |
+|---|---|---|---|
+| Procedure (9.1, Section 5) | One procedure performs the complete operation | Starts the transaction and commits or rolls it back | Calls the procedure outside a transaction |
+| Caller (9.2) | Several calls form one larger operation | Starts the transaction and commits or rolls it back | Has no `BEGIN`, `COMMIT`, or `ROLLBACK`; reports errors with `THROW` |
+
+A procedure that can work both ways, alone or inside a caller's transaction, needs a more careful contract; that is beyond the scope of this lab.
 
 ---
 

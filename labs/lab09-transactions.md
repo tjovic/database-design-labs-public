@@ -2097,19 +2097,24 @@ Suppose both account updates have run, but the operation is canceled before comm
 
 The balances visible inside our session are now `800.00` and `700.00`. A full rollback must restore `1000.00` and `500.00`.
 
-Conceptually, the system follows the transaction's changes backward:
+SQL Server follows the transaction's log records backward and puts back the old values:
 
-1. Undo the later update: restore account B from `700.00` to `500.00`.
-2. Undo the earlier update: restore account A from `800.00` to `1000.00`.
+```text
+time ─────────────────────────────────────────────►
+            1              2              3
+     ┌──────────────┬──────────────┬──────────────┐
+Log  │   T1 Begin   │ T1 Change A  │ T1 Change B  │   no COMMIT
+     │              │ old 1000.00  │ old  500.00  │
+     │              │ new  800.00  │ new  700.00  │
+     └──────────────┴──────────────┴──────────────┘
+                            ▲              ▲
+                            │              │
+                      2nd: A = 1000  1st: B = 500
 
-Follow the restored balances in the table below:
+UNDO ◄─────────────────────────────────────────────  old values, right to left
+```
 
-| Point | Account A | Account B |
-|---|---:|---:|
-| Before the transaction | 1000.00 | 500.00 |
-| After both updates | 800.00 | 700.00 |
-| After undoing B | 800.00 | 500.00 |
-| After undoing A | 1000.00 | 500.00 |
+First the later change is undone, account B from `700.00` back to `500.00`; then the earlier one, account A from `800.00` back to `1000.00`.
 
 The final outcome illustrates **Atomicity**: neither update remains.
 

@@ -2030,19 +2030,25 @@ WHERE AccountID = 2;
 COMMIT TRANSACTION;
 ```
 
-Each statement adds a record to the log. Call this transaction T1. In simplified form, its log looks like this:
+Each statement adds a record to the log, in the order the statements run. Call this transaction T1. In simplified form, its log looks like this:
 
-| Order | Transaction | Record | Old value | New value |
-|---|---|---|---:|---:|
-| 1 | T1 | Begin | | |
-| 2 | T1 | Change account A | 1000.00 | 800.00 |
-| 3 | T1 | Change account B | 500.00 | 700.00 |
-| 4 | T1 | Commit | | |
+```text
+time ────────────────────────────────────────────────────────────►
+            1              2              3              4
+     ┌──────────────┬──────────────┬──────────────┬──────────────┐
+Log  │   T1 Begin   │ T1 Change A  │ T1 Change B  │  T1 Commit   │
+     │              │ old 1000.00  │ old  500.00  │              │
+     │              │ new  800.00  │ new  700.00  │              │
+     └──────────────┴──────────────┴──────────────┴──────────────┘
+
+REDO ────────────────────────────────────────────────────────────►  new values, left to right
+UNDO ◄────────────────────────────────────────────────────────────  old values, right to left
+```
 
 The key point: every change record stores **both** values. Each value serves one direction of recovery:
 
-- **Old value → UNDO.** To roll T1 back, SQL Server reads its records from the bottom up and puts back the old values: B to `500.00`, then A to `1000.00`.
-- **New value → REDO.** If T1 committed but its changed pages never reached the data file before a crash, SQL Server reads the records from the top down and applies the new values again: A to `800.00`, B to `700.00`.
+- **Old value → UNDO.** To roll T1 back, SQL Server reads its records from right to left and puts back the old values: B to `500.00`, then A to `1000.00`.
+- **New value → REDO.** If T1 committed but its changed pages never reached the data file before a crash, SQL Server reads the records from left to right and applies the new values again: A to `800.00`, B to `700.00`.
 
 Sections 10.4 and 10.5 follow each direction in turn.
 

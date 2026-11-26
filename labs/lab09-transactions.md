@@ -1880,11 +1880,9 @@ Only the outermost `COMMIT` confirms anything, and any full `ROLLBACK` ends the 
 
 ## 9.4 A rollback inside a procedure can undo the caller's work
 
-The reverse is equally important. Our transfer procedure uses a **full rollback** when an execution error reaches its handler.
+9.3 showed that the procedure's `COMMIT` confirms nothing inside the caller's transaction. Now the opposite: what happens when the procedure **fails** inside the caller's transaction? Its `CATCH` block runs a full `ROLLBACK` — and a full rollback cannot stop at the procedure's own changes.
 
-If an outer transaction exists, that rollback also undoes earlier work in the outer transaction.
-
-This time the destination does not exist, and the caller has done some work of its own before the call.
+This time the caller first renames Account A, its own work, and then calls the procedure with a destination that does not exist. Predict: after the error, what is Account A called?
 
 The balances are still `1000.00` and `500.00` after 9.3, so no reset is needed.
 
@@ -1923,7 +1921,7 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-The temporary name change is also undone. Account A is still named `Account A`, and the balances are `1000.00` and `500.00`. The whole sequence:
+Account A is still named `Account A`, and the balances are `1000.00` and `500.00`. **Both** changes are gone: the procedure's debit and the caller's rename. The `ROLLBACK` ran inside the procedure, but it undid the caller's work too. The whole sequence:
 
 ```mermaid
 sequenceDiagram
@@ -1944,7 +1942,13 @@ sequenceDiagram
     Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW
 ```
 
-The caller's `CATCH` receives error `50014` and passes it on with `THROW`. When the `CATCH` runs, `@@TRANCOUNT` is already `0`: the procedure's full rollback ended the caller's transaction too. This is the case the `IF @@TRANCOUNT > 0` check in the pattern from Section 3 exists for: without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
+Step by step:
+
+1. **Inside the procedure**, `THROW 50014` sends execution to the procedure's `CATCH`. There, `@@TRANCOUNT` is `2`, and `ROLLBACK TRANSACTION` sets it to `0`. A full rollback undoes everything since the **first** `BEGIN TRANSACTION` — the caller's — so the rename is undone together with the debit.
+2. The procedure passes error `50014` on with `THROW;`.
+3. **In the caller**, `CATCH` finds `@@TRANCOUNT` already at `0`. The `IF @@TRANCOUNT > 0` check skips the `ROLLBACK`, and `THROW;` passes error `50014` on.
+
+Step 3 is the case the `IF @@TRANCOUNT > 0` check from Section 3 exists for. Without it, the caller's `ROLLBACK` would fail with error 3903 (*"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION"*). With `SET XACT_ABORT ON`, that error ends the batch before `THROW` runs, so the caller would see only error 3903 and never learn the real reason, error `50014`.
 
 **A procedure's full `ROLLBACK` is not limited to the statements inside that procedure. It ends the entire current transaction.** For this lab's transfer procedure, a failure means the complete enclosing operation fails. A caller must not continue toward a commit after that failure.
 

@@ -1890,7 +1890,7 @@ The balances are still `1000.00` and `500.00` after 9.3, so no reset is needed.
 SET XACT_ABORT ON;
 
 BEGIN TRY
-    BEGIN TRANSACTION;
+    BEGIN TRANSACTION; -- count: 0 -> 1
 
     -- Earlier work belonging to the caller.
     UPDATE dbo.BankAccount
@@ -1898,18 +1898,19 @@ BEGIN TRY
     WHERE AccountID = 1;
 
     -- The procedure debits the source, then finds no destination.
+    -- Inside it: BEGIN 1 -> 2, THROW 50014, ROLLBACK 2 -> 0.
     EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
         @DestinationAccountID = 999,
         @Amount = 100.00;
 
-    COMMIT TRANSACTION;
+    COMMIT TRANSACTION; -- never reached
 END TRY
 BEGIN CATCH
-    IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
+    IF @@TRANCOUNT > 0          -- count is already 0,
+        ROLLBACK TRANSACTION;   -- so this is skipped
 
-    THROW;
+    THROW;                      -- passes on error 50014
 END CATCH;
 ```
 

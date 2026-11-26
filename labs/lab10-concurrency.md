@@ -115,7 +115,7 @@ Each window should report a different number. That number identifies your sessio
 
 ---
 
-# Part A – The Three Problems
+# 🟦 Part A – The Three Problems
 
 # Section 1 – Two Sessions, One Database
 
@@ -751,7 +751,7 @@ Almost every real application runs on `READ COMMITTED`. Design for it by default
 
 ---
 
-# Part B – How SQL Server Enforces Isolation
+# 🟩 Part B – How SQL Server Enforces Isolation
 
 Part A showed **what** each isolation level prevents. This part explains **how** SQL Server enforces that — by holding locks for a controlled duration — and what happens when two sessions end up waiting for each other.
 

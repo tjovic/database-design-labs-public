@@ -51,7 +51,7 @@ Run this once at the start. Within the lab, the examples reset the account balan
 
 ---
 
-# Part A – Understanding Transactions
+# 🟦 Part A – Understanding Transactions
 
 Part A shows why a transaction is needed and how to start and end one by hand.
 
@@ -345,7 +345,7 @@ A procedure's `BEGIN ... END` body does not create a transaction.
 
 ---
 
-# Part B – Transactions in Code
+# 🟩 Part B – Transactions in Code
 
 Part B moves the transaction into code that chooses the outcome itself: it rolls back on errors, reports them to the caller, and detects business failures that raise no error.
 
@@ -1012,7 +1012,7 @@ The output is `Not enough money in the source account.` With `@DestinationAccoun
 
 ---
 
-# Part C – Going Deeper
+# 🟨 Part C – Going Deeper
 
 Parts A and B cover what you need to write a correct transaction. Part C looks at less common tools (savepoints) and at what happens when transactions meet procedures (nesting and ownership).
 
@@ -2023,7 +2023,7 @@ A procedure that can work both ways, alone or inside a caller's transaction, nee
 
 ---
 
-# Part D – Under the Hood (Theory)
+# 🟪 Part D – Under the Hood (Theory)
 
 Parts A–C showed how to write transactions. Part D explains how SQL Server keeps their promises after a crash.
 

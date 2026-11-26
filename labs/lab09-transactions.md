@@ -1927,13 +1927,16 @@ The temporary name change is also undone. Account A is still named `Account A`, 
 sequenceDiagram
     participant C as Caller
     participant P as usp_TransferFunds
+    participant A as Account 1
     Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
-    Note over C: rename Account A
+    C->>A: UPDATE name (the caller's own work)
     C->>P: EXEC (destination 999)
     Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
-    Note over P: debit, then no destination:<br>THROW 50014
+    P->>A: UPDATE balance − 100.00
+    Note over P: destination not found<br>THROW 50014
     rect rgb(248, 215, 218)
-    Note over P: CATCH: ROLLBACK<br>@@TRANCOUNT 2 → 0<br>also undoes the caller's rename
+    P->>A: CATCH: ROLLBACK, @@TRANCOUNT 2 → 0
+    Note over A: debit undone<br>AND name undone
     end
     P-->>C: error 50014
     Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW

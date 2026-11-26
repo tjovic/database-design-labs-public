@@ -46,7 +46,7 @@ GO
 
 ---
 
-# Part A – Reading data through Views
+# 🟦 Part A – Reading data through Views
 
 Sections 1–5 use Views to read data: to simplify queries, hide complexity, and give applications a stable interface.
 
@@ -938,7 +938,7 @@ This is useful when working with SQL Server metadata.
 
 ---
 
-# Part B – Modifying data through Views
+# 🟩 Part B – Modifying data through Views
 
 So far, Views have mainly been used for reading data, simplifying queries, hiding complexity, and providing an interface over the underlying database.
 

@@ -991,7 +991,7 @@ The output is `Not enough money in the source account.` With `@DestinationAccoun
 
 # Part C – Going Deeper
 
-Parts A and B cover what you need to write a correct transaction. Part C looks at less common tools (savepoints), at what happens when transactions meet procedures (nesting and ownership), and at how SQL Server keeps its promises after a crash.
+Parts A and B cover what you need to write a correct transaction. Part C looks at less common tools (savepoints) and at what happens when transactions meet procedures (nesting and ownership).
 
 ---
 
@@ -1966,11 +1966,20 @@ A procedure that can work both ways, alone or inside a caller's transaction, nee
 
 ---
 
+# Part D – Under the Hood (Theory)
+
+Parts A–C showed how to write transactions. Part D explains how SQL Server keeps their promises after a crash.
+
+---
+
 # Section 10 – How SQL Server Keeps A and D: the Transaction Log
 
-Sections 1–9 relied on two of the ACID promises from 1.4: **atomicity** (`ROLLBACK` undoes everything) and **durability** (`COMMIT` is permanent). This section explains how SQL Server keeps them, even if the server stops unexpectedly. Nothing here changes how you write a transaction.
+> [!NOTE]
+> **Theory section – nothing new to run.** Nothing here changes how you write a transaction. Sections 10.1–10.5 are the core ideas; 10.6–10.9 are optional depth.
 
-The section builds on the data pages and buffer pool from Lab 5. It uses a **simplified model**: the real log format and recovery algorithm contain more detail, but they follow the same rules. Sections 10.1–10.5 are the core ideas; 10.6–10.9 go further into recovery.
+Sections 1–9 relied on two of the ACID promises from 1.4: **atomicity** (`ROLLBACK` undoes everything) and **durability** (`COMMIT` is permanent). This section explains how SQL Server keeps them, even if the server stops unexpectedly.
+
+The section builds on the data pages and buffer pool from Lab 5. It uses a **simplified model**: the real log format and recovery algorithm contain more detail, but they follow the same rules.
 
 ## 10.1 The missing link: memory is not permanent storage
 

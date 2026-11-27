@@ -160,7 +160,11 @@ END TRY
 BEGIN CATCH
     SELECT ERROR_MESSAGE() AS ErrorMessage;
 END CATCH;
+```
 
+The `CHECK` constraint error is expected. Check the balances and the total:
+
+```sql
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
@@ -168,8 +172,6 @@ ORDER BY AccountID;
 SELECT SUM(Balance) AS TotalBalance
 FROM dbo.BankAccount;
 ```
-
-The `CHECK` constraint error is expected. Results:
 
 | Account | Balance |
 |---|---:|

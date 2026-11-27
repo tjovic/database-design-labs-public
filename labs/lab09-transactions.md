@@ -374,7 +374,7 @@ Part B moves the transaction into code that chooses the outcome itself: it rolls
 
 Manual `COMMIT` and `ROLLBACK` are useful while learning. An application needs code that chooses the correct outcome when an operation fails.
 
-[Lab 0 – T-SQL Essentials](lab00-tsql-essentials.md), Section 10, introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
+[Lab 0 – T-SQL Essentials, Section 10](lab00-tsql-essentials.md#section-10--basic-error-handling-with-trycatch) introduced the basic `TRY/CATCH` block. Here we combine it with transactions.
 
 ## 3.1 TRY/CATCH with ROLLBACK
 

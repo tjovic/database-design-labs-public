@@ -412,7 +412,11 @@ BEGIN CATCH
     IF @@TRANCOUNT > 0          -- NEW: is a transaction still open?
         ROLLBACK TRANSACTION;   -- NEW: undo both changes
 END CATCH;
+```
 
+Check the balances:
+
+```sql
 SELECT AccountID, AccountName, Balance
 FROM dbo.BankAccount
 ORDER BY AccountID;
@@ -430,7 +434,7 @@ The transfer did not happen, yet whoever started it is told that it did. Here yo
 
 `THROW;` without arguments, placed inside `CATCH`, passes the original error on to the caller, with its original number and message. [Lab 7](lab07-crud-operations.md) met a weaker form of the same problem: a return code tells the caller *that* something failed, but not *what*.
 
-The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again. The block is the same as in 3.1, except for one new line, `THROW;`, after the rollback. The verification `SELECT` is no longer part of the block (see below):
+The balances are still `1000.00` and `500.00`, so no reset is needed. Run the transfer again. The block is the same as in 3.1, except for one new line, `THROW;`, after the rollback:
 
 ```sql
 BEGIN TRY
@@ -454,7 +458,7 @@ BEGIN CATCH
 END CATCH;
 ```
 
-This time the `CHECK` constraint error appears, as it should. `THROW` also ends the batch, so no statement after it runs. Check the balances in a **separate** block:
+This time the `CHECK` constraint error appears, as it should. `THROW` also ends the batch, so a statement placed after it in the same block would not run. That is why the check is a separate block:
 
 ```sql
 SELECT AccountID, AccountName, Balance

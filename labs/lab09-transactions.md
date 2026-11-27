@@ -98,10 +98,9 @@ The `CHECK` constraint prevents negative balances. It does not ensure that every
 
 ## 1.2 Two statements, one business operation
 
-A transfer of `200.00` from Account A to Account B requires two changes:
+A transfer of `200.00` from Account A to Account B requires two changes. Run them:
 
 ```sql
--- Read this example first. The next subsection demonstrates the failure.
 UPDATE dbo.BankAccount
 SET Balance = Balance - 200.00
 WHERE AccountID = 1;
@@ -111,7 +110,24 @@ SET Balance = Balance + 200.00
 WHERE AccountID = 2;
 ```
 
-The business operation succeeds only when **both** changes succeed. If the second statement fails after the first has been committed, we have an incomplete transfer.
+Check the balances and the total:
+
+```sql
+SELECT AccountID, AccountName, Balance
+FROM dbo.BankAccount
+ORDER BY AccountID;
+
+SELECT SUM(Balance) AS TotalBalance
+FROM dbo.BankAccount;
+```
+
+| Account | Balance |
+|---|---:|
+| Account A | 800.00 |
+| Account B | 700.00 |
+| **Total** | **1500.00** |
+
+Both statements succeeded, so the transfer is complete and the total is unchanged. But the business operation succeeds only when **both** changes succeed. What if the second statement fails after the first has already been committed? The next subsection tries it.
 
 ## 1.3 Demonstrate a partial operation
 

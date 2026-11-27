@@ -98,7 +98,7 @@ The `CHECK` constraint prevents negative balances. It does not ensure that every
 
 ## 1.2 Two statements, one business operation
 
-A transfer of `200.00` from Account A to Account B requires two changes. Run them:
+A transfer of `200.00` from Account A to Account B is two changes: a **withdrawal** from Account A (subtract `200.00`) and a **deposit** to Account B (add `200.00`). Run them:
 
 ```sql
 UPDATE dbo.BankAccount
@@ -143,16 +143,16 @@ SET Balance = 500.00
 WHERE AccountID = 2;
 ```
 
-Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer credits the destination first and debits the source second. Predict the final balances and the total before you run the block:
+Now transfer `600.00` from Account B to Account A — but Account B has only `500.00`. This transfer makes the deposit to the destination first and the withdrawal from the source second. Predict the final balances and the total before you run the block:
 
 ```sql
 BEGIN TRY
-    -- Credit Account A.
+    -- Deposit to Account A.
     UPDATE dbo.BankAccount
     SET Balance = Balance + 600.00
     WHERE AccountID = 1;
 
-    -- Debit Account B: 500.00 - 600.00 would be negative, so CHECK fails.
+    -- Withdrawal from Account B: 500.00 - 600.00 would be negative, so CHECK fails.
     UPDATE dbo.BankAccount
     SET Balance = Balance - 600.00
     WHERE AccountID = 2;
@@ -179,7 +179,7 @@ FROM dbo.BankAccount;
 | Account B | 500.00 |
 | **Total** | **2100.00** |
 
-The bank has just created `600.00` out of nothing. The credit succeeded and was committed. The debit failed and was undone. The `CATCH` block displayed the error, but it did not undo the credit.
+The bank has just created `600.00` out of nothing. The deposit succeeded and was committed. The withdrawal failed and was undone. The `CATCH` block displayed the error, but it did not undo the deposit.
 
 **Handling an error does not automatically make several statements atomic.**
 
@@ -189,7 +189,7 @@ What went wrong in 1.3 has a name. A reliable transaction makes four promises, k
 
 | Property | Promise | In our example | Where in this lab |
 |---|---|---|---|
-| **Atomicity** | All changes are kept together or undone together | The credit and the debit form one operation | Sections 2, 3, and 5 |
+| **Atomicity** | All changes are kept together or undone together | The withdrawal and the deposit form one operation | Sections 2, 3, and 5 |
 | **Consistency** | A transaction takes the database from one valid state to another | Balances stay non-negative; a transfer preserves the total | Section 4 |
 | **Isolation** | Concurrent transactions do not interfere with each other | Two simultaneous transfers from the same account | Lab 10 |
 | **Durability** | Once committed, changes survive a crash or restart | A confirmed transfer does not disappear | Part D (Section 10) |
@@ -246,7 +246,7 @@ Section 2 shows how to group the two statements of the transfer into one explici
 <details>
 <summary>Show answers</summary>
 
-1. Its credit was a separate, successful autocommit transaction.
+1. Its deposit was a separate, successful autocommit transaction.
 2. No. `TRY/CATCH` controls error handling; it does not create a transaction around the statements.
 3. A procedure can execute several statements. Calling it once does not automatically group them into one transaction.
 
@@ -419,7 +419,7 @@ ORDER BY AccountID;
 
 `@@TRANCOUNT` returns the number of open transactions in the current session; `0` means none (Section 8 looks at it in detail). In the examples of this section the count in `CATCH` is always `1`. The check matters when something has already ended the transaction before `CATCH` runs — you will see such a case in 9.4. A `ROLLBACK` without an open transaction would raise a second error and hide the original one.
 
-The balances are `1000.00` and `500.00`. The credit to Account A succeeded at first, but the handler rolled it back when the debit failed. No money was created: the **data** is correct.
+The balances are `1000.00` and `500.00`. The deposit to Account A succeeded at first, but the handler rolled it back when the withdrawal failed. No money was created: the **data** is correct.
 
 But look at the *Messages* tab: there is **no error**. SSMS reports that the query completed successfully. The `CATCH` block handled the error and kept it to itself.
 
@@ -543,7 +543,7 @@ After cancelling, run:
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-The result is `1`: the debit is still in an **open transaction** that nobody will finish. Locks it holds can block other sessions (Lab 10). Close it by hand:
+The result is `1`: the withdrawal is still in an **open transaction** that nobody will finish. Locks it holds can block other sessions (Lab 10). Close it by hand:
 
 ```sql
 ROLLBACK TRANSACTION;
@@ -588,7 +588,7 @@ After cancelling, check again:
 SELECT @@TRANCOUNT AS OpenTransactionCount;
 ```
 
-This time the result is `0`: SQL Server rolled back the debit itself, even though `CATCH` never ran.
+This time the result is `0`: SQL Server rolled back the withdrawal itself, even though `CATCH` never ran.
 
 > [!NOTE]
 > The block with `SET XACT_ABORT ON` is the complete pattern; the `WAITFOR` was only there to give you time to cancel. From now on, transactional code with `TRY/CATCH` in this lab, including the procedure in Section 5, starts with `SET XACT_ABORT ON`.
@@ -749,7 +749,7 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-The balances are `1000.00` and `500.00`: the custom error sent the transaction into `CATCH`, which rolled back the debit.
+The balances are `1000.00` and `500.00`: the custom error sent the transaction into `CATCH`, which rolled back the withdrawal.
 
 Read `@@ROWCOUNT` **immediately** after the statement you want to check. Other statements can change or reset its value.
 
@@ -810,9 +810,9 @@ IF @@ROWCOUNT <> 1
 
 Account A has less than `2000.00`, so no row is changed and the custom error is raised.
 
-The check and the debit are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50013`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
+The check and the withdrawal are now **one statement**, so no other session can slip in between. The caller gets a clear business error, `50013`, instead of a constraint error, and the rule works whatever the `CHECK` constraint says.
 
-This gives one clear rule: **the source account must exist and have enough money at the point of the debit**.
+This gives one clear rule: **the source account must exist and have enough money at the moment of the withdrawal**.
 
 **Check your understanding**
 
@@ -827,7 +827,7 @@ This gives one clear rule: **the source account must exist and have enough money
 1. Zero affected rows is not an error. `CATCH` and `XACT_ABORT` react only to errors.
 2. Other statements can change or reset its value.
 3. `THROW;` passes on an error that already happened. `THROW` with arguments raises a new error with your own number and message.
-4. The check and the debit are one statement, so no other session can change the balance in between. The caller also gets a clear business error, `50013`, instead of a constraint error.
+4. The check and the withdrawal are one statement, so no other session can change the balance in between. The caller also gets a clear business error, `50013`, instead of a constraint error.
 
 </details>
 
@@ -844,8 +844,8 @@ The procedure accepts a source account, a destination account, and an amount.
 It must:
 
 1. reject missing parameters, a non-positive amount, or equal account IDs;
-2. debit the source only if it exists and has sufficient funds;
-3. credit the destination only if it exists;
+2. withdraw from the source only if it exists and has sufficient funds;
+3. deposit to the destination only if it exists;
 4. commit both changes on success;
 5. roll back the operation and report the error on failure.
 
@@ -909,8 +909,8 @@ flowchart TD
     P{"Parameters valid?"} -->|"no"| E1["THROW 50010–50012<br/>(no transaction started)"]
     P -->|"yes"| B
     subgraph TRAN["Transaction"]
-        B["BEGIN TRANSACTION"] --> D{"Debit source:<br/>1 row changed?"}
-        D -->|"yes"| C{"Credit destination:<br/>1 row changed?"}
+        B["BEGIN TRANSACTION"] --> D{"Withdraw from source:<br/>1 row changed?"}
+        D -->|"yes"| C{"Deposit to destination:<br/>1 row changed?"}
         C -->|"yes"| CM["COMMIT TRANSACTION"]
         D -->|"no: THROW 50013"| X["CATCH:<br/>ROLLBACK, then THROW;"]
         C -->|"no: THROW 50014"| X
@@ -972,7 +972,7 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-The balances remain `800.00` and `700.00`: the debit was undone.
+The balances remain `800.00` and `700.00`: the withdrawal was undone.
 
 ## 5.5 Test insufficient funds
 
@@ -1018,8 +1018,8 @@ The output is `Not enough money in the source account.` With `@DestinationAccoun
 
 | Test | Expected result | What to verify |
 |---|---|---|
-| Valid transfer | Success | Correct debit and credit; total unchanged |
-| Missing destination | Error `50014` | Earlier debit undone |
+| Valid transfer | Success | Correct withdrawal and deposit; total unchanged |
+| Missing destination | Error `50014` | Earlier withdrawal undone |
 | Insufficient funds | Error `50013` | Neither balance changes |
 | Zero or negative amount | Error `50011` | Neither balance changes |
 | Same source and destination | Error `50012` | Neither balance changes |
@@ -1870,7 +1870,7 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-The balances are still `900.00` and `600.00`. The first call had already debited Account A, but the caller's rollback undid it. Without the caller's transaction, each call would run in autocommit mode, and the debit would stay.
+The balances are still `900.00` and `600.00`. The first call had already withdrawn from Account A, but the caller's rollback undid it. Without the caller's transaction, each call would run in autocommit mode, and the withdrawal would stay.
 
 This helper illustrates transaction ownership. It is a low-level building block: it does not itself enforce a complete transfer or preserve the combined account balance.
 
@@ -1926,7 +1926,7 @@ sequenceDiagram
     Note over C: BEGIN TRANSACTION<br>@@TRANCOUNT 0 → 1
     C->>P: EXEC
     Note over P: BEGIN TRANSACTION<br>@@TRANCOUNT 1 → 2
-    Note over P: debit and credit
+    Note over P: withdrawal and deposit
     Note over P: COMMIT<br>@@TRANCOUNT 2 → 1<br>nothing is confirmed yet
     P-->>C: returns successfully
     rect rgb(248, 215, 218)
@@ -1955,7 +1955,7 @@ BEGIN TRY
     SET AccountName = N'Temporary account name'
     WHERE AccountID = 1;
 
-    -- The procedure debits the source, then finds no destination.
+    -- The procedure withdraws from the source, then finds no destination.
     -- Inside it: BEGIN 1 -> 2, THROW 50014, ROLLBACK 2 -> 0.
     EXEC dbo.usp_TransferFunds
         @SourceAccountID = 1,
@@ -1980,7 +1980,7 @@ FROM dbo.BankAccount
 ORDER BY AccountID;
 ```
 
-Account A is still named `Account A`, and the balances are `1000.00` and `500.00`. **Both** changes are gone: the procedure's debit and the caller's rename. The `ROLLBACK` ran inside the procedure, but it undid the caller's work too. The whole sequence:
+Account A is still named `Account A`, and the balances are `1000.00` and `500.00`. **Both** changes are gone: the procedure's withdrawal and the caller's rename. The `ROLLBACK` ran inside the procedure, but it undid the caller's work too. The whole sequence:
 
 ```mermaid
 sequenceDiagram
@@ -1995,7 +1995,7 @@ sequenceDiagram
     Note over P: destination not found<br>THROW 50014
     rect rgb(248, 215, 218)
     P->>A: CATCH: ROLLBACK, @@TRANCOUNT 2 → 0
-    Note over A: debit undone<br>AND name undone
+    Note over A: withdrawal undone<br>AND name undone
     end
     P-->>C: error 50014
     Note over C: CATCH: @@TRANCOUNT is 0<br>no ROLLBACK, only THROW
@@ -2003,7 +2003,7 @@ sequenceDiagram
 
 Step by step:
 
-1. **Inside the procedure**, `THROW 50014` sends execution to the procedure's `CATCH`. There, `@@TRANCOUNT` is `2`, and `ROLLBACK TRANSACTION` sets it to `0`. A full rollback undoes everything since the **first** `BEGIN TRANSACTION` — the caller's — so the rename is undone together with the debit.
+1. **Inside the procedure**, `THROW 50014` sends execution to the procedure's `CATCH`. There, `@@TRANCOUNT` is `2`, and `ROLLBACK TRANSACTION` sets it to `0`. A full rollback undoes everything since the **first** `BEGIN TRANSACTION` — the caller's — so the rename is undone together with the withdrawal.
 2. The procedure passes error `50014` on with `THROW;`.
 3. **In the caller**, `CATCH` finds `@@TRANCOUNT` already at `0`. The `IF @@TRANCOUNT > 0` check skips the `ROLLBACK`, and `THROW;` passes error `50014` on.
 
@@ -2024,7 +2024,7 @@ A procedure that can work both ways, alone or inside a caller's transaction, nee
 
 **Check your understanding**
 
-1. In 9.2, the helper procedure has no transaction commands. What undid the first debit when the second call failed?
+1. In 9.2, the helper procedure has no transaction commands. What undid the first withdrawal when the second call failed?
 2. In 9.3, `usp_TransferFunds` committed and returned successfully. Why are the balances back at `1000.00` and `500.00`?
 3. In 9.4, the caller's rename was undone. Which `ROLLBACK` undid it?
 4. Why does the caller's `CATCH` in 9.4 need `IF @@TRANCOUNT > 0`?
@@ -2404,7 +2404,7 @@ These questions connect the sections of the lab.
 <summary>Show answers</summary>
 
 1. `BEGIN TRANSACTION`/`COMMIT` set the boundary; `ROLLBACK` in `CATCH` protects the data; `THROW` informs the caller; `@@ROWCOUNT` with `THROW` and your own number turns a business failure into an error; `SET XACT_ABORT ON` covers a cancel or timeout that never reaches `CATCH`.
-2. Without a transaction, the credit stays after the debit fails (1.3). Without `@@ROWCOUNT`, a transfer to a missing account commits (4.1). Without `XACT_ABORT`, a cancelled query leaves the transaction open (3.3).
+2. Without a transaction, the deposit stays after the withdrawal fails (1.3). Without `@@ROWCOUNT`, a transfer to a missing account commits (4.1). Without `XACT_ABORT`, a cancelled query leaves the transaction open (3.3).
 3. Its `COMMIT` confirms nothing, so the caller's rollback undoes the transfer (9.3). Its `ROLLBACK` undoes the caller's own earlier work (9.4).
 4. A full `ROLLBACK` sets the count to `0` and ends the transaction. A rollback to a savepoint does not change the count, and the transaction stays open. An inner `COMMIT` lowers the count by `1` and ends nothing.
 5. No. It reports how many transactions are open, not whether the open transaction can still be committed. After an error with `XACT_ABORT ON`, the count is still above `0`, but the transaction can only be rolled back.

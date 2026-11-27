@@ -1262,7 +1262,7 @@ FROM dbo.TransferHistory
 ORDER BY TransferID;
 ```
 
-Balances remain `900.00` and `600.00`, and the history has no new row: the history insert was never reached, and the debit was rolled back.
+Balances remain `900.00` and `600.00`, and the history has no new row: the history insert was never reached, and the withdrawal was rolled back.
 
 This demonstration intentionally resets balances between tests, so the history table is a record of procedure calls, not a complete ledger of all lab changes.
 

@@ -264,7 +264,8 @@ Section 2 shows how to group the two statements of the transfer into one explici
 | `COMMIT TRANSACTION` | Confirm the transaction's changes |
 | `ROLLBACK TRANSACTION` | Undo the transaction's changes |
 
-`TRAN` is a shorter spelling of `TRANSACTION`.
+> [!TIP]
+> `TRAN` is a shorter spelling of `TRANSACTION`: `BEGIN TRAN`, `COMMIT TRAN`, and `ROLLBACK TRAN` work the same way.
 
 ```sql
 BEGIN TRANSACTION;

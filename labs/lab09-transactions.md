@@ -554,7 +554,7 @@ The result is `1`: the withdrawal is still in an **open transaction** that nobod
 ROLLBACK TRANSACTION;
 ```
 
-The fix is one session setting. By default, `XACT_ABORT` is `OFF`. When it is `ON`, an error or a cancel aborts the whole transaction:
+**The fix is one session setting: `SET XACT_ABORT ON`.** By default, `XACT_ABORT` is `OFF`. When it is `ON`, an error or a cancel aborts the whole transaction:
 
 - if `CATCH` never runs, as after a cancel, SQL Server rolls the transaction back itself;
 - if `CATCH` runs, the transaction can no longer be committed, so `CATCH` still rolls it back. That is why the pattern keeps its own `ROLLBACK`.

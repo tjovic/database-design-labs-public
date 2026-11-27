@@ -512,7 +512,7 @@ The pattern assumes that this block owns the whole operation. Section 9 explains
 ## 3.3 When CATCH never runs: SET XACT_ABORT ON
 
 > [!TIP]
-> **Best practice.** The pattern from 3.2 is already correct for every error that reaches `CATCH`. `SET XACT_ABORT ON` adds protection for the cases that never reach it, such as a cancelled query or a client timeout. Professional code uses it in every procedure with a transaction, and so does the rest of this lab.
+> **Best practice.** The pattern from 3.2 is already correct for every error that reaches `CATCH`. `SET XACT_ABORT ON` adds protection for the cases that never reach it, such as a cancelled query or a client timeout. Professional code uses it in every procedure with a transaction, and so does the rest of this lab. In practice, a transaction left open after such an interruption is one of the most common causes of blocked applications and a fast-growing log file.
 
 In 3.1 and 3.2, `CATCH` ran and rolled back. But some interruptions never reach `CATCH`. The most common one is a **cancelled query**: the user presses *Cancel* in SSMS, or an application gives up after its command timeout. The client stops the batch, so no T-SQL code runs after that point, `CATCH` included.
 
